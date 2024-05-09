@@ -159,6 +159,37 @@ NO WARRANTY EXPRESSED OR IMPLIED.**
 
 </details>
 
+<details><summary><h3>Support sunnypilot</h3></summary>
+<h3>💰 Support sunnypilot</h3>
+
+---
+
+If you find any of the features useful, consider becoming a [patron on Patreon](https://www.patreon.com/sunnyhaibin) or a [sponsor on GitHub](https://github.com/sponsors/sunnyhaibin) to support future feature development and improvements.
+
+
+By becoming a patron/sponsor, you will gain access to exclusive content, early access to new features, and the opportunity to directly influence the project's development.
+
+<h3>Patreon</h3>
+
+<a href="https://www.patreon.com/sunnyhaibin">
+  <img src="https://user-images.githubusercontent.com/47793918/244128051-bc7e913e-a196-4455-926e-23aec9a4bd3b.png" alt="Become a Patron" width="300" style="max-width: 100%; height: auto;">
+</a>
+<br>
+
+<h3>GitHub Sponsor</h3>
+
+<a href="https://github.com/sponsors/sunnyhaibin">
+  <img src="https://user-images.githubusercontent.com/47793918/244135584-9800acbd-69fd-4b2b-bec9-e5fa2d85c817.png" alt="Become a Sponsor" width="300" style="max-width: 100%; height: auto;">
+</a>
+<br>
+
+<h3>PayPal</h3>
+
+<a href="https://paypal.me/sunnyhaibin0850" target="_blank">
+<img src="https://www.paypalobjects.com/en_US/i/btn/btn_donateCC_LG.gif" alt="PayPal this" title="PayPal - The safer, easier way to pay online!" border="0" />
+</a>
+<br></br>
+</details>
 
 
 <span>-</span> BluePilotDev Team
