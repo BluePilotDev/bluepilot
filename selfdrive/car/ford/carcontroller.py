@@ -224,9 +224,10 @@ class CarController:
         # if changing lanes, blend PC and DC to smooth out the lane change.
         if self.lane_change:
             if apply_curvature < 0: # making a right lane change
-              apply_curvature = apply_curvature * self.right_lc_modifier
-            apply_curvature = ((predicted_curvature * self.lc_PC_percentage) + (apply_curvature * (1- self.lc_PC_percentage)))
-            self.precision_type = 0 # comfort for lane change
+                apply_curvature = apply_curvature * self.right_lc_modifier
+            if apply_curvature < self.max_app_curvature: # if we are not changing lanes in a curve
+                apply_curvature = ((predicted_curvature * self.lc_PC_percentage) + (apply_curvature * (1- self.lc_PC_percentage)))
+                self.precision_type = 0 # comfort for lane change
 
       else:
         apply_curvature = 0.
