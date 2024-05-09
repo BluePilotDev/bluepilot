@@ -82,10 +82,10 @@ Requires further assistance with software installation? Join the [sunnypilot Dis
 ---
 In addition to all sunnypilot features, bluepilot incorporates the following Ford specific enhacements.
 
-- [**Improved Ford Longitudinal controls**](#Imporoved-long) - logic to adjust stock OpenPilot single acceleration signal into seperate gas and brake signals for much smoother long control on ford vehicles.
-- [**Anti-Windup in Turns**](#awp-turns) - Logic to reset the EPAS back to zero when a human turn is detected.  This prevents the EPAS from winding up and fighting to keep turning after the car has straightened up.  Makes experimental mode and MADS safer to use.
-- [**Anti Ping Pong Logic**](#app) - Applies a blend of desired curvature and predicted curvature when no curves have been detected for at least the next 3 seconds.  This greatly reduce steering wheel wiggle and ping pong.
-- [**Less Aggressive Lance Changes**](#lane-change) - utilitizes a blend of desired curvature and predicted curvature to achieve smoother, less aggressive lane changes.
+- [**Improved Ford Longitudinal controls**] - logic to adjust stock OpenPilot single acceleration signal into seperate gas and brake signals for much smoother long control on ford vehicles.
+- [**Anti-Windup in Turns**] - Logic to reset the EPAS back to zero when a human turn is detected.  This prevents the EPAS from winding up and fighting to keep turning after the car has straightened up.  Makes experimental mode and MADS safer to use.
+- [**Anti Ping Pong Logic**] - Applies a blend of desired curvature and predicted curvature when no curves have been detected for at least the next 3 seconds.  This greatly reduce steering wheel wiggle and ping pong.
+- [**Less Aggressive Lance Changes**] - utilitizes a blend of desired curvature and predicted curvature to achieve smoother, less aggressive lane changes.
    
 
 </details>
