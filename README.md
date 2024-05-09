@@ -56,13 +56,13 @@ The following changes are a **VIOLATION** of this policy and **ARE NOT** include
 
 Please refer to [Recommended Branches](#-recommended-branches) to find your preferred/supported branch. This guide will assume you want to install the latest `stable` branch.
 
-* sunnypilot/bluepilot not installed or you installed a version before 0.8.17?
+* bluepilot not installed
   1. [Factory reset/uninstall](https://github.com/commaai/openpilot/wiki/FAQ#how-can-i-reset-the-device) the previous software if you have another software/fork installed.
   2. After factory reset/uninstall and upon reboot, select `Custom Software` when given the option.
   3. Input the installation URL per [Recommended Branches](#-recommended-branches). Example: ```https://bit.ly/bp-stable``` [^4] (note: `https://` is not requirement on the comma three)
   4. Complete the rest of the installation following the onscreen instructions.
 
-* sunnypilot already installed and you installed a version after 0.8.17?
+* bluepilot already installed and you installed a version after 0.8.17?
   1. On the comma three, go to `Settings` ▶️ `Software`.
   2. At the `Download` option, press `CHECK`. This will fetch the list of latest branches from sunnypilot.
   3. At the `Target Branch` option, press `SELECT` to open the Target Branch selector.
@@ -86,7 +86,6 @@ In addition to all sunnypilot features, bluepilot incorporates the following For
 - [**Anti-Windup in Turns**](#awp-turns) - Logic to reset the EPAS back to zero when a human turn is detected.  This prevents the EPAS from winding up and fighting to keep turning after the car has straightened up.  Makes experimental mode and MADS safer to use.
 - [**Anti Ping Pong Logic**](#app) - Applies a blend of desired curvature and predicted curvature when no curves have been detected for at least the next 3 seconds.  This greatly reduce steering wheel wiggle and ping pong.
 - [**Less Aggressive Lance Changes**](#lane-change) - utilitizes a blend of desired curvature and predicted curvature to achieve smoother, less aggressive lane changes.
-    - [**Quiet Drive 🤫**](#-quiet-drive) - Toggle to mute all notification sounds (excluding driver safety warnings)
    
 
 </details>
@@ -98,7 +97,7 @@ In addition to all sunnypilot features, bluepilot incorporates the following For
 |    Tag    | Definition           | Description                                                                                                                                                                                 |
 |:---------:|----------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `stable` | stable branches     | Include features that are **verified** by trusted testers and the community. Ready to use. ✅                                                                                                |
-| `experimental` | experimental branches     | Include new features that are in testing, this branch might fail to boot, crash, or have unpredicaable behavior.  Please test with caution ⚠                                                                                        
+| `experimental` | experimental branches     | Include new features that are in testing, this branch might fail to boot, crash, or have unpredictable behavior.  Please test with caution ⚠                                                                                        
 
 Example:
 * [`stable`](https://github.com/bluepilotdev/bluepilot/stable): Latest stable branch that is verified by trusted testers and the community. Ready to use.
@@ -110,11 +109,10 @@ Example:
 
 ---
 
-| Branch                                                                              | Definition                                              | Compatible Device | Changelogs                                                                                 |
+| Branch                                                                              | Definition                                              | Compatible Device |                                                                                |
 |:------------------------------------------------------------------------------------|---------------------------------------------------------|-------------------|--------------------------------------------------------------------------------------------|
 | [`stable`](https://github.com/bluepilotdev/bluepilot/stable)           | • Latest release/stable branch                          | comma three       | 
-[`CHANGELOGS.md`](https://github.com/bluepilotdev/bluepilot/stable/CHANGELOGS.md) |
-| [`experimental`](https://github.com/bluepilotdev/bluepilot/experimental)                   | • Latest development branch with experimental features  | comma three       | [`CHANGELOGS.md`](https://github.com/bluepilotdev/bluepilot/experimental/CHANGELOGS.md)     |
+| [`experimental`](https://github.com/bluepilotdev/bluepilot/experimental)                   | • Latest development branch with experimental features  | comma three       | 
 
 </details>
 
@@ -163,4 +161,4 @@ NO WARRANTY EXPRESSED OR IMPLIED.**
 
 
 
-<span>-</span> Jason, Founder of sunnypilot
+<span>-</span> BluePilotDev Team
