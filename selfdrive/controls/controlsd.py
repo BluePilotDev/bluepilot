@@ -45,7 +45,7 @@ CAMERA_OFFSET = 0.04
 REPLAY = "REPLAY" in os.environ
 SIMULATION = "SIMULATION" in os.environ
 TESTING_CLOSET = "TESTING_CLOSET" in os.environ
-IGNORE_PROCESSES = {"loggerd", "encoderd", "statsd", "mapd", "gpxd", "gpxd_uploader", "mapd", "otisserv", "fleet_manager"}
+IGNORE_PROCESSES = {"loggerd", "encoderd", "statsd", "mapd", "gpxd", "gpxd_uploader", "otisserv", "fleet_manager"}
 
 ThermalStatus = log.DeviceState.ThermalStatus
 State = log.ControlsState.OpenpilotState
@@ -179,12 +179,15 @@ class CarD:
       cp_send.carParams = self.CP
       self.pm.send('carParams', cp_send)
 
-  def controls_update(self, CC: car.CarControl):
+  def controls_update(self, CC: car.CarControl, curvature, model_data):
     """control update loop, driven by carControl"""
 
     # send car controls over can
+    # For curvature/angle cars, send current curvature as CC.actuators.steer
+    if self.CP.steerControlType == car.CarParams.SteerControlType.angle:
+      CC.actuators.steer = curvature
     now_nanos = self.can_log_mono_time if REPLAY else int(time.monotonic() * 1e9)
-    actuators_output, can_sends = self.CI.apply(CC, now_nanos)
+    actuators_output, can_sends = self.CI.apply(CC, now_nanos, model_data)
     self.pm.send('sendcan', can_list_to_can_capnp(can_sends, msgtype='sendcan', valid=self.CS.canValid))
 
     return actuators_output
@@ -816,6 +819,16 @@ class Controls:
       else:
         self.desired_curvature = clip_curvature(CS.vEgo, self.desired_curvature, model_v2.action.desiredCurvature)
       actuators.curvature = self.desired_curvature
+
+      # orig_desired_curvature = self.desired_curvature
+      # if(lat_plan.laneChangeState == LaneChangeState.laneChangeStarting):
+      #  # if we are in a lane change and no steering pressed - don't allow a large change rate
+      #  # set the curvature rate based on vEgo
+      #  max_curv_rate_during_lane_change = interp( CS.vEgo, [5, 30], [0.0025,0.0002])
+      #  self.desired_curvature = clip(orig_desired_curvature,
+      #                                self.last_actuators.curvature - max_curv_rate_during_lane_change,
+      #                                self.last_actuators.curvature + max_curv_rate_during_lane_change)
+
       actuators.steer, actuators.steeringAngleDeg, lac_log = self.LaC.update(CC.latActive, CS, self.VM, lp,
                                                                              self.steer_limited, self.desired_curvature,
                                                                              self.sm['liveLocationKalman'],
@@ -871,7 +884,7 @@ class Controls:
 
           left_deviation = steering_value > 0 and dpath_points[0] < -0.20
           right_deviation = steering_value < 0 and dpath_points[0] > 0.20
-
+          # Disabling for now as Ford has new controls for steering that causes false alarms
           if left_deviation or right_deviation:
             self.events.add(EventName.steerSaturated)
 
@@ -952,8 +965,15 @@ class Controls:
     if current_alert:
       hudControl.visualAlert = current_alert.visual_alert
 
+    # Curvature & Steering angle
+    lp = self.sm['liveParameters']
+    lp_mono_time_svs = 'lateralPlanDEPRECATED' if self.model_use_lateral_planner else 'modelV2'
+
+    steer_angle_without_offset = math.radians(CS.steeringAngleDeg - lp.angleOffsetDeg)
+    curvature = -self.VM.calc_curvature(steer_angle_without_offset, CS.vEgo, lp.roll)
+
     if not self.CP.passive and self.initialized:
-      self.last_actuators = self.card.controls_update(CC)
+      self.last_actuators = self.card.controls_update(CC, curvature, self.sm['modelV2'])
       CC.actuatorsOutput = self.last_actuators
       if self.CP.steerControlType == car.CarParams.SteerControlType.angle:
         self.steer_limited = abs(CC.actuators.steeringAngleDeg - CC.actuatorsOutput.steeringAngleDeg) > \
@@ -963,13 +983,6 @@ class Controls:
 
     force_decel = (self.sm['driverMonitoringState'].awarenessStatus < 0.) or \
                   (self.state == State.softDisabling)
-
-    # Curvature & Steering angle
-    lp = self.sm['liveParameters']
-    lp_mono_time_svs = 'lateralPlanDEPRECATED' if self.model_use_lateral_planner else 'modelV2'
-
-    steer_angle_without_offset = math.radians(CS.steeringAngleDeg - lp.angleOffsetDeg)
-    curvature = -self.VM.calc_curvature(steer_angle_without_offset, CS.vEgo, lp.roll)
 
     # controlsState
     dat = messaging.new_message('controlsState')

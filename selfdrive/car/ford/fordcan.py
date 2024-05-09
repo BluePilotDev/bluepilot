@@ -46,7 +46,7 @@ def create_lka_msg(packer, CAN: CanBus):
   return packer.make_can_msg("Lane_Assist_Data1", CAN.main, {})
 
 
-def create_lat_ctl_msg(packer, CAN: CanBus, lat_active: bool, path_offset: float, path_angle: float, curvature: float,
+def create_lat_ctl_msg(packer, CAN: CanBus, lat_active: bool, ramp_type: int, precision_type: int, path_offset: float, path_angle: float, curvature: float,
                        curvature_rate: float):
   """
   Creates a CAN message for the Ford TJA/LCA Command.
@@ -74,9 +74,9 @@ def create_lat_ctl_msg(packer, CAN: CanBus, lat_active: bool, path_offset: float
     "HandsOffCnfm_B_Rq": 0,                     # Unknown: 0=Inactive, 1=Active [0|1]
     "LatCtl_D_Rq": 1 if lat_active else 0,      # Mode: 0=None, 1=ContinuousPathFollowing, 2=InterventionLeft,
                                                 #       3=InterventionRight, 4-7=NotUsed [0|7]
-    "LatCtlRampType_D_Rq": 0,                   # Ramp speed: 0=Slow, 1=Medium, 2=Fast, 3=Immediate [0|3]
+    "LatCtlRampType_D_Rq": ramp_type,           # Ramp speed: 0=Slow, 1=Medium, 2=Fast, 3=Immediate [0|3]
                                                 #             Makes no difference with curvature control
-    "LatCtlPrecision_D_Rq": 1,                  # Precision: 0=Comfortable, 1=Precise, 2/3=NotUsed [0|3]
+    "LatCtlPrecision_D_Rq": precision_type,     # Precision: 0=Comfortable, 1=Precise, 2/3=NotUsed [0|3]
                                                 #            The stock system always uses comfortable
     "LatCtlPathOffst_L_Actl": path_offset,      # Path offset [-5.12|5.11] meter
     "LatCtlPath_An_Actl": path_angle,           # Path angle [-0.5|0.5235] radians
@@ -86,7 +86,7 @@ def create_lat_ctl_msg(packer, CAN: CanBus, lat_active: bool, path_offset: float
   return packer.make_can_msg("LateralMotionControl", CAN.main, values)
 
 
-def create_lat_ctl2_msg(packer, CAN: CanBus, mode: int, path_offset: float, path_angle: float, curvature: float,
+def create_lat_ctl2_msg(packer, CAN: CanBus, mode: int, ramp_type: int, precision_type: int, path_offset: float, path_angle: float, curvature: float,
                         curvature_rate: float, counter: int):
   """
   Create a CAN message for the new Ford Lane Centering command.
@@ -100,8 +100,8 @@ def create_lat_ctl2_msg(packer, CAN: CanBus, mode: int, path_offset: float, path
   values = {
     "LatCtl_D2_Rq": mode,                       # Mode: 0=None, 1=PathFollowingLimitedMode, 2=PathFollowingExtendedMode,
                                                 #       3=SafeRampOut, 4-7=NotUsed [0|7]
-    "LatCtlRampType_D_Rq": 0,                   # 0=Slow, 1=Medium, 2=Fast, 3=Immediate [0|3]
-    "LatCtlPrecision_D_Rq": 1,                  # 0=Comfortable, 1=Precise, 2/3=NotUsed [0|3]
+    "LatCtlRampType_D_Rq": ramp_type,           # 0=Slow, 1=Medium, 2=Fast, 3=Immediate [0|3]
+    "LatCtlPrecision_D_Rq": precision_type,     # 0=Comfortable, 1=Precise, 2/3=NotUsed [0|3]
     "LatCtlPathOffst_L_Actl": path_offset,      # [-5.12|5.11] meter
     "LatCtlPath_An_Actl": path_angle,           # [-0.5|0.5235] radians
     "LatCtlCurv_No_Actl": curvature,            # [-0.02|0.02094] 1/meter
@@ -117,8 +117,7 @@ def create_lat_ctl2_msg(packer, CAN: CanBus, mode: int, path_offset: float, path
 
   return packer.make_can_msg("LateralMotionControl2", CAN.main, values)
 
-
-def create_acc_msg(packer, CAN: CanBus, long_active: bool, gas: float, accel: float, stopping: bool, v_ego_kph: float):
+def create_acc_msg(packer, CAN: CanBus, long_active: bool, gas: float, accel: float, stopping: bool, brake_actuator: bool, precharge_actuator: bool, v_ego_kph: float):
   """
   Creates a CAN message for the Ford ACC Command.
 
@@ -136,8 +135,8 @@ def create_acc_msg(packer, CAN: CanBus, long_active: bool, gas: float, accel: fl
     "AccResumEnbl_B_Rq": 1 if long_active else 0,
     "AccVeh_V_Trg": v_ego_kph,                        # Target speed: [0|255] km/h
     # TODO: we may be able to improve braking response by utilizing pre-charging better
-    "AccBrkPrchg_B_Rq": 1 if decel else 0,            # Pre-charge brake request: 0=No, 1=Yes
-    "AccBrkDecel_B_Rq": 1 if decel else 0,            # Deceleration request: 0=Inactive, 1=Active
+    "AccBrkPrchg_B_Rq": 1 if precharge_actuator else 0,            # Pre-charge brake request: 0=No, 1=Yes
+    "AccBrkDecel_B_Rq": 1 if brake_actuator else 0,            # Deceleration request: 0=Inactive, 1=Active
     "AccStopStat_B_Rq": 1 if stopping else 0,
   }
   return packer.make_can_msg("ACCDATA", CAN.main, values)
