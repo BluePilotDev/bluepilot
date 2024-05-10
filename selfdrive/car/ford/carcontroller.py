@@ -92,6 +92,8 @@ class CarController:
     self.app_PC_percentage = 0.4 # what percentage of apply_curvature is derived from predicted curvature for straight aways
     self.lc_PC_percentage = 0.4 # what percentaage of apply_curvature is derived from predicted curvature for lane changes
     self.right_lc_modifier = 0.9 # how much to reduce curvature of right lane changes
+    self.lc1_modifier = 0.70 # how much to reduce curvature during "starting lane change"
+    self.lc2_modifier = 0.90 # how much to reduce curvature during "chanigng lanes"
     self.lane_change = False # initialize variable for capturing lane change status
 
     # Activates at self.brake_actutator_target - self.brake_actutator_stdDevLow
@@ -226,8 +228,11 @@ class CarController:
             if apply_curvature < 0: # making a right lane change
                 apply_curvature = apply_curvature * self.right_lc_modifier
             if apply_curvature < self.max_app_curvature: # if we are not changing lanes in a curve
-                apply_curvature = ((predicted_curvature * self.lc_PC_percentage) + (apply_curvature * (1- self.lc_PC_percentage)))
-                self.precision_type = 0 # comfort for lane change
+                if model_data.meta.laneChangeState == 1:
+                  apply_curvature = apply_curvature * self.lc1_modifier
+                if model_data.meta.laneChangeState == 2:
+                  apply_curvature = apply_curvature * self.lc2_modifier
+            self.precision_type = 0 # comfort for lane change
 
       else:
         apply_curvature = 0.
