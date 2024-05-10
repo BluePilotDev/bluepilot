@@ -90,10 +90,10 @@ class CarController:
     # self.app_filter_factor = 0.45 # how much to allow current signals for anti ping-pong
     # self.app_damp_factor = 0.85 # how much to mute all signals for anti ping-pong
     self.app_PC_percentage = 0.4 # what percentage of apply_curvature is derived from predicted curvature for straight aways
-    self.lc_PC_percentage = 0.4 # what percentaage of apply_curvature is derived from predicted curvature for lane changes
-    self.right_lc_modifier = 0.9 # how much to reduce curvature of right lane changes
-    self.lc1_modifier = 0.70 # how much to reduce curvature during "starting lane change"
-    self.lc2_modifier = 0.90 # how much to reduce curvature during "chanigng lanes"
+    # self.lc_PC_percentage = 0.4 # what percentage of apply_curvature is derived from predicted curvature for lane changes
+    self.right_lc_modifier = 0.7 # how much to reduce curvature of right lane changes
+    self.lc1_modifier = 0.80 # how much to reduce curvature during "starting lane change"
+    self.lc2_modifier = 0.95 # how much to reduce curvature during "chanigng lanes"
     self.lane_change = False # initialize variable for capturing lane change status
 
     # Activates at self.brake_actutator_target - self.brake_actutator_stdDevLow
