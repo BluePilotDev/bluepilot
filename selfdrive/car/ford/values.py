@@ -112,7 +112,7 @@ class CAR(Platforms):
       FordCarInfo("Ford Kuga Hybrid 2023-24", "Co-Pilot360 Assist 2.0"),
       FordCarInfo("Ford Kuga Plug-in Hybrid 2023-24", "Co-Pilot360 Assist 2.0"),
     ],
-    dbc_dict=dbc_dict('ford_lincoln_base_pt', RADAR.STEER_ASSIST_DATA)),
+    dbc_dict=dbc_dict('ford_lincoln_base_pt', RADAR.STEER_ASSIST_DATA),
     specs=CarSpecs(mass=1750, wheelbase=2.71, steerRatio=16.7),
   )    
   EXPLORER_MK6 = FordPlatformConfig(
