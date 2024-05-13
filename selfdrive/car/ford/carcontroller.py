@@ -192,7 +192,8 @@ class CarController:
       if CC.latActive:
         # apply rate limits, curvature error limit, and clip to signal range
         current_curvature = -CS.out.yawRate / max(CS.out.vEgoRaw, 0.1)
-        apply_curvature = apply_ford_curvature_limits(actuators.curvature, self.apply_curvature_last, current_curvature, CS.out.vEgoRaw)
+        desired_curvature = actuators.curvature
+        # apply_curvature = apply_ford_curvature_limits(actuators.curvature, self.apply_curvature_last, current_curvature, CS.out.vEgoRaw)
         self.precision_type = 1 #precise by default
         # equate velocity
         vEgoRaw = CS.out.vEgoRaw
@@ -219,9 +220,13 @@ class CarController:
 
         # if at highway speeds, check for straight aways and apply anti ping pong logic
         if vEgoRaw > 24.56:
-          if abs(apply_curvature) < self.max_app_curvature and curvature_1 < self.max_app_curvature and curvature_2 < self.max_app_curvature and curvature_3 < self.max_app_curvature:
-              apply_curvature = ((predicted_curvature * self.app_PC_percentage) + (apply_curvature * (1- self.app_PC_percentage)))
+          if abs(desired_curvature) < self.max_app_curvature and curvature_1 < self.max_app_curvature and curvature_2 < self.max_app_curvature and curvature_3 < self.max_app_curvature:
+              apply_curvature = ((predicted_curvature * self.app_PC_percentage) + (desired_curvature * (1- self.app_PC_percentage)))
               self.precision_type = 0 # comfort for straight aways
+          else:
+              apply_curvature = desired_curvature
+        else:
+            apply_curvature = desired_curvature
 
         # if changing lanes, blend PC and DC to smooth out the lane change.
         if self.lane_change:
@@ -233,6 +238,8 @@ class CarController:
                 if model_data.meta.laneChangeState == 2:
                   apply_curvature = apply_curvature * self.lc2_modifier
             self.precision_type = 0 # comfort for lane change
+
+        apply_curvature = apply_ford_curvature_limits(apply_curvature, self.apply_curvature_last, current_curvature, CS.out.vEgoRaw)
 
       else:
         apply_curvature = 0.
