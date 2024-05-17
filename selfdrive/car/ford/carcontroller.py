@@ -151,7 +151,7 @@ class CarController:
         self.precharge_actutator_stdDevHigh = 0.05
         self.app_PC_percentage = 0.5 # what percentage of apply_curvature is derived from predicted curvature
 
-        elif self.CP.carFingerprint == "FORD ESCAPE 2023 REFRESH":
+      elif self.CP.carFingerprint == "FORD ESCAPE 2023 REFRESH":
         print(f'Matched carFingerprint: {self.CP.carFingerprint}')
         self.brake_actutator_target = -0.1
         self.brake_actutator_stdDevLow = 0.00
