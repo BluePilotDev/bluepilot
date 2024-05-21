@@ -102,6 +102,19 @@ class CAR(Platforms):
     ],
     specs=CarSpecs(mass=1750, wheelbase=2.71, steerRatio=16.7),
   )
+  ESCAPE_MK4_23REFRESH = FordPlatformConfig(
+    "FORD ESCAPE 2023 REFRESH",
+    [
+      FordCarInfo("Ford Escape 2023-24", "Co-Pilot360 Assist 2.0"),	
+      FordCarInfo("Ford Escape Hybrid 2023-24", "Co-Pilot360 Assist 2.0"),
+      FordCarInfo("Ford Escape Plug-in Hybrid 2023-24", "Co-Pilot360 Assist 2.0"),	
+      FordCarInfo("Ford Kuga 2023-24", "Co-Pilot360 Assist 2.0"),	
+      FordCarInfo("Ford Kuga Hybrid 2023-24", "Co-Pilot360 Assist 2.0"),	
+      FordCarInfo("Ford Kuga Plug-in Hybrid 2023-24", "Co-Pilot360 Assist 2.0"),	
+    ],
+    dbc_dict=dbc_dict('ford_lincoln_base_pt', RADAR.STEER_ASSIST_DATA),
+    specs=CarSpecs(mass=1750, wheelbase=2.71, steerRatio=16.7),
+  )    
   EXPLORER_MK6 = FordPlatformConfig(
     "FORD EXPLORER 6TH GEN",
     [
@@ -153,7 +166,7 @@ class CAR(Platforms):
   )
 
 
-CANFD_CAR = {CAR.F_150_MK14, CAR.F_150_LIGHTNING_MK1, CAR.MUSTANG_MACH_E_MK1}
+CANFD_CAR = {CAR.F_150_MK14, CAR.F_150_LIGHTNING_MK1, CAR.MUSTANG_MACH_E_MK1, CAR.ESCAPE_MK4_23REFRESH}
 
 
 DATA_IDENTIFIER_FORD_ASBUILT = 0xDE00
