@@ -232,7 +232,7 @@ class CarController:
         if self.lane_change:
             if apply_curvature > 0 and model_data.meta.laneChangeState == 1: # initial stages of a right lane change (positive in comma, negative when sent to Ford)
                 apply_curvature = apply_curvature * self.right_lc_modifier
-            if apply_curvature < self.max_app_curvature: # if we are not changing lanes in a curve
+            if abs(apply_curvature) < self.max_app_curvature: # if we are not changing lanes in a curve
                 if model_data.meta.laneChangeState == 1:
                   apply_curvature = apply_curvature * self.lc1_modifier
                 if model_data.meta.laneChangeState == 2:
