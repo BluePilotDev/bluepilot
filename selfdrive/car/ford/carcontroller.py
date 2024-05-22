@@ -252,7 +252,7 @@ class CarController:
       steeringAngleDeg = CS.out.steeringAngleDeg
 
       # if a human turn is active, reset steering to prevent windup
-      if steeringPressed and abs(steeringAngleDeg) > 60:
+      if steeringPressed and abs(steeringAngleDeg) > 45:
         apply_curvature = 0
         ramp_type = 3
       else:
