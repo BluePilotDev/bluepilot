@@ -96,7 +96,6 @@ struct CarEvent @0x9b1657f34caf3ad3 {
     fanMalfunction @91;
     cameraMalfunction @92;
     cameraFrameRate @110;
-    gpsMalfunction @94;
     processNotRunning @95;
     dashcamMode @96;
     controlsInitializing @98;
@@ -162,6 +161,7 @@ struct CarEvent @0x9b1657f34caf3ad3 {
     noTargetDEPRECATED @25;
     brakeUnavailableDEPRECATED @2;
     plannerErrorDEPRECATED @32;
+    gpsMalfunctionDEPRECATED @94;
   }
 }
 
@@ -366,13 +366,11 @@ struct CarControl {
   # Actuator commands as computed by controlsd
   actuators @6 :Actuators;
 
+  # moved to CarOutput
+  actuatorsOutputDEPRECATED @10 :Actuators;
+
   leftBlinker @15: Bool;
   rightBlinker @16: Bool;
-
-  # Any car specific rate limits or quirks applied by
-  # the CarController are reflected in actuatorsOutput
-  # and matches what is sent to the car
-  actuatorsOutput @10 :Actuators;
 
   orientationNED @13 :List(Float32);
   angularVelocity @14 :List(Float32);
@@ -423,6 +421,7 @@ struct CarControl {
     leftLaneVisible @7: Bool;
     rightLaneDepart @8: Bool;
     leftLaneDepart @9: Bool;
+    leadDistanceBars @10: Int8;  # 1-3: 1 is closest, 3 is farthest. some ports may utilize 2-4 bars instead
 
     enum VisualAlert {
       # these are the choices from the Honda
@@ -464,6 +463,13 @@ struct CarControl {
   pitchDEPRECATED @9 :Float32;
 }
 
+struct CarOutput {
+  # Any car specific rate limits or quirks applied by
+  # the CarController are reflected in actuatorsOutput
+  # and matches what is sent to the car
+  actuatorsOutput @0 :CarControl.Actuators;
+}
+
 # ****** car param ******
 
 struct CarParams {
@@ -473,7 +479,6 @@ struct CarParams {
 
   notCar @66 :Bool;  # flag for non-car robotics platforms
 
-  enableGasInterceptor @2 :Bool;
   pcmCruise @3 :Bool;        # is openpilot's state tied to the PCM's cruise state?
   enableDsu @5 :Bool;        # driving support unit
   enableBsm @56 :Bool;       # blind spot monitoring
@@ -648,6 +653,7 @@ struct CarParams {
     hyundaiCanfd @28;
     volkswagenMqbEvo @29;
     chryslerCusw @30;
+    psa @31;
   }
 
   enum SteerControlType {
@@ -722,6 +728,7 @@ struct CarParams {
     gateway @1;    # Integration at vehicle's CAN gateway
   }
 
+  enableGasInterceptorDEPRECATED @2 :Bool;
   enableCameraDEPRECATED @4 :Bool;
   enableApgsDEPRECATED @6 :Bool;
   steerRateCostDEPRECATED @33 :Float32;

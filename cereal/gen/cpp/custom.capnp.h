@@ -420,6 +420,8 @@ public:
 
   inline typename LateralControlState::Reader getLateralControlState() const;
 
+  inline  ::cereal::LongitudinalPersonalitySP getPersonality() const;
+
 private:
   ::capnp::_::StructReader _reader;
   template <typename, ::capnp::Kind>
@@ -457,6 +459,9 @@ public:
 
   inline typename LateralControlState::Builder getLateralControlState();
   inline typename LateralControlState::Builder initLateralControlState();
+
+  inline  ::cereal::LongitudinalPersonalitySP getPersonality();
+  inline void setPersonality( ::cereal::LongitudinalPersonalitySP value);
 
 private:
   ::capnp::_::StructBuilder _builder;
@@ -1212,7 +1217,7 @@ public:
 
   inline  ::cereal::LongitudinalPlanSP::LongitudinalPlanSource getLongitudinalPlanSource() const;
 
-  inline  ::cereal::LongitudinalPersonalitySP getPersonality() const;
+  inline  ::cereal::LongitudinalPersonalitySP getPersonalityDEPRECATED() const;
 
 private:
   ::capnp::_::StructReader _reader;
@@ -1318,8 +1323,8 @@ public:
   inline  ::cereal::LongitudinalPlanSP::LongitudinalPlanSource getLongitudinalPlanSource();
   inline void setLongitudinalPlanSource( ::cereal::LongitudinalPlanSP::LongitudinalPlanSource value);
 
-  inline  ::cereal::LongitudinalPersonalitySP getPersonality();
-  inline void setPersonality( ::cereal::LongitudinalPersonalitySP value);
+  inline  ::cereal::LongitudinalPersonalitySP getPersonalityDEPRECATED();
+  inline void setPersonalityDEPRECATED( ::cereal::LongitudinalPersonalitySP value);
 
 private:
   ::capnp::_::StructBuilder _builder;
@@ -2187,6 +2192,20 @@ inline typename ControlsStateSP::LateralControlState::Builder ControlsStateSP::B
   _builder.getPointerField(::capnp::bounded<1>() * ::capnp::POINTERS).clear();
   return typename ControlsStateSP::LateralControlState::Builder(_builder);
 }
+inline  ::cereal::LongitudinalPersonalitySP ControlsStateSP::Reader::getPersonality() const {
+  return _reader.getDataField< ::cereal::LongitudinalPersonalitySP>(
+      ::capnp::bounded<1>() * ::capnp::ELEMENTS);
+}
+
+inline  ::cereal::LongitudinalPersonalitySP ControlsStateSP::Builder::getPersonality() {
+  return _builder.getDataField< ::cereal::LongitudinalPersonalitySP>(
+      ::capnp::bounded<1>() * ::capnp::ELEMENTS);
+}
+inline void ControlsStateSP::Builder::setPersonality( ::cereal::LongitudinalPersonalitySP value) {
+  _builder.setDataField< ::cereal::LongitudinalPersonalitySP>(
+      ::capnp::bounded<1>() * ::capnp::ELEMENTS, value);
+}
+
 inline bool ControlsStateSP::LateralTorqueState::Reader::hasNnLog() const {
   return !_reader.getPointerField(
       ::capnp::bounded<0>() * ::capnp::POINTERS).isNull();
@@ -2970,16 +2989,16 @@ inline void LongitudinalPlanSP::Builder::setLongitudinalPlanSource( ::cereal::Lo
       ::capnp::bounded<26>() * ::capnp::ELEMENTS, value);
 }
 
-inline  ::cereal::LongitudinalPersonalitySP LongitudinalPlanSP::Reader::getPersonality() const {
+inline  ::cereal::LongitudinalPersonalitySP LongitudinalPlanSP::Reader::getPersonalityDEPRECATED() const {
   return _reader.getDataField< ::cereal::LongitudinalPersonalitySP>(
       ::capnp::bounded<27>() * ::capnp::ELEMENTS);
 }
 
-inline  ::cereal::LongitudinalPersonalitySP LongitudinalPlanSP::Builder::getPersonality() {
+inline  ::cereal::LongitudinalPersonalitySP LongitudinalPlanSP::Builder::getPersonalityDEPRECATED() {
   return _builder.getDataField< ::cereal::LongitudinalPersonalitySP>(
       ::capnp::bounded<27>() * ::capnp::ELEMENTS);
 }
-inline void LongitudinalPlanSP::Builder::setPersonality( ::cereal::LongitudinalPersonalitySP value) {
+inline void LongitudinalPlanSP::Builder::setPersonalityDEPRECATED( ::cereal::LongitudinalPersonalitySP value) {
   _builder.setDataField< ::cereal::LongitudinalPersonalitySP>(
       ::capnp::bounded<27>() * ::capnp::ELEMENTS, value);
 }

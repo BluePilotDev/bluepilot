@@ -20,6 +20,7 @@ enum LongitudinalPersonalitySP {
 
 struct ControlsStateSP @0x81c2f05a394cf4af {
   lateralState @0 :Text;
+  personality @8 :LongitudinalPersonalitySP;
 
   lateralControlState :union {
     indiState @1 :LateralINDIState;
@@ -81,7 +82,7 @@ struct LongitudinalPlanSP @0xaedffd8f31e7b55d {
   events @19 :List(Car.CarEvent);
   longitudinalPlanSource @20 :LongitudinalPlanSource;
 
-  personality @21 :LongitudinalPersonalitySP;
+  personalityDEPRECATED @21 :LongitudinalPersonalitySP;
 
   enum SpeedLimitControlState {
     inactive @0; # No speed limit set or not enabled by parameter.
