@@ -273,7 +273,7 @@ class CarController:
         if self.CP.spFlags & FordFlagsSP.SP_ENHANCED_LAT_CONTROL.value:
           can_sends.append(fordcan.create_lat_ctl2_msg(self.packer, self.CAN, mode, ramp_type, self.precision_type, 0., 0., -apply_curvature, 0., counter))
         else:
-          can_sends.append(fordcan.create_lat_ctl2_msg(self.packer, self.CAN, mode, 0., 0., -apply_curvature, 0., counter))
+          can_sends.append(fordcan.create_lat_ctl2_msg(self.packer, self.CAN, mode, ramp_type, self.precision_type, 0., 0., -apply_curvature, 0., counter))
       else:
         can_sends.append(fordcan.create_lat_ctl_msg(self.packer, self.CAN, CC.latActive, ramp_type, self.precision_type, 0., 0., -apply_curvature, 0.))
 
