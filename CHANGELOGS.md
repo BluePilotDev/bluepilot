@@ -29,6 +29,11 @@ sunnypilot - 0.9.7.0 (2024-05-xx)
   * When Forced Offroad mode is on, allows changing offroad-only settings even when the car is turned on
 * NEW❗: Ford CAN-FD longitudinal
   * NEW❗: Parse speed limit sign recognition from camera for certain supported platforms
+* UPDATED: Auto Lane Change Timer -> Auto Lane Change by Blinker
+  * NEW❗: New "Off" option to disable lane change by blinker
+* UPDATED: Pause Lateral Below Speed with Blinker
+  * NEW❗: Customizable Pause Lateral Speed
+    * Pause lateral actuation with blinker when traveling below the desired speed selected. Default is 20 MPH or 32 km/h.
 * UPDATED: Hyundai CAN Longitudinal
   * Auto-enable radar tracks on platforms with applicable Mando radar
 * UPDATED: Hyundai CAN-FD Radar-based SCC
@@ -65,6 +70,12 @@ sunnypilot - 0.9.7.0 (2024-05-xx)
 * Ford F-150 2022-23 support
 * Ford F-150 Lightning 2021-23 support
 * Ford Mustang Mach-E 2021-23 support
+
+sunnypilot - 0.9.6.2 (2024-05-29)
+========================
+* REMOVED: Screen Recorder
+  * Screen Recorder is removed due to unnecessary resource usage
+  * An improved version will be available in the near future. Stay tuned!
 
 sunnypilot - 0.9.6.1 (2024-02-27)
 ========================

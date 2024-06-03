@@ -125,15 +125,6 @@
 <context>
     <name>AutoLaneChangeTimer</name>
     <message>
-        <source>Auto Lane Change Timer</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Set a timer to delay the auto lane change operation when the blinker is used. No nudge on the steering wheel is required to auto lane change if a timer is set.
-Please use caution when using this feature. Only use the blinker when traffic and road conditions permit.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <source>s</source>
         <translation type="unfinished"></translation>
     </message>
@@ -143,6 +134,19 @@ Please use caution when using this feature. Only use the blinker when traffic an
     </message>
     <message>
         <source>Nudgeless</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Auto Lane Change by Blinker</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Off</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Set a timer to delay the auto lane change operation when the blinker is used. No nudge on the steering wheel is required to auto lane change if a timer is set. Default is Nudge.
+Please use caution when using this feature. Only use the blinker when traffic and road conditions permit.</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -598,14 +602,6 @@ Please use caution when using this feature. Only use the blinker when traffic an
         <translation type="unfinished">Retour</translation>
     </message>
     <message>
-        <source>Pause Lateral Below Speed w/ Blinker</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <source>Enable this toggle to pause lateral actuation with blinker when traveling below 20 MPH or 32 km/h.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <source>Auto Lane Change: Delay with Blind Spot</source>
         <translation type="unfinished"></translation>
     </message>
@@ -619,6 +615,14 @@ Please use caution when using this feature. Only use the blinker when traffic an
     </message>
     <message>
         <source>Enable this toggle to block lane change when road edge is detected on the stalk actuated side.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Pause Lateral Below Speed with Blinker</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Enable this toggle to pause lateral actuation with blinker when traveling below the desired speed selected below.</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -1112,6 +1116,25 @@ Warning: You are on a metered connection!</source>
     </message>
 </context>
 <context>
+    <name>PauseLateralSpeed</name>
+    <message>
+        <source>Pause lateral actuation with blinker when traveling below the desired speed selected. Default is 20 MPH or 32 km/h.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Default</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>km/h</source>
+        <translation type="unfinished">km/h</translation>
+    </message>
+    <message>
+        <source>mph</source>
+        <translation type="unfinished">mi/h</translation>
+    </message>
+</context>
+<context>
     <name>PrimeAdWidget</name>
     <message>
         <source>Upgrade Now</source>
@@ -1210,6 +1233,14 @@ Warning: You are on a metered connection!</source>
     </message>
     <message>
         <source>sunnypilot</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Update</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <source>Updating...</source>
         <translation type="unfinished"></translation>
     </message>
 </context>

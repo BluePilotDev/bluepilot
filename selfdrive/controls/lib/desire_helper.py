@@ -34,12 +34,18 @@ DESIRES = {
 }
 
 AUTO_LANE_CHANGE_TIMER = {
+  -1: 0.0,
   0: 0.0,
   1: 0.1,
   2: 0.5,
   3: 1.0,
   4: 1.5,
 }
+
+
+def get_min_lateral_speed(value: int, is_metric: bool, default: float = LANE_CHANGE_SPEED_MIN):
+  speed: float = default if value == 0 else value * CV.KPH_TO_MS if is_metric else CV.MPH_TO_MS
+  return speed
 
 
 class DesireHelper:
@@ -79,12 +85,13 @@ class DesireHelper:
     lane_change_auto_timer = AUTO_LANE_CHANGE_TIMER.get(self.lane_change_set_timer, 2.0)
     v_ego = carstate.vEgo
     one_blinker = carstate.leftBlinker != carstate.rightBlinker
+    # TODO: SP: !659: User-defined minimum lane change speed
     below_lane_change_speed = v_ego < LANE_CHANGE_SPEED_MIN
 
     if self.model_use_lateral_planner:
       self.road_edge = get_road_edge(carstate, model_data, self.edge_toggle)
 
-    if not carstate.madsEnabled or self.lane_change_timer > LANE_CHANGE_TIME_MAX:
+    if not lateral_active or self.lane_change_timer > LANE_CHANGE_TIME_MAX or self.lane_change_set_timer == -1:
       self.lane_change_state = LaneChangeState.off
       self.lane_change_direction = LaneChangeDirection.none
       self.prev_lane_change = False

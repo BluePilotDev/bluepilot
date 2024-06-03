@@ -167,7 +167,6 @@ class Controls:
     self.nn_alert_shown = False
     self.enable_nnff = self.params.get_bool("NNFF")
 
-    self.lane_change_set_timer = int(self.params.get("AutoLaneChangeTimer", encoding="utf8"))
     self.reverse_acc_change = False
     self.dynamic_experimental_control = False
 
@@ -496,8 +495,8 @@ class Controls:
 
     # All pandas not in silent mode must have controlsAllowed when openpilot is enabled
     if self.enabled and any(not ps.controlsAllowed for ps in self.sm['pandaStates']
-      if ps.safetyModel not in IGNORED_SAFETY_MODES):
-        self.mismatch_counter += 1
+           if ps.safetyModel not in IGNORED_SAFETY_MODES):
+      self.mismatch_counter += 1
 
     return CS
 
@@ -665,9 +664,9 @@ class Controls:
         self.desired_curvature = clip_curvature(CS.vEgo, self.desired_curvature, model_v2.action.desiredCurvature)
       actuators.curvature = self.desired_curvature
       actuators.steer, actuators.steeringAngleDeg, lac_log = self.LaC.update(CC.latActive, CS, self.VM, lp,
-                                                                            self.steer_limited, self.desired_curvature,
-                                                                            self.sm['liveLocationKalman'],
-                                                                            model_data=model_v2)
+                                                                             self.steer_limited, self.desired_curvature,
+                                                                             self.sm['liveLocationKalman'],
+                                                                             model_data=model_v2)
       if self.model_use_lateral_planner:
         actuators.curvature = self.desired_curvature
     else:
@@ -814,7 +813,7 @@ class Controls:
       self.last_actuators = CO.actuatorsOutput
       if self.CP.steerControlType == car.CarParams.SteerControlType.angle:
         self.steer_limited = abs(CC.actuators.steeringAngleDeg - CO.actuatorsOutput.steeringAngleDeg) > \
-                              STEER_ANGLE_SATURATION_THRESHOLD
+                             STEER_ANGLE_SATURATION_THRESHOLD
       else:
         self.steer_limited = abs(CC.actuators.steer - CO.actuatorsOutput.steer) > 1e-2
 
@@ -937,7 +936,6 @@ class Controls:
       if self.CP.notCar:
         self.joystick_mode = self.params.get_bool("JoystickDebugMode")
 
-      self.lane_change_set_timer = int(self.params.get("AutoLaneChangeTimer", encoding="utf8"))
       self.reverse_acc_change = self.params.get_bool("ReverseAccChange")
       self.dynamic_experimental_control = self.params.get_bool("DynamicExperimentalControl")
 
