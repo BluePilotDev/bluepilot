@@ -239,6 +239,9 @@ class CarController:
             apply_curvature = ((predicted_curvature * self.app_PC_percentage) + (desired_curvature * (1- self.app_PC_percentage)))
             self.precision_type = 0 # comfort for straight aways
 
+        # apply ford cuvature safety limits
+        apply_curvature = apply_ford_curvature_limits(apply_curvature, self.apply_curvature_last, current_curvature, vEgoRaw)
+        
         # if changing lanes, blend PC and DC to smooth out the lane change.
         if self.lane_change:
           if apply_curvature > 0 and model_data.meta.laneChangeState == 1: # initial stages of a right lane change (positive in comma, negative when sent to Ford)
@@ -249,9 +252,6 @@ class CarController:
             if model_data.meta.laneChangeState == 2:
               apply_curvature = apply_curvature * self.lc2_modifier
           self.precision_type = 0 # comfort for lane change
-
-        # apply ford cuvature safety limits
-        apply_curvature = apply_ford_curvature_limits(apply_curvature, self.apply_curvature_last, current_curvature, vEgoRaw)
 
       else:
         apply_curvature = 0.
