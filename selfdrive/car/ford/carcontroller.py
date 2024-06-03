@@ -208,9 +208,9 @@ class CarController:
       if CC.latActive:
         # apply rate limits, curvature error limit, and clip to signal range
         current_curvature = -CS.out.yawRate / max(CS.out.vEgoRaw, 0.1)
-        # desired_curvature = apply_ford_curvature_limits(actuators.curvature, self.apply_curvature_last, current_curvature, CS.out.vEgoRaw)
         desired_curvature = actuators.curvature
         apply_curvature = desired_curvature
+        immediate_curvature = apply_ford_curvature_limits(desired_curvature, self.apply_curvature_last, current_curvature, CS.out.vEgoRaw)
         self.precision_type = 1 #precise by default
         # equate velocity
         vEgoRaw = CS.out.vEgoRaw
@@ -218,10 +218,8 @@ class CarController:
         if model_data is not None and len(model_data.orientation.x) >= CONTROL_N:
           # compute curvature from model predicted orientation
           future_time = 0.2 + self.future_lookup_time # 0.2 + SteerActutatorDelay
-          # for now revert back to actuators.curvature because predicted curvature can't overcome the lack of path_offset
           predicted_curvature = interp(future_time, ModelConstants.T_IDXS, model_data.orientationRate.z) / vEgoRaw
-          # predicted_curvature = apply_ford_curvature_limits(predicted_curvature, self.apply_curvature_last, current_curvature, vEgoRaw)
-
+         
           # build an array to hold future curvatures, to help with straight away detection
           curvatures = np.array(model_data.acceleration.y) / (CS.out.vEgo ** 2)
           # extract predicted curvature for 1.0 seconds, 2.0 seconds, and 3.0 seconds into the future
@@ -237,7 +235,7 @@ class CarController:
 
         # if at highway speeds, check for straight aways and apply anti ping pong logic
         if vEgoRaw > 24.56:
-          if abs(apply_curvature) < self.max_app_curvature and curvature_1 < self.max_app_curvature and curvature_2 < self.max_app_curvature and curvature_3 < self.max_app_curvature:
+          if abs(immediate_curvature) < self.max_app_curvature and curvature_1 < self.max_app_curvature and curvature_2 < self.max_app_curvature and curvature_3 < self.max_app_curvature:
             apply_curvature = ((predicted_curvature * self.app_PC_percentage) + (desired_curvature * (1- self.app_PC_percentage)))
             self.precision_type = 0 # comfort for straight aways
 
