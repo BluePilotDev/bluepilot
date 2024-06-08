@@ -1,18 +1,18 @@
 import numpy as np
 from cereal import car, log
-from openpilot.common.numpy_fast import clip, interp
 from openpilot.common.realtime import DT_CTRL
 from opendbc.can.packer import CANPacker
+from openpilot.common.numpy_fast import clip, interp
 from openpilot.selfdrive.car import apply_std_steer_angle_limits
 from openpilot.selfdrive.car.ford import fordcan
-from openpilot.selfdrive.car.ford.values import CANFD_CAR, CarControllerParams
+from openpilot.selfdrive.car.ford.values import CarControllerParams, FordFlags, FordFlagsSP
+from openpilot.selfdrive.car.interfaces import CarControllerBase
 from openpilot.selfdrive.controls.lib.drive_helpers import V_CRUISE_MAX, CONTROL_N
 from openpilot.selfdrive.modeld.constants import ModelConstants
 
 LongCtrlState = car.CarControl.Actuators.LongControlState
 VisualAlert = car.CarControl.HUDControl.VisualAlert
 LaneChangeState = log.LaneChangeState # is lane change active
-
 
 
 def apply_ford_curvature_limits(apply_curvature, apply_curvature_last, current_curvature, v_ego_raw):
@@ -78,6 +78,14 @@ class CarController:
     self.brake_actuate_last = 0
     self.precharge_actuate_last = 0
     self.precharge_actuate_ts = 0
+    self.lead_distance_bars_last = None
+    # self.path_angle = 0.
+    # self.path_offset = 0.
+    # self.curvature_rate = 0.
+
+    self.brake_actuate_last = 0
+    self.precharge_actuate_last = 0
+    self.precharge_actuate_ts = 0
 
     # Anti ping-pong parameters
     self.t_diffs = np.diff(ModelConstants.T_IDXS)
@@ -97,6 +105,7 @@ class CarController:
     self.lane_change = False # initialize variable for capturing lane change status
 
     # Activates at self.brake_actutator_target - self.brake_actutator_stdDevLow
+    self.brake_actutator_target = -0.5 # Default: -0.5
     self.brake_actutator_stdDevLow = 0.2 # Default: -0.5
 
     # Deactivates at self.brake_actutator_target + self.brake_actutator_stdDevHigh
@@ -118,7 +127,7 @@ class CarController:
 
     # model specific tuning
     print(f'CarFingerprint: {self.CP.carFingerprint}')
-    if self.CP.carFingerprint in CANFD_CAR:
+    if self.CP.flags & FordFlags.CANFD:
       self.testing_active = True
 
       if self.CP.carFingerprint == "FORD F-150 14TH GEN":
@@ -160,17 +169,14 @@ class CarController:
         self.precharge_actutator_stdDevLow = 0.0
         self.precharge_actutator_stdDevHigh = 0.05
         self.app_PC_percentage = 0.5 # what percentage of apply_curvature is derived from predicted curvature
-
-      self.brake_clip = self.brake_actutator_target - self.brake_actutator_stdDevLow
-
     else:
-        self.brake_actutator_target = -0.1
-        self.brake_actutator_stdDevLow = 0.00
-        self.brake_actutator_stdDevHigh = 0.05
-        self.precharge_actutator_target = -0.1
-        self.precharge_actutator_stdDevLow = 0.0
-        self.precharge_actutator_stdDevHigh = 0.05
-        self.app_PC_percentage = 0.5 # what percentage of apply_curvature is derived from predicted curvature
+      self.brake_actutator_target = -0.1
+      self.brake_actutator_stdDevLow = 0.00
+      self.brake_actutator_stdDevHigh = 0.05
+      self.precharge_actutator_target = -0.1
+      self.precharge_actutator_stdDevLow = 0.0
+      self.precharge_actutator_stdDevHigh = 0.05
+      self.app_PC_percentage = 0.5 # what percentage of apply_curvature is derived from predicted curvature
 
     self.brake_clip = self.brake_actutator_target - self.brake_actutator_stdDevLow
 
@@ -202,7 +208,9 @@ class CarController:
       if CC.latActive:
         # apply rate limits, curvature error limit, and clip to signal range
         current_curvature = -CS.out.yawRate / max(CS.out.vEgoRaw, 0.1)
-        apply_curvature = apply_ford_curvature_limits(actuators.curvature, self.apply_curvature_last, current_curvature, CS.out.vEgoRaw)
+        desired_curvature = actuators.curvature
+        apply_curvature = desired_curvature
+        immediate_curvature = apply_ford_curvature_limits(desired_curvature, self.apply_curvature_last, current_curvature, CS.out.vEgoRaw)
         self.precision_type = 1 #precise by default
         # equate velocity
         vEgoRaw = CS.out.vEgoRaw
@@ -210,10 +218,8 @@ class CarController:
         if model_data is not None and len(model_data.orientation.x) >= CONTROL_N:
           # compute curvature from model predicted orientation
           future_time = 0.2 + self.future_lookup_time # 0.2 + SteerActutatorDelay
-          # for now revert back to actuators.curvature because predicted curvature can't overcome the lack of path_offset
           predicted_curvature = interp(future_time, ModelConstants.T_IDXS, model_data.orientationRate.z) / vEgoRaw
-          predicted_curvature = apply_ford_curvature_limits(predicted_curvature, self.apply_curvature_last, current_curvature, vEgoRaw)
-
+         
           # build an array to hold future curvatures, to help with straight away detection
           curvatures = np.array(model_data.acceleration.y) / (CS.out.vEgo ** 2)
           # extract predicted curvature for 1.0 seconds, 2.0 seconds, and 3.0 seconds into the future
@@ -223,26 +229,29 @@ class CarController:
 
         # determine if a lane change is active
         if model_data.meta.laneChangeState == 1 or model_data.meta.laneChangeState == 2:
-            self.lane_change = True
+          self.lane_change = True
         else:
-            self.lane_change = False
+          self.lane_change = False
 
         # if at highway speeds, check for straight aways and apply anti ping pong logic
         if vEgoRaw > 24.56:
-          if abs(apply_curvature) < self.max_app_curvature and curvature_1 < self.max_app_curvature and curvature_2 < self.max_app_curvature and curvature_3 < self.max_app_curvature:
-              apply_curvature = ((predicted_curvature * self.app_PC_percentage) + (apply_curvature * (1- self.app_PC_percentage)))
-              self.precision_type = 0 # comfort for straight aways
+          if abs(immediate_curvature) < self.max_app_curvature and curvature_1 < self.max_app_curvature and curvature_2 < self.max_app_curvature and curvature_3 < self.max_app_curvature:
+            apply_curvature = ((predicted_curvature * self.app_PC_percentage) + (desired_curvature * (1- self.app_PC_percentage)))
+            self.precision_type = 0 # comfort for straight aways
 
+        # apply ford cuvature safety limits
+        apply_curvature = apply_ford_curvature_limits(apply_curvature, self.apply_curvature_last, current_curvature, vEgoRaw)
+        
         # if changing lanes, blend PC and DC to smooth out the lane change.
         if self.lane_change:
-            if apply_curvature > 0 and model_data.meta.laneChangeState == 1: # initial stages of a right lane change (positive in comma, negative when sent to Ford)
-                apply_curvature = apply_curvature * self.right_lc_modifier
-            if abs(apply_curvature) < self.max_app_curvature: # if we are not changing lanes in a curve
-                if model_data.meta.laneChangeState == 1:
-                  apply_curvature = apply_curvature * self.lc1_modifier
-                if model_data.meta.laneChangeState == 2:
-                  apply_curvature = apply_curvature * self.lc2_modifier
-            self.precision_type = 0 # comfort for lane change
+          if apply_curvature > 0 and model_data.meta.laneChangeState == 1: # initial stages of a right lane change (positive in comma, negative when sent to Ford)
+            apply_curvature = apply_curvature * self.right_lc_modifier
+          if abs(apply_curvature) < self.max_app_curvature: # if we are not changing lanes in a curve
+            if model_data.meta.laneChangeState == 1:
+              apply_curvature = apply_curvature * self.lc1_modifier
+            if model_data.meta.laneChangeState == 2:
+              apply_curvature = apply_curvature * self.lc2_modifier
+          self.precision_type = 0 # comfort for lane change
 
       else:
         apply_curvature = 0.
@@ -260,11 +269,14 @@ class CarController:
 
       self.apply_curvature_last = apply_curvature
 
-      if self.CP.carFingerprint in CANFD_CAR:
+      if self.CP.flags & FordFlags.CANFD:
         # TODO: extended mode
         mode = 1 if CC.latActive else 0
-        counter = (self.frame // CarControllerParams.STEER_STEP) % 0xF
-        can_sends.append(fordcan.create_lat_ctl2_msg(self.packer, self.CAN, mode, ramp_type, self.precision_type, 0., 0., -apply_curvature, 0., counter))
+        counter = (self.frame // CarControllerParams.STEER_STEP) % 0x10
+        if self.CP.spFlags & FordFlagsSP.SP_ENHANCED_LAT_CONTROL.value:
+          can_sends.append(fordcan.create_lat_ctl2_msg(self.packer, self.CAN, mode, ramp_type, self.precision_type, 0., 0., -apply_curvature, 0., counter))
+        else:
+          can_sends.append(fordcan.create_lat_ctl2_msg(self.packer, self.CAN, mode, ramp_type, self.precision_type, 0., 0., -apply_curvature, 0., counter))
       else:
         can_sends.append(fordcan.create_lat_ctl_msg(self.packer, self.CAN, CC.latActive, ramp_type, self.precision_type, 0., 0., -apply_curvature, 0.))
 
@@ -299,15 +311,19 @@ class CarController:
     # send lkas ui msg at 1Hz or if ui state changes
     if (self.frame % CarControllerParams.LKAS_UI_STEP) == 0 or send_ui:
       can_sends.append(fordcan.create_lkas_ui_msg(self.packer, self.CAN, main_on, CC.latActive, steer_alert, hud_control, CS.lkas_status_stock_values))
+
     # send acc ui msg at 5Hz or if ui state changes
+    if hud_control.leadDistanceBars != self.lead_distance_bars_last:
+      send_ui = True
     if (self.frame % CarControllerParams.ACC_UI_STEP) == 0 or send_ui:
       can_sends.append(fordcan.create_acc_ui_msg(self.packer, self.CAN, self.CP, main_on, CC.latActive,
-                                         fcw_alert, CS.out.cruiseState.standstill, hud_control,
-                                         CS.acc_tja_status_stock_values, CS.gac_tr_cluster))
+                                                 fcw_alert, CS.out.cruiseState.standstill, hud_control,
+                                                 CS.acc_tja_status_stock_values))
 
     self.main_on_last = main_on
     self.lkas_enabled_last = CC.latActive
     self.steer_alert_last = steer_alert
+    self.lead_distance_bars_last = hud_control.leadDistanceBars
 
     new_actuators = actuators.copy()
     new_actuators.curvature = self.apply_curvature_last

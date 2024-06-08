@@ -1,10 +1,10 @@
 from cereal import car
 from panda import Panda
 from openpilot.common.conversions import Conversions as CV
-from openpilot.selfdrive.car import get_safety_config, create_mads_event
+from openpilot.selfdrive.car import create_button_events, get_safety_config, create_mads_event
 from openpilot.selfdrive.car.ford.fordcan import CanBus
 from openpilot.common.params import Params
-from openpilot.selfdrive.car.ford.values import CANFD_CAR, Ecu, BUTTON_STATES, FordFlagsSP
+from openpilot.selfdrive.car.ford.values import Ecu, FordFlags, BUTTON_STATES, FordFlagsSP
 from openpilot.selfdrive.car.interfaces import CarInterfaceBase
 
 ButtonType = car.CarState.ButtonEvent.Type
@@ -22,7 +22,7 @@ class CarInterface(CarInterfaceBase):
   def _get_params(ret, candidate, fingerprint, car_fw, experimental_long, docs):
     ret.carName = "ford"
 
-    ret.radarUnavailable = False # enable radar for all Fords (candidate not in CANFD_CAR)
+    ret.radarUnavailable = not (ret.flags & FordFlags.CANFD)
     ret.steerControlType = car.CarParams.SteerControlType.angle
     ret.steerActuatorDelay = 0.05
     ret.steerLimitTimer = 1.0
@@ -30,6 +30,9 @@ class CarInterface(CarInterfaceBase):
     ret.longitudinalTuning.kpBP = [0.]
     ret.longitudinalTuning.kpV = [0.5]
     ret.longitudinalTuning.kiV = [0.]
+
+    if Params().get("DongleId", encoding='utf8') in ("4fde83db16dc0802", "112e4d6e0cad05e1", "e36b272d5679115f", "24574459dd7fb3e0", "83a4e056c7072678"):
+      ret.spFlags |= FordFlagsSP.SP_ENHANCED_LAT_CONTROL.value
 
     CAN = CanBus(fingerprint=fingerprint)
     cfgs = [get_safety_config(car.CarParams.SafetyModel.ford)]
@@ -42,14 +45,11 @@ class CarInterface(CarInterfaceBase):
       ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_FORD_LONG_CONTROL
       ret.openpilotLongitudinalControl = True
 
-    if candidate in CANFD_CAR:
+    if ret.flags & FordFlags.CANFD:
       ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_FORD_CANFD
 
     if ret.spFlags & FordFlagsSP.SP_ENHANCED_LAT_CONTROL:
       ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_FORD_ENHANCED_LAT_CONTROL
-
-    if Params().get("DongleId", encoding='utf8') in ("4fde83db16dc0802", "112e4d6e0cad05e1", "e36b272d5679115f", "24574459dd7fb3e0", "83a4e056c7072678"):
-      ret.spFlags |= FordFlagsSP.SP_ENHANCED_LAT_CONTROL.value
 
     ret.longitudinalTuning.kpBP = [0.]
     ret.longitudinalTuning.kpV = [0.5]
@@ -78,9 +78,9 @@ class CarInterface(CarInterfaceBase):
 
   def _update(self, c):
     ret = self.CS.update(self.cp, self.cp_cam)
-    self.CS = self.sp_update_params(self.CS)
+    self.sp_update_params()
 
-    buttonEvents = []
+    buttonEvents = create_button_events(self.CS.distance_button, self.CS.prev_distance_button, {1: ButtonType.gapAdjustCruise})
 
     for button in self.CS.buttonStates:
       if self.CS.buttonStates[button] != self.buttonStatesPrev[button]:
@@ -91,8 +91,8 @@ class CarInterface(CarInterfaceBase):
 
     self.CS.mads_enabled = self.get_sp_cruise_main_state(ret, self.CS)
 
-    self.CS.accEnabled, buttonEvents = self.get_sp_v_cruise_non_pcm_state(ret, self.CS.accEnabled,
-                                                                          buttonEvents, c.vCruise)
+    self.CS.accEnabled = self.get_sp_v_cruise_non_pcm_state(ret, self.CS.accEnabled,
+                                                            buttonEvents, c.vCruise)
 
     if ret.cruiseState.available:
       if self.enable_mads:
@@ -101,7 +101,6 @@ class CarInterface(CarInterfaceBase):
         if not self.CS.prev_lkas_enabled and self.CS.lkas_enabled:
           self.CS.madsEnabled = not self.CS.madsEnabled
         self.CS.madsEnabled = self.get_acc_mads(ret.cruiseState.enabled, self.CS.accEnabled, self.CS.madsEnabled)
-      ret, self.CS = self.toggle_gac(ret, self.CS, self.CS.buttonStates["gapAdjustCruise"], 1, 3, 4, "-")
     else:
       self.CS.madsEnabled = False
 
@@ -117,7 +116,7 @@ class CarInterface(CarInterfaceBase):
         self.CS.accEnabled = False
       self.CS.accEnabled = ret.cruiseState.enabled or self.CS.accEnabled
 
-    ret, self.CS = self.get_sp_common_state(ret, self.CS)
+    ret, self.CS = self.get_sp_common_state(ret, self.CS, gap_button=bool(self.CS.distance_button))
 
     if self.CS.out.madsEnabled != self.CS.madsEnabled:
       if self.mads_event_lock:
@@ -143,6 +142,3 @@ class CarInterface(CarInterfaceBase):
     self.buttonStatesPrev = self.CS.buttonStates.copy()
 
     return ret
-
-  def apply(self, c, now_nanos, model_data=None):
-     return self.CC.update(c, self.CS, now_nanos, model_data=model_data)

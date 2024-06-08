@@ -14,7 +14,6 @@ DELPHI_MRR_RADAR_MSG_COUNT = 64
 
 STEER_ASSIST_DATA_MSGS = 0x3d7
 
-
 def _create_delphi_esr_radar_can_parser(CP) -> CANParser:
   msg_n = len(DELPHI_ESR_RADAR_MSGS)
   messages = list(zip(DELPHI_ESR_RADAR_MSGS, [20] * msg_n, strict=True))
@@ -31,11 +30,9 @@ def _create_delphi_mrr_radar_can_parser(CP) -> CANParser:
 
   return CANParser(RADAR.DELPHI_MRR, messages, CanBus(CP).radar)
 
-
 def _create_steer_assist_data(CP) -> CANParser:
   messages = [("Steer_Assist_Data", 20)]
   return CANParser(RADAR.STEER_ASSIST_DATA, messages, CanBus(CP).camera)
-
 
 class RadarInterface(RadarInterfaceBase):
   def __init__(self, CP):
@@ -139,6 +136,7 @@ class RadarInterface(RadarInterfaceBase):
       if 0 in self.pts:
         del self.pts[0]
         del self.vRelCol[0]
+
 
   def _update_delphi_esr(self):
     for ii in sorted(self.updated_messages):

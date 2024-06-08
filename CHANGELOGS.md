@@ -1,11 +1,13 @@
-sunnypilot - 0.9.7.0 (2024-xx-xx)
+sunnypilot - 0.9.7.0 (2024-05-xx)
 ========================
 * New driving model
-* Support for many hybrid Ford models
+* Adjust driving personality with the follow distance button
+* Support for hybrid variants of supported Ford models
+* Added toggle to enable driver monitoring even when openpilot is not engaged
+* Fingerprinting without the OBD-II port on all cars
 ************************
 * UPDATED: Synced with commaai's openpilot
-  * master commit 56e343b (February 27, 2024)
-* UPDATED: Bumping mapd by [@pfeiferj](https://github.com/pfeiferj) to version [v1.9.0](https://github.com/pfeiferj/mapd/releases/tag/v1.9.0).
+  * master commit 2e6b2ef (May 9, 2024)
 * NEW❗: sunnylink (Alpha early access)
   * NEW❗: Config Backup
     * Remotely back up and restore sunnypilot settings easily
@@ -22,28 +24,58 @@ sunnypilot - 0.9.7.0 (2024-xx-xx)
   * comma Prime support
   * Personal Mapbox/Amap/Google Maps token support
   * Instructions on how to set up your iOS Siri Shortcuts: https://routinehub.co/shortcut/17677/
-* NEW❗: Hyundai CAN-FD longitudinal:
-  * NEW❗: Parse lead info for camera-based SCC platforms
-    * Improve lead tracking when using openpilot longitudinal
-* NEW❗: Ford CAN-FD longitudinal
-  * NEW❗: Parse speed limit sign recognition from camera for certain supported platforms
 * NEW❗: Forced Offroad mode
   * Force sunnypilot in the offroad state even when the car is on
   * When Forced Offroad mode is on, allows changing offroad-only settings even when the car is turned on
-* UPDATED: Neutral Network Lateral Control (NNLC)
-  * FIXED: Hotfix for "lazy" steering performance in tighter curves thanks to twilsonco!
+* NEW❗: Ford CAN-FD longitudinal
+  * NEW❗: Parse speed limit sign recognition from camera for certain supported platforms
+* UPDATED: Auto Lane Change Timer -> Auto Lane Change by Blinker
+  * NEW❗: New "Off" option to disable lane change by blinker
+* UPDATED: Pause Lateral Below Speed with Blinker
+  * NEW❗: Customizable Pause Lateral Speed
+    * Pause lateral actuation with blinker when traveling below the desired speed selected. Default is 20 MPH or 32 km/h.
+* UPDATED: Hyundai CAN Longitudinal
+  * Auto-enable radar tracks on platforms with applicable Mando radar
+* UPDATED: Hyundai CAN-FD Radar-based SCC
+  * Longitudinal support for CAN-FD Radar-based SCC cars
+* UPDATED: Hyundai CAN-FD Camera-based SCC
+  * NEW❗: Parse lead info for camera-based SCC platforms with longitudinal support
+    * Improve lead tracking when using openpilot longitudinal
 * RE-ENABLED: Map-based Turn Speed Control (M-TSC) for supported platforms
   * openpilot Longitudianl Control available cars
   * Custom Stock Longitudinal Control available cars
+* UPDATED: Continued support for comma Pedal
+  * In response to the official deprecation of support for comma Pedal in the upstream, sunnypilot will continue maintaining software support for comma Pedal
+* UPDATED: Driving Model Selector v4
+  * NEW❗: Driving Model additions
+    * North Dakota (April 29, 2024) - NDv2
+    * WD40 (April 09, 2024) - WD40
+    * Duck Amigo (March 18, 2024) - DA
+    * Recertified Herbalist (March 01, 2024) - CHLR
+  * Legacy Driving Models with Navigate on openpilot (NoO) support
+    * Includes Duck Amigo and all preceding models
+* UPDATED: Bumping mapd by [@pfeiferj](https://github.com/pfeiferj) to version [v1.9.0](https://github.com/pfeiferj/mapd/releases/tag/v1.9.0).
 * UPDATED: Reset Mapbox Access Token -> Reset Access Tokens for Map Services
   * Reset self-service access tokens for Mapbox, Amap, and Google Maps
+* UPDATED: Upstream native support for Gap Adjust Cruise
+* UPDATED: Neural Network Lateral Control (NNLC)
+  * FIXED: Hotfix for "lazy" steering performance in tighter curves thanks to twilsonco!
+  * Due to upstream changes with platform simplifications, most platforms will match and fallback to combined platform model
+  * This will be updated when the new mapping of platforms are restructured (thanks @twilsonco 😉)
 * UI Updates
   * Display Metrics Below Chevron
     * NEW❗: Metrics is now being displayed below the chevron instead of above
     * NEW❗: Display both Distance and Speed simultaneously
+    * NEW❗: View sunnylink connectivity status on the left sidebar!
 * Ford F-150 2022-23 support
 * Ford F-150 Lightning 2021-23 support
 * Ford Mustang Mach-E 2021-23 support
+
+sunnypilot - 0.9.6.2 (2024-05-29)
+========================
+* REMOVED: Screen Recorder
+  * Screen Recorder is removed due to unnecessary resource usage
+  * An improved version will be available in the near future. Stay tuned!
 
 sunnypilot - 0.9.6.1 (2024-02-27)
 ========================

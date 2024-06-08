@@ -16,6 +16,7 @@ import sys
 import tempfile
 import threading
 import time
+import gzip
 from dataclasses import asdict, dataclass, replace
 from datetime import datetime
 from functools import partial
@@ -38,7 +39,7 @@ from openpilot.common.realtime import set_core_affinity
 from openpilot.system.hardware import HARDWARE, PC
 from openpilot.system.loggerd.xattr_cache import getxattr, setxattr
 from openpilot.common.swaglog import cloudlog
-from openpilot.system.version import get_commit, get_normalized_origin, get_short_branch, get_version
+from openpilot.system.version import get_build_metadata
 from openpilot.system.hardware.hw import Paths
 
 
@@ -320,11 +321,12 @@ def getMessage(service: str, timeout: int = 1000) -> dict:
 
 @dispatcher.add_method
 def getVersion() -> dict[str, str]:
+  build_metadata = get_build_metadata()
   return {
-    "version": get_version(),
-    "remote": get_normalized_origin(),
-    "branch": get_short_branch(),
-    "commit": get_commit(),
+    "version": build_metadata.openpilot.version,
+    "remote": build_metadata.openpilot.git_normalized_origin,
+    "branch": build_metadata.channel,
+    "commit": build_metadata.openpilot.git_commit,
   }
 
 
@@ -467,6 +469,10 @@ def startLocalProxy(global_end_event: threading.Event, remote_ws_uri: str, local
                            cookie="jwt=" + identity_token,
                            enable_multithread=True)
 
+    # Set TOS to keep connection responsive while under load.
+    # DSCP of 36/HDD_LINUX_AC_VI with the minimum delay flag
+    ws.sock.setsockopt(socket.IPPROTO_IP, socket.IP_TOS, 0x90)
+
     ssock, csock = socket.socketpair()
     local_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     local_sock.connect(('127.0.0.1', local_port))
@@ -545,7 +551,7 @@ def takeSnapshot() -> str | dict[str, str] | None:
     raise Exception("not available while camerad is started")
 
 
-def get_logs_to_send_sorted() -> list[str]:
+def get_logs_to_send_sorted(log_attr_name=LOG_ATTR_NAME) -> list[str]:
   # TODO: scan once then use inotify to detect file creation/deletion
   curr_time = int(time.time())
   logs = []
@@ -553,7 +559,7 @@ def get_logs_to_send_sorted() -> list[str]:
     log_path = os.path.join(Paths.swaglog_root(), log_entry)
     time_sent = 0
     try:
-      value = getxattr(log_path, LOG_ATTR_NAME)
+      value = getxattr(log_path, log_attr_name)
       if value is not None:
         time_sent = int.from_bytes(value, sys.byteorder)
     except (ValueError, TypeError):
@@ -565,7 +571,66 @@ def get_logs_to_send_sorted() -> list[str]:
   return sorted(logs)[:-1]
 
 
-def log_handler(end_event: threading.Event) -> None:
+def add_log_to_queue(log_path, log_id, is_sunnylink = False):
+  MAX_SIZE_KB = 32
+  MAX_SIZE_BYTES = MAX_SIZE_KB * 1024
+
+  with open(log_path, 'r') as f:
+    data = f.read()
+
+    # Check if the file is empty
+    if not data:
+      cloudlog.warning(f"Log file {log_path} is empty.")
+      return
+
+    # Initialize variables for encoding
+    payload = data
+    is_compressed = False
+
+    # Log the current size of the file
+    current_size = len(json.dumps(payload).encode("utf-8")) + len(log_id.encode("utf-8")) + 100  # Add 100 bytes to account for encoding overhead
+    cloudlog.debug(f"Current size of log file {log_path}: {current_size} bytes")
+
+    if is_sunnylink and current_size > MAX_SIZE_BYTES:
+      # Compress and encode the data if it exceeds the maximum size
+      compressed_data = gzip.compress(data.encode())
+      payload = base64.b64encode(compressed_data).decode()
+      is_compressed = True
+
+      # Log the size after compression and encoding
+      compressed_size = len(compressed_data)
+      encoded_size = len(payload)
+      cloudlog.debug(f"Size of log file {log_path} "
+                    f"after compression: {compressed_size} bytes, "
+                    f"after encoding: {encoded_size} bytes")
+
+    jsonrpc = {
+      "method": "forwardLogs",
+      "params": {
+        "logs": payload
+      },
+      "jsonrpc": "2.0",
+      "id": log_id
+    }
+
+    if is_sunnylink and is_compressed:
+      jsonrpc["params"]["compressed"] = is_compressed
+
+    jsonrpc_str = json.dumps(jsonrpc)
+    size_in_bytes = len(jsonrpc_str.encode('utf-8'))
+
+    if is_sunnylink and size_in_bytes <= MAX_SIZE_BYTES:
+      cloudlog.debug(f"Target is sunnylink and log file {log_path} is small enough to send in one request ({size_in_bytes} bytes).")
+      low_priority_send_queue.put_nowait(jsonrpc_str)
+    elif is_sunnylink:
+      cloudlog.warning(f"Target is sunnylink and log file {log_path} is too large to send in one request.")
+    else:
+      cloudlog.debug(f"Target is not sunnylink, proceeding to send log file {log_path} in one request ({size_in_bytes} bytes).")
+      low_priority_send_queue.put_nowait(jsonrpc_str)
+
+
+def log_handler(end_event: threading.Event, log_attr_name=LOG_ATTR_NAME) -> None:
+  is_sunnylink = log_attr_name != LOG_ATTR_NAME
   if PC:
     return
 
@@ -575,7 +640,7 @@ def log_handler(end_event: threading.Event) -> None:
     try:
       curr_scan = time.monotonic()
       if curr_scan - last_scan > 10:
-        log_files = get_logs_to_send_sorted()
+        log_files = get_logs_to_send_sorted(log_attr_name)
         last_scan = curr_scan
 
       # send one log
@@ -586,18 +651,10 @@ def log_handler(end_event: threading.Event) -> None:
         try:
           curr_time = int(time.time())
           log_path = os.path.join(Paths.swaglog_root(), log_entry)
-          setxattr(log_path, LOG_ATTR_NAME, int.to_bytes(curr_time, 4, sys.byteorder))
-          with open(log_path) as f:
-            jsonrpc = {
-              "method": "forwardLogs",
-              "params": {
-                "logs": f.read()
-              },
-              "jsonrpc": "2.0",
-              "id": log_entry
-            }
-            low_priority_send_queue.put_nowait(json.dumps(jsonrpc))
-            curr_log = log_entry
+          setxattr(log_path, log_attr_name, int.to_bytes(curr_time, 4, sys.byteorder))
+
+          add_log_to_queue(log_path, log_entry, is_sunnylink)
+          curr_log = log_entry
         except OSError:
           pass  # file could be deleted by log rotation
 
@@ -614,7 +671,7 @@ def log_handler(end_event: threading.Event) -> None:
           if log_entry and log_success:
             log_path = os.path.join(Paths.swaglog_root(), log_entry)
             try:
-              setxattr(log_path, LOG_ATTR_NAME, LOG_ATTR_VALUE_MAX_UNIX_TIME)
+              setxattr(log_path, log_attr_name, LOG_ATTR_VALUE_MAX_UNIX_TIME)
             except OSError:
               pass  # file could be deleted by log rotation
           if curr_log == log_entry:
@@ -657,10 +714,12 @@ def stat_handler(end_event: threading.Event) -> None:
 def ws_proxy_recv(ws: WebSocket, local_sock: socket.socket, ssock: socket.socket, end_event: threading.Event, global_end_event: threading.Event) -> None:
   while not (end_event.is_set() or global_end_event.is_set()):
     try:
-      data = ws.recv()
-      if isinstance(data, str):
-        data = data.encode("utf-8")
-      local_sock.sendall(data)
+      r = select.select((ws.sock,), (), (), 30)
+      if r[0]:
+        data = ws.recv()
+        if isinstance(data, str):
+          data = data.encode("utf-8")
+        local_sock.sendall(data)
     except WebSocketTimeoutException:
       pass
     except Exception:
@@ -670,6 +729,7 @@ def ws_proxy_recv(ws: WebSocket, local_sock: socket.socket, ssock: socket.socket
   cloudlog.debug("athena.ws_proxy_recv closing sockets")
   ssock.close()
   local_sock.close()
+  ws.close()
   cloudlog.debug("athena.ws_proxy_recv done closing sockets")
 
   end_event.set()
