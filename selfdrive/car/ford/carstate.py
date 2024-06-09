@@ -75,8 +75,8 @@ class CarState(CarStateBase):
     ret.cruiseState.standstill = cp.vl["EngBrakeData"]["AccStopMde_D_Rq"] == 3
     ret.accFaulted = cp.vl["EngBrakeData"]["CcStat_D_Actl"] in (1, 2)
 
-    if self.CP.flags & FordFlags.CANFD:
-      ret.cruiseState.speedLimit = self.update_traffic_signals(cp_cam)
+    # TODO: Will this cause issues with Q3 Cars that do not have TSR enabled?
+    ret.cruiseState.speedLimit = self.update_traffic_signals(cp_cam)
 
     if not self.CP.openpilotLongitudinalControl:
       ret.accFaulted = ret.accFaulted or cp_cam.vl["ACCDATA"]["CmbbDeny_B_Actl"] == 1
@@ -133,14 +133,13 @@ class CarState(CarStateBase):
     return ret
 
   def update_traffic_signals(self, cp_cam):
-    # TODO: Check if CAN platforms have the same signals
-    if self.CP.flags & FordFlags.CANFD:
-      self.v_limit = cp_cam.vl["Traffic_RecognitnData"]["TsrVLim1MsgTxt_D_Rq"]
-      v_limit_unit = cp_cam.vl["Traffic_RecognitnData"]["TsrVlUnitMsgTxt_D_Rq"]
+    # TODO: Need more testing on Q3 vehicles
+    self.v_limit = cp_cam.vl["Traffic_RecognitnData"]["TsrVLim1MsgTxt_D_Rq"]
+    v_limit_unit = cp_cam.vl["Traffic_RecognitnData"]["TsrVlUnitMsgTxt_D_Rq"]
 
-      speed_factor = CV.MPH_TO_MS if v_limit_unit == 2 else CV.KPH_TO_MS if v_limit_unit == 1 else 0
+    speed_factor = CV.MPH_TO_MS if v_limit_unit == 2 else CV.KPH_TO_MS if v_limit_unit == 1 else 0
 
-      return self.v_limit * speed_factor if self.v_limit not in (0, 255) else 0
+    return self.v_limit * speed_factor if self.v_limit not in (0, 255) else 0
 
   @staticmethod
   def get_can_parser(CP):
@@ -198,10 +197,10 @@ class CarState(CarStateBase):
       ("IPMA_Data", 1),
     ]
 
-    if CP.flags & FordFlags.CANFD:
-      messages += [
-        ("Traffic_RecognitnData", 1),
-      ]
+    #TODO:  Need more testing on other Q3 vehciles
+    messages += [
+      ("Traffic_RecognitnData", 1),
+    ]
 
     if CP.enableBsm and CP.flags & FordFlags.CANFD:
       messages += [
