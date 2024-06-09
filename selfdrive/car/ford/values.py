@@ -118,10 +118,10 @@ class CAR(Platforms):
     CarSpecs(mass=1625, wheelbase=2.67, steerRatio=17.7),
   )
   FORD_EDGE_MK2 = FordPlatformConfig(
-     [FordCarDocs("Ford Edge 2022")],
-     CarSpecs(mass=1933, steerRatio=15.3, wheelbase=2.824),
-     flags=FordFlags.ALT_STEER_ANGLE,
-   )
+    [FordCarDocs("Ford Edge 2022")],
+    CarSpecs(mass=1933, steerRatio=15.3, wheelbase=2.824),
+    flags=FordFlags.ALT_STEER_ANGLE,
+  )
   FORD_ESCAPE_MK4 = FordPlatformConfig(
     [
       FordCarDocs("Ford Escape 2020-22", hybrid=True, plug_in_hybrid=True),
