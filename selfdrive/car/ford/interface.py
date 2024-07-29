@@ -27,7 +27,7 @@ class CarInterface(CarInterfaceBase):
     ret.radarUnavailable = not (ret.flags & FordFlags.CANFD)
     print(f'Radar Unavailable: {ret.radarUnavailable}')
     ret.steerControlType = car.CarParams.SteerControlType.angle
-    ret.steerActuatorDelay = 0.2
+    ret.steerActuatorDelay = 0.05
     ret.steerLimitTimer = 1.0
 
     ret.longitudinalTuning.kpBP = [0.]
