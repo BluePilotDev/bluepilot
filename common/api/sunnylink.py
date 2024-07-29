@@ -18,7 +18,7 @@ CRASH_LOG_DIR = '/data/community/crashes'
 class SunnylinkApi(BaseApi):
   def __init__(self, dongle_id):
     super().__init__(dongle_id, API_HOST)
-    self.user_agent = "sunnypilot-"
+    self.user_agent = "bluepilot-"
     self.spinner = None
     self.params = Params()
 

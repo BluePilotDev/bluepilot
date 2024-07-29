@@ -18,12 +18,23 @@ class CarInterface(CarInterfaceBase):
 
   @staticmethod
   def _get_params(ret, candidate, fingerprint, car_fw, experimental_long, docs):
-    ret.carName = "ford"
+    # print the value of candidate
+    print(f'candidate (interface): {candidate}')
 
-    ret.radarUnavailable = True
+    ret.carName = "ford"
+    ret.dashcamOnly = not (ret.flags & FordFlags.CANFD)
+    print(f'Dashcam Only Mode: {ret.dashcamOnly}')
+    ret.radarUnavailable = not (ret.flags & FordFlags.CANFD)
+    print(f'Radar Unavailable: {ret.radarUnavailable}')
     ret.steerControlType = car.CarParams.SteerControlType.angle
     ret.steerActuatorDelay = 0.2
     ret.steerLimitTimer = 1.0
+
+    ret.longitudinalTuning.kpBP = [0.]
+    ret.longitudinalTuning.kpV = [0.5]
+    ret.longitudinalTuning.kiV = [0.]
+    ret.longitudinalTuning.deadzoneBPDEPRECATED = [0., 9.]
+    ret.longitudinalTuning.deadzoneVDEPRECATED = [.0, .20]
 
     if Params().get("DongleId", encoding='utf8') in ("4fde83db16dc0802", "112e4d6e0cad05e1", "e36b272d5679115f", "24574459dd7fb3e0", "83a4e056c7072678"):
       ret.spFlags |= FordFlagsSP.SP_ENHANCED_LAT_CONTROL.value
@@ -57,9 +68,6 @@ class CarInterface(CarInterfaceBase):
     if ret.spFlags & FordFlagsSP.SP_ENHANCED_LAT_CONTROL:
       ret.safetyConfigs[-1].safetyParam |= Panda.FLAG_FORD_ENHANCED_LAT_CONTROL
 
-    ret.longitudinalTuning.kpBP = [0.]
-    ret.longitudinalTuning.kpV = [0.5]
-    ret.longitudinalTuning.kiV = [0.]
 
     # Auto Transmission: 0x732 ECU or Gear_Shift_by_Wire_FD1
     found_ecus = [fw.ecu for fw in car_fw]

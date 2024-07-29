@@ -1,3 +1,4 @@
+import collections
 from math import cos, sin
 from cereal import car
 from opendbc.can.parser import CANParser
@@ -40,6 +41,7 @@ class RadarInterface(RadarInterfaceBase):
     self.updated_messages = set()
     self.track_id = 0
     self.radar = DBC[CP.carFingerprint]['radar']
+    self.vRelCol = {}
     if self.radar is None or CP.radarUnavailable:
       self.rcp = None
     elif self.radar == RADAR.DELPHI_ESR:

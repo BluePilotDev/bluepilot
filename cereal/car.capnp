@@ -403,6 +403,42 @@ struct CarControl {
     accel @4: Float32; # m/s^2
     longControlState @5: LongControlState;
 
+    fordVariables @9: FordVariables;
+    
+    struct FordVariables {
+      currentCurvature01 @0: Float32;
+      desiredCurvature01 @1: Float32;
+      applyCurvature01 @2: Float32;
+      predictedCurvature01 @3: Float32;
+      predictedPathCurvature01 @4: Float32;
+      spareOrdinal @5: Float32;
+      desiredCurvatureRate01 @6: Float32;
+      pathOffsetPosition01 @7: Float32;
+      pathOffsetAdj01 @8: Float32;
+      pathOffsetAdj02 @9: Float32;
+      pathOffset01 @10: Float32;
+      pathAngleRamp01 @11: Float32;
+      applyCurvature02 @12: Float32;
+      desiredCurvatureRate02 @13: Float32;
+      pathOffset02 @14: Float32;
+      pathAngleRamp02 @15: Float32;
+      pathAngleRamp03 @16: Float32;
+      pathAngle01 @17: Float32;
+      humanTurn01 @18: Float32;
+      humanTurn02 @19: Float32;
+      poScalingFactor01 @20: Float32;
+      paScalingFactor01 @21: Float32;
+      largeCurveActive01 @22: Float32;
+      predictedCurvature02 @23: Float32;
+      largeCurveActive02 @24: Float32;
+      pcBlendRatio01 @25: Float32;
+      maxAbsPredictedCurvature01 @26: Float32;
+      resetLookupTime01 @27: Float32;
+      pathLookupTime01 @28: Float32;
+      resetCurvature01 @29: Float32;
+      laneBias01 @30: Float32;
+    }
+
     enum LongControlState @0xe40f3a917d908282{
       off @0;
       pid @1;

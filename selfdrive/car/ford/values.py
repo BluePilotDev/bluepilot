@@ -46,6 +46,7 @@ class CarControllerParams:
 class FordFlags(IntFlag):
   # Static flags
   CANFD = 1
+  ALT_STEER_ANGLE = 2
 
 
 class FordFlagsSP(IntFlag):
@@ -74,7 +75,7 @@ class FordCarDocs(CarDocs):
 
   def init_make(self, CP: car.CarParams):
     harness = CarHarness.ford_q4 if CP.flags & FordFlags.CANFD else CarHarness.ford_q3
-    if CP.carFingerprint in (CAR.FORD_BRONCO_SPORT_MK1, CAR.FORD_MAVERICK_MK1, CAR.FORD_F_150_MK14, CAR.FORD_F_150_LIGHTNING_MK1):
+    if CP.carFingerprint in (CAR.FORD_BRONCO_SPORT_MK1, CAR.FORD_MAVERICK_MK1, CAR.FORD_F_150_MK14, CAR.FORD_F_150_LIGHTNING_MK1, CAR.FORD_ESCAPE_MK4_23REFRESH):
       self.car_parts = CarParts([Device.threex_angled_mount, harness])
     else:
       self.car_parts = CarParts([Device.threex, harness])
@@ -108,10 +109,22 @@ class CAR(Platforms):
     [FordCarDocs("Ford Bronco Sport 2021-23")],
     CarSpecs(mass=1625, wheelbase=2.67, steerRatio=17.7),
   )
+  FORD_EDGE_MK2 = FordPlatformConfig(
+    [FordCarDocs("Ford Edge 2022")],
+    CarSpecs(mass=1933, steerRatio=15.3, wheelbase=2.824),
+    flags=FordFlags.ALT_STEER_ANGLE,
+  )
   FORD_ESCAPE_MK4 = FordPlatformConfig(
     [
       FordCarDocs("Ford Escape 2020-22", hybrid=True, plug_in_hybrid=True),
       FordCarDocs("Ford Kuga 2020-22", "Adaptive Cruise Control with Lane Centering", hybrid=True, plug_in_hybrid=True),
+    ],
+    CarSpecs(mass=1750, wheelbase=2.71, steerRatio=16.7),
+  )
+  FORD_ESCAPE_MK4_23REFRESH = FordCANFDPlatformConfig(
+    [
+      FordCarDocs("Ford Escape 2023-24", "Co-Pilot360 Assist 2.0", hybrid=True, plug_in_hybrid=True),
+      FordCarDocs("Ford Kuga 2023-24", "Co-Pilot360 Assist 2.0", hybrid=True, plug_in_hybrid=True),
     ],
     CarSpecs(mass=1750, wheelbase=2.71, steerRatio=16.7),
   )
