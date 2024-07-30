@@ -161,7 +161,7 @@ def create_acc_ui_msg(packer, CAN: CanBus, CP, main_on: bool, enabled: bool, fcw
     elif hud_control.rightLaneDepart:
       status = 4  # ActiveInterventionRight
     else:
-      status = 2  # Active
+      status = 7  # hands free
   elif main_on:
     if hud_control.leftLaneDepart:
       status = 5  # ActiveWarningLeft
