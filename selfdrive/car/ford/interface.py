@@ -4,7 +4,7 @@ from openpilot.common.conversions import Conversions as CV
 from openpilot.selfdrive.car import create_button_events, get_safety_config
 from openpilot.selfdrive.car.ford.fordcan import CanBus
 from openpilot.common.params import Params
-from openpilot.selfdrive.car.ford.values import Ecu, FordFlags, FordFlagsSP
+from openpilot.selfdrive.car.ford.values import Ecu, FordFlags, FordFlagsSP, FordConfig
 from openpilot.selfdrive.car.interfaces import CarInterfaceBase
 
 ButtonType = car.CarState.ButtonEvent.Type
@@ -26,6 +26,13 @@ class CarInterface(CarInterfaceBase):
     print(f'Dashcam Only Mode: {ret.dashcamOnly}')
     ret.radarUnavailable = not (ret.flags & FordFlags.CANFD)
     print(f'Radar Unavailable: {ret.radarUnavailable}')
+
+    FordConfig.BLUECRUISE_CLUSTER_PRESENT = any(fw.ecu == Ecu.hud for fw in car_fw) # Check for blue cruise cluster
+    print(f'Blue Cruise Cluster Present: {FordConfig.BLUECRUISE_CLUSTER_PRESENT}')
+
+    for fw in car_fw:
+      print(f'ECU: {fw.ecu}, FW Version: {fw.fwVersion}')
+
     ret.steerControlType = car.CarParams.SteerControlType.angle
     ret.steerActuatorDelay = 0.05
     ret.steerLimitTimer = 1.0

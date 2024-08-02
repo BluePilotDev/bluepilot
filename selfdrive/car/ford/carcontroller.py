@@ -219,7 +219,7 @@ class CarController(CarControllerBase):
           # compute curvature from model predicted orientation
           future_time = 0.2 + self.future_lookup_time # 0.2 + SteerActutatorDelay
           predicted_curvature = interp(future_time, ModelConstants.T_IDXS, model_data.orientationRate.z) / vEgoRaw
-         
+
           # build an array to hold future curvatures, to help with straight away detection
           curvatures = np.array(model_data.acceleration.y) / (CS.out.vEgo ** 2)
           # extract predicted curvature for 1.0 seconds, 2.0 seconds, and 3.0 seconds into the future
@@ -241,7 +241,7 @@ class CarController(CarControllerBase):
 
         # apply ford cuvature safety limits
         apply_curvature = apply_ford_curvature_limits(apply_curvature, self.apply_curvature_last, current_curvature, vEgoRaw)
-        
+
         # if changing lanes, blend PC and DC to smooth out the lane change.
         if self.lane_change:
           if apply_curvature > 0 and model_data.meta.laneChangeState == 1: # initial stages of a right lane change (positive in comma, negative when sent to Ford)
@@ -318,7 +318,7 @@ class CarController(CarControllerBase):
     if (self.frame % CarControllerParams.ACC_UI_STEP) == 0 or send_ui:
       can_sends.append(fordcan.create_acc_ui_msg(self.packer, self.CAN, self.CP, main_on, CC.latActive,
                                                  fcw_alert, CS.out.cruiseState.standstill, hud_control,
-                                                 CS.acc_tja_status_stock_values))
+                                                 CS.acc_tja_status_stock_values, CS.bluecruise_cluster_present))
 
     self.main_on_last = main_on
     self.lkas_enabled_last = CC.latActive

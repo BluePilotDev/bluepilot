@@ -30,9 +30,9 @@ class CarControllerParams:
   # The curvature signal is limited to 0.003 to 0.009 m^-1/sec by the EPS depending on speed and direction
   # Limit to ~2 m/s^3 up, ~3 m/s^3 down at 75 mph
   # Worst case, the low speed limits will allow 4.3 m/s^3 up, 4.9 m/s^3 down at 75 mph
-  ANGLE_RATE_LIMIT_UP = AngleRateLimit(speed_bp=[5, 25], angle_v=[0.0002, 0.0001])
-  ANGLE_RATE_LIMIT_DOWN = AngleRateLimit(speed_bp=[5, 25], angle_v=[0.000225, 0.00015])
-  CURVATURE_ERROR = 0.002  # ~6 degrees at 10 m/s, ~10 degrees at 35 m/s
+  ANGLE_RATE_LIMIT_UP = AngleRateLimit(speed_bp=[5, 25], angle_v=[0.0006, 0.0004])
+  ANGLE_RATE_LIMIT_DOWN = AngleRateLimit(speed_bp=[5, 25], angle_v=[0.0006, 0.0006])
+  CURVATURE_ERROR = 0.004  # ~6 degrees at 10 m/s, ~10 degrees at 35 m/s
 
   ACCEL_MAX = 2.0               # m/s^2 max acceleration
   ACCEL_MIN = -3.5              # m/s^2 max deceleration
@@ -42,6 +42,9 @@ class CarControllerParams:
   def __init__(self, CP):
     pass
 
+
+class FordConfig:
+    BLUECRUISE_CLUSTER_PRESENT = False
 
 class FordFlags(IntFlag):
   # Static flags
@@ -164,6 +167,76 @@ class CAR(Platforms):
   )
 
 
+# Custom Ford Vehicle Tuning Params (per-fingerprint)
+FORD_VEHICLE_TUNINGS = {
+  "FORD_F_150_MK14": {
+    "brake_actutator_target": -0.1,
+    "brake_actutator_stdDevLow": 0.00,
+    "brake_actutator_stdDevHigh": 0.05,
+    "precharge_actutator_target": -0.1,
+    "precharge_actutator_stdDevLow": 0.0,
+    "precharge_actutator_stdDevHigh": 0.05,
+    "path_lookup_time": 0.5,
+    "reset_lookup_time": 0.5,
+    "steerActuatorDelay": 0.02,
+    "steerLimitTimer": 1.5,
+    "stoppingControl": True,
+    "startingState": True,
+    "startAccel": 1.0,
+    "stoppingDecelRate": 0.8,
+    "longitudinalTuning": {
+      "kpBP": [0.0],
+      "kpV": [0.25],
+      "kiV": [0],
+    },
+    "lane_change_factor": 0.65,
+  },
+  "FORD_F_150_LIGHTNING_MK1": {
+    "brake_actutator_target": -0.1,
+    "brake_actutator_stdDevLow": 0.00,
+    "brake_actutator_stdDevHigh": 0.05,
+    "precharge_actutator_target": -0.1,
+    "precharge_actutator_stdDevLow": 0.0,
+    "precharge_actutator_stdDevHigh": 0.05,
+    "path_lookup_time": 0.5,
+    "reset_lookup_time": 0.5,
+    "steerActuatorDelay": 0.02,
+    "steerLimitTimer": 1.5,
+    "stoppingControl": True,
+    "startingState": True,
+    "startAccel": 1.0,
+    "stoppingDecelRate": 0.8,
+    "longitudinalTuning": {
+      "kpBP": [0.0],
+      "kpV": [0.25],
+      "kiV": [0],
+    },
+    "lane_change_factor": 0.65,
+  },
+  "FORD_MUSTANG_MACH_E_MK1": {
+    "brake_actutator_target": -0.1,
+    "brake_actutator_stdDevLow": 0.00,
+    "brake_actutator_stdDevHigh": 0.05,
+    "precharge_actutator_target": -0.1,
+    "precharge_actutator_stdDevLow": 0.0,
+    "precharge_actutator_stdDevHigh": 0.05,
+    "path_lookup_time": 0.5,
+    "reset_lookup_time": 0.5,
+    "steerActuatorDelay": 0.02,
+    "steerLimitTimer": 1.5,
+    "stoppingControl": True,
+    "startingState": True,
+    "startAccel": 1.0,
+    "stoppingDecelRate": 0.8,
+    "longitudinalTuning": {
+      "kpBP": [0.0],
+      "kpV": [0.25],
+      "kiV": [0],
+    },
+    "lane_change_factor": 0.65,
+  }
+}
+
 BUTTONS = [
   Button(car.CarState.ButtonEvent.Type.accelCruise, "Steering_Data_FD1", "CcAslButtnSetIncPress", [1]),
   Button(car.CarState.ButtonEvent.Type.decelCruise, "Steering_Data_FD1", "CcAslButtnSetDecPress", [1]),
@@ -182,18 +255,34 @@ BUTTONS = [
 # 3 = Part number
 # 4 = Software version
 FW_ALPHABET = b'A-HJ-NP-VX-Z'
-FW_PATTERN = re.compile(b'^(?P<model_year_hint>[' + FW_ALPHABET + b'])' +
-                        b'(?P<platform_hint>[0-9' + FW_ALPHABET + b']{3})-' +
-                        b'(?P<part_number>[0-9' + FW_ALPHABET + b']{5,6})-' +
-                        b'(?P<software_revision>[' + FW_ALPHABET + b']{2,})\x00*$')
+# Full firmware version pattern
+FW_PATTERN_FULL = re.compile(
+    b'^(?P<model_year_hint>[' + FW_ALPHABET + b'])' +
+    b'(?P<platform_hint>[0-9' + FW_ALPHABET + b']{3})-' +
+    b'(?P<part_number>[0-9' + FW_ALPHABET + b']{5,6})-' +
+    b'(?P<software_revision>[' + FW_ALPHABET + b']{2,})\x00*$'
+)
+
+# Partial firmware version pattern (excluding software_revision)
+FW_PATTERN_PARTIAL = re.compile(
+    b'^(?P<model_year_hint>[' + FW_ALPHABET + b'])' +
+    b'(?P<platform_hint>[0-9' + FW_ALPHABET + b']{3})-' +
+    b'(?P<part_number>[0-9' + FW_ALPHABET + b']{5,6})\x00*$'
+)
 
 
 def get_platform_codes(fw_versions: list[bytes] | set[bytes]) -> set[tuple[bytes, bytes]]:
   codes = set()
   for fw in fw_versions:
-    match = FW_PATTERN.match(fw)
-    if match is not None:
-      codes.add((match.group('platform_hint'), match.group('model_year_hint')))
+    # Try full match first
+    full_match = FW_PATTERN_FULL.match(fw)
+    if full_match is not None:
+      codes.add((full_match.group('platform_hint'), full_match.group('model_year_hint')))
+    else:
+      # If full match fails, try partial match
+      partial_match = FW_PATTERN_PARTIAL.match(fw)
+      if partial_match is not None:
+        codes.add((partial_match.group('platform_hint'), partial_match.group('model_year_hint')))
 
   return codes
 
@@ -246,10 +335,10 @@ PLATFORM_CODE_ECUS = (Ecu.abs, Ecu.fwdCamera, Ecu.fwdRadar, Ecu.eps)
 DATA_IDENTIFIER_FORD_ASBUILT = 0xDE00
 
 ASBUILT_BLOCKS: list[tuple[int, list]] = [
-  (1, [Ecu.debug, Ecu.fwdCamera, Ecu.eps]),
-  (2, [Ecu.abs, Ecu.debug, Ecu.eps]),
-  (3, [Ecu.abs, Ecu.debug, Ecu.eps]),
-  (4, [Ecu.debug, Ecu.fwdCamera]),
+  (1, [Ecu.debug, Ecu.fwdCamera, Ecu.eps, Ecu.hud]),
+  (2, [Ecu.abs, Ecu.debug, Ecu.eps, Ecu.hud]),
+  (3, [Ecu.abs, Ecu.debug, Ecu.eps, Ecu.hud]),
+  (4, [Ecu.debug, Ecu.fwdCamera, Ecu.hud]),
   (5, [Ecu.debug]),
   (6, [Ecu.debug]),
   (7, [Ecu.debug]),
@@ -277,13 +366,13 @@ FW_QUERY_CONFIG = FwQueryConfig(
     Request(
       [StdQueries.TESTER_PRESENT_REQUEST, StdQueries.MANUFACTURER_SOFTWARE_VERSION_REQUEST],
       [StdQueries.TESTER_PRESENT_RESPONSE, StdQueries.MANUFACTURER_SOFTWARE_VERSION_RESPONSE],
-      whitelist_ecus=[Ecu.abs, Ecu.debug, Ecu.engine, Ecu.eps, Ecu.fwdCamera, Ecu.fwdRadar, Ecu.shiftByWire],
+      whitelist_ecus=[Ecu.abs, Ecu.debug, Ecu.engine, Ecu.eps, Ecu.fwdCamera, Ecu.fwdRadar, Ecu.shiftByWire, Ecu.hud],
       logging=True,
     ),
     Request(
       [StdQueries.TESTER_PRESENT_REQUEST, StdQueries.MANUFACTURER_SOFTWARE_VERSION_REQUEST],
       [StdQueries.TESTER_PRESENT_RESPONSE, StdQueries.MANUFACTURER_SOFTWARE_VERSION_RESPONSE],
-      whitelist_ecus=[Ecu.abs, Ecu.debug, Ecu.engine, Ecu.eps, Ecu.fwdCamera, Ecu.fwdRadar, Ecu.shiftByWire],
+      whitelist_ecus=[Ecu.abs, Ecu.debug, Ecu.engine, Ecu.eps, Ecu.fwdCamera, Ecu.fwdRadar, Ecu.shiftByWire, Ecu.hud],
       bus=0,
       auxiliary=True,
     ),
@@ -300,6 +389,7 @@ FW_QUERY_CONFIG = FwQueryConfig(
                                       # Note: We are unlikely to get a response from behind the gateway
     (Ecu.shiftByWire, 0x732, None),   # Gear Shift Module
     (Ecu.debug, 0x7d0, None),         # Accessory Protocol Interface Module
+    (Ecu.hud, 0x720, None),           # Instrument Cluster Module
   ],
   # Custom fuzzy fingerprinting function using platform and model year hints
   match_fw_to_car_fuzzy=match_fw_to_car_fuzzy,

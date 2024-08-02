@@ -1,4 +1,5 @@
 from cereal import car
+from openpilot.common.numpy_fast import clip
 from openpilot.selfdrive.car import CanBusBase
 
 HUDControl = car.CarControl.HUDControl
@@ -44,6 +45,21 @@ def create_lka_msg(packer, CAN: CanBus):
   """
 
   return packer.make_can_msg("Lane_Assist_Data1", CAN.main, {})
+
+def create_lka3_msg(packer, CAN: CanBus):
+  """
+  Creates an empty CAN message for the Ford LKA Command.
+
+  This command can apply "Lane Keeping Aid" manoeuvres, which are subject to the PSCM lockout.
+
+  Frequency is 33Hz.
+  """
+  values = {
+    "LatCtlCpblty_D_Stat": 2,                   # Lateral Control Capability: 0=NoModeAvailable, 1=LimitedModeAvailable,
+                                                #            2=ExtendedModeAvailable, 3=Faulty [0|3]
+    "LaActAvail_D_Actl": 3,                      # Lane Keeping Aid Availability: 0=No, 1=Yes, 2=Faulty, 3=NotAvailable [0|3]
+  }
+  return packer.make_can_msg("Lane_Assist_Data3", CAN.main, values)
 
 
 def create_lat_ctl_msg(packer, CAN: CanBus, lat_active: bool, ramp_type: int, precision_type: int, path_offset: float, path_angle: float,
@@ -145,7 +161,7 @@ def create_acc_msg(packer, CAN: CanBus, long_active: bool, gas: float, accel: fl
 
 
 def create_acc_ui_msg(packer, CAN: CanBus, CP, main_on: bool, enabled: bool, fcw_alert: bool, standstill: bool,
-                      hud_control, stock_values: dict):
+                      hud_control, stock_values: dict, bc_cluster: bool):
   """
   Creates a CAN message for the Ford IPC adaptive cruise, forward collision warning and traffic jam
   assist status.
@@ -155,12 +171,14 @@ def create_acc_ui_msg(packer, CAN: CanBus, CP, main_on: bool, enabled: bool, fcw
   Frequency is 5Hz.
   """
 
-  # Tja_D_Stat
+   # Tja_D_Stat
   if enabled:
     if hud_control.leftLaneDepart:
       status = 3  # ActiveInterventionLeft
     elif hud_control.rightLaneDepart:
       status = 4  # ActiveInterventionRight
+    elif bc_cluster:
+      status = 7 # Show BlueCruise UI in the Cluster
     else:
       status = 2  # Active
   elif main_on:

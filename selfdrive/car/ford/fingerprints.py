@@ -109,7 +109,8 @@ FW_VERSIONS = {
       b'ML3V-14D003-BC\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00',
     ],
     (Ecu.abs, 0x760, None): [
-      b'PL34-2D053-CA\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00',
+      # b'PL34-2D053-CA\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00',
+      b'PL34-2D053\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00',
     ],
     (Ecu.fwdRadar, 0x764, None): [
       b'ML3T-14D049-AL\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00',
@@ -118,6 +119,9 @@ FW_VERSIONS = {
       b'ML3T-14H102-ABR\x00\x00\x00\x00\x00\x00\x00\x00\x00',
       b'PJ6T-14H102-ABJ\x00\x00\x00\x00\x00\x00\x00\x00\x00',
     ],
+    (Ecu.hud, 0x720, None): [
+      b'NU5T-10F906\x00\x00\x00\x00\x00\x00\x00\x00\x00',
+    ]
   },
   CAR.FORD_F_150_LIGHTNING_MK1: {
     (Ecu.abs, 0x760, None): [
@@ -128,6 +132,10 @@ FW_VERSIONS = {
     ],
     (Ecu.fwdRadar, 0x764, None): [
       b'ML3T-14D049-AL\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00',
+    ],
+    (Ecu.hud, 0x720, None): [
+      # b'NU5T-10F906-FCC\x00\x00\x00\x00\x00\x00\x00\x00\x00',
+      b'NU5T-10F906\x00\x00\x00\x00\x00\x00\x00\x00\x00',
     ],
   },
   CAR.FORD_MUSTANG_MACH_E_MK1: {
@@ -143,6 +151,10 @@ FW_VERSIONS = {
     ],
     (Ecu.fwdCamera, 0x706, None): [
       b'ML3T-14H102-ABS\x00\x00\x00\x00\x00\x00\x00\x00\x00',
+    ],
+    (Ecu.hud, 0x720, None): [
+      b'PJ8T-14C026\x00\x00\x00\x00\x00\x00\x00\x00\x00',
+      # b'LJ8T-14C026-LT\x00\x00\x00\x00\x00\x00\x00\x00\x00',
     ],
   },
   CAR.FORD_FOCUS_MK4: {
