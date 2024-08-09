@@ -38,7 +38,7 @@ class CarInterface(CarInterfaceBase):
     ret.steerLimitTimer = 1.0
 
     ret.longitudinalTuning.kpBP = [0.]
-    ret.longitudinalTuning.kpV = [0.5]
+    ret.longitudinalTuning.kpV = [0.0]
     ret.longitudinalTuning.kiV = [0.]
     ret.longitudinalTuning.deadzoneBPDEPRECATED = [0., 9.]
     ret.longitudinalTuning.deadzoneVDEPRECATED = [.0, .20]
