@@ -22,8 +22,8 @@ class CarInterface(CarInterfaceBase):
     print(f'candidate (interface): {candidate}')
 
     ret.carName = "ford"
-    ret.dashcamOnly = not (ret.flags & FordFlags.CANFD)
-    print(f'Dashcam Only Mode: {ret.dashcamOnly}')
+    # ret.dashcamOnly = not (ret.flags & FordFlags.CANFD)
+    # print(f'Dashcam Only Mode: {ret.dashcamOnly}')
     ret.radarUnavailable = not (ret.flags & FordFlags.CANFD)
     print(f'Radar Unavailable: {ret.radarUnavailable}')
 
