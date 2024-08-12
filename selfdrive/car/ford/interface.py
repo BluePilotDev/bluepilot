@@ -27,8 +27,12 @@ class CarInterface(CarInterfaceBase):
     ret.radarUnavailable = not (ret.flags & FordFlags.CANFD)
     print(f'Radar Unavailable: {ret.radarUnavailable}')
 
-    FordConfig.BLUECRUISE_CLUSTER_PRESENT = any(fw.ecu == Ecu.hud for fw in car_fw) # Check for blue cruise cluster
-    print(f'Blue Cruise Cluster Present: {FordConfig.BLUECRUISE_CLUSTER_PRESENT}')
+    if fingerprint == "FORD_MUSTANG_MACH_E_MK1":
+       FordConfig.BLUECRUISE_CLUSTER_PRESENT = True
+       print(f'Blue Cruise Cluster Present: {FordConfig.BLUECRUISE_CLUSTER_PRESENT}')
+    else:
+        FordConfig.BLUECRUISE_CLUSTER_PRESENT = any(fw.ecu == Ecu.hud for fw in car_fw) # Check for blue cruise cluster
+        print(f'Blue Cruise Cluster Present: {FordConfig.BLUECRUISE_CLUSTER_PRESENT}')
 
     for fw in car_fw:
       print(f'ECU: {fw.ecu}, FW Version: {fw.fwVersion}')
