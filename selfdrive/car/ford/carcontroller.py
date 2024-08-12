@@ -126,57 +126,13 @@ class CarController(CarControllerBase):
     self.target_speed_multiplier = 1 # Default: 0
 
     # model specific tuning
-    print(f'CarFingerprint: {self.CP.carFingerprint}')
-    if self.CP.flags & FordFlags.CANFD:
-      self.testing_active = True
-
-      if self.CP.carFingerprint == "FORD F-150 14TH GEN":
-        print(f'Matched carFingerprint: {self.CP.carFingerprint}')
-        self.brake_actutator_target = -0.1
-        self.brake_actutator_stdDevLow = 0.05
-        self.brake_actutator_stdDevHigh = 0.08
-        self.precharge_actutator_target = -0.07
-        self.precharge_actutator_stdDevLow = 0.03
-        self.precharge_actutator_stdDevHigh = 0.05
-        self.app_PC_percentage = 0.4 # what percentage of apply_curvature is derived from predicted curvature
-
-      elif self.CP.carFingerprint == "FORD F-150 LIGHTNING 1ST GEN":
-        print(f'Matched carFingerprint: {self.CP.carFingerprint}')
-        self.brake_actutator_target = -0.1
-        self.brake_actutator_stdDevLow = 0.05
-        self.brake_actutator_stdDevHigh = 0.08
-        self.precharge_actutator_target = -0.07
-        self.precharge_actutator_stdDevLow = 0.03
-        self.precharge_actutator_stdDevHigh = 0.05
-        self.app_PC_percentage = 0.4 # what percentage of apply_curvature is derived from predicted curvature
-
-      elif self.CP.carFingerprint == "FORD MUSTANG MACH-E 1ST GEN":
-        print(f'Matched carFingerprint: {self.CP.carFingerprint}')
-        self.brake_actutator_target = -0.1
-        self.brake_actutator_stdDevLow = 0.05
-        self.brake_actutator_stdDevHigh = 0.08
-        self.precharge_actutator_target = -0.07
-        self.precharge_actutator_stdDevLow = 0.03
-        self.precharge_actutator_stdDevHigh = 0.05
-        self.app_PC_percentage = 0.5 # what percentage of apply_curvature is derived from predicted curvature
-
-      elif self.CP.carFingerprint == "FORD ESCAPE 2023 REFRESH":
-        print(f'Matched carFingerprint: {self.CP.carFingerprint}')
-        self.brake_actutator_target = -0.1
-        self.brake_actutator_stdDevLow = 0.05
-        self.brake_actutator_stdDevHigh = 0.08
-        self.precharge_actutator_target = -0.07
-        self.precharge_actutator_stdDevLow = 0.03
-        self.precharge_actutator_stdDevHigh = 0.05
-        self.app_PC_percentage = 0.5 # what percentage of apply_curvature is derived from predicted curvature
-    else:
-      self.brake_actutator_target = -0.1
-      self.brake_actutator_stdDevLow = 0.05
-      self.brake_actutator_stdDevHigh = 0.08
-      self.precharge_actutator_target = -0.07
-      self.precharge_actutator_stdDevLow = 0.03
-      self.precharge_actutator_stdDevHigh = 0.05
-      self.app_PC_percentage = 0.5 # what percentage of apply_curvature is derived from predicted curvature
+    self.brake_actutator_target = -0.1
+    self.brake_actutator_stdDevLow = 0.05
+    self.brake_actutator_stdDevHigh = 0.08
+    self.precharge_actutator_target = -0.07
+    self.precharge_actutator_stdDevLow = 0.03
+    self.precharge_actutator_stdDevHigh = 0.05
+    self.app_PC_percentage = 0.5 # what percentage of apply_curvature is derived from predicted curvature
 
     self.brake_clip = self.brake_actutator_target - self.brake_actutator_stdDevLow
 
