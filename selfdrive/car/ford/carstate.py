@@ -67,7 +67,7 @@ class CarState(CarStateBase):
     ret.parkingBrake = cp.vl["DesiredTorqBrk"]["PrkBrkStatus"] in (1, 2)
 
     # steering wheel
-     if self.CP.flags & FordFlags.ALT_STEER_ANGLE:
+    if self.CP.flags & FordFlags.ALT_STEER_ANGLE:
       steering_angle_init = cp.vl[self.steering_msg]["StePinRelInit_An_Sns"]
       if self.vehicle_sensors_valid:
         steering_angle_est = cp.vl["ParkAid_Data"]["ExtSteeringAngleReq2"]
@@ -164,7 +164,6 @@ class CarState(CarStateBase):
 
       return self.v_limit * speed_factor if self.v_limit not in (0, 255) else 0
 
-  # @staticmethod
   def get_can_parser(CP):
     messages = [
       # sig_address, frequency
