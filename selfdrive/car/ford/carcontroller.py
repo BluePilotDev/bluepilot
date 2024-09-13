@@ -275,8 +275,7 @@ class CarController(CarControllerBase):
               requested_curvature = requested_curvature * self.high_curvature_factor
 
           # apply ford cuvature safety limits
-          apply_curvature = requested_curvature
-          # apply_curvature = apply_ford_curvature_limits(requested_curvature, self.apply_curvature_last, current_curvature, CS.out.vEgoRaw)
+          apply_curvature = apply_ford_curvature_limits(requested_curvature, self.apply_curvature_last, current_curvature, CS.out.vEgoRaw)
 
           # detect if steering was limited
           if (requested_curvature != apply_curvature) and (not steeringPressed):
