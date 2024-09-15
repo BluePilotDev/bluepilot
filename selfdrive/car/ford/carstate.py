@@ -19,7 +19,7 @@ class CarState(CarStateBase):
     if CP.transmissionType == TransmissionType.automatic:
       if CP.flags & FordFlags.CANFD:
         self.shifter_values = can_define.dv["Gear_Shift_by_Wire_FD1"]["TrnRng_D_RqGsm"]
-      elif CP.flags & FordFlags.ALT_STEER_ANGL:
+      elif CP.flags & FordFlags.ALT_STEER_ANGLE:
         self.shifter_values = can_define.dv["TransGearData"]["GearLvrPos_D_Actl"]
       else:
         self.shifter_values = can_define.dv["PowertrainData_10"]["TrnRng_D_Rq"]
@@ -113,7 +113,7 @@ class CarState(CarStateBase):
     if self.CP.transmissionType == TransmissionType.automatic:
       if self.CP.flags & FordFlags.CANFD:
         gear = self.shifter_values.get(cp.vl["Gear_Shift_by_Wire_FD1"]["TrnRng_D_RqGsm"])
-      elif self.CP.flags & FordFlags.ALT_STEER_ANGL:
+      elif self.CP.flags & FordFlags.ALT_STEER_ANGLE:
           gear = self.shifter_values.get(cp.vl["TransGearData"]["GearLvrPos_D_Actl"])
       else:
         gear = self.shifter_values.get(cp.vl["PowertrainData_10"]["TrnRng_D_Rq"])
