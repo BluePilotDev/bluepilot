@@ -34,9 +34,9 @@ def load_initial_cc_pref_params(self_obj): # self_obj is the CarController objec
   self_obj.enable_human_turn_detection = get_bool_param("FordPrefHumanTurnDetectionEnable", True)
   self_obj.send_lane_depart_can_msg = get_bool_param("FordPrefLaneDepartCanMsg", False)
   self_obj.send_driver_monitor_can_msg = get_bool_param("FordPrefDriverMonitorCanMsg", False)
-  self_obj.low_curv_pc_factor = get_float_param("FordLatTuningLowCurvPCFactor", 0.2)
-  self_obj.high_curv_pc_factor = get_float_param("FordLatTuningHighCurvPCFactor", 0.65)
-  self_obj.high_curvature_factor = get_float_param("FordLatTuningHighCurvFactor", 0.95)
+  self_obj.low_curv_pc_factor = get_float_param("FordLatTuningLowCurvPCFactor", 0.3)
+  self_obj.high_curv_pc_factor = get_float_param("FordLatTuningHighCurvPCFactor", 0.3)
+  self_obj.high_curvature_factor = get_float_param("FordLatTuningHighCurvFactor", 0.98)
   self_obj.curvature_max = get_float_param("FordLimitsCurvatureMax", CarControllerParams.CURVATURE_MAX)
   self_obj.curvature_error = get_float_param("FordLimitsCurvatureError", CarControllerParams.CURVATURE_ERROR)
 
