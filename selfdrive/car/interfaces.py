@@ -261,7 +261,10 @@ class CarInterfaceBase(ABC):
     return self.lat_torque_nn_model is not None and self.param_s.get_bool("NNFF")
 
   def apply(self, c: car.CarControl, now_nanos: int, model_data=None) -> tuple[car.CarControl.Actuators, list[SendCan]]:
-    return self.CC.update(c, self.CS, now_nanos, model_data=model_data)
+     if self.CP.carName == "ford":
+      return self.CC.update(c, self.CS, now_nanos, model_data=model_data)
+    else:
+      return self.CC.update(c, self.CS, now_nanos)
 
   @staticmethod
   def get_pid_accel_limits(CP, current_speed, cruise_speed):
