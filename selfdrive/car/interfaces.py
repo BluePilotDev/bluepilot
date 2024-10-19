@@ -263,7 +263,7 @@ class CarInterfaceBase(ABC):
   def apply(self, c: car.CarControl, now_nanos: int, model_data=None) -> tuple[car.CarControl.Actuators, list[SendCan]]:
      if self.CP.carName == "ford":
       return self.CC.update(c, self.CS, now_nanos, model_data=model_data)
-    else:
+     else:
       return self.CC.update(c, self.CS, now_nanos)
 
   @staticmethod
