@@ -22,8 +22,8 @@ Table of Contents
 
 ---
 
-Join the official Ford channel at the sunnypilot Discord server to stay up to date with all the latest features and be a part of shaping the future of bluepilot!
-* https://discord.com/channels/880416502577266699/1064822699085545522
+Join the official #Ford channel at the sunnypilot Discord server to stay up to date with all the latest features and be a part of shaping the future of bluepilot!
+* https://discord.gg/sunnypilot
 
 </details>
 
@@ -82,12 +82,14 @@ Requires further assistance with software installation? Join the [sunnypilot Dis
 ---
 In addition to all sunnypilot features, bluepilot incorporates the following Ford specific enhacements.
 
-- [**Improved Ford Longitudinal controls**] - Logic to adjust stock OpenPilot single acceleration signal into seperate gas and brake signals for much smoother long control on ford vehicles.
+- [**Improved Ford Longitudinal controls**] - logic to adjust stock OpenPilot single acceleration signal into seperate gas and brake signals for much smoother long control on ford vehicles.
 - [**Anti-Windup in Turns**] - Logic to reset the EPAS back to zero when a human turn is detected.  This prevents the EPAS from winding up and fighting to keep turning after the car has straightened up.  Makes experimental mode and MADS safer to use.
-- [**Anti Ping Pong Logic**] - Tunable amounts of predicted curvature (https://www.f150gen14.com/forum/threads/introducing-bluepilot-a-ford-specific-fork-for-comma3x-openpilot.24241/#post-457707) for straight aways and curves.  This greatly reduce steering wheel wiggle and ping pong.
-- [**Less Aggressive Lane Changes**] - Utilizes a blend of desired curvature and predicted curvature to achieve smoother, less aggressive lane changes.
-- [**Tunable Curve Cutting**] - Adjust the amount of curvature applied in curves to eliminate cutting corners
-- [**Updated Steering Limited Exceeded Calculation**] - Updated logic to determine when steering limited has actually been exceeded.  Reduces nuiscance alerts.
+- [**Tunable Lateral Control**] - customize many aspects of the lateral control.  Before tuning the lateral variables, it is important to understand the disticntion between predicted curvature and desired curvature.  See the following forum posts (#4 and #5) for an explination with visuals: https://www.f150gen14.com/forum/threads/introducing-bluepilot-a-ford-specific-fork-for-comma3x-openpilot.24241/#post-457706
+- - [**Lane Change Modifier**] - This is the percentage of the calculated curvature signal to send when making a lane change.  OpenPilot models request very aggressive lane changes which can be uncomfortable in a Ford.  This is a decimal number 0-1 where 0 would send no curvature (and a lane change would not happen) and 1 would send the full curvature derived from the model and result in an aggressive lane change.  Te lower the number, the smoother the lane change, however too low of a number can result in the lane change aborting part of the way through (espeically in curves).  The hard-coded number in initial releases of BluePilot was 65%
+- - [**Low Curvature PC Factor**] - This controls the amount of predicted curvature used to derive the steering signal in straight aways.  It is a decimal number 0 to 1 where 0 would use 0% predicted curvature and 100% desired curvature.  More predicted curvature results in less aggressive control and less ping pong.  Too much predicted curvature results in "lazy control" or "low torque".  The idea is to slowly increase this variable until ping pong stops, but go no further. For lazy control or low torque, decrease this number.  The hard-coded value in the initial releases of BluePilot was 40%.
+- - [**High Curvature PC Factor**] - This controls the amount of predicted curvature used to derive the steering signal in curves.  It is a decimal number 0 to 1 where 0 would use 0% predicted curvature and 100% desired curvature.  More predicted curvature results in less aggressive control and less ping pong.  Too much predicted curvature results in "lazy control" or "low torque".  The idea is to slowly increase this variable until ping pong stops, but go no further. For lazy control or low torque, decrease this number.  The hard-coded value in the initial releases of BluePilot was 55%
+- - [**High Curvature Factor**] - This variables reduces the final control signal to the steering.  It is a decimal number 0 to 1 where 0 would send no steering signal to the vehicle and  1 would send the full steering signal to the vehicle. Anything less than 1.0 will reduce the torque available and make steering feel lazy, use this variable only if having issues with cutting corners in curves and all other variables are tuned to satisfaction.  The hard-coded value in early releases of BluePilot was 1.0
+   
 
 </details>
 
