@@ -105,19 +105,19 @@ class CarController:
     self.lane_change = False # initialize variable for capturing lane change status
 
     # Activates at self.brake_actutator_target - self.brake_actutator_stdDevLow
-    self.brake_actutator_target = -0.5 # Default: -0.5
-    self.brake_actutator_stdDevLow = 0.2 # Default: -0.5
+    self.brake_actutator_target = -0.1 # Default: -0.5
+    self.brake_actutator_stdDevLow = 0.05 # Default: -0.5
 
     # Deactivates at self.brake_actutator_target + self.brake_actutator_stdDevHigh
-    self.brake_actutator_stdDevHigh = 0.1 # Default: 0
+    self.brake_actutator_stdDevHigh = 0.08 # Default: 0
 
     # Activates at self.precharge_actutator_target - self.precharge_actutator_stdDevLow
-    self.precharge_actutator_stdDevLow = 0.1 # Default: -0.25
+    self.precharge_actutator_stdDevLow = 0.03 # Default: -0.25
 
     # Deactivates at self.precharge_actutator_target + self.precharge_actutator_stdDevHigh
-    self.precharge_actutator_stdDevHigh = 0.1 # Default: 0
+    self.precharge_actutator_stdDevHigh = 0.05 # Default: 0
 
-    self.precharge_actutator_target = -0.1
+    self.precharge_actutator_target = -0.07
     self.brake_0_point = 0
     self.brake_converge_at = -1.5
     self.testing_active = False
