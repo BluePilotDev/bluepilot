@@ -14,7 +14,7 @@ SETTINGS_PARAMS = [
   ["FordPrefDriverMonitorCanMsg", "send_driver_monitor_can_msg", False, bool],
   ["FordLatTuningLowCurvPCFactor", "low_curv_pc_factor", 0.65, float],
   ["FordLatTuningHighCurvPCFactor", "high_curv_pc_factor", 0.45, float],
-  ["FordLatTuningHighCurvFactor", "high_curvature_factor", 0.90, float],
+  ["FordLatTuningHighCurvFactor", "high_curvature_factor", 0.99, float],
   ["FordLatTuningPathLookupTime", "path_lookup_time", None, float],
   ["FordLatTuningResetLookupTime", "reset_lookup_time", None, float],
   ["FordLatTuningLaneChgModifier", "lane_change_factor", None, float],
