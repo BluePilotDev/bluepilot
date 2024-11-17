@@ -44,7 +44,7 @@ class CarControllerParams:
 class FordFlags(IntFlag):
   # Static flags
   CANFD = 1
-
+  ALT_STEER_ANGLE = 2
 
 class FordFlagsSP(IntFlag):
   SP_ENHANCED_LAT_CONTROL = 1
@@ -122,6 +122,14 @@ class CAR(Platforms):
       FordCarDocs("Ford Kuga 2020-22", "Adaptive Cruise Control with Lane Centering", hybrid=True, plug_in_hybrid=True),
     ],
     CarSpecs(mass=1750, wheelbase=2.71, steerRatio=16.7),
+  )
+    FORD_EDGE_MK2 = FordPlatformConfig(
+    [
+    FordCarDocs("Ford Edge 2022"),
+    FordCarDocs("Ford Fusion Retrofited 2013-2019"),
+    ],
+    CarSpecs(mass=1691, steerRatio=15.3, wheelbase=2.824),
+    flags=FordFlags.ALT_STEER_ANGLE,
   )
   FORD_ESCAPE_MK4_23REFRESH = FordCANFDPlatformConfig(
     [
