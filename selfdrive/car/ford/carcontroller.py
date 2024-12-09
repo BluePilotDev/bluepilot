@@ -127,7 +127,7 @@ class CarController(CarControllerBase):
     # max absolute values for all four signals
     self.path_angle_max = 0.25  # too much path_angle can cause jerky steering
     self.path_offset_max = 1.50  # too much path_offset can cause jerky steering
-    self.curvature_max = 0.02  # too much curvature can cause steering windup
+    self.curvature_max = 0.015  # too much curvature can cause steering windup
     self.curvature_rate_max = 0.001023  # from dbc files
 
     # human turn detection parameters
