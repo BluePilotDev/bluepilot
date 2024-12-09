@@ -84,10 +84,7 @@ In addition to all sunnypilot features, bluepilot incorporates the following For
 
 - [**Improved Ford Longitudinal controls**] - logic to adjust stock OpenPilot single acceleration signal into seperate gas and brake signals for much smoother long control on ford vehicles.
 - [**Anti-Windup in Turns**] - Logic to reset the EPAS back to zero when a human turn is detected.  This prevents the EPAS from winding up and fighting to keep turning after the car has straightened up.  Makes experimental mode and MADS safer to use.
-- [**Anti Ping Pong Logic**] - Tunable amounts of predicted curvature (https://www.f150gen14.com/forum/threads/introducing-bluepilot-a-ford-specific-fork-for-comma3x-openpilot.24241/#post-457707) for straight aways and curves.  This greatly reduce steering wheel wiggle and ping pong.
-- [**Less Aggressive Lane Changes**] - utilizes a blend of desired curvature and predicted curvature to achieve smoother, less aggressive lane changes.
-- [**Tunable Curve Cutting**] - adjust the amount of curvature applied in curves to eliminate cutting corners
-   
+- [**Adjustable In-Lane Position**] - Adjust the postion in lane either left or right(negative value) or right (positive value)
 
 </details>
 
