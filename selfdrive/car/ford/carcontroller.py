@@ -100,9 +100,9 @@ class CarController(CarControllerBase):
     self.steer_warning_count = 0 # count how many cycles the warning has existed
 
     # Curvature variables
-    self.lane_change_factor = 0.00  #how much of predicted curvature do we actually use if a lane chagne is active (because desired curvatureis too aggressive)
+    self.lane_change_factor = 0.60  #how much of predicted curvature do we actually use if a lane chagne is active (because desired curvatureis too aggressive)
     self.requested_curvature_filtered = FirstOrderFilter(0.0, 0.3, 0.05)  # filter for apply_curvature
-    self.pc_blend_ratio = 0.00 # 0% Predicted Curvature and 100% Desired Curvature
+    self.pc_blend_ratio = 0.60 # 60% Predicted Curvature and 40% Desired Curvature
     self.curvature_lookup_time =  CP.steerActuatorDelay # how far into the future do we need to look for curvature signal
 
     # Curvature rate variables
