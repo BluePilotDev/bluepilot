@@ -41,7 +41,7 @@ class CarInterface(CarInterfaceBase):
     info(f'| Blue Cruise Cluster Present: {FordConfig.BLUECRUISE_CLUSTER_PRESENT}', True)
 
     ret.steerControlType = structs.CarParams.SteerControlType.angle
-    ret.steerActuatorDelay = 0.05
+    ret.steerActuatorDelay = 0.22
     ret.steerLimitTimer = 1.0
     ret.steerAtStandstill = True
 
