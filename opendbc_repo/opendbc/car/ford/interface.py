@@ -62,7 +62,7 @@ class CarInterface(CarInterfaceBase):
       cfgs.insert(0, get_safety_config(structs.CarParams.SafetyModel.noOutput))
     ret.safetyConfigs = cfgs
 
-    ret.experimentalLongitudinalAvailable = (bool)(ret.flags & FordFlags.CANFD)
+    ret.experimentalLongitudinalAvailable = True # (bool)(ret.flags & FordFlags.CANFD)
     info(f"| experimentalLongAvailable: {ret.experimentalLongitudinalAvailable}", True)
     info(f"| experimental_long: {experimental_long}", True)
     info(f"| ret.flags & FordFlags.CANFD: {ret.flags & FordFlags.CANFD}", True)
