@@ -3,6 +3,7 @@
 Table of Contents
 =======================
 
+* [Updates on Branch Names and Links](#-updates-on-branch-names-and-links)
 * [Join our Discord](#-join-our-discord)
 * [What is bluepilot?](#-what-is-sunnypilot)
 * [Running in a car](#-running-on-a-dedicated-device-in-a-car)
@@ -10,11 +11,30 @@ Table of Contents
 * [Prohibited Safety Modifications](#-prohibited-safety-modifications)
 * [Installation](#-installation)
 * [Highlight Features](#-highlight-features)
-* [Branch Definitions](#-branch-definitions)
-* [Recommended Branches](#-recommended-branches)
 * [Special Thanks](#-special-thanks)
 * [User Data](#-user-data)
 * [Licensing](#licensing)
+
+---
+
+<details><summary><h3>💭 Updates on Branch Names and Links</h3></summary>
+
+---
+
+As of May 2025, we are updating the way branches are named and how links are generated. We had intially intended to use a branch naming system similar to openpilot and sunnypilot where there was a "stable" or "release" branch which included all fully vetted code, and then "staging" or "beta" branches with new code that would eventually move into the stable/release branches.  However as we evolved we found everyone liked being able to bounce between newer and older branches to compare features and control. Moving forwards all releases will simply be named bp-"feature release number" as an example "staging-1.1" which features the bluepilot 1.1 features (custom tuning) will become "bp-1.1".  We will not delete older branches so that anyone can go back and view older code for references.  Branches that no longer work properly will be denoted as -deprecated.
+
+To install any version of bleupilot, use the following URL formula (URL is case sensitive)
+
+installer.comaa.ai/BluePilotDev/"branch name"  
+
+For example
+
+installer.comma.ai/BluePilotDev/bp-2.1 
+
+will install the bp-2.1 branch.  Branches known to no longer work due to changes in the comma codebase will be apended with -deprecated so it will be obvious they will not install or work correctly.
+
+</details>
+
 
 ---
 
@@ -22,8 +42,8 @@ Table of Contents
 
 ---
 
-Join the official Ford channel at the sunnypilot Discord server to stay up to date with all the latest features and be a part of shaping the future of bluepilot!
-* https://discord.com/channels/880416502577266699/1064822699085545522
+Join the official #ford channel at the sunnypilot Discord server to stay up to date with all the latest features and be a part of shaping the future of bluepilot!
+* [sunnypilot Discord server](https://discord.sunnypilot.com)
 
 </details>
 
@@ -54,23 +74,17 @@ The following changes are a **VIOLATION** of this policy and **ARE NOT** include
 
 <details><summary><h3>⚒ Installation</h3></summary>
 
-Please refer to [Recommended Branches](#-recommended-branches) to find your preferred/supported branch. This guide will assume you want to install the latest `stable` branch.
-
 * bluepilot not installed
   1. [Factory reset/uninstall](https://github.com/commaai/openpilot/wiki/FAQ#how-can-i-reset-the-device) the previous software if you have another software/fork installed.
   2. After factory reset/uninstall and upon reboot, select `Custom Software` when given the option.
-  3. Input the installation URL per [Recommended Branches](#-recommended-branches). Example: ```https://bit.ly/bp-stable``` [^4] (note: `https://` is not requirement on the comma three)
+  3. Input the installation URL based on the desired branch. Example: ```installter.comma.ai/BluePilotDev/staging-2.1``` [^4] (note: `https://` is not requirement on the comma three)
   4. Complete the rest of the installation following the onscreen instructions.
 
 * bluepilot already installed and you installed a version after 0.8.17?
   1. On the comma three, go to `Settings` ▶️ `Software`.
   2. At the `Download` option, press `CHECK`. This will fetch the list of latest branches from sunnypilot.
   3. At the `Target Branch` option, press `SELECT` to open the Target Branch selector.
-  4. Scroll to select the desired branch per [Recommended Branches](#-recommended-branches). Example: `stable`
-
-|    Branch    |         Installation URL         |
-|:------------:|:--------------------------------:|
-| `stable` | https://bit.ly/bp-stable |
+  4. Scroll to select the desired branch
 
 
 Requires further assistance with software installation? Join the [sunnypilot Discord server](https://discord.sunnypilot.com) and message us in the `#ford` channel.
@@ -90,29 +104,6 @@ In addition to all sunnypilot features, bluepilot incorporates the following For
 
 </details>
 
-<details><summary><h3>⚒ Branch Definitions</h3></summary>
-
----
-
-|    Tag    | Definition           | Description                                                                                                                                                                                 |
-|:---------:|----------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `stable` | stable branches     | Include features that are **verified** by trusted testers and the community. Ready to use. ✅                                                                                                |                                                                                      
-
-Example:
-* [`stable`](https://github.com/bluepilotdev/bluepilot/stable): Latest stable branch that is verified by trusted testers and the community. Ready to use.
-
-</details>
-
-<details><summary><h3>✅ Recommended Branches</h3></summary>
-
----
-
-| Branch                                                                              | Definition                                              | Compatible Device |                                                                                |
-|:------------------------------------------------------------------------------------|---------------------------------------------------------|-------------------|--------------------------------------------------------------------------------------------|
-| [`stable`](https://github.com/bluepilotdev/bluepilot/stable)           | • Latest release/stable branch                          | comma three       | 
-
-
-</details>
 
 <details><summary><h3>📗 How To's</h3></summary>
 
