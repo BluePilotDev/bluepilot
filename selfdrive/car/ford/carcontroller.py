@@ -17,7 +17,7 @@ LaneChangeState = log.LaneChangeState # is lane change active
 
 def apply_ford_curvature_limits(apply_curvature, apply_curvature_last, current_curvature, v_ego_raw):
   # No blending at low speed due to lack of torque wind-up and inaccurate current curvature
-  if v_ego_raw > 9:
+  if v_ego_raw > 12:
     apply_curvature = clip(apply_curvature, current_curvature - CarControllerParams.CURVATURE_ERROR,
                            current_curvature + CarControllerParams.CURVATURE_ERROR)
 
@@ -261,7 +261,7 @@ class CarController:
       steeringAngleDeg = CS.out.steeringAngleDeg
 
       # if a human turn is active, reset steering to prevent windup
-      if steeringPressed and abs(steeringAngleDeg) > 45:
+      if steeringPressed and abs(steeringAngleDeg) > 60:
         apply_curvature = 0
         ramp_type = 3
       else:
