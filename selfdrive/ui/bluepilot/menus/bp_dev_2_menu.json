@@ -1,0 +1,764 @@
+{
+  "type": "navigation",
+  "menuName": "BluePilot",
+  "menuIcon": "icon_ford.png",
+  "menuDescription": "BluePilot Panel",
+  "equalWidth": true,
+  "iconPosition": "top",
+  "tabs": [
+    {
+      "name": "Preferences",
+      "icon": "../assets/offroad/icon_user_prefs.png",
+      "groups": [
+        {
+          "groupName": "systemPreferencesGroup",
+          "title": "System Preferences:",
+          "enableResetButton": false,
+          "controls": [
+            {
+              "type": "selection",
+              "param": "FordSelectedVehicleModel",
+              "title": "Vehicle Model",
+              "desc": "This will for the FINGERPRINT for the vehicle so it exits the Dashcam Mode and allows the vehicle to drive.",
+              "requiresReboot": true,
+              "hidden": false,
+              "options": [
+                {
+                  "name": "Auto Detect",
+                  "value": ""
+                },
+                {
+                  "name": "Ford Bronco Sport (2021-2024)",
+                  "value": "FORD_BRONCO_SPORT_MK1"
+                },
+                {
+                  "name": "Ford Edge (2019-2024)",
+                  "value": "FORD_EDGE_MK2"
+                },
+                {
+                  "name": "Lincoln Nautilus (2019-2024)",
+                  "value": "FORD_EDGE_MK2"
+                },
+                {
+                  "name": "Ford Explorer (2020-2024)",
+                  "value": "FORD_EXPLORER_MK6"
+                },
+                {
+                  "name": "Lincoln Aviator (2020-2024)",
+                  "value": "FORD_EXPLORER_MK6"
+                },
+                {
+                  "name": "Ford Escape (2022-2024)",
+                  "value": "FORD_ESCAPE_MK4"
+                },
+                {
+                  "name": "Lincoln Corsair (2022-2024)",
+                  "value": "FORD_ESCAPE_MK4"
+                },
+                {
+                  "name": "Ford Escape (2023-2025)",
+                  "value": "FORD_ESCAPE_MK5"
+                },
+                {
+                  "name": "Lincoln Corsair (2023-2025)",
+                  "value": "FORD_ESCAPE_MK5"
+                },
+                {
+                  "name": "Ford F-150 (2021-2023)",
+                  "value": "FORD_F_150_MK14"
+                },
+                {
+                  "name": "Ford F-150 Lightning (2022-2025)",
+                  "value": "FORD_F_150_LIGHTNING_MK1"
+                },
+                {
+                  "name": "Ford Expedition (2022-2024)",
+                  "value": "FORD_EXPEDITION_MK4"
+                },
+                {
+                  "name": "Lincoln Navigator (2022-2024)",
+                  "value": "FORD_EXPEDITION_MK4"
+                },
+                {
+                  "name": "Ford Mustang Mach-E (2021-2024)",
+                  "value": "FORD_MUSTANG_MACH_E_MK1"
+                },
+
+                {
+                  "name": "Ford Maverick 1st Gen",
+                  "value": "FORD_MAVERICK_MK1"
+                },
+                {
+                  "name": "Ford Ranger (2023-2024)",
+                  "value": "FORD_RANGER_MK2"
+                }
+              ],
+              "conditions": {
+                "git_remote": ["ford-op/sp-dev-c3"],
+                "git_branch": []
+              }
+            },
+            {
+              "type": "toggle",
+              "param": "QuietMode",
+              "title": "Quiet Mode - Warnings/Alerts Only",
+              "desc": "BluePilot displays alerts but only plays important warning sounds.",
+              "hidden": true,
+              "conditions": {
+                "git_remote": ["any"],
+                "git_branch": []
+              }
+            }
+          ]
+        },
+        {
+          "groupName": "visualOnroadPreferencesGroup",
+          "title": "Visual Onroad Preferences:",
+          "enableResetButton": false,
+          "keepScreenAwake": true,
+          "controls": [
+            {
+              "type": "toggle",
+              "param": "FordPrefShowAnimatedWheelAngle",
+              "title": "Show Animated Steer Angle Icon",
+              "desc": "Animates Comma icon based on steering angle.",
+              "hidden": false,
+              "conditions": {
+                "allConditionsTrue": [
+                  { "git_remote": ["any"] },
+                  { "git_branch": [] }
+                ]
+              }
+            },
+            {
+              "type": "selection",
+              "param": "CustomModelPathColor",
+              "title": "Custom Model Path Color",
+              "desc": "Customize the color of the driving path overlay",
+              "requiresReboot": false,
+              "hidden": false,
+              "options": [
+                { "name": "Stock", "value": "Stock" },
+                { "name": "Rainbow", "value": "Rainbow" },
+                { "name": "Blue", "value": "Blue" },
+                { "name": "Green", "value": "Green" },
+                { "name": "Purple", "value": "Purple" },
+                { "name": "Orange", "value": "Orange" },
+                { "name": "Red", "value": "Red" },
+                { "name": "Cyan", "value": "Cyan" },
+                { "name": "Yellow", "value": "Yellow" }
+              ],
+              "conditions": {
+                "git_remote": ["any"],
+                "git_branch": []
+              }
+            },
+            {
+              "type": "toggle",
+              "param": "ShowBrakeStatus",
+              "title": "Show Brake Status",
+              "desc": "Changes the speed color to red when the brake is pressed.",
+              "hidden": false,
+              "conditions": {
+                "git_remote": ["any"],
+                "git_branch": []
+              }
+            },
+            {
+              "type": "toggle",
+              "param": "FordPrefShowRadarLeadOverlay",
+              "title": "Show Radar Lead Vehicle Overlay",
+              "desc": "Displays radar data lead vehicle overlay.",
+              "hidden": false,
+              "conditions": {
+                "git_remote": ["any"],
+                "git_branch": []
+              }
+            },
+            {
+              "type": "segmented_control",
+              "param": "FordPrefRadarOverlaySize",
+              "title": "Radar Lead Vehicle Overlay Size",
+              "desc": "Adjusts the size of the radar lead vehicle overlay",
+              "hidden": false,
+              "options": [
+                { "name": "Small", "value": "1", "default": true },
+                { "name": "Medium", "value": "2" },
+                { "name": "Large", "value": "3" },
+                { "name": "Ex-Large", "value": "4" }
+              ],
+              "conditions": {
+                "allConditionsTrue": [
+                  { "git_remote": ["any"] },
+                  { "git_branch": [] },
+                  {
+                    "paramValueEquals": {
+                      "FordPrefShowRadarLeadOverlay": "1"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "type": "toggle",
+              "param": "FordPrefHybridDriveOverlay",
+              "title": "Show Hybrid Electric Data Overlays",
+              "desc": "Displays hybrid electric vehicle data.",
+              "hidden": false,
+              "conditions": {
+                "allConditionsTrue": [
+                  { "paramValueEquals": { "FordPrefHevDataAvailable": "1" } },
+                  { "git_remote": ["any"] },
+                  { "git_branch": [] }
+                ]
+              }
+            },
+            {
+              "type": "toggle",
+              "param": "FordPrefHybridBatteryOverlay",
+              "title": "Show Hybrid Battery Data Overlays",
+              "desc": "Displays hybrid battery data.",
+              "hidden": false,
+              "conditions": {
+                "allConditionsTrue": [
+                  { "paramValueEquals": { "FordPrefHybridDriveOverlay": "1" } },
+                  { "paramValueEquals": { "FordPrefHevDataAvailable": "1" } },
+                  {
+                    "paramValueEquals": { "FordPrefHevBattDataAvailable": "1" }
+                  },
+                  { "git_remote": ["any"] },
+                  { "git_branch": [] }
+                ]
+              }
+            },
+            {
+              "type": "segmented_control",
+              "param": "FordPrefHybridDriveGaugeSize",
+              "title": "Hybrid Drive Gauge Size",
+              "desc": "Adjusts the size of the hybrid drive gauge",
+              "hidden": false,
+              "options": [
+                { "name": "Small", "value": "1", "default": true },
+                { "name": "Medium", "value": "2" },
+                { "name": "Large", "value": "3" }
+              ],
+              "conditions": {
+                "allConditionsTrue": [
+                  { "git_remote": ["any"] },
+                  { "git_branch": [] },
+                  {
+                    "paramValueEquals": {
+                      "FordPrefHybridDriveOverlay": "1"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "type": "toggle",
+              "param": "ShowGForceMeter",
+              "title": "Show G-Force Meter",
+              "desc": "Displays a g-force meter when onroad.",
+              "hidden": false,
+              "conditions": {
+                "git_remote": ["any"],
+                "git_branch": []
+              }
+            },
+            {
+              "type": "toggle",
+              "param": "StandstillTimer",
+              "title": "Show Standstill Timer",
+              "desc": "Displays a timer when the vehicle is in standstill.",
+              "hidden": false,
+              "conditions": {
+                "git_remote": ["any"],
+                "git_branch": []
+              }
+            },
+            {
+              "type": "toggle",
+              "param": "BlindSpot",
+              "title": "Show Blindspot Indicators",
+              "desc": "Displays blindspot indicators on the road model.",
+              "hidden": false,
+              "conditions": {
+                "git_remote": ["any"],
+                "git_branch": []
+              }
+            },
+            {
+              "type": "toggle",
+              "param": "ShowStopIndicatorOverlay",
+              "title": "Show Stop Indicator Overlay",
+              "desc": "Displays a stop indicator overlay when it detects a stop point.",
+              "hidden": false,
+              "conditions": {
+                "git_remote": ["any"],
+                "git_branch": []
+              }
+            },
+            {
+              "type": "toggle",
+              "param": "ShowWideCameraAtLowSpeed",
+              "title": "Show Wide Camera at Low Speed",
+              "desc": "Show the wide camera at low speed.",
+              "hidden": false,
+              "conditions": {
+                "git_remote": ["ford-op/sp-dev-c3"],
+                "git_branch": []
+              }
+            }
+          ]
+        },
+        {
+          "groupName": "clusterPreferencesGroup",
+          "title": "Cluster Preferences:",
+          "enableResetButton": false,
+          "controls": [
+            {
+              "type": "toggle",
+              "param": "FordPrefSendHandsFreeCanMsg",
+              "title": "Show Hands-Free UI (On Supported Vehicles)",
+              "desc": "Enables hands-free UI for supported vehicles.",
+              "hidden": false,
+              "conditions": {
+                "git_remote": ["any"],
+                "git_branch": []
+              }
+            },
+            {
+              "type": "toggle",
+              "param": "FordPrefLaneDepartCanMsg",
+              "title": "Send Lane Departure Signals to Vehicle",
+              "desc": "Send Openpilot lane departure signals for native cluster alerts.",
+              "hidden": false,
+              "conditions": {
+                "git_remote": ["any"],
+                "git_branch": []
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Lat. Tuning",
+      "icon": "../assets/offroad/icon_steering.png",
+      "groups": [
+        {
+          "groupName": "lateralControlsGroup",
+          "title": "Lateral Controls:",
+          "enableResetButton": true,
+          "controls": [
+            {
+              "type": "toggle",
+              "param": "FordPrefHumanTurnDetectionEnable",
+              "title": "Enable Human Turn Detection",
+              "desc": "Reset steering so you don't fight the wheel making manual turns.",
+              "hidden": false,
+              "conditions": {
+                "git_remote": ["any"],
+                "git_branch": []
+              }
+            },
+            {
+              "type": "float",
+              "param": "FordLatTuningLaneChgFactorHigh",
+              "title": "Lane Change Factor High",
+              "desc": "Adjust lane change curvature aggressiveness (lower = slower).",
+              "hidden": false,
+              "min": 0.0,
+              "max": 1.0,
+              "increment": 0.05,
+              "division": 100.0,
+              "conditions": {
+                "allConditionsTrue": [
+                  { "git_remote": ["any"] },
+                  { "git_branch": [] }
+                ]
+              }
+            },
+            {
+              "type": "toggle",
+              "param": "FordLatTuningTuningCustomProfile",
+              "title": "Use Custom Tuning Profile",
+              "desc": "Use custom tuning profile for advanced lateral control",
+              "hidden": false,
+              "conditions": {
+                "allConditionsTrue": [
+                  { "git_remote": ["any"] },
+                  { "git_branch": [] }
+                ]
+              }
+            },
+            {
+              "type": "float",
+              "param": "FordLatTuningPCBlendRatio_low_C",
+              "title": "Predicted Curvature Blend Ratio Low",
+              "desc": "Adjust the blend ratio of predicted curvature in straightaways.",
+              "hidden": false,
+              "min": 0.0,
+              "max": 1.0,
+              "increment": 0.05,
+              "division": 100.0,
+              "conditions": {
+                "allConditionsTrue": [
+                  { "git_remote": ["any"] },
+                  { "git_branch": [] },
+                  {
+                    "paramValueEquals": {
+                      "FordLatTuningTuningCustomProfile": "1"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "type": "float",
+              "param": "FordLatTuningPCBlendRatio_high_C",
+              "title": "Predicted Curvature Blend Ratio High",
+              "desc": "Adjust the blend ratio of predicted curvature in curves.",
+              "hidden": false,
+              "min": 0.0,
+              "max": 1.0,
+              "increment": 0.05,
+              "division": 100.0,
+              "conditions": {
+                "allConditionsTrue": [
+                  { "git_remote": ["any"] },
+                  { "git_branch": [] },
+                  {
+                    "paramValueEquals": {
+                      "FordLatTuningTuningCustomProfile": "1"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "type": "toggle",
+              "param": "FordLatTuningEnableLanePositioning",
+              "title": "Enable Advanced Lane Positioning",
+              "desc": "Allows custom lane positioning and lanefull.",
+              "hidden": false,
+              "conditions": {
+                "git_remote": ["any"],
+                "git_branch": []
+              }
+            },
+            {
+              "type": "float",
+              "param": "FordLatTuningCustomPathOffset",
+              "title": "In Lane Offset",
+              "desc": "Adjusts lane position - left (-) / right (+)",
+              "hidden": false,
+              "min": -0.5,
+              "max": 0.5,
+              "increment": 0.01,
+              "division": 100.0,
+              "conditions": {
+                "allConditionsTrue": [
+                  { "git_remote": ["any"] },
+                  { "git_branch": [] },
+                  {
+                    "paramValueEquals": {
+                      "FordLatTuningEnableLanePositioning": "1"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "type": "float",
+              "param": "FordLatTuningPathOffsetLookupTime",
+              "title": "Path Offset Lookup Time",
+              "desc": "Adjusts the time it takes to lookup the path offset.",
+              "hidden": false,
+              "min": 0.0,
+              "max": 0.8,
+              "increment": 0.01,
+              "division": 100.0,
+              "conditions": {
+                "allConditionsTrue": [
+                  { "git_remote": ["any"] },
+                  { "git_branch": [] },
+                  {
+                    "paramValueEquals": {
+                      "FordLatTuningEnableLanePositioning": "1"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "type": "toggle",
+              "param": "FordLatTuningEnableLanefullMode",
+              "title": "Enable Lane Full Mode",
+              "desc": "Enable Auto Lanefull Mode similar to legacy SunnyPilot",
+              "hidden": false,
+              "conditions": {
+                "allConditionsTrue": [
+                  { "git_remote": ["any"] },
+                  { "git_branch": [] },
+                  {
+                    "paramValueEquals": {
+                      "FordLatTuningEnableLanePositioning": "1"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "type": "float",
+              "param": "FordLatTuningLCPIDGainUI",
+              "title": "Low Curvature PID Gain",
+              "desc": "Adjust the gain of the PID controller for low curvature",
+              "hidden": false,
+              "min": 0.0,
+              "max": 10.0,
+              "increment": 0.1,
+              "division": 100.0,
+              "conditions": {
+                "allConditionsTrue": [
+                  { "git_remote": ["any"] },
+                  { "git_branch": [] },
+                  {
+                    "paramValueEquals": {
+                      "FordLatTuningTuningCustomProfile": "1"
+                    }
+                  },
+                  {
+                    "paramValueEquals": {
+                      "FordLatTuningEnableLanePositioning": "1"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Utilities",
+      "icon": "../assets/offroad/icon_toolbox.png",
+      "groups": [
+        {
+          "groupName": "utilityCommandsGroup",
+          "title": "Utility Commands:",
+          "enableResetButton": false,
+          "controls": [
+            {
+              "type": "command_button",
+              "command": "echo \"Starting process...\" && for i in {1..5}; do echo \"[$(date '+%H:%M:%S')] Processing batch $i/5...\"; sleep 1; echo \"  -> Completed subtask $i\"; sleep 1; done && echo \"All tasks completed successfully!\"",
+              "working_dir": "/data/openpilot",
+              "title": "Test Command",
+              "desc": "Test Command",
+              "button_text": "Test Command",
+              "confirm": true,
+              "confirm_text": "Are you sure you want to run this command?",
+              "confirm_button_text": "Run",
+              "cancel_button_text": "Cancel",
+              "hidden": false,
+              "conditions": {
+                "git_remote": ["ford-op/sp-dev-c3"],
+                "git_branch": []
+              }
+            },
+            {
+              "type": "command_button",
+              "command": "wget https://raw.githubusercontent.com/tonesto7/op-utilities/main/CommaUtility.sh && chmod +x /data/CommaUtility.sh",
+              "working_dir": "/data",
+              "title": "Install Comma Utility",
+              "desc": "Install Comma Utility",
+              "button_text": "Install",
+              "confirm": false,
+              "hidden": false,
+              "OnlyOnCommaDevice": true,
+              "conditions": {
+                "git_remote": ["ford-op/sp-dev-c3"],
+                "git_branch": []
+              }
+            },
+            {
+              "type": "file_viewer",
+              "path": "/data/community/crashes/error.txt",
+              "title": "Recent Crashes",
+              "desc": "View the crashes file",
+              "button_text": "View Error",
+              "confirm": false,
+              "hidden": false,
+              "conditions": {
+                "git_remote": ["ford-op/sp-dev-c3"],
+                "git_branch": []
+              }
+            },
+            {
+              "type": "file_viewer",
+              "path": "/data/logs/bp_logger/bluepilot.log",
+              "title": "BluePilot Log",
+              "desc": "View the BluePilot log",
+              "button_text": "View Log",
+              "confirm": false,
+              "hidden": false,
+              "conditions": {
+                "git_remote": ["ford-op/sp-dev-c3"],
+                "git_branch": []
+              }
+            },
+            {
+              "type": "command_button",
+              "command": "ifconfig",
+              "working_dir": "/data/openpilot",
+              "title": "Get Network Info",
+              "desc": "Get network info using ifconfig",
+              "button_text": "Get Info",
+              "confirm": false,
+              "hidden": false,
+              "conditions": {
+                "git_remote": ["ford-op/sp-dev-c3"],
+                "git_branch": []
+              }
+            },
+            {
+              "type": "command_button",
+              "command": "joystick_control.py",
+              "working_dir": "/data/openpilot/tools/joystick",
+              "title": "Joystick Control",
+              "desc": "Joystick Control",
+              "button_text": "Start Joystick",
+              "confirm": true,
+              "hidden": false,
+              "conditions": {
+                "git_remote": ["ford-op/sp-dev-c3"],
+                "git_branch": []
+              }
+            },
+            {
+              "type": "command_button",
+              "command": "tail -f /tmp/launch_log",
+              "working_dir": "/data/openpilot",
+              "title": "View Launch Log",
+              "desc": "View the launch log",
+              "button_text": "View Log",
+              "confirm": false,
+              "hidden": false,
+              "conditions": {
+                "git_remote": ["ford-op/sp-dev-c3"],
+                "git_branch": []
+              }
+            },
+            {
+              "type": "toggle",
+              "param": "GsmMetered",
+              "title": "GSM Metered Mode Enabled",
+              "desc": "Toggle GSM metered mode",
+              "hidden": false,
+              "conditions": {
+                "git_remote": ["ford-op/sp-dev-c3"],
+                "git_branch": []
+              }
+            },
+            {
+              "type": "toggle",
+              "param": "DisableUpdates",
+              "title": "Disable Updates",
+              "desc": "Toggle Disable Updates",
+              "hidden": false,
+              "conditions": {
+                "git_remote": ["ford-op/sp-dev-c3"],
+                "git_branch": []
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Debug",
+      "icon": "../assets/offroad/icon_debug.png",
+      "groups": [
+        {
+          "groupName": "paramViewerGroup",
+          "title": "Parameter Viewer",
+          "enableResetButton": false,
+          "controls": [
+            {
+              "type": "param_list_viewer",
+              "title": "All Parameters",
+              "desc": "View all available parameters in the system",
+              "hidden": false,
+              "conditions": {
+                "git_remote": ["ford-op/sp-dev-c3"],
+                "git_branch": []
+              }
+            },
+            {
+              "type": "param_viewer",
+              "param": "LiveParameters",
+              "title": "Live Parameters",
+              "desc": "Displays live parameters",
+              "conditions": {
+                "git_remote": ["ford-op/sp-dev-c3"],
+                "git_branch": []
+              }
+            }
+          ]
+        },
+        {
+          "groupName": "debugPreferencesGroup",
+          "title": "Debug Preferences:",
+          "enableResetButton": false,
+          "keepScreenAwake": true,
+          "controls": [
+            {
+              "type": "toggle",
+              "param": "FordPrefEnableDebugLogs",
+              "title": "Enable Debug Logging",
+              "desc": "Enable this to collect more detailed logs for the route."
+            }
+          ],
+          "conditions": {
+            "git_remote": ["ford-op/sp-dev-c3"],
+            "git_branch": []
+          }
+        }
+      ]
+    },
+    {
+      "name": "Info",
+      "icon": "../assets/offroad/icon_info.png",
+      "groups": [
+        {
+          "groupName": "infoPreferencesGroup",
+          "title": "Info:",
+          "enableResetButton": false,
+          "keepScreenAwake": false,
+          "controls": [
+            {
+              "type": "file_viewer",
+              "path": "CHANGELOGS_BP.md",
+              "title": "BluePilot Changelog",
+              "desc": "View the latest changes and updates for BluePilot",
+              "header": "BluePilot Changelog",
+              "conditions": {
+                "git_remote": ["ford-op/sp-dev-c3"],
+                "git_branch": []
+              }
+            },
+            {
+              "type": "recent_changes",
+              "title": "Recent Changes",
+              "desc": "View recent changes and updates for the current version",
+              "conditions": {
+                "git_remote": ["any"],
+                "git_branch": []
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

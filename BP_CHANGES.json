@@ -1,0 +1,32 @@
+{
+  "versions": {
+    "4.0.0": {
+      "changes": [
+        "Added this recent changes dialog functionality to offroad transition in UI",
+        "Added the fan demand percentage to the sidebar.  Just tap on the memory card to toggle it",
+        "Enhanced stop sign detection and rendering with improved vehicle state checks and visual effects",
+        "Refactored HybridDriveGauge and HybridBatteryGauge with enhanced automotive styling",
+        "Added a new GForceMeter to the HUD",
+        "Enhanced stop sign rendering with improved position and size smoothing",
+        "Refactored lead tracking logic with enhanced stability requirements",
+        "Complete rewrite of advanced lateral control.  In-lane position is now handle stand-alone and is smoother",
+        "Updates to lateral control logic to incorporate dynamic lag calculation",
+        "Reset low speed torque limits to match bp-2.1",
+        "Updated 'steering limited exceeded' warning logic to reduce false alerts",
+        "Added a new parameter to control the speed color when the brake is pressed",
+        "Added restriction to the calibration that require the car to have 2 valid lane lines before starting the calibration",
+        "Latest Upstream SunnyPilot changes"
+      ],
+      "fixes": [
+        "Fixed typo in parameter name for standstill timer which was causing the timer to not display",
+        "Performance improvements to hopefully fix the random UI restarts",
+        "Enhanced stop detection and rendering with improved data validation",
+        "Latest Upstream SunnyPilot fixes"
+      ],
+      "removals": [
+        "Disabled routes panel for now until we get FFMpeg hardware decoding working then it will be added back and allow for video playback like a dashcam"
+      ],
+      "known_issues": []
+    }
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "_comment": "This configuration file defines all statistics panels, groups, and controls.",
+  "menuName": "Statistics",
+  "menuIcon": "icon_statistics.png",
+  "menuDescription": "Statistics Panel",
+  "persistentParams": [],
+  "clearOnManagerStartParams": [],
+  "clearOnOnroadTransitionParams": [],
+  "clearOnOffroadTransitionParams": [],
+  "groups": [
+    {
+      "groupName": "statisticsGroup",
+      "title": "",
+      "enableResetButton": false,
+      "keepScreenAwake": true,
+      "hideDividers": true,
+      "controls": [
+        {
+          "type": "stats_card_system",
+          "title": "System Resources",
+          "desc": "Shows system resources",
+          "hidden": false
+        },
+        {
+          "type": "stats_card_connectivity",
+          "title": "Connectivity",
+          "desc": "Shows connectivity statistics",
+          "hidden": false
+        },
+        {
+          "type": "stats_card_storage",
+          "title": "Storage",
+          "desc": "Shows storage usage and details",
+          "hidden": false
+        }
+      ]
+    }
+  ]
+}

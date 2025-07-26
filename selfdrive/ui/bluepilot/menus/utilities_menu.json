@@ -1,0 +1,118 @@
+{
+  "_comment": "This configuration file defines all utilities panels, groups, and controls.",
+  "menuName": "Utilities",
+  "menuIcon": "icon_utilities.png",
+  "menuDescription": "Utilities Panel",
+  "persistentParams": [],
+  "clearOnManagerStartParams": [],
+  "clearOnOnroadTransitionParams": [],
+  "clearOnOffroadTransitionParams": [],
+  "groups": [
+    {
+      "groupName": "utilityCommandsGroup",
+      "title": "Utility Commands:",
+      "enableResetButton": false,
+      "controls": [
+        {
+          "type": "model_data_viewer",
+          "title": "Model Data Viewer",
+          "desc": "View model data",
+          "hidden": true
+        },
+        {
+          "type": "param_list_viewer",
+          "title": "All Parameters",
+          "desc": "View all available parameters in the system",
+          "hidden": false
+        },
+        {
+          "type": "toggle",
+          "param": "GsmMetered",
+          "title": "GSM Metered Mode Enabled",
+          "desc": "Toggle GSM metered mode",
+          "hidden": false
+        },
+        {
+          "type": "toggle",
+          "param": "DisableUpdates",
+          "title": "Disable Updates",
+          "desc": "Toggle Disable Updates",
+          "hidden": false
+        },
+        {
+          "type": "command_button",
+          "command": "echo \"Starting process...\" && for i in {1..5}; do echo \"[$(date '+%H:%M:%S')] Processing batch $i/5...\"; sleep 1; echo \"  -> Completed subtask $i\"; sleep 1; done && echo \"All tasks completed successfully!\"",
+          "working_dir": "/data/openpilot",
+          "title": "Test Command",
+          "desc": "Test Command",
+          "button_text": "Test Command",
+          "confirm": true,
+          "confirm_text": "Are you sure you want to run this command?",
+          "confirm_button_text": "Run",
+          "cancel_button_text": "Cancel",
+          "hidden": false,
+          "conditions": {
+            "git_remote": ["ford-op/sp-dev-c3"],
+            "git_branch": []
+          }
+        },
+        {
+          "type": "command_button",
+          "command": "wget https://raw.githubusercontent.com/tonesto7/op-utilities/main/CommaUtility.sh && chmod +x /data/CommaUtility.sh",
+          "working_dir": "/data",
+          "title": "Install Comma Utility",
+          "desc": "Install Comma Utility",
+          "button_text": "Install",
+          "confirm": false,
+          "hidden": false,
+          "OnlyOnCommaDevice": true,
+          "conditions": {
+            "git_remote": ["ford-op/sp-dev-c3"],
+            "git_branch": []
+          }
+        },
+        {
+          "type": "file_viewer",
+          "path": "/data/community/crashes/error.txt",
+          "title": "Recent Crashes",
+          "desc": "View the crashes file",
+          "button_text": "View Error",
+          "confirm": false,
+          "hidden": false,
+          "conditions": {
+            "git_remote": ["any"],
+            "git_branch": []
+          }
+        },
+        {
+          "type": "command_button",
+          "command": "ifconfig",
+          "working_dir": "/data/openpilot",
+          "title": "Get Network Info",
+          "desc": "Get network info using ifconfig",
+          "button_text": "Get Info",
+          "confirm": false,
+          "hidden": false,
+          "conditions": {
+            "git_remote": ["ford-op/sp-dev-c3"],
+            "git_branch": []
+          }
+        },
+        {
+          "type": "command_button",
+          "command": "tail -f /tmp/launch_log",
+          "working_dir": "/data/openpilot",
+          "title": "View Launch Log",
+          "desc": "View the launch log",
+          "button_text": "View Log",
+          "confirm": false,
+          "hidden": false,
+          "conditions": {
+            "git_remote": ["ford-op/sp-dev-c3"],
+            "git_branch": []
+          }
+        }
+      ]
+    }
+  ]
+}

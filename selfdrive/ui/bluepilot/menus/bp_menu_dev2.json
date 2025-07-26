@@ -1,0 +1,426 @@
+{
+  "_comment": "This configuration file defines all Ford settings panels, groups, and controls.",
+  "menuName": "BluePilot",
+  "menuIcon": "icon_ford.png",
+  "menuDescription": "BluePilot Panel",
+  "persistentParams": [],
+  "clearOnManagerStartParams": [],
+  "clearOnOnroadTransitionParams": [],
+  "clearOnOffroadTransitionParams": [],
+  "groups": [
+    {
+      "groupName": "vehicleSelectorGroup",
+      "title": "Vehicle Selection: (Tap item for desc)",
+      "enableResetButton": false,
+      "controls": [
+        {
+          "type": "selection",
+          "param": "FordSelectedVehicleModel",
+          "title": "Vehicle Model",
+          "desc": "This will for the FINGERPRINT for the vehicle so it exits the Dashcam Mode and allows the vehicle to drive.",
+          "hidden": false,
+          "options": [
+            { "name": "F-150 14th Gen (21-23)", "value": "FORD_F_150_MK14" },
+            {
+              "name": "F-150 Lightning 1st Gen",
+              "value": "FORD_F_150_LIGHTNING_MK1"
+            },
+            {
+              "name": "Mustang Mach-E 1st Gen",
+              "value": "FORD_MUSTANG_MACH_E_MK1"
+            }
+          ]
+        },
+        {
+          "type": "segmented_control",
+          "param": "ExampleTuningLevel",
+          "title": "Segmented Button Example",
+          "desc": "Select example tuning level",
+          "hidden": false,
+          "options": [
+            { "name": "Off", "value": "off", "default": true },
+            { "name": "Low", "value": "low" },
+            { "name": "Medium", "value": "medium" },
+            { "name": "High", "value": "high" }
+          ]
+        }
+      ]
+    },
+
+    {
+      "groupName": "systemPreferencesGroup",
+      "title": "System Preferences: (Tap item for desc)",
+      "enableResetButton": false,
+      "controls": [
+        {
+          "type": "toggle",
+          "param": "FordPrefQuietDrive",
+          "title": "Quiet Drive - Warnings/Alerts Only",
+          "desc": "BluePilot displays alerts but only plays important warning sounds.",
+          "hidden": false,
+          "conditions": {
+            "git_remote": ["any"],
+            "git_branch": []
+          }
+        },
+        {
+          "type": "toggle",
+          "param": "FordPrefEnableDebugLogs",
+          "title": "Enable Debug Logging",
+          "desc": "Enables additional debug output.",
+          "hidden": false,
+          "conditions": {
+            "git_remote": ["ford-op/sp-dev-c3"],
+            "git_branch": []
+          }
+        }
+      ]
+    },
+    {
+      "groupName": "clusterPreferencesGroup",
+      "title": "Cluster Preferences: (Tap item for desc)",
+      "enableResetButton": false,
+      "controls": [
+        {
+          "type": "toggle",
+          "param": "FordPrefSendHandsFreeCanMsg",
+          "title": "Show Hands-Free UI (On Supported Vehicles)",
+          "desc": "Sends necessary messages for Hands-Free interface.",
+          "hidden": false,
+          "conditions": {
+            "git_remote": ["any"],
+            "git_branch": []
+          }
+        },
+        {
+          "type": "toggle",
+          "param": "FordPrefLaneDepartCanMsg",
+          "title": "Send Lane Departure Signals to Vehicle",
+          "desc": "Send Openpilot lane departure signals for native cluster alerts.",
+          "hidden": false,
+          "conditions": {
+            "git_remote": ["any"],
+            "git_branch": []
+          }
+        },
+        {
+          "type": "toggle",
+          "param": "FordPrefDriverMonitorCanMsg",
+          "title": "Send Driver Monitor Signals",
+          "desc": "Send driver monitor notice signals to the vehicle for native cluster alerts.",
+          "hidden": false,
+          "conditions": {
+            "git_remote": ["any"],
+            "git_branch": []
+          }
+        }
+      ]
+    },
+    {
+      "groupName": "lateralControlsGroup",
+      "title": "Lateral Controls: (Tap item for desc)",
+      "enableResetButton": true,
+      "controls": [
+        {
+          "type": "toggle",
+          "param": "FordPrefHumanTurnDetectionEnable",
+          "title": "Enable Human Turn Detection",
+          "desc": "Reset steering so you don't fight the wheel making manual turns.",
+          "hidden": false,
+          "conditions": {
+            "git_remote": ["any"],
+            "git_branch": []
+          }
+        },
+        {
+          "type": "toggle",
+          "param": "FordPrefAllowNudgelessLaneChange",
+          "title": "Allow Nudgeless Lane Changes",
+          "desc": "Allow nudgeless lane change",
+          "hidden": false,
+          "conditions": {
+            "git_remote": ["any"],
+            "git_branch": []
+          }
+        },
+        {
+          "type": "toggle",
+          "param": "FordPrefHideSteerSaturatedAlerts",
+          "title": "Hide Steer Saturated Alerts",
+          "desc": "Hide steer saturated alerts",
+          "hidden": false,
+          "conditions": {
+            "git_remote": ["any"],
+            "git_branch": []
+          }
+        },
+        {
+          "type": "toggle",
+          "param": "FordPrefEnableCustomLatLogic",
+          "title": "Enable Custom Lateral Logic",
+          "desc": "Enable custom lateral logic",
+          "hidden": false,
+          "conditions": {
+            "git_remote": ["any"],
+            "git_branch": []
+          }
+        },
+        {
+          "type": "toggle",
+          "param": "FordPrefEnablePathAngle",
+          "title": "Enable Path Angle",
+          "desc": "Enable path angle",
+          "hidden": false,
+          "conditions": {
+            "allConditionsTrue": [
+              { "git_remote": ["any"] },
+              { "git_branch": [] },
+              { "paramValueEquals": { "FordPrefEnableCustomLatLogic": "1" } }
+            ]
+          }
+        },
+        {
+          "type": "float",
+          "param": "FordLatTuningLaneChgFactorHigh",
+          "title": "Lane Change Factor High",
+          "desc": "Adjust lane change curvature aggressiveness (lower = slower).",
+          "hidden": false,
+          "min": 0.0,
+          "max": 1.0,
+          "increment": 0.05,
+          "division": 100.0,
+          "conditions": {
+            "allConditionsTrue": [
+              { "git_remote": ["any"] },
+              { "git_branch": [] }
+            ]
+          }
+        },
+        {
+          "type": "segmented_control",
+          "param": "FordLatTuningTuningProfile",
+          "title": "Tuning Profile",
+          "desc": "Sets the tuning aggressiveness profile",
+          "hidden": false,
+          "options": [
+            { "name": "Low", "value": "1", "default": true },
+            { "name": "Medium", "value": "2" },
+            { "name": "High", "value": "3" },
+            { "name": "Custom", "value": "4" }
+          ]
+        },
+        {
+          "type": "float",
+          "param": "FordLatTuningCustomPathOffset",
+          "title": "In Lane Offset",
+          "desc": "Positions car further left (negative) or right (positive)",
+          "hidden": false,
+          "min": -0.5,
+          "max": 0.5,
+          "increment": 0.05,
+          "division": 100.0,
+          "conditions": {
+            "allConditionsTrue": [
+              { "git_remote": ["any"] },
+              { "git_branch": [] }
+            ]
+          }
+        },
+        {
+          "type": "float",
+          "param": "FordLatTuningLaneChgModifier",
+          "title": "Lane Change Modifier",
+          "desc": "Adjust lane change curvature aggressiveness (lower = slower).",
+          "hidden": true,
+          "min": 0.0,
+          "max": 1.0,
+          "increment": 0.05,
+          "division": 100.0,
+          "conditions": {
+            "allConditionsTrue": [
+              { "git_remote": ["any"] },
+              { "git_branch": [] },
+              { "paramValueEquals": { "FordPrefEnableCustomLatLogic": "1" } }
+            ]
+          }
+        },
+        {
+          "type": "float",
+          "param": "FordLatTuningPathAngleLowSpeedFactor",
+          "title": "Path Angle - Low Speed Factor",
+          "desc": "Adjust aggressiveness of path_angle at 15mph (lower = less aggressive).",
+          "hidden": false,
+          "min": 0.0,
+          "max": 1.0,
+          "increment": 0.05,
+          "division": 100.0,
+          "conditions": {
+            "allConditionsTrue": [
+              { "git_remote": ["any"] },
+              { "git_branch": [] },
+              { "paramValueEquals": { "FordPrefEnableCustomLatLogic": "1" } },
+              { "paramValueEquals": { "FordPrefEnablePathAngle": "1" } }
+            ]
+          }
+        },
+        {
+          "type": "float",
+          "param": "FordLatTuningPathAngleHighSpeedFactor",
+          "title": "Path Angle - High Speed Factor",
+          "desc": "Adjust aggressiveness of path_angle at 85mph (lower = less aggressive).",
+          "hidden": false,
+          "min": 0.0,
+          "max": 5.0,
+          "increment": 0.05,
+          "division": 100.0,
+          "conditions": {
+            "allConditionsTrue": [
+              { "git_remote": ["any"] },
+              { "git_branch": [] },
+              { "paramValueEquals": { "FordPrefEnableCustomLatLogic": "1" } },
+              { "paramValueEquals": { "FordPrefEnablePathAngle": "1" } }
+            ]
+          }
+        },
+        {
+          "type": "float",
+          "param": "FordLatTuningCustomPathOffset",
+          "title": "In Lane Offset",
+          "desc": "Positions car further left (negative) or right (positive)",
+          "hidden": false,
+          "min": -0.5,
+          "max": 0.5,
+          "increment": 0.05,
+          "division": 100.0,
+          "conditions": {
+            "allConditionsTrue": [
+              { "git_remote": ["any"] },
+              { "git_branch": [] },
+              { "paramValueEquals": { "FordPrefEnableCustomLatLogic": "1" } },
+              { "paramValueEquals": { "FordPrefEnablePathAngle": "1" } }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "groupName": "brakeTuningGroup",
+      "title": "Brake Tuning: (Tap item for desc)",
+      "enableResetButton": true,
+      "controls": [
+        {
+          "type": "float",
+          "param": "FordLongTuningBrakeActuatorActivate",
+          "title": "Brake Actuator Activate",
+          "desc": "Acceleration setpoint for brake actuator activation.",
+          "hidden": false,
+          "min": -0.2,
+          "max": 0.2,
+          "increment": 0.01,
+          "division": 100.0,
+          "conditions": {
+            "git_remote": ["ford-op/sp-dev-c3"],
+            "git_branch": []
+          }
+        },
+        {
+          "type": "float",
+          "param": "FordLongTuningBrakeActuatorReleaseDelta",
+          "title": "Brake Actuator Release Delta",
+          "desc": "Acceleration gap between activation and release.",
+          "hidden": false,
+          "min": 0.0,
+          "max": 0.2,
+          "increment": 0.01,
+          "division": 100.0,
+          "conditions": {
+            "git_remote": ["ford-op/sp-dev-c3"],
+            "git_branch": []
+          }
+        },
+        {
+          "type": "float",
+          "param": "FordLongTuningPrechargeActuatorTargetDelta",
+          "title": "Precharge Actuator Target Delta",
+          "desc": "How much earlier to activate the precharge actuator.",
+          "hidden": false,
+          "min": 0.0,
+          "max": 0.2,
+          "increment": 0.01,
+          "division": 100.0,
+          "conditions": {
+            "git_remote": ["ford-op/sp-dev-c3"],
+            "git_branch": []
+          }
+        }
+      ]
+    },
+    {
+      "groupName": "limitsTuningGroup",
+      "title": "Limits Tuning: (Tap item for desc)",
+      "enableResetButton": true,
+      "controls": [
+        {
+          "_comment": "Originally commented out in the code snippet",
+          "type": "float",
+          "param": "FordLimitsCurvatureMax",
+          "title": "Curvature Max",
+          "desc": "Defines the max curvature allowed.",
+          "hidden": true,
+          "min": 0.0,
+          "max": 0.2,
+          "increment": 0.005,
+          "division": 100.0,
+          "conditions": {
+            "git_remote": ["ford-op/sp-dev-c3"],
+            "git_branch": []
+          }
+        },
+        {
+          "type": "float",
+          "param": "FordLimitsCurvatureError",
+          "title": "Curvature Error",
+          "desc": "Defines the max curvature error allowed.",
+          "hidden": true,
+          "min": 0.0,
+          "max": 0.02,
+          "increment": 0.001,
+          "division": 1000.0,
+          "conditions": {
+            "git_remote": ["ford-op/sp-dev-c3"],
+            "git_branch": []
+          }
+        }
+      ]
+    },
+    {
+      "groupName": "paramViewerGroup",
+      "title": "Parameter Viewer",
+      "enableResetButton": false,
+      "controls": [
+        {
+          "type": "param_viewer",
+          "param": "LiveParameters",
+          "title": "Live Parameters",
+          "desc": "View live parameters",
+          "hidden": false
+        }
+      ]
+    },
+    {
+      "groupName": "bpInfoGroup",
+      "title": "Other Information",
+      "enableResetButton": false,
+      "controls": [
+        {
+          "type": "file_viewer",
+          "path": "CHANGELOGS_BP.md",
+          "title": "BluePilot Changelog",
+          "desc": "View the BluePilot changelog",
+          "header": "BluePilot Changelog",
+          "hidden": false
+        }
+      ]
+    }
+  ]
+}

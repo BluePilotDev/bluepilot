@@ -1,0 +1,2232 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>JSON Configuration Guide for ConfigDrivenPanel</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        line-height: 1.6;
+        margin: 20px;
+        background-color: #f9f9f9;
+        color: #333;
+      }
+      h1,
+      h2,
+      h3,
+      h4 {
+        color: #2c3e50;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 20px;
+        background-color: #fff;
+      }
+      table,
+      th,
+      td {
+        border: 1px solid #bdc3c7;
+      }
+      th,
+      td {
+        padding: 10px;
+        text-align: left;
+      }
+      th {
+        background-color: #ecf0f1;
+      }
+      pre {
+        background-color: #ecf0f1;
+        padding: 10px;
+        overflow-x: auto;
+      }
+      code {
+        font-family: Consolas, monospace;
+        background-color: #ecf0f1;
+        padding: 2px 4px;
+        border-radius: 4px;
+      }
+      blockquote {
+        border-left: 4px solid #bdc3c7;
+        padding-left: 16px;
+        color: #7f8c8d;
+        margin: 20px 0;
+      }
+      ul,
+      ol {
+        margin-left: 20px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>JSON Configuration Guide for ConfigDrivenPanel</h1>
+
+    <p>
+      This document provides a comprehensive overview of the JSON configuration
+      format used to define panels, groups, and controls within the
+      <code>ConfigDrivenPanel</code> system. Whether you're customizing vehicle
+      settings, adding utility commands, or managing parameters, this guide will
+      help you understand and utilize the available options effectively.
+    </p>
+
+    <h2>Table of Contents</h2>
+    <ul>
+      <li><a href="#introduction">Introduction</a></li>
+      <li>
+        <a href="#overall-json-structure">Overall JSON Structure</a>
+        <ul>
+          <li><a href="#top-level-properties">Top-Level Properties</a></li>
+          <li><a href="#groups">Groups</a></li>
+        </ul>
+      </li>
+      <li>
+        <a href="#group-object">Group Object</a>
+        <ul>
+          <li><a href="#properties">Properties</a></li>
+        </ul>
+      </li>
+      <li>
+        <a href="#control-object">Control Object</a>
+        <ul>
+          <li><a href="#common-properties">Common Properties</a></li>
+          <li>
+            <a href="#control-types">Control Types</a>
+            <ul>
+              <li><a href="#toggle-control">Toggle Control</a></li>
+              <li><a href="#float-control">Float Control</a></li>
+              <li><a href="#integer-control">Integer Control</a></li>
+              <li><a href="#selection-control">Selection Control</a></li>
+              <li><a href="#segmented-control">Segmented Control</a></li>
+              <li><a href="#param-viewer-control">Param Viewer Control</a></li>
+              <li>
+                <a href="#param-list-viewer-control"
+                  >Param List Viewer Control</a
+                >
+              </li>
+              <li><a href="#file-viewer-control">File Viewer Control</a></li>
+              <li>
+                <a href="#command-button-control">Command Button Control</a>
+              </li>
+            </ul>
+          </li>
+          <li><a href="#custom-controls">Custom Controls</a></li>
+        </ul>
+      </li>
+      <li>
+        <a href="#conditions">Conditions</a>
+        <ul>
+          <li><a href="#condition-types">Condition Types</a></li>
+          <li><a href="#composite-conditions">Composite Conditions</a></li>
+        </ul>
+      </li>
+      <li>
+        <a href="#examples">Examples</a>
+        <ul>
+          <li>
+            <a href="#full-configuration-example">Full Configuration Example</a>
+          </li>
+          <li>
+            <a href="#individual-control-examples"
+              >Individual Control Examples</a
+            >
+            <ul>
+              <li>
+                <a href="#toggle-control-with-conditions"
+                  >Toggle Control with Conditions</a
+                >
+              </li>
+              <li>
+                <a href="#float-control-with-default-value"
+                  >Float Control with Default Value</a
+                >
+              </li>
+              <li>
+                <a href="#command-button-control-with-confirmation"
+                  >Command Button Control with Confirmation</a
+                >
+              </li>
+              <li>
+                <a href="#segmented-control-example"
+                  >Segmented Control Example</a
+                >
+              </li>
+              <li>
+                <a href="#advanced-condition-example"
+                  >Advanced Condition Example</a
+                >
+              </li>
+            </ul>
+          </li>
+        </ul>
+      </li>
+      <li>
+        <a href="#optional-vs-required-properties"
+          >Optional vs. Required Properties</a
+        >
+        <ul>
+          <li><a href="#required-properties">Required Properties</a></li>
+          <li><a href="#optional-properties">Optional Properties</a></li>
+        </ul>
+      </li>
+      <li><a href="#notes-and-best-practices">Notes and Best Practices</a></li>
+      <li><a href="#conclusion">Conclusion</a></li>
+    </ul>
+
+    <hr />
+
+    <h2 id="introduction">Introduction</h2>
+
+    <p>
+      The <code>ConfigDrivenPanel</code> system leverages JSON files to
+      dynamically generate user interface panels, organizing settings into
+      groups and controls. This approach allows for flexible and scalable
+      configuration management, enabling developers and advanced users to
+      customize functionalities without altering the underlying codebase.
+    </p>
+
+    <h2 id="overall-json-structure">Overall JSON Structure</h2>
+
+    <p>
+      A configuration JSON file defines the entire panel's structure, including
+      its name, icon, description, and the groups and controls it contains.
+    </p>
+
+    <h3 id="top-level-properties">Top-Level Properties</h3>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Property</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Required</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>menuName</code></td>
+          <td>String</td>
+          <td>The name of the panel displayed in the UI.</td>
+          <td>Yes</td>
+          <td>-</td>
+        </tr>
+        <tr>
+          <td><code>menuIcon</code></td>
+          <td>String</td>
+          <td>The icon associated with the panel.</td>
+          <td>Yes</td>
+          <td>-</td>
+        </tr>
+        <tr>
+          <td><code>menuDescription</code></td>
+          <td>String</td>
+          <td>A brief description of the panel.</td>
+          <td>Yes</td>
+          <td>-</td>
+        </tr>
+        <tr>
+          <td><code>persistentParams</code></td>
+          <td>Array</td>
+          <td>List of parameter names that persist across sessions.</td>
+          <td>No</td>
+          <td><code>[]</code></td>
+        </tr>
+        <tr>
+          <td><code>clearOnManagerStartParams</code></td>
+          <td>Array</td>
+          <td>Parameters to clear when the manager starts.</td>
+          <td>No</td>
+          <td><code>[]</code></td>
+        </tr>
+        <tr>
+          <td><code>clearOnOnroadTransitionParams</code></td>
+          <td>Array</td>
+          <td>Parameters to clear during on-road transitions.</td>
+          <td>No</td>
+          <td><code>[]</code></td>
+        </tr>
+        <tr>
+          <td><code>clearOnOffroadTransitionParams</code></td>
+          <td>Array</td>
+          <td>Parameters to clear during off-road transitions.</td>
+          <td>No</td>
+          <td><code>[]</code></td>
+        </tr>
+        <tr>
+          <td><code>groups</code></td>
+          <td>Array</td>
+          <td>An array of group objects defining UI sections and controls.</td>
+          <td>Yes</td>
+          <td>-</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3 id="groups">Groups</h3>
+
+    <p>
+      The <code>groups</code> array contains objects that define distinct
+      sections within the panel, each housing related controls.
+    </p>
+
+    <h2 id="group-object">Group Object</h2>
+
+    <p>
+      Each group organizes related controls under a common title and can
+      optionally include a reset button.
+    </p>
+
+    <h3 id="properties">Properties</h3>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Property</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Required</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>groupName</code></td>
+          <td>String</td>
+          <td>A unique identifier for the group.</td>
+          <td>Yes</td>
+          <td>-</td>
+        </tr>
+        <tr>
+          <td><code>title</code></td>
+          <td>String</td>
+          <td>The display title of the group in the UI.</td>
+          <td>Yes</td>
+          <td>-</td>
+        </tr>
+        <tr>
+          <td><code>enableResetButton</code></td>
+          <td>Boolean</td>
+          <td>Determines if a reset button is available for the group.</td>
+          <td>No</td>
+          <td><code>false</code></td>
+        </tr>
+        <tr>
+          <td><code>controls</code></td>
+          <td>Array</td>
+          <td>An array of control objects within the group.</td>
+          <td>Yes</td>
+          <td>-</td>
+        </tr>
+        <tr>
+          <td><code>type</code></td>
+          <td>String</td>
+          <td>The type of group, e.g., <code>"tabPanel"</code>.</td>
+          <td>No</td>
+          <td><code>"group"</code></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <blockquote>
+      <strong>Example:</strong>
+      <pre><code>{
+  "groupName": "systemPreferencesGroup",
+  "title": "System Preferences: (Tap item for desc)",
+  "enableResetButton": false,
+  "controls": [
+    // Control objects here
+  ]
+}
+    </code></pre>
+    </blockquote>
+
+    <h2 id="control-object">Control Object</h2>
+
+    <p>
+      Controls are interactive elements within a group that allow users to view
+      or modify settings. Each control type has specific properties.
+    </p>
+
+    <h3 id="common-properties">Common Properties</h3>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Property</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Required</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>type</code></td>
+          <td>String</td>
+          <td>The type of control (e.g., toggle, float, selection).</td>
+          <td>Yes</td>
+          <td>-</td>
+        </tr>
+        <tr>
+          <td><code>param</code></td>
+          <td>String</td>
+          <td>The parameter name associated with the control.</td>
+          <td>Yes</td>
+          <td>-</td>
+        </tr>
+        <tr>
+          <td><code>title</code></td>
+          <td>String</td>
+          <td>The display title of the control.</td>
+          <td>Yes</td>
+          <td>-</td>
+        </tr>
+        <tr>
+          <td><code>desc</code></td>
+          <td>String</td>
+          <td>A description or tooltip for the control.</td>
+          <td>Yes</td>
+          <td>-</td>
+        </tr>
+        <tr>
+          <td><code>disable</code></td>
+          <td>Boolean</td>
+          <td>Disables the control if set to <code>true</code>.</td>
+          <td>No</td>
+          <td><code>false</code></td>
+        </tr>
+        <tr>
+          <td><code>hidden</code></td>
+          <td>Boolean</td>
+          <td>Hides the control if set to <code>true</code>.</td>
+          <td>No</td>
+          <td><code>false</code></td>
+        </tr>
+        <tr>
+          <td><code>conditions</code></td>
+          <td>Object</td>
+          <td>Defines conditions for the control's visibility and behavior.</td>
+          <td>No</td>
+          <td>-</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3 id="control-types">Control Types</h3>
+
+    <h4 id="toggle-control">Toggle Control</h4>
+
+    <p>A switch that allows users to enable or disable a specific feature.</p>
+
+    <h5>Properties:</h5>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Property</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Required</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>type</code></td>
+          <td>String</td>
+          <td>Must be <code>"toggle"</code>.</td>
+          <td>Yes</td>
+          <td>-</td>
+        </tr>
+        <tr>
+          <td><code>param</code></td>
+          <td>String</td>
+          <td>The parameter name to toggle.</td>
+          <td>Yes</td>
+          <td>-</td>
+        </tr>
+        <tr>
+          <td><code>title</code></td>
+          <td>String</td>
+          <td>The display title of the toggle.</td>
+          <td>Yes</td>
+          <td>-</td>
+        </tr>
+        <tr>
+          <td><code>desc</code></td>
+          <td>String</td>
+          <td>Description of what the toggle controls.</td>
+          <td>Yes</td>
+          <td>-</td>
+        </tr>
+        <tr>
+          <td><code>disable</code></td>
+          <td>Boolean</td>
+          <td>Disables the toggle if set to <code>true</code>.</td>
+          <td>No</td>
+          <td><code>false</code></td>
+        </tr>
+        <tr>
+          <td><code>hidden</code></td>
+          <td>Boolean</td>
+          <td>Hides the toggle if set to <code>true</code>.</td>
+          <td>No</td>
+          <td><code>false</code></td>
+        </tr>
+        <tr>
+          <td><code>conditions</code></td>
+          <td>Object</td>
+          <td>Conditions to determine the toggle's availability.</td>
+          <td>No</td>
+          <td>-</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p><strong>Example:</strong></p>
+    <pre><code>{
+  "type": "toggle",
+  "param": "FordPrefEnableDebugLogs",
+  "title": "Enable Debug Logging",
+  "desc": "Enables additional debug output.",
+  "disable": false,
+  "hidden": false,
+  "conditions": {
+    "git_remote": ["ford-op/sp-dev-c3"],
+    "git_branch": []
+  }
+}
+</code></pre>
+
+    <h4 id="float-control">Float Control</h4>
+
+    <p>
+      Allows users to adjust a floating-point parameter within a specified
+      range.
+    </p>
+
+    <h5>Properties:</h5>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Property</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Required</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>type</code></td>
+          <td>String</td>
+          <td>Must be <code>"float"</code>.</td>
+          <td>Yes</td>
+          <td>-</td>
+        </tr>
+        <tr>
+          <td><code>param</code></td>
+          <td>String</td>
+          <td>The parameter name to adjust.</td>
+          <td>Yes</td>
+          <td>-</td>
+        </tr>
+        <tr>
+          <td><code>title</code></td>
+          <td>String</td>
+          <td>The display title of the float control.</td>
+          <td>Yes</td>
+          <td>-</td>
+        </tr>
+        <tr>
+          <td><code>desc</code></td>
+          <td>String</td>
+          <td>Description of what the float control adjusts.</td>
+          <td>Yes</td>
+          <td>-</td>
+        </tr>
+        <tr>
+          <td><code>disable</code></td>
+          <td>Boolean</td>
+          <td>Disables the control if set to <code>true</code>.</td>
+          <td>No</td>
+          <td><code>false</code></td>
+        </tr>
+        <tr>
+          <td><code>min</code></td>
+          <td>Number</td>
+          <td>The minimum allowable value.</td>
+          <td>Yes</td>
+          <td>-</td>
+        </tr>
+        <tr>
+          <td><code>max</code></td>
+          <td>Number</td>
+          <td>The maximum allowable value.</td>
+          <td>Yes</td>
+          <td>-</td>
+        </tr>
+        <tr>
+          <td><code>increment</code></td>
+          <td>Number</td>
+          <td>The step increment for adjusting the value.</td>
+          <td>Yes</td>
+          <td>-</td>
+        </tr>
+        <tr>
+          <td><code>division</code></td>
+          <td>Number</td>
+          <td>Division factor for displaying the value.</td>
+          <td>Yes</td>
+          <td><code>1.0</code></td>
+        </tr>
+        <tr>
+          <td><code>hidden</code></td>
+          <td>Boolean</td>
+          <td>Hides the control if set to <code>true</code>.</td>
+          <td>No</td>
+          <td><code>false</code></td>
+        </tr>
+        <tr>
+          <td><code>conditions</code></td>
+          <td>Object</td>
+          <td>Conditions to determine the control's availability.</td>
+          <td>No</td>
+          <td>-</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p><strong>Example:</strong></p>
+    <pre><code>{
+  "type": "float",
+  "param": "FordLatTuningLaneChgModifier",
+  "title": "Lane Change Modifier",
+  "desc": "Adjust lane change curvature aggressiveness (lower = slower).",
+  "disable": false,
+  "hidden": false,
+  "min": 0.0,
+  "max": 1.0,
+  "increment": 0.05,
+  "division": 100.0,
+  "conditions": {
+    "git_remote": ["any"],
+    "git_branch": []
+  }
+}
+</code></pre>
+
+    <h4 id="integer-control">Integer Control</h4>
+
+    <p>Allows users to adjust an integer parameter within a specified range.</p>
+
+    <h5>Properties:</h5>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Property</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Required</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>type</code></td>
+          <td>String</td>
+          <td>Must be <code>"integer"</code>.</td>
+          <td>Yes</td>
+          <td>-</td>
+        </tr>
+        <tr>
+          <td><code>param</code></td>
+          <td>String</td>
+          <td>The parameter name to adjust.</td>
+          <td>Yes</td>
+          <td>-</td>
+        </tr>
+        <tr>
+          <td><code>title</code></td>
+          <td>String</td>
+          <td>The display title of the integer control.</td>
+          <td>Yes</td>
+          <td>-</td>
+        </tr>
+        <tr>
+          <td><code>desc</code></td>
+          <td>String</td>
+          <td>Description of what the integer control adjusts.</td>
+          <td>Yes</td>
+          <td>-</td>
+        </tr>
+        <tr>
+          <td><code>disable</code></td>
+          <td>Boolean</td>
+          <td>Disables the control if set to <code>true</code>.</td>
+          <td>No</td>
+          <td><code>false</code></td>
+        </tr>
+        <tr>
+          <td><code>min</code></td>
+          <td>Number</td>
+          <td>The minimum allowable value.</td>
+          <td>Yes</td>
+          <td>-</td>
+        </tr>
+        <tr>
+          <td><code>max</code></td>
+          <td>Number</td>
+          <td>The maximum allowable value.</td>
+          <td>Yes</td>
+          <td>-</td>
+        </tr>
+        <tr>
+          <td><code>increment</code></td>
+          <td>Number</td>
+          <td>The step increment for adjusting the value.</td>
+          <td>Yes</td>
+          <td>-</td>
+        </tr>
+        <tr>
+          <td><code>hidden</code></td>
+          <td>Boolean</td>
+          <td>Hides the control if set to <code>true</code>.</td>
+          <td>No</td>
+          <td><code>false</code></td>
+        </tr>
+        <tr>
+          <td><code>conditions</code></td>
+          <td>Object</td>
+          <td>Conditions to determine the control's availability.</td>
+          <td>No</td>
+          <td>-</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p><strong>Example:</strong></p>
+    <pre><code>{
+  "type": "integer",
+  "param": "FordLatTuningRandomNumber",
+  "title": "Random Number",
+  "desc": "A random number between 0 and 10",
+  "disable": false,
+  "hidden": false,
+  "min": 0,
+  "max": 10,
+  "increment": 1,
+  "conditions": { "git_remote": ["any"], "git_branch": [] }
+}
+</code></pre>
+
+    <h4 id="selection-control">Selection Control</h4>
+
+    <p>
+      Provides a dropdown or selection interface for choosing among predefined
+      options.
+    </p>
+
+    <h5>Properties:</h5>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Property</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Required</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>type</code></td>
+          <td>String</td>
+          <td>Must be <code>"selection"</code>.</td>
+          <td>Yes</td>
+          <td>-</td>
+        </tr>
+        <tr>
+          <td><code>param</code></td>
+          <td>String</td>
+          <td>The parameter name to set based on selection.</td>
+          <td>Yes</td>
+          <td>-</td>
+        </tr>
+        <tr>
+          <td><code>title</code></td>
+          <td>String</td>
+          <td>The display title of the selection control.</td>
+          <td>Yes</td>
+          <td>-</td>
+        </tr>
+        <tr>
+          <td><code>desc</code></td>
+          <td>String</td>
+          <td>Description of what the selection controls.</td>
+          <td>Yes</td>
+          <td>-</td>
+        </tr>
+        <tr>
+          <td><code>disable</code></td>
+          <td>Boolean</td>
+          <td>Disables the control if set to <code>true</code>.</td>
+          <td>No</td>
+          <td><code>false</code></td>
+        </tr>
+        <tr>
+          <td><code>hidden</code></td>
+          <td>Boolean</td>
+          <td>Hides the control if set to <code>true</code>.</td>
+          <td>No</td>
+          <td><code>false</code></td>
+        </tr>
+        <tr>
+          <td><code>options</code></td>
+          <td>Array</td>
+          <td>An array of option objects defining selectable items.</td>
+          <td>Yes</td>
+          <td>-</td>
+        </tr>
+        <tr>
+          <td><code>conditions</code></td>
+          <td>Object</td>
+          <td>Conditions to determine the control's availability.</td>
+          <td>No</td>
+          <td>-</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p><strong>Option Object Properties:</strong></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Property</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Required</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>name</code></td>
+          <td>String</td>
+          <td>The display name of the option.</td>
+          <td>Yes</td>
+          <td>-</td>
+        </tr>
+        <tr>
+          <td><code>value</code></td>
+          <td>String</td>
+          <td>The value to set when the option is selected.</td>
+          <td>Yes</td>
+          <td>-</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p><strong>Example:</strong></p>
+    <pre><code>{
+  "type": "selection",
+  "param": "FordSelectedVehicleModel",
+  "title": "Vehicle Model",
+  "desc": "Select your vehicle model",
+  "disable": false,
+  "hidden": false,
+  "options": [
+    { "name": "F-150 14th Gen (21-23)", "value": "FORD_F_150_MK14" },
+    { "name": "F-150 Lightning 1st Gen", "value": "FORD_F_150_LIGHTNING_MK1" },
+    { "name": "Mustang Mach-E 1st Gen", "value": "FORD_MUSTANG_MACH_E_MK1" }
+  ]
+}
+</code></pre>
+
+    <h4 id="segmented-control">Segmented Control</h4>
+
+    <p>
+      Provides a segmented button interface for selecting one option among
+      multiple predefined options.
+    </p>
+
+    <h5>Properties:</h5>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Property</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Required</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>type</code></td>
+          <td>String</td>
+          <td>Must be <code>"segmented_control"</code>.</td>
+          <td>Yes</td>
+          <td>-</td>
+        </tr>
+        <tr>
+          <td><code>param</code></td>
+          <td>String</td>
+          <td>The parameter name to set based on selection.</td>
+          <td>Yes</td>
+          <td>-</td>
+        </tr>
+        <tr>
+          <td><code>title</code></td>
+          <td>String</td>
+          <td>The display title of the segmented control.</td>
+          <td>Yes</td>
+          <td>-</td>
+        </tr>
+        <tr>
+          <td><code>desc</code></td>
+          <td>String</td>
+          <td>Description of what the segmented control does.</td>
+          <td>Yes</td>
+          <td>-</td>
+        </tr>
+        <tr>
+          <td><code>disable</code></td>
+          <td>Boolean</td>
+          <td>Disables the control if set to <code>true</code>.</td>
+          <td>No</td>
+          <td><code>false</code></td>
+        </tr>
+        <tr>
+          <td><code>hidden</code></td>
+          <td>Boolean</td>
+          <td>Hides the control if set to <code>true</code>.</td>
+          <td>No</td>
+          <td><code>false</code></td>
+        </tr>
+        <tr>
+          <td><code>options</code></td>
+          <td>Array</td>
+          <td>An array of option objects defining selectable segments.</td>
+          <td>Yes</td>
+          <td>-</td>
+        </tr>
+        <tr>
+          <td><code>defaultValue</code></td>
+          <td>String</td>
+          <td>The default value to select if not set.</td>
+          <td>No</td>
+          <td>-</td>
+        </tr>
+        <tr>
+          <td><code>conditions</code></td>
+          <td>Object</td>
+          <td>Conditions to determine the control's availability.</td>
+          <td>No</td>
+          <td>-</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p><strong>Option Object Properties:</strong></p>
+    <table>
+      <thead>
+        <tr>
+          <th>Property</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Required</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>name</code></td>
+          <td>String</td>
+          <td>The display name of the segment.</td>
+          <td>Yes</td>
+          <td>-</td>
+        </tr>
+        <tr>
+          <td><code>value</code></td>
+          <td>String</td>
+          <td>The value to set when the segment is selected.</td>
+          <td>Yes</td>
+          <td>-</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p><strong>Example:</strong></p>
+    <pre><code>{
+  "type": "segmented_control",
+  "param": "FordLatTuningTuningProfile",
+  "title": "Tuning Profile",
+  "desc": "Sets the tuning aggressiveness",
+  "disable": false,
+  "hidden": false,
+  "options": [
+    { "name": "Low", "value": "1" },
+    { "name": "Medium", "value": "2" },
+    { "name": "High", "value": "3" },
+    { "name": "Custom", "value": "4" }
+  ],
+  "defaultValue": "2",
+  "conditions": {
+    "allConditionsTrue": [
+      { "git_remote": ["any"] },
+      { "git_branch": [] }
+    ]
+  }
+}
+</code></pre>
+
+    <h4 id="param-viewer-control">Param Viewer Control</h4>
+
+    <p>
+      Displays the current value of a specified parameter in a read-only format.
+    </p>
+
+    <h5>Properties:</h5>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Property</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Required</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>type</code></td>
+          <td>String</td>
+          <td>Must be <code>"param_viewer"</code>.</td>
+          <td>Yes</td>
+          <td>-</td>
+        </tr>
+        <tr>
+          <td><code>param</code></td>
+          <td>String</td>
+          <td>The parameter name to view.</td>
+          <td>Yes</td>
+          <td>-</td>
+        </tr>
+        <tr>
+          <td><code>title</code></td>
+          <td>String</td>
+          <td>The display title of the parameter viewer.</td>
+          <td>Yes</td>
+          <td>-</td>
+        </tr>
+        <tr>
+          <td><code>desc</code></td>
+          <td>String</td>
+          <td>Description of what the viewer displays.</td>
+          <td>Yes</td>
+          <td>-</td>
+        </tr>
+        <tr>
+          <td><code>disable</code></td>
+          <td>Boolean</td>
+          <td>Disables the control if set to <code>true</code>.</td>
+          <td>No</td>
+          <td><code>false</code></td>
+        </tr>
+        <tr>
+          <td><code>hidden</code></td>
+          <td>Boolean</td>
+          <td>Hides the control if set to <code>true</code>.</td>
+          <td>No</td>
+          <td><code>false</code></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p><strong>Example:</strong></p>
+    <pre><code>{
+  "type": "param_viewer",
+  "param": "LiveParameters",
+  "title": "Live Parameters",
+  "desc": "View live parameters",
+  "disable": false,
+  "hidden": false
+}
+</code></pre>
+
+    <h4 id="param-list-viewer-control">Param List Viewer Control</h4>
+
+    <p>
+      Provides a comprehensive view of all available parameters, allowing users
+      to browse through them.
+    </p>
+
+    <h5>Properties:</h5>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Property</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Required</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>type</code></td>
+          <td>String</td>
+          <td>Must be <code>"param_list_viewer"</code>.</td>
+          <td>Yes</td>
+          <td>-</td>
+        </tr>
+        <tr>
+          <td><code>param</code></td>
+          <td>String</td>
+          <td>The parameter name to view all parameters.</td>
+          <td>Yes</td>
+          <td>-</td>
+        </tr>
+        <tr>
+          <td><code>title</code></td>
+          <td>String</td>
+          <td>The display title of the parameter list viewer.</td>
+          <td>Yes</td>
+          <td>-</td>
+        </tr>
+        <tr>
+          <td><code>desc</code></td>
+          <td>String</td>
+          <td>Description of what the viewer displays.</td>
+          <td>Yes</td>
+          <td>-</td>
+        </tr>
+        <tr>
+          <td><code>disable</code></td>
+          <td>Boolean</td>
+          <td>Disables the control if set to <code>true</code>.</td>
+          <td>No</td>
+          <td><code>false</code></td>
+        </tr>
+        <tr>
+          <td><code>hidden</code></td>
+          <td>Boolean</td>
+          <td>Hides the control if set to <code>true</code>.</td>
+          <td>No</td>
+          <td><code>false</code></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p><strong>Example:</strong></p>
+    <pre><code>{
+  "type": "param_list_viewer",
+  "param": "AllParameters",
+  "title": "All Parameters",
+  "desc": "View all available parameters",
+  "disable": false,
+  "hidden": false
+}
+</code></pre>
+
+    <h4 id="file-viewer-control">File Viewer Control</h4>
+
+    <p>
+      Allows users to view the contents of a specified file within the
+      application.
+    </p>
+
+    <h5>Properties:</h5>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Property</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Required</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>type</code></td>
+          <td>String</td>
+          <td>Must be <code>"file_viewer"</code>.</td>
+          <td>Yes</td>
+          <td>-</td>
+        </tr>
+        <tr>
+          <td><code>path</code></td>
+          <td>String</td>
+          <td>Relative path to the file to be viewed.</td>
+          <td>Yes</td>
+          <td>-</td>
+        </tr>
+        <tr>
+          <td><code>title</code></td>
+          <td>String</td>
+          <td>The display title of the file viewer.</td>
+          <td>Yes</td>
+          <td>-</td>
+        </tr>
+        <tr>
+          <td><code>desc</code></td>
+          <td>String</td>
+          <td>Description of what the file viewer does.</td>
+          <td>Yes</td>
+          <td>-</td>
+        </tr>
+        <tr>
+          <td><code>header</code></td>
+          <td>String</td>
+          <td>Optional header text for the dialog displaying the file.</td>
+          <td>No</td>
+          <td>-</td>
+        </tr>
+        <tr>
+          <td><code>disable</code></td>
+          <td>Boolean</td>
+          <td>Disables the control if set to <code>true</code>.</td>
+          <td>No</td>
+          <td><code>false</code></td>
+        </tr>
+        <tr>
+          <td><code>hidden</code></td>
+          <td>Boolean</td>
+          <td>Hides the control if set to <code>true</code>.</td>
+          <td>No</td>
+          <td><code>false</code></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p><strong>Example:</strong></p>
+    <pre><code>{
+  "type": "file_viewer",
+  "path": "CHANGELOGS_BP.md",
+  "title": "BluePilot Changelog",
+  "desc": "View the BluePilot changelog",
+  "header": "BluePilot Changelog",
+  "disable": false,
+  "hidden": false
+}
+</code></pre>
+
+    <h4 id="command-button-control">Command Button Control</h4>
+
+    <p>
+      Executes a specified command when clicked, optionally requiring user
+      confirmation.
+    </p>
+
+    <h5>Properties:</h5>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Property</th>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Required</th>
+          <th>Default</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>type</code></td>
+          <td>String</td>
+          <td>Must be <code>"command_button"</code>.</td>
+          <td>Yes</td>
+          <td>-</td>
+        </tr>
+        <tr>
+          <td><code>command</code></td>
+          <td>String</td>
+          <td>The command to execute.</td>
+          <td>Yes</td>
+          <td>-</td>
+        </tr>
+        <tr>
+          <td><code>working_dir</code></td>
+          <td>String</td>
+          <td>The working directory to execute the command in.</td>
+          <td>No</td>
+          <td>Current directory</td>
+        </tr>
+        <tr>
+          <td><code>title</code></td>
+          <td>String</td>
+          <td>The display title of the command button.</td>
+          <td>Yes</td>
+          <td>-</td>
+        </tr>
+        <tr>
+          <td><code>desc</code></td>
+          <td>String</td>
+          <td>Description of what the command does.</td>
+          <td>Yes</td>
+          <td>-</td>
+        </tr>
+        <tr>
+          <td><code>button_text</code></td>
+          <td>String</td>
+          <td>The text displayed on the button.</td>
+          <td>No</td>
+          <td><code>"EXECUTE"</code></td>
+        </tr>
+        <tr>
+          <td><code>confirm</code></td>
+          <td>Boolean</td>
+          <td>
+            Whether to prompt for confirmation before executing the command.
+          </td>
+          <td>No</td>
+          <td><code>false</code></td>
+        </tr>
+        <tr>
+          <td><code>confirm_text</code></td>
+          <td>String</td>
+          <td>The confirmation message displayed to the user.</td>
+          <td>No</td>
+          <td>Default confirmation message</td>
+        </tr>
+        <tr>
+          <td><code>confirm_yes_text</code></td>
+          <td>String</td>
+          <td>The text for the confirmation "Yes" button.</td>
+          <td>No</td>
+          <td><code>"Yes"</code></td>
+        </tr>
+        <tr>
+          <td><code>confirm_no_text</code></td>
+          <td>String</td>
+          <td>The text for the confirmation "No" button.</td>
+          <td>No</td>
+          <td><code>"No"</code></td>
+        </tr>
+        <tr>
+          <td><code>disable</code></td>
+          <td>Boolean</td>
+          <td>Disables the control if set to <code>true</code>.</td>
+          <td>No</td>
+          <td><code>false</code></td>
+        </tr>
+        <tr>
+          <td><code>hidden</code></td>
+          <td>Boolean</td>
+          <td>Hides the control if set to <code>true</code>.</td>
+          <td>No</td>
+          <td><code>false</code></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p><strong>Example:</strong></p>
+    <pre><code>{
+  "type": "command_button",
+  "command": "touch test.txt",
+  "working_dir": "/data/openpilot",
+  "title": "Create test file",
+  "desc": "Create a test file in the openpilot directory",
+  "button_text": "Create",
+  "confirm": true,
+  "confirm_text": "Are you sure you want to create a test file?",
+  "confirm_yes_text": "Yes",
+  "confirm_no_text": "No",
+  "disable": false,
+  "hidden": false
+}
+</code></pre>
+
+    <h3 id="custom-controls">Custom Controls</h3>
+
+    <p>
+      The <code>ConfigDrivenPanel</code> system also supports custom control
+      types beyond the standard ones listed above. These controls can be defined
+      and integrated based on specific requirements.
+    </p>
+
+    <p><strong>Example:</strong></p>
+    <pre><code>{
+  "type": "custom_control",
+  "param": "CustomParam",
+  "title": "Custom Control",
+  "desc": "Description for custom control.",
+  "disable": false,
+  "hidden": false,
+  "customProperty1": "Value1",
+  "customProperty2": 10,
+  "conditions": {
+    "paramValueEquals": { "CustomParam": "Enabled" }
+  }
+}
+</code></pre>
+
+    <p>
+      <em
+        >Note: Custom controls require corresponding implementation in the
+        codebase to handle their unique properties and behaviors.</em
+      >
+    </p>
+
+    <h2 id="conditions">Conditions</h2>
+
+    <p>
+      Conditions determine the visibility and behavior of controls based on
+      specific criteria. They enable dynamic and context-sensitive UI elements.
+    </p>
+
+    <h3 id="condition-types">Condition Types</h3>
+
+    <ul>
+      <li>
+        <strong><code>paramValueEquals</code>:</strong> Checks if a parameter
+        equals a specified value.
+        <pre><code>"paramValueEquals": {
+  "ParameterName": "ExpectedValue"
+}
+        </code></pre>
+      </li>
+      <li>
+        <strong><code>paramValueGreaterThan</code>:</strong> Checks if a
+        parameter's value is greater than a specified number.
+        <pre><code>"paramValueGreaterThan": {
+  "ParameterName": 70
+}
+        </code></pre>
+      </li>
+      <li>
+        <strong><code>paramValueLessThan</code>:</strong> Checks if a
+        parameter's value is less than a specified number.
+        <pre><code>"paramValueLessThan": {
+  "ParameterName": 90
+}
+        </code></pre>
+      </li>
+      <li>
+        <strong><code>paramValueInRange</code>:</strong> Checks if a parameter's
+        value falls within a specified range.
+        <pre><code>"paramValueInRange": {
+  "ParameterName": {
+    "min": 10,
+    "max": 20
+  }
+}
+        </code></pre>
+      </li>
+      <li>
+        <strong><code>git_remote</code>:</strong> Validates against specified
+        Git remote repositories.
+        <pre><code>"git_remote": ["remote1", "remote2"]
+        </code></pre>
+      </li>
+      <li>
+        <strong><code>git_branch</code>:</strong> Validates against specified
+        Git branches.
+        <pre><code>"git_branch": ["branch1", "branch2"]
+        </code></pre>
+      </li>
+      <li>
+        <strong><code>onlyWhenTheseParams</code>:</strong> Ensures that certain
+        parameters are enabled or true.
+        <pre><code>"onlyWhenTheseParams": ["Param1", "Param2"]
+        </code></pre>
+      </li>
+    </ul>
+
+    <h3 id="composite-conditions">Composite Conditions</h3>
+
+    <p>
+      Conditions can be combined using logical operators to form more complex
+      criteria.
+    </p>
+
+    <ul>
+      <li>
+        <strong><code>anyConditionsTrue</code>:</strong> The control is visible
+        if <strong>any</strong> of the specified conditions are true.
+        <pre><code>"anyConditionsTrue": [
+  { "paramValueEquals": { "DriveMode": "sport" } },
+  { "allConditionsTrue": [ /* Nested conditions */ ] }
+]
+        </code></pre>
+      </li>
+      <li>
+        <strong><code>allConditionsTrue</code>:</strong> The control is visible
+        only if <strong>all</strong> of the specified conditions are true.
+        <pre><code>"allConditionsTrue": [
+  { "git_remote": ["ford-op/sp-dev-c3"] },
+  { "paramValueLessThan": { "Temperature": 90 } }
+]
+        </code></pre>
+      </li>
+    </ul>
+
+    <p><strong>Example of Composite Conditions:</strong></p>
+    <pre><code>{
+  "conditions": {
+    "anyConditionsTrue": [
+      { "paramValueEquals": { "DriveMode": "sport" } },
+      {
+        "allConditionsTrue": [
+          { "paramValueGreaterThan": { "Speed": 70 } },
+          { "onlyWhenTheseParams": ["AdvancedModeEnabled"] }
+        ]
+      }
+    ],
+    "allConditionsTrue": [
+      { "git_remote": ["ford-op/sp-dev-c3"] },
+      { "paramValueLessThan": { "Temperature": 90 } }
+    ]
+  }
+}
+</code></pre>
+
+    <p><em>In this example:</em></p>
+    <ul>
+      <li>
+        The toggle is enabled if:
+        <ul>
+          <li>
+            <strong>Any</strong> of the following is true:
+            <ul>
+              <li><code>UserLevel</code> equals <code>"admin"</code>.</li>
+              <li>
+                Both:
+                <ul>
+                  <li>
+                    <code>SystemLoad</code> is greater than <code>70</code>.
+                  </li>
+                  <li><code>SystemStable</code> is <code>true</code>.</li>
+                </ul>
+              </li>
+            </ul>
+          </li>
+          <li>
+            <strong>And</strong>:
+            <ul>
+              <li>
+                <code>git_remote</code> is <code>"ford-op/sp-dev-c3"</code>.
+              </li>
+              <li><code>Temperature</code> is less than <code>90</code>.</li>
+            </ul>
+          </li>
+        </ul>
+      </li>
+    </ul>
+
+    <h2 id="examples">Examples</h2>
+
+    <h3 id="full-configuration-example">Full Configuration Example</h3>
+
+    <p>
+      Below is a sample JSON configuration that defines multiple groups and
+      controls, including various control types and conditions.
+    </p>
+
+    <pre><code>{
+  "_comment": "This configuration file defines all Ford settings panels, groups, and controls.",
+  "menuName": "BluePilot",
+  "menuIcon": "icon_ford.png",
+  "menuDescription": "BluePilot Panel",
+  "persistentParams": [
+    "FordSelectedVehicleModel",
+    "FordPrefQuietDrive",
+    "FordPrefEnableDebugLogs",
+    "FordPrefSendHandsFreeCanMsg",
+    "FordPrefLaneDepartCanMsg",
+    "FordPrefDriverMonitorCanMsg",
+    "FordPrefEnablePathAngle",
+    "FordPrefHumanTurnDetectionEnable",
+    "FordPrefEnableCustomLatLogic",
+    "FordLatTuningLaneChgModifier",
+    "FordLatTuningCustomPathOffset",
+    "FordLongTuningBrakeActuatorActivate",
+    "FordLongTuningBrakeActuatorReleaseDelta",
+    "FordLongTuningPrechargeActuatorTargetDelta",
+    "FordLimitsCurvatureMax",
+    "FordLimitsCurvatureError"
+  ],
+  "clearOnManagerStartParams": [],
+  "clearOnOnroadTransitionParams": [],
+  "clearOnOffroadTransitionParams": [],
+  "groups": [
+    {
+      "groupName": "vehicleSelectorGroup",
+      "title": "Vehicle Selection: (Tap item for desc)",
+      "enableResetButton": false,
+      "controls": [
+        {
+          "type": "selection",
+          "param": "FordSelectedVehicleModel",
+          "title": "Vehicle Model",
+          "desc": "Select your vehicle model",
+          "disable": false,
+          "hidden": false,
+          "options": [
+            { "name": "F-150 14th Gen (21-23)", "value": "FORD_F_150_MK14" },
+            { "name": "F-150 Lightning 1st Gen", "value": "FORD_F_150_LIGHTNING_MK1" },
+            { "name": "Mustang Mach-E 1st Gen", "value": "FORD_MUSTANG_MACH_E_MK1" }
+          ]
+        },
+        {
+          "type": "file_viewer",
+          "path": "CHANGELOGS_BP.md",
+          "title": "BluePilot Changelog",
+          "desc": "View the BluePilot changelog",
+          "header": "BluePilot Changelog",
+          "disable": false,
+          "hidden": false
+        }
+      ]
+    },
+    {
+      "groupName": "systemPreferencesGroup",
+      "title": "System Preferences: (Tap item for desc)",
+      "enableResetButton": false,
+      "controls": [
+        {
+          "type": "toggle",
+          "param": "FordPrefEnableDebugLogs",
+          "title": "Enable Debug Logging",
+          "desc": "Enables additional debug output.",
+          "disable": false,
+          "hidden": false,
+          "conditions": {
+            "git_remote": ["ford-op/sp-dev-c3"],
+            "git_branch": []
+          }
+        }
+      ]
+    },
+    {
+      "groupName": "clusterPreferencesGroup",
+      "title": "Cluster Preferences: (Tap item for desc)",
+      "enableResetButton": false,
+      "controls": [
+        {
+          "type": "toggle",
+          "param": "FordPrefSendHandsFreeCanMsg",
+          "title": "Show Hands-Free UI (On Supported Vehicles)",
+          "desc": "Sends necessary messages for Hands-Free interface.",
+          "disable": false,
+          "hidden": false,
+          "conditions": {
+            "git_remote": ["any"],
+            "git_branch": []
+          }
+        },
+        {
+          "type": "toggle",
+          "param": "FordPrefLaneDepartCanMsg",
+          "title": "Send Lane Departure Signals to Vehicle",
+          "desc": "Send Openpilot lane departure signals for native cluster alerts.",
+          "disable": false,
+          "hidden": false,
+          "conditions": {
+            "git_remote": ["any"],
+            "git_branch": []
+          }
+        },
+        {
+          "type": "toggle",
+          "param": "FordPrefDriverMonitorCanMsg",
+          "title": "Send Driver Monitor Signals",
+          "desc": "Send driver monitor notice signals to the vehicle for native cluster alerts.",
+          "disable": false,
+          "hidden": false,
+          "conditions": {
+            "git_remote": ["any"],
+            "git_branch": []
+          }
+        }
+      ]
+    },
+    {
+      "groupName": "lateralControlsGroup",
+      "title": "Lateral Controls: (Tap item for desc)",
+      "enableResetButton": true,
+      "controls": [
+        {
+          "type": "toggle",
+          "param": "FordPrefHumanTurnDetectionEnable",
+          "title": "Enable Human Turn Detection",
+          "desc": "Reset steering so you don't fight the wheel making manual turns.",
+          "disable": false,
+          "hidden": false,
+          "conditions": {
+            "git_remote": ["any"],
+            "git_branch": []
+          }
+        },
+        {
+          "type": "toggle",
+          "param": "FordPrefAllowNudgelessLaneChange",
+          "title": "Allow Nudgeless Lane Changes",
+          "desc": "Allow nudgeless lane change",
+          "disable": false,
+          "hidden": false,
+          "conditions": {
+            "git_remote": ["any"],
+            "git_branch": []
+          }
+        },
+        {
+          "type": "segmented_control",
+          "param": "FordLatTuningTuningProfile",
+          "title": "Tuning Profile",
+          "desc": "Sets the tuning aggressiveness",
+          "disable": false,
+          "hidden": false,
+          "options": [
+            { "name": "Low", "value": "1" },
+            { "name": "Medium", "value": "2" },
+            { "name": "High", "value": "3" },
+            { "name": "Custom", "value": "4" }
+          ],
+          "defaultValue": "2",
+          "conditions": {
+            "allConditionsTrue": [
+              { "git_remote": ["any"] },
+              { "git_branch": [] }
+            ]
+          }
+        },
+        {
+          "type": "float",
+          "param": "FordLatTuningCustomPathOffset",
+          "title": "In Lane Offset",
+          "desc": "Positions car further left (negative) or right (positive)",
+          "disable": false,
+          "hidden": false,
+          "min": -0.5,
+          "max": 0.5,
+          "increment": 0.05,
+          "division": 100.0,
+          "conditions": {
+            "git_remote": ["any"],
+            "git_branch": []
+          }
+        },
+        {
+          "type": "float",
+          "param": "FordLatTuningPCBlendRatioUI",
+          "title": "Predicted Curvature Blend Ratio",
+          "desc": "Sets the blend ratio between predicted and desired curvature",
+          "disable": false,
+          "hidden": false,
+          "min": 0.0,
+          "max": 1.0,
+          "increment": 0.01,
+          "division": 100.0,
+          "conditions": {
+            "git_remote": ["any"],
+            "git_branch": []
+          }
+        },
+        {
+          "type": "float",
+          "param": "FordLatTuningPathAngleHighSpeedFactorUI",
+          "title": "Path Angle High Speed Factor",
+          "desc": "Lower numbers for less twitchy steering",
+          "disable": false,
+          "hidden": false,
+          "min": 0.0,
+          "max": 10.0,
+          "increment": 0.01,
+          "division": 100.0,
+          "conditions": {
+            "git_remote": ["any"],
+            "git_branch": []
+          }
+        },
+        {
+          "type": "float",
+          "param": "FordLatTuningPathAngleHighCurvatureFactorUI",
+          "title": "Path Angle High Curvature Factor",
+          "desc": "Lower numbers for less aggressive curves",
+          "disable": false,
+          "hidden": false,
+          "min": 0.0,
+          "max": 1.0,
+          "increment": 0.05,
+          "division": 100.0,
+          "conditions": {
+            "git_remote": ["any"],
+            "git_branch": []
+          }
+        },
+        {
+          "type": "float",
+          "param": "FordLatTuningLaneChangeFactorHighUI",
+          "title": "Lane Change Factor",
+          "desc": "Lower numbers for less aggressive lane change",
+          "disable": false,
+          "hidden": false,
+          "min": 0.0,
+          "max": 1.0,
+          "increment": 0.05,
+          "division": 100.0,
+          "conditions": {
+            "git_remote": ["any"],
+            "git_branch": []
+          }
+        }
+      ]
+    },
+    {
+      "groupName": "brakeTuningGroup",
+      "title": "Brake Tuning: (Tap item for desc)",
+      "enableResetButton": true,
+      "controls": [
+        {
+          "type": "float",
+          "param": "FordLongTuningBrakeActuatorActivate",
+          "title": "Brake Actuator Activate",
+          "desc": "Acceleration setpoint for brake actuator activation.",
+          "disable": false,
+          "hidden": false,
+          "min": -0.2,
+          "max": 0.2,
+          "increment": 0.01,
+          "division": 100.0,
+          "conditions": {
+            "git_remote": ["ford-op/sp-dev-c3"],
+            "git_branch": []
+          }
+        },
+        {
+          "type": "float",
+          "param": "FordLongTuningBrakeActuatorReleaseDelta",
+          "title": "Brake Actuator Release Delta",
+          "desc": "Acceleration gap between activation and release.",
+          "disable": false,
+          "hidden": false,
+          "min": 0.0,
+          "max": 0.2,
+          "increment": 0.01,
+          "division": 100.0,
+          "conditions": {
+            "git_remote": ["ford-op/sp-dev-c3"],
+            "git_branch": []
+          }
+        },
+        {
+          "type": "float",
+          "param": "FordLongTuningPrechargeActuatorTargetDelta",
+          "title": "Precharge Actuator Target Delta",
+          "desc": "How much earlier to activate the precharge actuator.",
+          "disable": false,
+          "hidden": true,
+          "min": 0.0,
+          "max": 0.2,
+          "increment": 0.01,
+          "division": 100.0,
+          "conditions": {
+            "git_remote": ["ford-op/sp-dev-c3"],
+            "git_branch": []
+          }
+        }
+      ]
+    },
+    {
+      "groupName": "limitsTuningGroup",
+      "title": "Limits Tuning: (Tap item for desc)",
+      "enableResetButton": true,
+      "controls": [
+        {
+          "_comment": "Originally commented out in the code snippet",
+          "type": "float",
+          "param": "FordLimitsCurvatureMax",
+          "title": "Curvature Max",
+          "desc": "Defines the max curvature allowed.",
+          "disable": false,
+          "hidden": true,
+          "min": 0.0,
+          "max": 0.2,
+          "increment": 0.005,
+          "division": 100.0,
+          "conditions": {
+            "git_remote": ["ford-op/sp-dev-c3"],
+            "git_branch": []
+          }
+        },
+        {
+          "type": "float",
+          "param": "FordLimitsCurvatureError",
+          "title": "Curvature Error",
+          "desc": "Defines the max curvature error allowed.",
+          "disable": false,
+          "hidden": true,
+          "min": 0.0,
+          "max": 0.02,
+          "increment": 0.001,
+          "division": 1000.0,
+          "conditions": {
+            "git_remote": ["ford-op/sp-dev-c3"],
+            "git_branch": []
+          }
+        }
+      ]
+    },
+    {
+      "groupName": "paramViewerGroup",
+      "title": "Parameter Viewer",
+      "enableResetButton": false,
+      "controls": [
+        {
+          "type": "param_viewer",
+          "param": "LiveParameters",
+          "title": "Live Parameters",
+          "desc": "View live parameters",
+          "disable": false,
+          "hidden": false
+        }
+      ]
+    },
+    {
+      "groupName": "bpInfoGroup",
+      "title": "Other Information",
+      "enableResetButton": false,
+      "controls": [
+        {
+          "type": "file_viewer",
+          "path": "CHANGELOGS_BP.md",
+          "title": "BluePilot Changelog",
+          "desc": "View the BluePilot changelog",
+          "header": "BluePilot Changelog",
+          "disable": false,
+          "hidden": false
+        }
+      ]
+    }
+  ]
+}
+</code></pre>
+
+    <h3 id="individual-control-examples">Individual Control Examples</h3>
+
+    <h4 id="toggle-control-with-conditions">Toggle Control with Conditions</h4>
+
+    <p>
+      This example demonstrates a toggle control that is only available when the
+      Git remote is <code>ford-op/sp-dev-c3</code>.
+    </p>
+
+    <pre><code>{
+  "type": "toggle",
+  "param": "FordPrefEnableDebugLogs",
+  "title": "Enable Debug Logging",
+  "desc": "Enables additional debug output.",
+  "disable": false,
+  "hidden": false,
+  "conditions": {
+    "git_remote": ["ford-op/sp-dev-c3"],
+    "git_branch": []
+  }
+}
+</code></pre>
+
+    <h4 id="float-control-with-default-value">
+      Float Control with Default Value
+    </h4>
+
+    <p>
+      This float control allows users to adjust the lane change modifier with a
+      default value set to <code>2</code>.
+    </p>
+
+    <pre><code>{
+  "type": "float",
+  "param": "FordLatTuningLaneChgModifier",
+  "title": "Lane Change Modifier",
+  "desc": "Adjust lane change curvature aggressiveness (lower = slower).",
+  "disable": false,
+  "hidden": false,
+  "min": 0.0,
+  "max": 1.0,
+  "increment": 0.05,
+  "division": 100.0,
+  "conditions": {
+    "git_remote": ["any"],
+    "git_branch": []
+  }
+}
+</code></pre>
+
+    <h4 id="command-button-control-with-confirmation">
+      Command Button Control with Confirmation
+    </h4>
+
+    <p>
+      This command button control executes a command to create a test file, with
+      a confirmation prompt before execution.
+    </p>
+
+    <pre><code>{
+  "type": "command_button",
+  "command": "touch test.txt",
+  "working_dir": "/data/openpilot",
+  "title": "Create test file",
+  "desc": "Create a test file in the openpilot directory",
+  "button_text": "Create",
+  "confirm": true,
+  "confirm_text": "Are you sure you want to create a test file?",
+  "confirm_yes_text": "Yes",
+  "confirm_no_text": "No",
+  "disable": false,
+  "hidden": false
+}
+</code></pre>
+
+    <h4 id="segmented-control-example">Segmented Control Example</h4>
+
+    <p>
+      This segmented control allows users to select the tuning profile with
+      predefined options.
+    </p>
+
+    <pre><code>{
+  "type": "segmented_control",
+  "param": "FordLatTuningTuningProfile",
+  "title": "Tuning Profile",
+  "desc": "Sets the tuning aggressiveness",
+  "disable": false,
+  "hidden": false,
+  "options": [
+    { "name": "Low", "value": "1" },
+    { "name": "Medium", "value": "2" },
+    { "name": "High", "value": "3" },
+    { "name": "Custom", "value": "4" }
+  ],
+  "defaultValue": "2",
+  "conditions": {
+    "allConditionsTrue": [
+      { "git_remote": ["any"] },
+      { "git_branch": [] }
+    ]
+  }
+}
+</code></pre>
+
+    <h4 id="advanced-condition-example">Advanced Condition Example</h4>
+
+    <p>
+      This example demonstrates the use of both
+      <code>paramValueEquals</code> and <code>anyConditionsTrue</code> to
+      control the visibility and behavior of a control based on multiple
+      criteria.
+    </p>
+
+    <pre><code>{
+  "type": "toggle",
+  "param": "FordAdvancedFeatureEnable",
+  "title": "Enable Advanced Feature",
+  "desc": "Enables the advanced feature based on multiple conditions.",
+  "disable": false,
+  "hidden": false,
+  "conditions": {
+    "anyConditionsTrue": [
+      { "paramValueEquals": { "UserLevel": "admin" } },
+      {
+        "allConditionsTrue": [
+          { "paramValueGreaterThan": { "SystemLoad": 70 } },
+          { "onlyWhenTheseParams": ["SystemStable"] }
+        ]
+      }
+    ],
+    "allConditionsTrue": [
+      { "git_remote": ["ford-op/sp-dev-c3"] },
+      { "paramValueLessThan": { "Temperature": 90 } }
+    ]
+  }
+}
+</code></pre>
+
+    <p><em>In this example:</em></p>
+    <ul>
+      <li>
+        The toggle is enabled if:
+        <ul>
+          <li>
+            <strong>Any</strong> of the following is true:
+            <ul>
+              <li><code>UserLevel</code> equals <code>"admin"</code>.</li>
+              <li>
+                Both:
+                <ul>
+                  <li>
+                    <code>SystemLoad</code> is greater than <code>70</code>.
+                  </li>
+                  <li><code>SystemStable</code> is <code>true</code>.</li>
+                </ul>
+              </li>
+            </ul>
+          </li>
+          <li>
+            <strong>And</strong>:
+            <ul>
+              <li>
+                <code>git_remote</code> is <code>"ford-op/sp-dev-c3"</code>.
+              </li>
+              <li><code>Temperature</code> is less than <code>90</code>.</li>
+            </ul>
+          </li>
+        </ul>
+      </li>
+    </ul>
+
+    <h2 id="optional-vs-required-properties">
+      Optional vs. Required Properties
+    </h2>
+
+    <p>
+      Understanding which properties are mandatory and which are optional is
+      crucial for creating valid configurations.
+    </p>
+
+    <h3 id="required-properties">Required Properties</h3>
+
+    <ul>
+      <li>
+        <strong>Top-Level:</strong>
+        <ul>
+          <li><code>menuName</code></li>
+          <li><code>menuIcon</code></li>
+          <li><code>menuDescription</code></li>
+          <li><code>groups</code></li>
+        </ul>
+      </li>
+      <li>
+        <strong>Group Object:</strong>
+        <ul>
+          <li><code>groupName</code></li>
+          <li><code>title</code></li>
+          <li><code>controls</code></li>
+        </ul>
+      </li>
+      <li>
+        <strong>Control Object:</strong>
+        <ul>
+          <li><code>type</code></li>
+          <li><code>param</code></li>
+          <li><code>title</code></li>
+          <li><code>desc</code></li>
+        </ul>
+      </li>
+    </ul>
+
+    <h3 id="optional-properties">Optional Properties</h3>
+
+    <ul>
+      <li>
+        <strong>Top-Level:</strong>
+        <ul>
+          <li><code>persistentParams</code></li>
+          <li><code>clearOnManagerStartParams</code></li>
+          <li><code>clearOnOnroadTransitionParams</code></li>
+          <li><code>clearOnOffroadTransitionParams</code></li>
+        </ul>
+      </li>
+      <li>
+        <strong>Group Object:</strong>
+        <ul>
+          <li><code>enableResetButton</code></li>
+          <li>
+            <code>type</code> (if using special group types like
+            <code>"tabPanel"</code>)
+          </li>
+        </ul>
+      </li>
+      <li>
+        <strong>Control Object:</strong>
+        <ul>
+          <li><code>disable</code></li>
+          <li><code>hidden</code></li>
+          <li><code>conditions</code></li>
+          <li>
+            Additional properties specific to control types (e.g.,
+            <code>min</code>, <code>max</code>, <code>options</code>,
+            <code>increment</code>, <code>division</code>,
+            <code>defaultValue</code>).
+          </li>
+        </ul>
+      </li>
+    </ul>
+
+    <h2 id="notes-and-best-practices">Notes and Best Practices</h2>
+
+    <ul>
+      <li>
+        <strong>Unique <code>groupName</code>:</strong> Ensure each
+        <code>groupName</code> is unique across the configuration to prevent
+        conflicts.
+      </li>
+      <li>
+        <strong>Consistent Parameter Naming:</strong> Use clear and consistent
+        naming conventions for parameters (<code>param</code>) to maintain
+        readability and manageability.
+      </li>
+      <li>
+        <strong>Condition Accuracy:</strong> When defining conditions, ensure
+        that parameter names and expected values match existing configurations
+        and logic to prevent controls from being unintentionally hidden or
+        disabled.
+      </li>
+      <li>
+        <strong>Increment and Division Values:</strong> For float controls,
+        <code>increment</code> and <code>division</code> values should be chosen
+        carefully to balance precision and usability.
+      </li>
+      <li>
+        <strong>Command Safety:</strong> When using
+        <code>command_button</code> controls, ensure that commands are safe and
+        tested to prevent unintended system behavior.
+      </li>
+      <li>
+        <strong>Styling Consistency:</strong> Leverage the available styling
+        options to maintain a consistent and intuitive UI across all controls
+        and groups.
+      </li>
+      <li>
+        <strong>Default Values:</strong> Provide <code>defaultValue</code> where
+        applicable to ensure controls have sensible initial states.
+      </li>
+      <li>
+        <strong>Hidden Controls:</strong> Use the <code>hidden</code> property
+        to manage the visibility of controls based on their relevance or
+        experimental status.
+      </li>
+      <li>
+        <strong>Composite Conditions:</strong> Utilize composite conditions to
+        create complex visibility and behavior rules, enhancing the dynamic
+        nature of the UI.
+      </li>
+    </ul>
+
+    <h2 id="conclusion">Conclusion</h2>
+
+    <p>
+      The JSON configuration system for <code>ConfigDrivenPanel</code> offers a
+      flexible and powerful way to define and manage user interface panels,
+      groups, and controls. By adhering to the outlined structure and best
+      practices, you can create customized, conditionally-driven interfaces that
+      enhance the user experience and streamline configuration management.
+    </p>
+
+    <p>
+      For further customization and advanced configurations, refer to the
+      codebase and explore additional properties and control types as needed.
+    </p>
+  </body>
+</html>

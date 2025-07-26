@@ -1,0 +1,528 @@
+{
+  "type": "navigation",
+  "menuName": "BluePilot",
+  "menuIcon": "icon_ford.png",
+  "menuDescription": "BluePilot Panel",
+  "equalWidth": true,
+  "iconPosition": "top",
+  "tabs": [
+    {
+      "name": "Preferences",
+      "icon": "../assets/offroad/icon_user_prefs.png",
+      "groups": [
+        {
+          "groupName": "visualOnroadPreferencesGroup",
+          "title": "Visual Onroad Preferences:",
+          "enableResetButton": false,
+          "keepScreenAwake": true,
+          "controls": [
+            {
+              "type": "toggle",
+              "param": "FordPrefShowAnimatedWheelAngle",
+              "title": "Show Animated Steer Angle Icon",
+              "desc": "Animates Comma icon based on steering angle.",
+              "hidden": false,
+              "conditions": {
+                "allConditionsTrue": [
+                  { "git_remote": ["any"] },
+                  { "git_branch": [] }
+                ]
+              }
+            },
+	    {
+              "type": "selection",
+              "param": "CustomModelPathColor",
+              "title": "Custom Model Path Color",
+              "desc": "Customize the color of the driving path overlay",
+              "hidden": false,
+              "options": [
+                { "name": "Stock", "value": "Stock" },
+                { "name": "Rainbow", "value": "Rainbow" },
+                { "name": "Blue", "value": "Blue" },
+                { "name": "Green", "value": "Green" },
+                { "name": "Purple", "value": "Purple" },
+                { "name": "Orange", "value": "Orange" },
+                { "name": "Red", "value": "Red" },
+                { "name": "Cyan", "value": "Cyan" },
+                { "name": "Yellow", "value": "Yellow" }
+              ],
+              "conditions": {
+                "git_remote": ["any"],
+                "git_branch": []
+              }
+            },
+            {
+              "type": "toggle",
+              "param": "FordPrefHybridDriveOverlay",
+              "title": "Show Hybrid Electric Data Overlays",
+              "desc": "Displays hybrid electric vehicle data.",
+              "hidden": false,
+              "conditions": {
+                "allConditionsTrue": [
+                  { "paramValueEquals": { "FordPrefHevDataAvailable": "1" } },
+                  { "git_remote": ["any"] },
+                  { "git_branch": [] }
+                ]
+              }
+            },
+            {
+              "type": "toggle",
+              "param": "FordPrefHybridBatteryOverlay",
+              "title": "Show Hybrid Battery Data Overlays",
+              "desc": "Displays hybrid battery data.",
+              "hidden": false,
+              "conditions": {
+                "allConditionsTrue": [
+                  { "paramValueEquals": { "FordPrefHybridDriveOverlay": "1" } },
+                  { "paramValueEquals": { "FordPrefHevDataAvailable": "1" } },
+                  {
+                    "paramValueEquals": { "FordPrefHevBattDataAvailable": "1" }
+                  },
+                  { "git_remote": ["any"] },
+                  { "git_branch": [] }
+                ]
+              }
+            },
+            {
+              "type": "segmented_control",
+              "param": "FordPrefHybridDriveGaugeSize",
+              "title": "Hybrid Drive Gauge Size",
+              "desc": "Adjusts the size of the hybrid drive gauge",
+              "hidden": false,
+              "options": [
+                { "name": "Small", "value": "1", "default": true },
+                { "name": "Medium", "value": "2" },
+                { "name": "Large", "value": "3" }
+              ],
+              "conditions": {
+                "allConditionsTrue": [
+                  { "git_remote": ["any"] },
+                  { "git_branch": [] },
+                  {
+                    "paramValueEquals": {
+                      "FordPrefHybridDriveOverlay": "1"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "groupName": "clusterPreferencesGroup",
+          "title": "Cluster Preferences:",
+          "enableResetButton": false,
+          "controls": [
+            {
+              "type": "toggle",
+              "param": "FordPrefSendHandsFreeCanMsg",
+              "title": "Show Hands-Free UI (On Supported Vehicles)",
+              "desc": "Enables hands-free UI for supported vehicles.",
+              "hidden": false,
+              "conditions": {
+                "git_remote": ["any"],
+                "git_branch": []
+              }
+            },
+            {
+              "type": "toggle",
+              "param": "FordPrefLaneDepartCanMsg",
+              "title": "Send Lane Departure Signals to Vehicle",
+              "desc": "Send Openpilot lane departure signals for native cluster alerts.",
+              "hidden": false,
+              "conditions": {
+                "git_remote": ["any"],
+                "git_branch": []
+              }
+            },
+            {
+              "type": "toggle",
+              "param": "FordPrefDriverMonitorCanMsg",
+              "title": "Send Driver Monitor Signals",
+              "desc": "Send driver monitor notice signals to the vehicle for native cluster alerts.",
+              "hidden": false,
+              "conditions": {
+                "git_remote": ["any"],
+                "git_branch": []
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Lat. Tuning",
+      "icon": "../assets/offroad/icon_steering.png",
+      "groups": [
+        {
+          "groupName": "lateralControlsGroup",
+          "title": "Lateral Controls:",
+          "enableResetButton": true,
+          "controls": [
+            {
+              "type": "toggle",
+              "param": "FordPrefHumanTurnDetectionEnable",
+              "title": "Enable Human Turn Detection",
+              "desc": "Reset steering so you don't fight the wheel making manual turns.",
+              "hidden": false,
+              "conditions": {
+                "git_remote": ["any"],
+                "git_branch": []
+              }
+            },
+            {
+              "type": "float",
+              "param": "FordLatTuningLaneChangeFactorHighUI",
+              "title": "Lane Change Factor",
+              "desc": "Lower numbers for less aggressive lane change",
+              "hidden": false,
+              "min": 0.0,
+              "max": 1.0,
+              "increment": 0.05,
+              "division": 100.0,
+              "conditions": {
+                "allConditionsTrue": [
+                  { "git_remote": ["any"] },
+                  { "git_branch": [] }
+                ]
+              }
+            },
+            {
+              "type": "toggle",
+              "param": "FordLatTuningEnableAdvLatCtrl",
+              "title": "Enable Advanced Lateral Control",
+              "desc": "Allows advanced lateral control such as in lane positioning.",
+              "hidden": false,
+              "conditions": {
+                "git_remote": ["any"],
+                "git_branch": []
+              }
+            },
+            {
+              "type": "segmented_control",
+              "param": "FordLatTuningProfile",
+              "title": "Tuning Profile",
+              "desc": "Adjusts the tuning aggressiveness profile",
+              "hidden": false,
+              "options": [
+                { "name": "Low", "value": "1", "default": true },
+                { "name": "Medium", "value": "2" },
+                { "name": "High", "value": "3" },
+                { "name": "Custom", "value": "4" }
+              ],
+              "conditions": {
+                "allConditionsTrue": [
+                  { "git_remote": ["any"] },
+                  { "git_branch": [] },
+                  {
+                    "paramValueEquals": {
+                      "FordLatTuningEnableAdvLatCtrl": "1"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "type": "toggle",
+              "param": "FordLatTuningEnableLanefullMode",
+              "title": "Enable Legacy Style Lanefull Mode",
+              "desc": "Enables auto lanefull mode similar to legacy SunnyPilot",
+              "hidden": false,
+              "conditions": {
+                "allConditionsTrue": [
+                  { "git_remote": ["any"] },
+                  { "git_branch": [] },
+                  {
+                    "paramValueEquals": {
+                      "FordLatTuningEnableAdvLatCtrl": "1"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "type": "float",
+              "param": "FordLatTuningCustomPathOffset",
+              "title": "In Lane Offset",
+              "desc": "Adjusts lane position - left (-) / right (+)",
+              "hidden": false,
+              "min": -0.5,
+              "max": 0.5,
+              "increment": 0.01,
+              "division": 100.0,
+              "conditions": {
+                "allConditionsTrue": [
+                  { "git_remote": ["any"] },
+                  { "git_branch": [] },
+                  {
+                    "paramValueEquals": {
+                      "FordLatTuningEnableAdvLatCtrl": "1"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "type": "float",
+              "param": "FordLatTuningPCBlendRatioUI",
+              "title": "Predicted Curvature Blend Ratio",
+              "desc": "Higher numbers to reduce ping pong, lower numbers to reduce wandering",
+              "hidden": false,
+              "min": 0.0,
+              "max": 1.0,
+              "increment": 0.01,
+              "division": 100.0,
+              "conditions": {
+                "allConditionsTrue": [
+                  { "git_remote": ["any"] },
+                  { "git_branch": [] },
+                  { "paramValueEquals": { "FordLatTuningProfile": "4" } },
+                  {
+                    "paramValueEquals": {
+                      "FordLatTuningEnableAdvLatCtrl": "1"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "type": "float",
+              "param": "FordLatTuningPathAngleHighSpeedFactorUI",
+              "title": "Path Angle Amplitude",
+              "desc": "Lower numbers to reduce twitchy steering, higher numbers decrease wandering or slow ping pong",
+              "hidden": false,
+              "min": 0.0,
+              "max": 50.0,
+              "increment": 0.1,
+              "division": 100.0,
+              "conditions": {
+                "allConditionsTrue": [
+                  { "git_remote": ["any"] },
+                  { "git_branch": [] },
+                  { "paramValueEquals": { "FordLatTuningProfile": "4" } },
+                  {
+                    "paramValueEquals": {
+                      "FordLatTuningEnableAdvLatCtrl": "1"
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "type": "float",
+              "param": "FordLatTuningPathAngleHighCurvatureFactorUI",
+              "title": "Path Angle in-Curve ReductionFactor",
+              "desc": "Lower numbers to reduce twitchy steering, higher numbers decrease wandering or slow ping pong",
+              "hidden": false,
+              "min": 0.0,
+              "max": 1.0,
+              "increment": 0.05,
+              "division": 100.0,
+              "conditions": {
+                "allConditionsTrue": [
+                  { "git_remote": ["any"] },
+                  { "git_branch": [] },
+                  { "paramValueEquals": { "FordLatTuningProfile": "4" } },
+                  {
+                    "paramValueEquals": {
+                      "FordLatTuningEnableAdvLatCtrl": "1"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Long. Tuning",
+      "icon": "../assets/offroad/icon_brake_gas_pedals.png",
+      "groups": [
+        {
+          "groupName": "longitudinalTuningGroup",
+          "title": "Brake Tuning:",
+          "enableResetButton": true,
+          "controls": [
+            {
+              "type": "float",
+              "param": "FordLongTuningBrakeActuatorActivate",
+              "title": "Brake Actuator Activate",
+              "desc": "Acceleration setpoint for brake actuator activation.",
+              "hidden": false,
+              "min": -0.2,
+              "max": 0.2,
+              "increment": 0.01,
+              "division": 100.0,
+              "conditions": {
+                "git_remote": ["ford-op/sp-dev-c3"],
+                "git_branch": []
+              }
+            },
+            {
+              "type": "float",
+              "param": "FordLongTuningBrakeActuatorReleaseDelta",
+              "title": "Brake Actuator Release Delta",
+              "desc": "Sets the gap between activation and release.",
+              "hidden": false,
+              "min": 0.0,
+              "max": 0.2,
+              "increment": 0.01,
+              "division": 100.0,
+              "conditions": {
+                "git_remote": ["ford-op/sp-dev-c3"],
+                "git_branch": []
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Utilities",
+      "icon": "../assets/offroad/icon_toolbox.png",
+      "groups": [
+        {
+          "groupName": "utilityCommandsGroup",
+          "title": "Utility Commands:",
+          "enableResetButton": false,
+          "controls": [
+            {
+              "type": "command_button",
+              "command": "echo \"Starting process...\" && for i in {1..5}; do echo \"[$(date '+%H:%M:%S')] Processing batch $i/5...\"; sleep 1; echo \"  -> Completed subtask $i\"; sleep 1; done && echo \"All tasks completed successfully!\"",
+              "working_dir": "/data/openpilot",
+              "title": "Test Command",
+              "desc": "Test Command",
+              "button_text": "Test Command",
+              "confirm": true,
+              "confirm_text": "Are you sure you want to run this command?",
+              "confirm_button_text": "Run",
+              "cancel_button_text": "Cancel",
+              "hidden": false,
+              "conditions": {
+                "git_remote": ["ford-op/sp-dev-c3"],
+                "git_branch": []
+              }
+            },
+            {
+              "type": "command_button",
+              "command": "wget https://raw.githubusercontent.com/tonesto7/op-utilities/main/CommaUtility.sh && chmod +x /data/CommaUtility.sh",
+              "working_dir": "/data",
+              "title": "Install Comma Utility",
+              "desc": "Install Comma Utility",
+              "button_text": "Install",
+              "confirm": false,
+              "hidden": false,
+              "OnlyOnCommaDevice": true,
+              "conditions": {
+                "git_remote": ["ford-op/sp-dev-c3"],
+                "git_branch": []
+              }
+            },
+            {
+              "type": "file_viewer",
+              "path": "/data/community/crashes/error.txt",
+              "title": "Recent Crashes",
+              "desc": "View the crashes file",
+              "button_text": "View Error",
+              "confirm": false,
+              "hidden": false,
+              "conditions": {
+                "git_remote": ["any"],
+                "git_branch": []
+              }
+            },
+            {
+              "type": "command_button",
+              "command": "ifconfig",
+              "working_dir": "/data/openpilot",
+              "title": "Get Network Info",
+              "desc": "Get network info using ifconfig",
+              "button_text": "Get Info",
+              "confirm": false,
+              "hidden": false,
+              "conditions": {
+                "git_remote": ["ford-op/sp-dev-c3"],
+                "git_branch": []
+              }
+            },
+            {
+              "type": "command_button",
+              "command": "tail -f /tmp/launch_log",
+              "working_dir": "/data/openpilot",
+              "title": "View Launch Log",
+              "desc": "View the launch log",
+              "button_text": "View Log",
+              "confirm": false,
+              "hidden": false,
+              "conditions": {
+                "git_remote": ["ford-op/sp-dev-c3"],
+                "git_branch": []
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Debug",
+      "icon": "../assets/offroad/icon_debug.png",
+      "groups": [
+        {
+          "groupName": "paramViewerGroup",
+          "title": "Parameter Viewer",
+          "enableResetButton": false,
+          "controls": [
+            {
+              "type": "param_list_viewer",
+              "title": "All Parameters",
+              "desc": "View all available parameters in the system",
+              "hidden": false
+            },
+            {
+              "type": "param_viewer",
+              "param": "LiveParameters",
+              "title": "Live Parameters",
+              "desc": "Displays live parameters"
+            }
+          ]
+        },
+        {
+          "groupName": "debugPreferencesGroup",
+          "title": "Debug Preferences:",
+          "enableResetButton": false,
+          "keepScreenAwake": true,
+          "controls": [
+            {
+              "type": "toggle",
+              "param": "FordPrefEnableDebugLogs",
+              "title": "Enable Debug Logging",
+              "desc": "Enable this to collect more detailed logs for the route."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Info",
+      "icon": "../assets/offroad/icon_info.png",
+      "groups": [
+        {
+          "groupName": "infoPreferencesGroup",
+          "title": "Info:",
+          "enableResetButton": false,
+          "keepScreenAwake": false,
+          "controls": [
+            {
+              "type": "file_viewer",
+              "path": "CHANGELOGS_BP.md",
+              "title": "BluePilot Changelog",
+              "desc": "View the latest changes and updates for BluePilot",
+              "header": "BluePilot Changelog"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
