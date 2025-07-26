@@ -470,28 +470,6 @@
               }
             },
             {
-              "type": "float",
-              "param": "FordLatTuningPathOffsetLookupTime",
-              "title": "Path Offset Lookup Time",
-              "desc": "Adjusts the time it takes to lookup the path offset.",
-              "hidden": false,
-              "min": 0.0,
-              "max": 0.8,
-              "increment": 0.01,
-              "division": 100.0,
-              "conditions": {
-                "allConditionsTrue": [
-                  { "git_remote": ["any"] },
-                  { "git_branch": [] },
-                  {
-                    "paramValueEquals": {
-                      "FordLatTuningEnableLanePositioning": "1"
-                    }
-                  }
-                ]
-              }
-            },
-            {
               "type": "toggle",
               "param": "FordLatTuningEnableLanefullMode",
               "title": "Enable Lane Full Mode",
