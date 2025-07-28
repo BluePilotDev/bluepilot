@@ -64,7 +64,7 @@ class CarInterface(CarInterfaceBase):
 
 	# For now continue to allow the user to still fall back to Ford Long
     # for  CANFD platforms - in case radar is not fully reliable
-    ret.alphaLongitudinalAvailable = bool(ret.flags & FordFlags.CANFD)
+    ret.alphaLongitudinalAvailable = True # bool(ret.flags & FordFlags.CANFD)
     info(f"| alphaLongAvailable: {ret.alphaLongitudinalAvailable}", True)
     info(f"| experimental_long: {alpha_long}", True)
     info(f"| ret.flags & FordFlags.CANFD: {ret.flags & FordFlags.CANFD}", True)
