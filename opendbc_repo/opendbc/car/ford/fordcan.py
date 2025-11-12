@@ -338,13 +338,16 @@ def create_lkas_ui_msg(packer, CAN: CanBus, main_on: bool, enabled: bool, hands:
   return packer.make_can_msg("IPMA_Data", CAN.main, values)
 
 
-def create_button_msg(packer, bus: int, stock_values: dict, cancel=False, resume=False, tja_toggle=False):
+def create_button_msg(packer, bus: int, stock_values: dict, cancel=False, resume=False, tja_toggle=False, icbm_button=None):
   """
   Creates a CAN message for the Ford SCCM buttons/switches.
 
   Includes cruise control buttons, turn lights and more.
 
   Frequency is 10Hz.
+
+  Args:
+    icbm_button: Optional string signal name for ICBM button press (e.g., "CcAslButtnSetIncPress", "CcAslButtnSetDecPress")
   """
 
   values = {s: stock_values[s] for s in [
@@ -386,4 +389,9 @@ def create_button_msg(packer, bus: int, stock_values: dict, cancel=False, resume
     "CcAsllButtnResPress": 1 if resume else 0,      # CC resume button
     "TjaButtnOnOffPress": 1 if tja_toggle else 0,   # LCA/TJA toggle button
   })
+
+  # ICBM button support - set the specified button signal to 1
+  if icbm_button is not None:
+    values[icbm_button] = 1
+
   return packer.make_can_msg("Steering_Data_FD1", bus, values)
