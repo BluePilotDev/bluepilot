@@ -51,7 +51,7 @@ export const routesAPI = {
   },
 
   delete: async (routeId: string): Promise<void> => {
-    await api.delete(`/api/routes/${routeId}`)
+    await api.delete(`/api/delete/${routeId}`)
   },
 
   preserve: async (routeId: string): Promise<void> => {

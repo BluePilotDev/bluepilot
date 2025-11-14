@@ -2,6 +2,8 @@
 export { Button } from './Button'
 export { LoadingSpinner } from './LoadingSpinner'
 export { Modal } from './Modal'
+export { Tabs } from './Tabs'
+export { Toast, ToastContainer } from './Toast'
 export { WarningBanners } from './WarningBanners'
 export { StatusOverlay } from './StatusOverlay'
 export { ControlCard } from './controls/ControlCard'

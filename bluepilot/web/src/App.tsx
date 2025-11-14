@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useWebSocketStore } from '@/stores/useWebSocketStore'
+import { useToastStore } from '@/stores/useToastStore'
 import { WarningBanners, StatusOverlay } from '@/components/common'
+import { ToastContainer } from '@/components/common/Toast'
 import { systemAPI } from '@/services/api'
 
 // Views
@@ -19,6 +21,7 @@ type DeviceStatus = 'online' | 'onroad' | 'offline' | 'checking'
 
 function App() {
   const { connect, disconnect } = useWebSocketStore()
+  const { toasts, removeToast } = useToastStore()
   const [deviceStatus, setDeviceStatus] = useState<DeviceStatus>('checking')
 
   useEffect(() => {
@@ -70,6 +73,7 @@ function App() {
       {(deviceStatus === 'onroad' || deviceStatus === 'offline') && (
         <StatusOverlay type={deviceStatus} onRetry={handleRetryConnection} />
       )}
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
       <Routes>
         <Route path="/" element={<Dashboard deviceStatus={deviceStatus} />} />
         <Route path="/settings" element={<SettingsView deviceStatus={deviceStatus} />} />

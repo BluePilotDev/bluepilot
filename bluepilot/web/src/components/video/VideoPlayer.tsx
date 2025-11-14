@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useRoutesStore } from '@/stores/useRoutesStore'
+import { useToastStore } from '@/stores/useToastStore'
 import { ExportBackupModal } from '@/components/modals'
 import type { RouteDetails, CameraType } from '@/types'
 import { VehicleInfoPanel } from './panels/VehicleInfoPanel'
@@ -24,6 +25,7 @@ interface VideoPlayerProps {
 export const VideoPlayer: React.FC<VideoPlayerProps> = ({ route, onClose }) => {
   const navigate = useNavigate()
   const { deleteRoute, preserveRoute } = useRoutesStore()
+  const { addToast } = useToastStore()
   const [showExportModal, setShowExportModal] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -747,8 +749,10 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ route, onClose }) => {
     e.stopPropagation()
     try {
       await preserveRoute(route.baseName || route.id || '')
-    } catch (error) {
+      addToast('Route preservation toggled successfully', 'success')
+    } catch (error: any) {
       console.error('Failed to preserve route:', error)
+      addToast(error?.message || 'Failed to preserve route', 'error')
     }
   }
 

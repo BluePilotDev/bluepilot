@@ -412,13 +412,13 @@ def generate_thumbnail(route_base):
         'ffmpeg',
         '-y',  # Overwrite output file
         '-nostdin',  # Disable interaction
-        '-ss', '0.33',  # Seek to 0.33 seconds (5-10 frames at 20fps)
-        '-f', 'hevc',  # Input format
         '-i', video_path,  # Input file
+        '-ss', '0.33',  # Seek to 0.33 seconds (5-10 frames at 20fps)
         '-vframes', '1',  # Extract one frame
         '-an',  # Disable audio
-        '-vf', 'scale=480:270',  # Scale to thumbnail size
+        '-vf', 'scale=480:270,format=yuvj420p',  # Scale to thumbnail size and convert to JPEG color space
         '-q:v', '2',  # High quality JPEG
+        '-update', '1',  # Write single image (not sequence)
         thumbnail_path
     ]
 

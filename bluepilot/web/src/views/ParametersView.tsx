@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from 'react'
 import { Header } from '@/components/layout/Header'
 import { useParamsStore } from '@/stores/useParamsStore'
-import { LoadingSpinner, Button, Modal, ToggleSwitch } from '@/components/common'
+import { LoadingSpinner, Button, Modal, ToggleSwitch, ToastContainer } from '@/components/common'
 import type { Parameter } from '@/types'
 import { formatParamValueForDisplay } from '@/utils/params'
 import './ParametersView.css'
@@ -50,6 +50,7 @@ export const ParametersView = ({ deviceStatus = 'checking' }: ParametersViewProp
   const [sortColumn, setSortColumn] = useState<SortColumn>('key')
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
   const [viewValueModal, setViewValueModal] = useState<Parameter | null>(null)
+  const [toasts, setToasts] = useState<Array<{ id: string; message: string; type?: 'success' | 'error' | 'info' }>>([])
 
   useEffect(() => {
     fetchParams()
@@ -70,21 +71,6 @@ export const ParametersView = ({ deviceStatus = 'checking' }: ParametersViewProp
     if (diffHours < 24) return `${diffHours}h ago`
     if (diffDays < 7) return `${diffDays}d ago`
     return date.toLocaleDateString()
-  }
-
-  const formatLastModifiedFull = (timestamp?: number): string => {
-    if (!timestamp) return 'Never modified'
-
-    const date = new Date(timestamp * 1000)
-    return date.toLocaleString(undefined, {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: true,
-    })
   }
 
   const sortedParams = useMemo(() => {
@@ -141,11 +127,36 @@ export const ParametersView = ({ deviceStatus = 'checking' }: ParametersViewProp
     setViewValueModal(param)
   }
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text)
+  const addToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
+    const id = `${Date.now()}-${Math.random()}`
+    setToasts((prev) => [...prev, { id, message, type }])
+  }
+
+  const removeToast = (id: string) => {
+    setToasts((prev) => prev.filter((toast) => toast.id !== id))
+  }
+
+  const copyToClipboard = (text: string, label: string = 'Value') => {
+    navigator.clipboard
+      .writeText(text)
+      .then(() => {
+        addToast(`${label} copied to clipboard`, 'success')
+      })
+      .catch(() => {
+        addToast('Failed to copy to clipboard', 'error')
+      })
   }
 
   const formattedModalValue = viewValueModal ? formatParamValueForDisplay(viewValueModal) : null
+  const modalValueDisplay = (() => {
+    if (!formattedModalValue) return '—'
+    if (formattedModalValue.isBinary) {
+      if (formattedModalValue.decodedString) return formattedModalValue.decodedString
+      if (viewValueModal?.raw_value) return viewValueModal.raw_value
+    }
+    return formattedModalValue.display || formattedModalValue.raw || '—'
+  })()
+  const modalCopyValue = formattedModalValue?.raw ?? modalValueDisplay
 
   if (loading && Object.keys(params).length === 0) {
     return (
@@ -161,6 +172,7 @@ export const ParametersView = ({ deviceStatus = 'checking' }: ParametersViewProp
   return (
     <>
       <Header deviceStatus={deviceStatus} />
+      <ToastContainer toasts={toasts} onRemove={removeToast} />
       <div className="params-manager">
         <div className="params-header">
           <h2>Parameters</h2>
@@ -212,21 +224,17 @@ export const ParametersView = ({ deviceStatus = 'checking' }: ParametersViewProp
             </div>
           ) : (
             <div className="params-list">
-            {sortedParams.map((param) => {
-              const formattedValue = formatParamValueForDisplay(param)
-              const condensedValue = (() => {
-                const singleLine = formattedValue.display.includes('\n')
-                  ? formattedValue.display
-                      .split('\n')
-                      .map((line) => line.trim())
-                      .filter(Boolean)
-                      .join(' ')
-                  : formattedValue.display
-                return singleLine.length > 160 ? `${singleLine.substring(0, 157)}…` : singleLine
-              })()
+              {sortedParams.map((param) => {
+                const formattedValue = formatParamValueForDisplay(param)
+                const trimmed = formattedValue.display.trim()
+                const preview =
+                  trimmed.length > 260 ? `${trimmed.substring(0, 257).trimEnd()}…` : trimmed || '—'
+                const formatBadge = formattedValue.formatLabel?.toUpperCase()
+                const typeBadge = param.type ? param.type.toUpperCase() : null
+                const categoryBadge = param.category ?? null
 
-              return (
-                <div className="param-row" key={param.key}>
+                return (
+                  <div className="param-row" key={param.key}>
                     <div className="param-row__header">
                       <div className="param-row__title-block">
                         <div className="param-row__title-line">
@@ -264,29 +272,37 @@ export const ParametersView = ({ deviceStatus = 'checking' }: ParametersViewProp
                       title="Click to view full value"
                       onClick={() => handleViewValue(param)}
                     >
-                      <span className="value-label">Value</span>
-                      <span className="value-content">{condensedValue}</span>
-                      {formattedValue.formatLabel && (
-                        <span className="value-format-badge">{formattedValue.formatLabel}</span>
-                      )}
-                      {param.type === 'bytes' && param.byte_length !== undefined && (
-                        <span className="value-format-badge">{param.byte_length} bytes</span>
-                      )}
-                    </div>
-                    <div className="param-row__meta">
-                      <div className="meta-block">
-                        <span className="meta-label">Type</span>
-                        <span className={`param-badge ${param.type}`}>{param.type}</span>
+                      <div className="param-row__value-header">
+                        <span className="value-label">Value</span>
+                        <div className="value-pill-group">
+                          {typeBadge && <span className="value-pill value-pill--type">{typeBadge}</span>}
+                          {categoryBadge && (
+                            <span className="value-pill value-pill--category">{categoryBadge}</span>
+                          )}
+                          {formatBadge && formatBadge !== typeBadge && (
+                            <span className="value-pill">{formatBadge}</span>
+                          )}
+                          {param.type === 'bytes' && param.byte_length !== undefined && (
+                            <span className="value-pill value-pill--outline">{param.byte_length} bytes</span>
+                          )}
+                        </div>
                       </div>
-                      <div className="meta-block">
-                        <span className="meta-label">Category</span>
-                        {param.category ? (
-                          <span className="param-badge category">{param.category}</span>
-                        ) : (
-                          <span className="meta-placeholder">—</span>
-                        )}
-                      </div>
+                      <pre className="value-code-block">
+                        <code>{preview}</code>
+                      </pre>
+                      <span className="value-footer-hint">Click to inspect full value</span>
                     </div>
+                    {param.description && (
+                      <div className="param-description">
+                        <span className="description-label">Description</span>
+                        <p>{param.description}</p>
+                      </div>
+                    )}
+                    {param.critical && (
+                      <div className="critical-flag">
+                        <span>⚠️ Critical parameter</span>
+                      </div>
+                    )}
                   </div>
                 )
               })}
@@ -298,40 +314,76 @@ export const ParametersView = ({ deviceStatus = 'checking' }: ParametersViewProp
       <Modal
         isOpen={editingParam !== null}
         onClose={() => setEditingParam(null)}
-        title={`Edit ${editingParam?.key}`}
+        title="Edit Parameter"
         size="small"
       >
-        <div className="edit-param-modal">
-          <div className="param-info">
-            <p><strong>Type:</strong> {editingParam?.type}</p>
-            {editingParam?.description && <p><strong>Description:</strong> {editingParam.description}</p>}
+        {editingParam && (
+          <div className="edit-param-modal-new">
+            <div className="edit-param-header">
+              <div className="edit-param-key-section">
+                <span className="param-key-label">Parameter Key</span>
+                <code className="param-key-value-edit">{editingParam.key}</code>
+              </div>
+              <div className="edit-param-type">
+                <span className={`param-badge ${editingParam.type}`}>{editingParam.type}</span>
+              </div>
+            </div>
+
+            {editingParam.description && (
+              <div className="edit-param-description">
+                <span className="description-label">Description</span>
+                <p>{editingParam.description}</p>
+              </div>
+            )}
+
+            <div className="edit-param-input-section">
+              <label htmlFor="edit-param-value" className="input-label">
+                New Value
+              </label>
+              {editingParam.type && BOOLEAN_TYPES.has(editingParam.type.toLowerCase()) ? (
+                <select
+                  id="edit-param-value"
+                  value={editValue}
+                  onChange={(e) => setEditValue(e.target.value)}
+                  className="edit-input-new"
+                  autoFocus
+                >
+                  <option value="true">true</option>
+                  <option value="false">false</option>
+                </select>
+              ) : (
+                <input
+                  id="edit-param-value"
+                  type={editingParam.type && NUMERIC_TYPES.has(editingParam.type.toLowerCase()) ? 'number' : 'text'}
+                  value={editValue}
+                  onChange={(e) => setEditValue(e.target.value)}
+                  className="edit-input-new"
+                  placeholder={`Enter ${editingParam.type} value...`}
+                  autoFocus
+                />
+              )}
+            </div>
+
+            {editingParam.critical && (
+              <div className="edit-warning-banner">
+                <span className="warning-icon">⚠️</span>
+                <div className="warning-content">
+                  <strong>Caution: Critical Parameter</strong>
+                  <p>Changes to this parameter may affect system stability.</p>
+                </div>
+              </div>
+            )}
+
+            <div className="modal-actions">
+              <Button variant="secondary" onClick={() => setEditingParam(null)}>
+                Cancel
+              </Button>
+              <Button variant="primary" onClick={handleSave}>
+                Save Changes
+              </Button>
+            </div>
           </div>
-          {editingParam?.type && BOOLEAN_TYPES.has(editingParam.type.toLowerCase()) ? (
-            <select
-              value={editValue}
-              onChange={(e) => setEditValue(e.target.value)}
-              className="edit-input"
-            >
-              <option value="true">true</option>
-              <option value="false">false</option>
-            </select>
-          ) : (
-            <input
-              type={editingParam?.type && NUMERIC_TYPES.has(editingParam.type.toLowerCase()) ? 'number' : 'text'}
-              value={editValue}
-              onChange={(e) => setEditValue(e.target.value)}
-              className="edit-input"
-            />
-          )}
-          <div className="modal-actions">
-            <Button variant="secondary" onClick={() => setEditingParam(null)}>
-              Cancel
-            </Button>
-            <Button variant="primary" onClick={handleSave}>
-              Save
-            </Button>
-          </div>
-        </div>
+        )}
       </Modal>
 
       <Modal
@@ -341,152 +393,57 @@ export const ParametersView = ({ deviceStatus = 'checking' }: ParametersViewProp
         size="large"
       >
         {viewValueModal && (
-          <div className="view-param-modal">
-            <div className="param-detail-header">
-              <div className="param-detail-key">
-                <span className="param-key-label">Parameter Key</span>
-                <span className="param-key-value">{viewValueModal.key}</span>
+          <div className="param-modal-simple">
+            <div className="param-modal-simple__header">
+              <span className="param-key-label">Parameter Key</span>
+              <div className="param-key-value-wrapper">
+                <code className="param-key-value">{viewValueModal.key}</code>
+                <button
+                  className="icon-btn"
+                  onClick={() => copyToClipboard(viewValueModal.key, 'Key')}
+                  title="Copy key"
+                >
+                  📋
+                </button>
               </div>
-              <div className="param-detail-badges">
-                <span className={`param-badge ${viewValueModal.type}`}>{viewValueModal.type}</span>
-                {viewValueModal.readonly && <span className="param-badge readonly">readonly</span>}
-                {viewValueModal.critical && <span className="param-badge critical">critical</span>}
+            </div>
+
+            <div className="param-modal-simple__value">
+              <div className="value-pill-group">
+                {viewValueModal.type && (
+                  <span className="value-pill value-pill--type">{viewValueModal.type.toUpperCase()}</span>
+                )}
                 {viewValueModal.category && (
-                  <span className="param-badge category">{viewValueModal.category}</span>
+                  <span className="value-pill value-pill--category">{viewValueModal.category}</span>
                 )}
-              </div>
-            </div>
-
-            <div className="param-detail-metadata">
-              <div className="metadata-row">
-                <span className="metadata-label">Type:</span>
-                <span className="metadata-value">{viewValueModal.type}</span>
-              </div>
-              {viewValueModal.category && (
-                <div className="metadata-row">
-                  <span className="metadata-label">Category:</span>
-                  <span className="metadata-value">{viewValueModal.category}</span>
-                </div>
-              )}
-              <div className="metadata-row">
-                <span className="metadata-label">Last Modified:</span>
-                <span className="metadata-value">{formatLastModifiedFull(viewValueModal.last_modified)}</span>
-              </div>
-              {viewValueModal.description && (
-                <div className="metadata-row">
-                  <span className="metadata-label">Description:</span>
-                  <span className="metadata-value">{viewValueModal.description}</span>
-                </div>
-              )}
-              <div className="metadata-row">
-                <span className="metadata-label">Read-Only:</span>
-                <span className="metadata-value">{viewValueModal.readonly ? 'Yes' : 'No'}</span>
-              </div>
-              {viewValueModal.type === 'bytes' && (
-                <>
-                  <div className="metadata-row">
-                    <span className="metadata-label">Byte Length:</span>
-                    <span className="metadata-value">
-                      {viewValueModal.byte_length !== undefined ? viewValueModal.byte_length : 'Unknown'}
-                    </span>
-                  </div>
-                  {viewValueModal.decoded?.summary?.carName && (
-                    <div className="metadata-row">
-                      <span className="metadata-label">Vehicle:</span>
-                      <span className="metadata-value">{viewValueModal.decoded.summary.carName}</span>
-                    </div>
-                  )}
-                  {viewValueModal.decoded?.summary?.carFingerprint && (
-                    <div className="metadata-row">
-                      <span className="metadata-label">Fingerprint:</span>
-                      <span className="metadata-value">{viewValueModal.decoded.summary.carFingerprint}</span>
-                    </div>
-                  )}
-                  {viewValueModal.decoded?.summary?.carVin && (
-                    <div className="metadata-row">
-                      <span className="metadata-label">VIN:</span>
-                      <span className="metadata-value">{viewValueModal.decoded.summary.carVin}</span>
-                    </div>
-                  )}
-                </>
-              )}
-              {viewValueModal.critical && (
-                <div className="metadata-row critical-warning">
-                  <span className="metadata-label">⚠️ Critical Parameter:</span>
-                  <span className="metadata-value">Modifying this parameter requires extra caution</span>
-                </div>
-              )}
-            </div>
-
-            <div className="param-value-section">
-              <div className="value-section-header">
-                <span className="value-section-title">Value</span>
                 {formattedModalValue?.formatLabel && (
-                  <span className="value-format-badge">{formattedModalValue.formatLabel}</span>
+                  <span className="value-pill">{formattedModalValue.formatLabel.toUpperCase()}</span>
+                )}
+                {viewValueModal.type === 'bytes' && viewValueModal.byte_length !== undefined && (
+                  <span className="value-pill value-pill--outline">{viewValueModal.byte_length} bytes</span>
                 )}
               </div>
-              <div className="param-value-display">
-                <pre className={formattedModalValue?.isBinary ? 'binary-value' : ''}>
-                  {formattedModalValue?.display}
-                </pre>
-              </div>
+              <pre
+                className={`value-code-block value-code-block--modal ${
+                  formattedModalValue?.isBinary ? 'binary-value' : 'text-value'
+                }`}
+              >
+                <code>{modalValueDisplay}</code>
+              </pre>
             </div>
 
-            {viewValueModal.type === 'bytes' && (
-              <>
-                {formattedModalValue?.decodedString && (
-                  <div className="param-value-section">
-                    <div className="value-section-header">
-                      <span className="value-section-title">
-                        Decoded ({viewValueModal.decoded?.format ?? 'binary'})
-                      </span>
-                    </div>
-                    <div className="param-value-display">
-                      <pre>{formattedModalValue.decodedString}</pre>
-                    </div>
-                  </div>
-                )}
-                <div className="param-value-section">
-                  <div className="value-section-header">
-                    <span className="value-section-title">Raw ({viewValueModal.raw_format ?? 'base64'})</span>
-                    {viewValueModal.byte_length !== undefined && (
-                      <span className="value-format-badge">{viewValueModal.byte_length} bytes</span>
-                    )}
-                  </div>
-                  <div className="param-value-display">
-                    <pre className="binary-value">{viewValueModal.raw_value ?? '—'}</pre>
-                  </div>
-                </div>
-                {formattedModalValue?.hexPreview && (
-                  <div className="param-value-section">
-                    <div className="value-section-header">
-                      <span className="value-section-title">Hex Preview</span>
-                    </div>
-                    <div className="param-value-display">
-                      <pre className="binary-value">{formattedModalValue.hexPreview}</pre>
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-
-            <div className="modal-actions">
+            <div className="param-modal-simple__actions">
               <Button
                 variant="secondary"
                 onClick={() => {
                   if (formattedModalValue) {
-                    copyToClipboard(formattedModalValue.raw)
+                    copyToClipboard(modalCopyValue, 'Value')
                   }
                 }}
               >
                 Copy Value
               </Button>
-              {viewValueModal.type === 'bytes' && viewValueModal.raw_value && (
-                <Button variant="secondary" onClick={() => copyToClipboard(viewValueModal.raw_value!)}>
-                  Copy Raw (base64)
-                </Button>
-              )}
-              <Button variant="secondary" onClick={() => copyToClipboard(viewValueModal.key)}>
+              <Button variant="secondary" onClick={() => copyToClipboard(viewValueModal.key, 'Key')}>
                 Copy Key
               </Button>
               <Button variant="primary" onClick={() => setViewValueModal(null)}>

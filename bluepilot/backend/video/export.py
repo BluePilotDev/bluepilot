@@ -346,7 +346,7 @@ def generate_route_export(route_base, camera, progress_callback=None, server_sta
         if not server_state:
             raise RuntimeError("Server state required for FFmpeg process management")
 
-        with FFmpegProcess(route_info, server_state, max_concurrent=MAX_CONCURRENT_FFMPEG) as ffmpeg_mgr:
+        with FFmpegProcess(route_info, server_state, max_concurrent=MAX_CONCURRENT_FFMPEG, stream_logs=True) as ffmpeg_mgr:
             process = ffmpeg_mgr.start(ffmpeg_cmd)
             _, stderr = process.communicate()
             if process.returncode != 0:
@@ -473,7 +473,7 @@ def stream_route_export(route_base, camera, response_handler, server_state=None)
         if not server_state:
             raise RuntimeError("Server state required for FFmpeg process management")
 
-        with FFmpegProcess(route_info, server_state, max_concurrent=MAX_CONCURRENT_FFMPEG) as ffmpeg_mgr:
+        with FFmpegProcess(route_info, server_state, max_concurrent=MAX_CONCURRENT_FFMPEG, stream_logs=True) as ffmpeg_mgr:
             process = ffmpeg_mgr.start(ffmpeg_cmd)
 
             # Stream FFmpeg output to HTTP response

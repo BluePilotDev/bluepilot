@@ -129,6 +129,7 @@ from bluepilot.backend.cache import (
 from bluepilot.backend.storage import (
     calculate_route_deletion_risk, get_cached_deletion_data,
     check_route_preserve_status, set_route_preserve,
+    clear_deletion_data_cache,
 )
 
 # Log extraction
@@ -3343,7 +3344,7 @@ class WebRoutesHandler(BaseHTTPRequestHandler):
 
                 # Clear in-memory route cache
                 get_route_segments.cache_clear()
-                get_cached_deletion_data.cache_clear()
+                clear_deletion_data_cache()
 
                 logger.info(f"Cache cleared: {cleared}")
 
@@ -3434,7 +3435,7 @@ class WebRoutesHandler(BaseHTTPRequestHandler):
 
                 # Clear cache
                 get_route_segments.cache_clear()
-                get_cached_deletion_data.cache_clear()
+                clear_deletion_data_cache()
 
                 self.send_json_response({
                     'success': True,

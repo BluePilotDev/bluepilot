@@ -115,10 +115,26 @@ export const useRoutesStore = create<RoutesState>((set) => ({
           (r.baseName === routeId || r.id === routeId) ? { ...r, preserved: !r.preserved } : r
         ),
       }))
-    } catch (error) {
-      set({
-        error: error instanceof Error ? error.message : 'Failed to preserve route',
+    } catch (error: any) {
+      // Extract error message from axios response
+      const errorMessage = error?.response?.data?.error
+        || error?.response?.data?.message
+        || error?.message
+        || 'Failed to preserve route'
+
+      console.error('Preserve route error:', {
+        routeId,
+        status: error?.response?.status,
+        data: error?.response?.data,
+        message: errorMessage
       })
+
+      set({
+        error: errorMessage,
+      })
+
+      // Re-throw so calling code can handle it
+      throw new Error(errorMessage)
     }
   },
 

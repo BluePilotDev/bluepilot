@@ -183,7 +183,9 @@ bool PanelConditions::validateSingleCondition(const QString &conditionType, cons
     AlignedBuffer aligned_buf;
     capnp::FlatArrayMessageReader cmsg(aligned_buf.align(cp_bytes.data(), cp_bytes.size()));
     cereal::CarParams::Reader CP = cmsg.getRoot<cereal::CarParams>();
-    return hasLongitudinalControl(CP);
+    bool has_long = hasLongitudinalControl(CP);
+    bool expected = condition.toBool();
+    return (has_long == expected);
   } else if (conditionType == "hasAlphaLongitudinalAvailable") {
     auto cp_bytes = params.get("CarParamsPersistent");
     if (cp_bytes.empty()) {
@@ -192,7 +194,9 @@ bool PanelConditions::validateSingleCondition(const QString &conditionType, cons
     AlignedBuffer aligned_buf;
     capnp::FlatArrayMessageReader cmsg(aligned_buf.align(cp_bytes.data(), cp_bytes.size()));
     cereal::CarParams::Reader CP = cmsg.getRoot<cereal::CarParams>();
-    return CP.getAlphaLongitudinalAvailable();
+    bool has_alpha_long = CP.getAlphaLongitudinalAvailable();
+    bool expected = condition.toBool();
+    return (has_alpha_long == expected);
   } else if (conditionType == "isReleaseBranch") {
     return params.getBool("IsReleaseBranch") == condition.toBool();
   } else if (conditionType == "isTestedBranch") {
@@ -228,7 +232,9 @@ bool PanelConditions::validateSingleCondition(const QString &conditionType, cons
     AlignedBuffer aligned_buf;
     capnp::FlatArrayMessageReader cmsg(aligned_buf.align(cp_sp_bytes.data(), cp_sp_bytes.size()));
     cereal::CarParamsSP::Reader CP_SP = cmsg.getRoot<cereal::CarParamsSP>();
-    return CP_SP.getIntelligentCruiseButtonManagementAvailable();
+    bool has_icbm = CP_SP.getIntelligentCruiseButtonManagementAvailable();
+    bool expected = condition.toBool();
+    return (has_icbm == expected);
   } else if (conditionType == "isTiciHardware") {
     return Hardware::TICI();
   } else if (conditionType == "isPcHardware") {
@@ -243,24 +249,32 @@ bool PanelConditions::validateSingleCondition(const QString &conditionType, cons
     cereal::CarParams::Reader CP = cmsg.getRoot<cereal::CarParams>();
     std::string brand = CP.getBrand();
 
+    // Determine if brand is limited
+    bool is_limited = false;
+
     // Rivian always has limited MADS settings
     if (brand == "rivian") {
-      return true;
+      is_limited = true;
     }
-
     // Tesla only has limited MADS settings if it doesn't have vehicle bus access
-    if (brand == "tesla") {
+    else if (brand == "tesla") {
       auto cp_sp_bytes = params.get("CarParamsSPPersistent");
       if (!cp_sp_bytes.empty()) {
         AlignedBuffer aligned_buf_sp;
         capnp::FlatArrayMessageReader cmsg_sp(aligned_buf_sp.align(cp_sp_bytes.data(), cp_sp_bytes.size()));
         cereal::CarParamsSP::Reader CP_SP = cmsg_sp.getRoot<cereal::CarParamsSP>();
-        return !(CP_SP.getFlags() & 1);  // 1 == TeslaFlagsSP.HAS_VEHICLE_BUS
+        bool has_vehicle_bus = CP_SP.getFlags() & 1;  // 1 == TeslaFlagsSP.HAS_VEHICLE_BUS
+        is_limited = !has_vehicle_bus;
+      } else {
+        is_limited = true;  // Default to limited if we can't check
       }
-      return true;  // Default to limited if we can't check
+    } else {
+      is_limited = false;
     }
 
-    return false;
+    // Compare the result with the expected value from JSON
+    bool expected = condition.toBool();
+    return (is_limited == expected);
   } else if (conditionType == "hasBlindSpotMonitoring") {
     auto cp_bytes = params.get("CarParamsPersistent");
     if (cp_bytes.empty()) {
@@ -269,7 +283,9 @@ bool PanelConditions::validateSingleCondition(const QString &conditionType, cons
     AlignedBuffer aligned_buf;
     capnp::FlatArrayMessageReader cmsg(aligned_buf.align(cp_bytes.data(), cp_bytes.size()));
     cereal::CarParams::Reader CP = cmsg.getRoot<cereal::CarParams>();
-    return CP.getEnableBsm();
+    bool has_bsm = CP.getEnableBsm();
+    bool expected = condition.toBool();
+    return (has_bsm == expected);
   } else if (conditionType == "isAngleSteering") {
     auto cp_bytes = params.get("CarParamsPersistent");
     if (cp_bytes.empty()) {
@@ -278,7 +294,9 @@ bool PanelConditions::validateSingleCondition(const QString &conditionType, cons
     AlignedBuffer aligned_buf;
     capnp::FlatArrayMessageReader cmsg(aligned_buf.align(cp_bytes.data(), cp_bytes.size()));
     cereal::CarParams::Reader CP = cmsg.getRoot<cereal::CarParams>();
-    return CP.getSteerControlType() == cereal::CarParams::SteerControlType::ANGLE;
+    bool is_angle = (CP.getSteerControlType() == cereal::CarParams::SteerControlType::ANGLE);
+    bool expected = condition.toBool();
+    return (is_angle == expected);
   } else if (conditionType == "paramExists") {
     QString paramName = condition.toString();
     auto value = params.get(paramName.toStdString());

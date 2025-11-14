@@ -4,7 +4,7 @@ import { useRoutesStore } from '@/stores/useRoutesStore'
 import { LoadingSpinner } from '@/components/common'
 import { VideoPlayer } from '@/components/video/VideoPlayer'
 import { DiskSpaceVisualization } from '@/components/storage/DiskSpaceVisualization'
-import { MetricsModal } from '@/components/modals'
+import { MetricsModal, ExportBackupModal } from '@/components/modals'
 import type { Route, RouteDetails } from '@/types'
 import './RoutesView.css'
 
@@ -16,6 +16,8 @@ export const RoutesView = ({ deviceStatus = 'checking' }: RoutesViewProps) => {
   const { routes, loading, fetchRoutes, fetchRouteDetails, preserveRoute } = useRoutesStore()
   const [selectedRoute, setSelectedRoute] = useState<RouteDetails | null>(null)
   const [showMetricsModal, setShowMetricsModal] = useState(false)
+  const [showExportModal, setShowExportModal] = useState(false)
+  const [exportRoute, setExportRoute] = useState<RouteDetails | null>(null)
 
   useEffect(() => {
     fetchRoutes()
@@ -35,6 +37,15 @@ export const RoutesView = ({ deviceStatus = 'checking' }: RoutesViewProps) => {
   const handlePreserveToggle = async (e: React.MouseEvent, baseName: string) => {
     e.stopPropagation()
     await preserveRoute(baseName)
+  }
+
+  const handleExportClick = async (e: React.MouseEvent, baseName: string) => {
+    e.stopPropagation()
+    const routeDetails = await fetchRouteDetails(baseName)
+    if (routeDetails) {
+      setExportRoute(routeDetails)
+      setShowExportModal(true)
+    }
   }
 
   // Helper function to get field value with fallback names (supports nested paths like 'driveStats.opEngagedPercent')
@@ -195,6 +206,14 @@ export const RoutesView = ({ deviceStatus = 'checking' }: RoutesViewProps) => {
     <>
       <Header deviceStatus={deviceStatus} onMetricsClick={() => setShowMetricsModal(true)} />
       <MetricsModal isOpen={showMetricsModal} onClose={() => setShowMetricsModal(false)} />
+      <ExportBackupModal
+        isOpen={showExportModal}
+        onClose={() => {
+          setShowExportModal(false)
+          setExportRoute(null)
+        }}
+        route={exportRoute}
+      />
       {selectedRoute && (
         <VideoPlayer route={selectedRoute} onClose={handleCloseVideo} />
       )}
@@ -295,18 +314,33 @@ export const RoutesView = ({ deviceStatus = 'checking' }: RoutesViewProps) => {
                               </svg>
                               {formatTimeRange(route)}
                             </div>
-                            <button
-                              type="button"
-                              className={`route-preserve-btn ${preserved ? 'active' : ''}`}
-                              aria-pressed={preserved}
-                              title={preserved ? 'Preserved' : 'Preserve'}
-                              onClick={(e) => handlePreserveToggle(e, baseName)}
-                            >
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill={preserved ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2">
-                                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
-                              </svg>
-                              <span>{preserved ? 'Preserved' : 'Preserve'}</span>
-                            </button>
+                            <div className="route-actions">
+                              <button
+                                type="button"
+                                className={`route-preserve-btn ${preserved ? 'active' : ''}`}
+                                aria-pressed={preserved}
+                                title={preserved ? 'Preserved' : 'Preserve'}
+                                onClick={(e) => handlePreserveToggle(e, baseName)}
+                              >
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill={preserved ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2">
+                                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                                </svg>
+                                <span>{preserved ? 'Preserved' : 'Preserve'}</span>
+                              </button>
+                              <button
+                                type="button"
+                                className="route-export-btn"
+                                title="Export videos and backup route data"
+                                onClick={(e) => handleExportClick(e, baseName)}
+                              >
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                  <polyline points="7 10 12 15 17 10" />
+                                  <line x1="12" y1="15" x2="12" y2="3" />
+                                </svg>
+                                <span>Export</span>
+                              </button>
+                            </div>
                           </div>
 
                           {/* Location */}

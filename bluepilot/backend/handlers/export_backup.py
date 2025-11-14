@@ -76,7 +76,7 @@ def handle_videos_zip_post(handler, path, server_state, get_route_segments,
                 route_base, cameras, segments, camera_files_dict,
                 videos_zip_cache, route_export_cache,
                 get_disk_space_info, generate_route_export,
-                generate_route_export_filename, progress_callback
+                generate_route_export_filename, progress_callback, server_state
             )
             info = server_state.complete_videos_zip(route_base, zip_path, "ZIP ready")
             # Broadcast completion
@@ -368,7 +368,7 @@ def handle_route_import_status_get(handler, path, server_state):
 def create_videos_zip(route_base, cameras, segments, camera_files_dict,
                      videos_zip_cache, route_export_cache,
                      get_disk_space_info, generate_route_export,
-                     generate_route_export_filename, progress_callback=None):
+                     generate_route_export_filename, progress_callback=None, server_state=None):
     """
     Create a ZIP file containing exported videos for multiple cameras
 
@@ -383,6 +383,7 @@ def create_videos_zip(route_base, cameras, segments, camera_files_dict,
         generate_route_export: Function to generate individual camera export
         generate_route_export_filename: Function to generate export filename
         progress_callback: Optional callback(progress, message)
+        server_state: Server state instance for FFmpeg process management
 
     Returns:
         Path to the created ZIP file
@@ -435,7 +436,7 @@ def create_videos_zip(route_base, cameras, segments, camera_files_dict,
                 progress_callback(progress_pct, f"Exporting {camera} camera...")
 
             # Generate individual video export
-            video_path = generate_route_export(route_base, camera, progress_callback)
+            video_path = generate_route_export(route_base, camera, progress_callback, server_state)
             camera_files[camera] = video_path
 
         except Exception as e:

@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Modal } from '@/components/common'
 import { exportAPI } from '@/services/api'
+import { useToastStore } from '@/stores/useToastStore'
+import { useExportStore } from '@/stores/useExportStore'
 import type { RouteDetails } from '@/types'
 import './ExportBackupModal.css'
 
@@ -25,6 +27,8 @@ interface ExportStatus {
 }
 
 export const ExportBackupModal = ({ isOpen, onClose, route }: ExportBackupModalProps) => {
+  const { addToast } = useToastStore()
+  const exportStore = useExportStore()
   const [selectedCameras, setSelectedCameras] = useState<Set<string>>(new Set(['front']))
   const [cameraSizes, setCameraSizes] = useState<CameraSizes>({})
   const [exportStatus, setExportStatus] = useState<ExportStatus | null>(null)
@@ -38,6 +42,70 @@ export const ExportBackupModal = ({ isOpen, onClose, route }: ExportBackupModalP
       setExportStatus(null)
     }
   }, [isOpen, route])
+
+  // Listen to export store for WebSocket updates
+  useEffect(() => {
+    if (!route || !isOpen) return
+
+    const routeId = route.baseName || route.id || ''
+    if (!routeId) return
+
+    // Check for updates from WebSocket every 100ms
+    const interval = setInterval(() => {
+      const progress = exportStore.getProgress(routeId)
+      if (progress) {
+        // Update the export status based on WebSocket data
+        const statusType: 'video' | 'backup' = progress.type === 'videos_zip' ? 'video' : 'backup'
+
+        setExportStatus({
+          visible: true,
+          message: progress.message,
+          progress: progress.progress * 100, // Convert to percentage
+          type: statusType
+        })
+
+        // Handle completion
+        if (progress.status === 'complete') {
+          setLoading(false)
+
+          // Trigger download
+          if (progress.type === 'videos_zip') {
+            const downloadUrl = exportAPI.downloadVideosZip(routeId)
+            console.log('Downloading from:', downloadUrl)
+            window.open(downloadUrl, '_blank')
+          } else if (progress.type === 'backup') {
+            const downloadUrl = exportAPI.downloadRouteBackup(routeId)
+            console.log('Downloading backup from:', downloadUrl)
+            window.open(downloadUrl, '_blank')
+          }
+
+          // Clear the export from store after a delay
+          setTimeout(() => {
+            exportStore.clearExport(routeId)
+            setExportStatus(null)
+          }, 3000)
+        }
+
+        // Handle errors
+        if (progress.status === 'error') {
+          setLoading(false)
+          setExportStatus({
+            visible: true,
+            message: progress.error || 'Export failed',
+            progress: 0,
+            type: statusType
+          })
+
+          // Clear error after showing
+          setTimeout(() => {
+            exportStore.clearExport(routeId)
+          }, 5000)
+        }
+      }
+    }, 100)
+
+    return () => clearInterval(interval)
+  }, [isOpen, route, exportStore])
 
   const loadCameraSizes = async () => {
     if (!route) return
@@ -76,7 +144,16 @@ export const ExportBackupModal = ({ isOpen, onClose, route }: ExportBackupModalP
   }
 
   const downloadSelectedVideos = async () => {
-    if (!route || selectedCameras.size === 0) return
+    if (!route || selectedCameras.size === 0) {
+      addToast('Please select at least one camera', 'error')
+      return
+    }
+
+    const routeId = route.baseName || route.id || ''
+    if (!routeId) {
+      addToast('Invalid route ID', 'error')
+      return
+    }
 
     setLoading(true)
     setExportStatus({
@@ -88,12 +165,14 @@ export const ExportBackupModal = ({ isOpen, onClose, route }: ExportBackupModalP
 
     try {
       const cameras = Array.from(selectedCameras)
-      await exportAPI.createVideosZip(route.baseName || route.id || '', cameras)
+      console.log('Creating videos ZIP for route:', routeId, 'cameras:', cameras)
+      await exportAPI.createVideosZip(routeId, cameras)
 
       // Poll for status
       const pollInterval = setInterval(async () => {
         try {
-          const status = await exportAPI.getVideosZipStatus(route.baseName || route.id || '')
+          const status = await exportAPI.getVideosZipStatus(routeId)
+          console.log('Videos ZIP status:', status)
 
           setExportStatus({
             visible: true,
@@ -111,9 +190,11 @@ export const ExportBackupModal = ({ isOpen, onClose, route }: ExportBackupModalP
               type: 'video'
             })
             // Trigger download
-            const downloadUrl = exportAPI.downloadVideosZip(route.baseName || route.id || '')
+            const downloadUrl = exportAPI.downloadVideosZip(routeId)
+            console.log('Downloading from:', downloadUrl)
             window.open(downloadUrl, '_blank')
             setLoading(false)
+            addToast('Video export started downloading', 'success')
           } else if (status.status === 'error') {
             clearInterval(pollInterval)
             setExportStatus({
@@ -124,9 +205,10 @@ export const ExportBackupModal = ({ isOpen, onClose, route }: ExportBackupModalP
             })
             setLoading(false)
           }
-        } catch (error) {
+        } catch (error: any) {
           clearInterval(pollInterval)
           console.error('Status poll error:', error)
+          addToast(error?.response?.data?.error || 'Failed to check export status', 'error')
           setLoading(false)
         }
       }, 1000)
@@ -134,30 +216,40 @@ export const ExportBackupModal = ({ isOpen, onClose, route }: ExportBackupModalP
       // Timeout after 10 minutes
       setTimeout(() => {
         clearInterval(pollInterval)
-        if (loading) {
-          setExportStatus({
-            visible: true,
-            message: 'Export timeout',
-            progress: 0,
-            type: 'video'
-          })
-          setLoading(false)
-        }
+        setExportStatus({
+          visible: true,
+          message: 'Export timeout - operation took too long',
+          progress: 0,
+          type: 'video'
+        })
+        setLoading(false)
+        addToast('Video export timed out', 'error')
       }, 600000)
-    } catch (error) {
+    } catch (error: any) {
       console.error('Export error:', error)
+      const errorMessage = error?.response?.data?.error || error?.message || 'Export failed'
       setExportStatus({
         visible: true,
-        message: 'Export failed',
+        message: errorMessage,
         progress: 0,
         type: 'video'
       })
+      addToast(errorMessage, 'error')
       setLoading(false)
     }
   }
 
   const createBackup = async () => {
-    if (!route) return
+    if (!route) {
+      addToast('No route selected', 'error')
+      return
+    }
+
+    const routeId = route.baseName || route.id || ''
+    if (!routeId) {
+      addToast('Invalid route ID', 'error')
+      return
+    }
 
     setLoading(true)
     setExportStatus({
@@ -168,12 +260,14 @@ export const ExportBackupModal = ({ isOpen, onClose, route }: ExportBackupModalP
     })
 
     try {
-      await exportAPI.createRouteBackup(route.baseName || route.id || '')
+      console.log('Creating backup for route:', routeId)
+      await exportAPI.createRouteBackup(routeId)
 
       // Poll for status
       const pollInterval = setInterval(async () => {
         try {
-          const status = await exportAPI.getRouteBackupStatus(route.baseName || route.id || '')
+          const status = await exportAPI.getRouteBackupStatus(routeId)
+          console.log('Backup status:', status)
 
           setExportStatus({
             visible: true,
@@ -191,9 +285,11 @@ export const ExportBackupModal = ({ isOpen, onClose, route }: ExportBackupModalP
               type: 'backup'
             })
             // Trigger download
-            const downloadUrl = exportAPI.downloadRouteBackup(route.baseName || route.id || '')
+            const downloadUrl = exportAPI.downloadRouteBackup(routeId)
+            console.log('Downloading backup from:', downloadUrl)
             window.open(downloadUrl, '_blank')
             setLoading(false)
+            addToast('Backup download started', 'success')
           } else if (status.status === 'error') {
             clearInterval(pollInterval)
             setExportStatus({
@@ -204,9 +300,10 @@ export const ExportBackupModal = ({ isOpen, onClose, route }: ExportBackupModalP
             })
             setLoading(false)
           }
-        } catch (error) {
+        } catch (error: any) {
           clearInterval(pollInterval)
           console.error('Status poll error:', error)
+          addToast(error?.response?.data?.error || 'Failed to check backup status', 'error')
           setLoading(false)
         }
       }, 1000)
@@ -214,24 +311,25 @@ export const ExportBackupModal = ({ isOpen, onClose, route }: ExportBackupModalP
       // Timeout after 10 minutes
       setTimeout(() => {
         clearInterval(pollInterval)
-        if (loading) {
-          setExportStatus({
-            visible: true,
-            message: 'Backup timeout',
-            progress: 0,
-            type: 'backup'
-          })
-          setLoading(false)
-        }
+        setExportStatus({
+          visible: true,
+          message: 'Backup timeout - operation took too long',
+          progress: 0,
+          type: 'backup'
+        })
+        setLoading(false)
+        addToast('Backup operation timed out', 'error')
       }, 600000)
-    } catch (error) {
+    } catch (error: any) {
       console.error('Backup error:', error)
+      const errorMessage = error?.response?.data?.error || error?.message || 'Backup failed'
       setExportStatus({
         visible: true,
-        message: 'Backup failed',
+        message: errorMessage,
         progress: 0,
         type: 'backup'
       })
+      addToast(errorMessage, 'error')
       setLoading(false)
     }
   }

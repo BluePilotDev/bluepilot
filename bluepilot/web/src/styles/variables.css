@@ -61,7 +61,7 @@
   --shadow-lg: 0 8px 16px rgba(0, 0, 0, 0.4);
 
   /* Z-index layers */
-  --z-modal: 1000;
+  --z-modal: 3000;
   --z-dropdown: 500;
   --z-header: 100;
   --z-overlay: 900;
