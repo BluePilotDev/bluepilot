@@ -17,9 +17,10 @@ SendButtonState = structs.IntelligentCruiseButtonManagement.SendButtonState
 
 # Ford cruise control button signals for speed adjustment
 # These correspond to the signals in the Steering_Data_FD1 CAN message (ID 131)
+# NOTE: Ford's SetInc/SetDec buttons appear to be semantically reversed compared to other brands
 BUTTON_SIGNALS = {
-  SendButtonState.increase: "CcAslButtnSetIncPress",  # Set + Increase button (speed up)
-  SendButtonState.decrease: "CcAslButtnSetDecPress",  # Set + Decrease button (speed down)
+  SendButtonState.increase: "CcAslButtnSetDecPress",  # Increase speed (using Dec signal - Ford-specific)
+  SendButtonState.decrease: "CcAslButtnSetIncPress",  # Decrease speed (using Inc signal - Ford-specific)
 }
 
 
