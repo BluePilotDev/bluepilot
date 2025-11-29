@@ -136,6 +136,6 @@ class CarInterface(CarInterfaceBase):
     # Enable ICBM (Intelligent Cruise Button Management) for Ford vehicles
     # ICBM allows openpilot to control cruise speed by emulating button presses
     # Only available when openpilotLongitudinalControl is False (using stock ACC)
-    ret.intelligentCruiseButtonManagementAvailable = False
+    ret.intelligentCruiseButtonManagementAvailable = True
 
     return ret
