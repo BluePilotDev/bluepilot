@@ -1,4 +1,5 @@
 from opendbc.car import CanBusBase, structs
+from openpilot.common.swaglog import cloudlog
 
 HUDControl = structs.CarControl.HUDControl
 
@@ -391,7 +392,9 @@ def create_button_msg(packer, bus: int, stock_values: dict, cancel=False, resume
   })
 
   # ICBM button support - set the specified button signal to 1
+  cloudlog.warning(f"XXXXXXXXXXXXXXXXXXX icbm_button: {icbm_button},  values[CcAslButtnSetDecPress]: {values['CcAslButtnSetDecPress']} values[CcAslButtnSetIncPress]: {values['CcAslButtnSetIncPress']}")
   if icbm_button is not None:
+    cloudlog.warning(f"XXXXXXXXXXXXXXXXXXX updating icbm_button: {icbm_button} to 1")
     values[icbm_button] = 1
 
   return packer.make_can_msg("Steering_Data_FD1", bus, values)

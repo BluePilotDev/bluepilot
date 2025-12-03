@@ -11,6 +11,7 @@ from opendbc.car import structs, DT_CTRL
 from opendbc.car.can_definitions import CanData
 from opendbc.car.ford import fordcan
 from opendbc.sunnypilot.car.intelligent_cruise_button_management_interface_base import IntelligentCruiseButtonManagementInterfaceBase
+from openpilot.common.swaglog import cloudlog
 
 ButtonType = structs.CarState.ButtonEvent.Type
 SendButtonState = structs.IntelligentCruiseButtonManagement.SendButtonState
@@ -48,12 +49,14 @@ class IntelligentCruiseButtonManagementInterface(IntelligentCruiseButtonManageme
     self.frame = frame
     self.last_button_frame = last_button_frame
 
+    # loudlog.warning(f"XXXXXXXXXXXXXXXXXXX ICBM: {self.ICBM.sendButton}")
     if self.ICBM.sendButton != SendButtonState.none:
       button_signal = BUTTON_SIGNALS[self.ICBM.sendButton]
 
       # Ford sends button messages at 10Hz (every 0.1s), but we send at 20Hz (every 0.05s) per CarControllerParams.BUTTONS_STEP
       # Only send if enough time has passed since last button press
       if (self.frame - self.last_button_frame) * DT_CTRL > 0.05:
+        cloudlog.warning(f"XXXXXXXXXXXXXXXXXXX Sending button press: {button_signal}")
         # Send button press to both camera and main bus (same as cancel/resume)
         can_sends.append(fordcan.create_button_msg(packer, CAN.camera, CS.buttons_stock_values,
                                                      icbm_button=button_signal))
