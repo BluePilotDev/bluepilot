@@ -110,11 +110,15 @@ class CarState(CarStateBase, MadsCarState):
     # cruise state
     is_metric = cp.vl["INSTRUMENT_PANEL"]["METRIC_UNITS"] == 1 if not self.CP.flags & FordFlags.CANFD else cp_cam.vl["IPMA_Data2"]["IsaVLimUnit_D_Rq"] == 1
     ret.cruiseState.speed = cp.vl["EngBrakeData"]["Veh_V_DsplyCcSet"] * (CV.KPH_TO_MS if is_metric else CV.MPH_TO_MS)
-    ret.cruiseState.speedCluster = ret.cruiseState.speed  * CV.MS_TO_KPH # ICBM needs speedCluster to read current cruise setpoint
+    ret.cruiseState.speedCluster = ret.cruiseState.speed # ICBM needs speedCluster to read current cruise setpoint
+    print(f"XXXXXXXXXXXXXXXXXXX speedCluster: {ret.cruiseState.speedCluster}")
     ret.cruiseState.enabled = cp.vl["EngBrakeData"]["CcStat_D_Actl"] in (4, 5)
     ret.cruiseState.available = cp.vl["EngBrakeData"]["CcStat_D_Actl"] in (3, 4, 5)
     ret.cruiseState.nonAdaptive = cp.vl["Cluster_Info1_FD1"]["AccEnbl_B_RqDrv"] == 0
     ret.cruiseState.standstill = cp.vl["EngBrakeData"]["AccStopMde_D_Rq"] == 3
+    if(ret.cruiseState.speed == 0):
+       ret.cruiseState.available = False
+    print(f"XXXXXXXXXXXXXXXXXXX cruiseState: {ret.cruiseState}")
     ret.accFaulted = cp.vl["EngBrakeData"]["CcStat_D_Actl"] in (1, 2)
 
     if self.CP.flags & FordFlags.CANFD:
