@@ -65,8 +65,8 @@ class CarStateExt:
         event.pressed = state
         button_events.append(event)
         # Debug: log combo button events
-        if button.event_type.raw in (3, 9, 5, 10):  # accelCruise, setCruise, cancel, resumeCruise
-          cloudlog.warning(f"Ford ButtonEvent: type={button.event_type.raw} ({button.event_type}), pressed={state}, signal={button.can_msg}={signal_value}")
+        if button.event_type in (3, 9, 5, 10):  # accelCruise, setCruise, cancel, resumeCruise
+          cloudlog.warning(f"Ford ButtonEvent: type={button.event_type}, pressed={state}, signal={button.can_msg}={signal_value}")
 
       # Update stored state for this ButtonEvent type
       self.button_states[button.event_type] = state
