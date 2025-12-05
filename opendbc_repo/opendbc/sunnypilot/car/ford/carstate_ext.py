@@ -34,9 +34,9 @@ class CarStateExt:
     """
     Update button state tracking and emit ButtonEvent messages.
 
-    This handles combo buttons correctly - when a single CAN signal maps to multiple
-    ButtonEvent types (e.g., CcAslButtnSetIncPress -> accelCruise + setCruise), both
-    events will be emitted when the signal changes state.
+    For combo buttons, we emit the appropriate event based on cruise state:
+    - CcAslButtnSetIncPress: emits setCruise if cruise disabled, accelCruise if enabled
+    - CcAslButtnCnclResPress: emits cancel if cruise enabled, resumeCruise if disabled
 
     Args:
       ret: CarState structure to update
@@ -46,9 +46,10 @@ class CarStateExt:
     cp = can_parsers[Bus.pt]
 
     button_events = []
+    cruise_enabled = ret.cruiseState.enabled
+
     for button in BUTTONS:
       # Check if button signal is in the pressed state (value == 1)
-      # Note: Multiple Button entries can reference the same CAN signal (combo buttons)
       try:
         signal_value = cp.vl[button.can_addr][button.can_msg]
         state = (signal_value in button.values)
@@ -56,15 +57,76 @@ class CarStateExt:
         # Signal not available in this frame, skip
         continue
 
-      # Emit event on state transition (pressed or released)
-      # Each ButtonEvent type is tracked separately, so combo buttons will emit
-      # multiple events when the same CAN signal changes state
-      if self.button_states[button.event_type] != state:
+      # Handle combo buttons: emit only the appropriate event based on cruise state
+      # CcAslButtnSetIncPress: setCruise (9) when disabled, accelCruise (3) when enabled
+      if button.can_msg == "CcAslButtnSetIncPress":
+        if state and self.button_states.get(button.event_type, False) != state:
+          # Choose event type based on cruise state
+          if cruise_enabled:
+            # Cruise is enabled, so this is an increase request
+            event_type = 3  # accelCruise
+          else:
+            # Cruise is disabled, so this is a set request
+            event_type = 9  # setCruise
+
+          # Only emit if this is the correct event type for current state
+          if button.event_type == event_type:
+            if self.button_states.get(button.event_type, False) != state:
+              event = structs.CarState.ButtonEvent.new_message()
+              event.type = button.event_type
+              event.pressed = state
+              button_events.append(event)
+              cloudlog.warning(f"Ford ButtonEvent: type={button.event_type}, pressed={state}, signal={button.can_msg}={signal_value}, cruise_enabled={cruise_enabled}")
+          # Update state for both event types to track transitions
+          self.button_states[button.event_type] = state
+        elif not state:
+          # Button released - update state for both event types
+          if self.button_states.get(button.event_type, False) != state:
+            event = structs.CarState.ButtonEvent.new_message()
+            event.type = button.event_type
+            event.pressed = state
+            button_events.append(event)
+          self.button_states[button.event_type] = state
+        continue
+
+      # CcAslButtnCnclResPress: cancel (5) when enabled, resumeCruise (10) when disabled
+      if button.can_msg == "CcAslButtnCnclResPress":
+        if state and self.button_states.get(button.event_type, False) != state:
+          # Choose event type based on cruise state
+          if cruise_enabled:
+            # Cruise is enabled, so this is a cancel request
+            event_type = 5  # cancel
+          else:
+            # Cruise is disabled, so this is a resume request
+            event_type = 10  # resumeCruise
+
+          # Only emit if this is the correct event type for current state
+          if button.event_type == event_type:
+            if self.button_states.get(button.event_type, False) != state:
+              event = structs.CarState.ButtonEvent.new_message()
+              event.type = button.event_type
+              event.pressed = state
+              button_events.append(event)
+              cloudlog.warning(f"Ford ButtonEvent: type={button.event_type}, pressed={state}, signal={button.can_msg}={signal_value}, cruise_enabled={cruise_enabled}")
+          # Update state for both event types to track transitions
+          self.button_states[button.event_type] = state
+        elif not state:
+          # Button released - update state for both event types
+          if self.button_states.get(button.event_type, False) != state:
+            event = structs.CarState.ButtonEvent.new_message()
+            event.type = button.event_type
+            event.pressed = state
+            button_events.append(event)
+          self.button_states[button.event_type] = state
+        continue
+
+      # Regular buttons (non-combo): emit event on state transition
+      if self.button_states.get(button.event_type, False) != state:
         event = structs.CarState.ButtonEvent.new_message()
         event.type = button.event_type
         event.pressed = state
         button_events.append(event)
-        # Debug: log combo button events
+        # Debug: log button events
         if button.event_type in (3, 9, 5, 10):  # accelCruise, setCruise, cancel, resumeCruise
           cloudlog.warning(f"Ford ButtonEvent: type={button.event_type}, pressed={state}, signal={button.can_msg}={signal_value}")
 
