@@ -10,6 +10,7 @@ from enum import StrEnum
 from opendbc.car import Bus, structs
 from opendbc.can.parser import CANParser
 from opendbc.sunnypilot.car.ford.values_ext import BUTTONS
+from openpilot.common.swaglog import cloudlog
 
 
 class CarStateExt:
@@ -48,7 +49,12 @@ class CarStateExt:
     for button in BUTTONS:
       # Check if button signal is in the pressed state (value == 1)
       # Note: Multiple Button entries can reference the same CAN signal (combo buttons)
-      state = (cp.vl[button.can_addr][button.can_msg] in button.values)
+      try:
+        signal_value = cp.vl[button.can_addr][button.can_msg]
+        state = (signal_value in button.values)
+      except (KeyError, AttributeError):
+        # Signal not available in this frame, skip
+        continue
 
       # Emit event on state transition (pressed or released)
       # Each ButtonEvent type is tracked separately, so combo buttons will emit
@@ -58,6 +64,9 @@ class CarStateExt:
         event.type = button.event_type
         event.pressed = state
         button_events.append(event)
+        # Debug: log combo button events
+        if button.event_type.raw in (3, 9, 5, 10):  # accelCruise, setCruise, cancel, resumeCruise
+          cloudlog.warning(f"Ford ButtonEvent: type={button.event_type.raw} ({button.event_type}), pressed={state}, signal={button.can_msg}={signal_value}")
 
       # Update stored state for this ButtonEvent type
       self.button_states[button.event_type] = state
