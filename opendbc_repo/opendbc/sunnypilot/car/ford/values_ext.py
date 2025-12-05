@@ -22,16 +22,15 @@ Button = namedtuple('Button', ['event_type', 'can_addr', 'can_msg', 'values'])
 # There is also a separate CcAslButtnSetPress signal for the standalone "Set" button,
 # but based on user mapping, setCruise is mapped to the combo button instead.
 BUTTONS = [
-  # Combo button: Set + Increase (emits both accelCruise and setCruise)
-  # When this button is pressed, both type 3 (accelCruise) and type 9 (setCruise) events are emitted
+  # Combo button: Set + Increase (emits accelCruise when enabled, setCruise when disabled)
   Button(ButtonType.accelCruise, "Steering_Data_FD1", "CcAslButtnSetIncPress", [1]),
   Button(ButtonType.setCruise, "Steering_Data_FD1", "CcAslButtnSetIncPress", [1]),
 
-  # Set + Decrease
+  # Combo button: Set + Decrease (emits decelCruise when enabled, setCruise when disabled)
   Button(ButtonType.decelCruise, "Steering_Data_FD1", "CcAslButtnSetDecPress", [1]),
+  Button(ButtonType.setCruise, "Steering_Data_FD1", "CcAslButtnSetDecPress", [1]),
 
-  # Combo button: Cancel/Resume (emits both cancel and resumeCruise)
-  # When this button is pressed, both type 5 (cancel) and type 10 (resumeCruise) events are emitted
+  # Combo button: Cancel/Resume (emits cancel when enabled, resumeCruise when disabled)
   Button(ButtonType.cancel, "Steering_Data_FD1", "CcAslButtnCnclResPress", [1]),
   Button(ButtonType.resumeCruise, "Steering_Data_FD1", "CcAslButtnCnclResPress", [1]),
 
