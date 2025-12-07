@@ -31,6 +31,10 @@ class CarStateExt:
     self.button_states = {button.event_type: False for button in BUTTONS}
     # Track which event type was actually emitted for combo buttons (to handle releases correctly)
     self.last_emitted_event = {}  # signal_name -> event_type
+    # Track previous cruise state to detect transitions
+    self.cruise_enabled_prev = False
+    # Track if mainCruise was pressed recently (to handle delayed cruise enable)
+    self.main_cruise_pressed_recently = False
 
   def update(self, ret: structs.CarState, ret_sp: structs.CarStateSP, can_parsers: dict[StrEnum, CANParser]):
     """
@@ -49,6 +53,10 @@ class CarStateExt:
 
     button_events = []
     cruise_enabled = ret.cruiseState.enabled
+
+    # Detect cruise transition from disabled to enabled
+    cruise_just_enabled = cruise_enabled and not self.cruise_enabled_prev
+    main_cruise_just_pressed = False
 
     for button in BUTTONS:
       # Check if button signal is in the pressed state (value == 1)
@@ -199,12 +207,46 @@ class CarStateExt:
         event.type = button.event_type
         event.pressed = state
         button_events.append(event)
+        # Track if mainCruise button was just pressed (transition from not pressed to pressed)
+        if button.event_type == structs.CarState.ButtonEvent.Type.mainCruise and state:
+          main_cruise_just_pressed = True
         # Debug: log button events
-        if button.event_type in (3, 9, 5, 10):  # accelCruise, setCruise, cancel, resumeCruise
+        if button.event_type in (3, 9, 5, 10, 8):  # accelCruise, setCruise, cancel, resumeCruise, mainCruise
           cloudlog.warning(f"Ford ButtonEvent: type={button.event_type}, pressed={state}, signal={button.can_msg}={signal_value}")
 
       # Update stored state for this ButtonEvent type
       self.button_states[button.event_type] = state
+
+    # Track mainCruise press for delayed cruise enable detection
+    if main_cruise_just_pressed:
+      self.main_cruise_pressed_recently = True
+
+    # When mainCruise enables cruise, also emit setCruise to set speed to current speed
+    # This restores the old behavior where turning on cruise also sets it to current speed
+    # Handle both immediate enable (same frame) and delayed enable (next frame)
+    if cruise_just_enabled and (main_cruise_just_pressed or self.main_cruise_pressed_recently):
+      set_cruise_event = structs.CarState.ButtonEvent.new_message()
+      set_cruise_event.type = structs.CarState.ButtonEvent.Type.setCruise
+      set_cruise_event.pressed = True
+      button_events.append(set_cruise_event)
+      cloudlog.warning(f"Ford ButtonEvent: type=9 (setCruise), pressed=True (auto-emitted on mainCruise enable)")
+
+      # Also emit release to complete the button press cycle
+      set_cruise_release = structs.CarState.ButtonEvent.new_message()
+      set_cruise_release.type = structs.CarState.ButtonEvent.Type.setCruise
+      set_cruise_release.pressed = False
+      button_events.append(set_cruise_release)
+      cloudlog.warning(f"Ford ButtonEvent: type=9 (setCruise), pressed=False (auto-emitted on mainCruise enable)")
+
+      # Clear the flag after emitting setCruise
+      self.main_cruise_pressed_recently = False
+
+    # Clear the flag if cruise is already enabled (button press was for something else)
+    if cruise_enabled and not cruise_just_enabled:
+      self.main_cruise_pressed_recently = False
+
+    # Update previous cruise state
+    self.cruise_enabled_prev = cruise_enabled
 
     self.button_events = button_events
 
