@@ -102,11 +102,13 @@ class CarStateExt:
           # Button released - emit release ONLY for the event type that was actually emitted on press
           last_emitted = self.last_emitted_event.get(button.can_msg)
           if last_emitted is not None:
-            if self.button_states.get(last_emitted, False) != signal_state:
-              event = structs.CarState.ButtonEvent.new_message()
-              event.type = last_emitted
-              event.pressed = False
-              button_events.append(event)
+            # Always emit release if we previously emitted a press event for this button
+            # This ensures ICBM button timers are properly reset
+            event = structs.CarState.ButtonEvent.new_message()
+            event.type = last_emitted
+            event.pressed = False
+            button_events.append(event)
+            cloudlog.warning(f"Ford ButtonEvent: type={last_emitted}, pressed=False, signal={button.can_msg} (release)")
           # Clear the tracking
           self.last_emitted_event.pop(button.can_msg, None)
           # Update state for both event types
@@ -145,11 +147,13 @@ class CarStateExt:
           # Button released - emit release ONLY for the event type that was actually emitted on press
           last_emitted = self.last_emitted_event.get(button.can_msg)
           if last_emitted is not None:
-            if self.button_states.get(last_emitted, False) != signal_state:
-              event = structs.CarState.ButtonEvent.new_message()
-              event.type = last_emitted
-              event.pressed = False
-              button_events.append(event)
+            # Always emit release if we previously emitted a press event for this button
+            # This ensures ICBM button timers are properly reset
+            event = structs.CarState.ButtonEvent.new_message()
+            event.type = last_emitted
+            event.pressed = False
+            button_events.append(event)
+            cloudlog.warning(f"Ford ButtonEvent: type={last_emitted}, pressed=False, signal={button.can_msg} (release)")
           # Clear the tracking
           self.last_emitted_event.pop(button.can_msg, None)
           # Update state for both event types
@@ -188,14 +192,15 @@ class CarStateExt:
           # Button released - emit release ONLY for the event type that was actually emitted on press
           last_emitted = self.last_emitted_event.get(button.can_msg)
           if last_emitted is not None:
-            if self.button_states.get(last_emitted, False) != signal_state:
-              event = structs.CarState.ButtonEvent.new_message()
-              event.type = last_emitted
-              event.pressed = False
-              button_events.append(event)
-              cloudlog.warning(f"Ford ButtonEvent: type={last_emitted}, pressed=False, signal={button.can_msg} (release)")
-            # Clear the tracking
-            self.last_emitted_event.pop(button.can_msg, None)
+            # Always emit release if we previously emitted a press event for this button
+            # This ensures ICBM button timers are properly reset
+            event = structs.CarState.ButtonEvent.new_message()
+            event.type = last_emitted
+            event.pressed = False
+            button_events.append(event)
+            cloudlog.warning(f"Ford ButtonEvent: type={last_emitted}, pressed=False, signal={button.can_msg} (release)")
+          # Clear the tracking
+          self.last_emitted_event.pop(button.can_msg, None)
           # Update state for both event types
           self.button_states[5] = False  # cancel
           self.button_states[10] = False  # resumeCruise
