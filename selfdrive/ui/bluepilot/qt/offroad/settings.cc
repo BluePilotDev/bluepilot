@@ -18,6 +18,7 @@
 #include "selfdrive/ui/bluepilot/qt/offroad/panels/bp_models_panel.h"
 #include "selfdrive/ui/bluepilot/qt/offroad/panels/bp_osm_panel.h"
 #include "selfdrive/ui/bluepilot/qt/offroad/panels/bp_portal_panel.h"
+#include "selfdrive/ui/bluepilot/qt/offroad/panels/bp_external_storage_panel.h"
 
 // Sunnypilot panels still needed
 #include "selfdrive/ui/sunnypilot/qt/offroad/settings/sunnylink_panel.h"
@@ -105,6 +106,7 @@ BPSettingsWindow::BPSettingsWindow(QWidget *parent) : SettingsWindow(parent) {
     PanelInfo(tr("sunnylink"), new SunnylinkPanel(this), "../assets/icons/wifi_strength_full.svg"),
     PanelInfo(tr("Developer"), bpDeveloperView, "../assets/icons/shell.png"),
     PanelInfo(tr("Statistics"), new BPStatisticsPanel(this), "../assets/offroad/icon_statistics.png"),
+    PanelInfo(tr("Storage"), new BPExternalStoragePanel(this), "../assets/offroad/icon_statistics.png"),
   };
 
   // === CREATE NAVIGATION BUTTONS ===

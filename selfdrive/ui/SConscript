@@ -56,6 +56,7 @@ bp_qt_src = [
   "bluepilot/qt/offroad/panels/bp_models_panel.cc",
   # BluePilot OSM Panel (Native)
   "bluepilot/qt/offroad/panels/bp_osm_panel.cc",
+  "bluepilot/qt/offroad/panels/bp_external_storage_panel.cc",
   # BluePilot Onroad Overlays
   "bluepilot/qt/onroad/overlays/radar_overlay.cc",
   "bluepilot/qt/onroad/overlays/stop_sign_overlay.cc",
