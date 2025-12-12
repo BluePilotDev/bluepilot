@@ -99,6 +99,7 @@ BPSettingsWindow::BPSettingsWindow(QWidget *parent) : SettingsWindow(parent) {
     PanelInfo(tr("Display"), bpDisplayView, "../../sunnypilot/selfdrive/assets/offroad/icon_display.png"),
     PanelInfo(tr("Software"), new BPSoftwarePanel(this), "../../sunnypilot/selfdrive/assets/offroad/icon_software.png"),
     PanelInfo(tr("Models"), new BPModelsPanel(this), "../../sunnypilot/selfdrive/assets/offroad/icon_models.png"),
+    PanelInfo(tr("Storage"), new BPExternalStoragePanel(this), "../assets/offroad/icon_statistics.png"),
     PanelInfo(tr("OSM"), new BPOsmPanel(this), "../../sunnypilot/selfdrive/assets/offroad/icon_map.png"),
     PanelInfo(tr("Trips"), new TripsPanel(this), "../../sunnypilot/selfdrive/assets/offroad/icon_trips.png"),
     PanelInfo(tr("Vehicle"), bpVehicleView, "../../sunnypilot/selfdrive/assets/offroad/icon_vehicle.png"),
@@ -106,7 +107,6 @@ BPSettingsWindow::BPSettingsWindow(QWidget *parent) : SettingsWindow(parent) {
     PanelInfo(tr("sunnylink"), new SunnylinkPanel(this), "../assets/icons/wifi_strength_full.svg"),
     PanelInfo(tr("Developer"), bpDeveloperView, "../assets/icons/shell.png"),
     PanelInfo(tr("Statistics"), new BPStatisticsPanel(this), "../assets/offroad/icon_statistics.png"),
-    PanelInfo(tr("Storage"), new BPExternalStoragePanel(this), "../assets/offroad/icon_statistics.png"),
   };
 
   // === CREATE NAVIGATION BUTTONS ===
