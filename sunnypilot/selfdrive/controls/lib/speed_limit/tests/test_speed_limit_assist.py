@@ -280,6 +280,7 @@ class TestSpeedLimitAssist:
     """Test that ICBM vehicles get target in preActive state to break circular dependency"""
     # Set up ICBM vehicle (non-PCM)
     self.sla.pcm_op_long = False
+    self.sla.CP_SP.intelligentCruiseButtonManagementAvailable = True
 
     # Set up preActive state with speed limit
     self.sla.state = SpeedLimitAssistState.preActive
@@ -290,24 +291,39 @@ class TestSpeedLimitAssist:
 
     # Test that ICBM gets target in preActive state
     v_target = self.sla.get_v_target_from_control()
-
-    # Should return the speed limit, not V_CRUISE_UNSET
     assert v_target == SPEED_LIMITS['city'], f"Expected {SPEED_LIMITS['city']}, got {v_target}"
     assert v_target != V_CRUISE_UNSET, "ICBM should get target in preActive state"
 
-    # Verify PCM vehicles still work as before (enabled but not active in preActive)
-    self.sla.pcm_op_long = True
-    v_target_pcm = self.sla.get_v_target_from_control()
-    assert v_target_pcm == SPEED_LIMITS['city'], "PCM vehicles should still get target when enabled"
-
-    # Verify ICBM vehicles don't get target when not enabled
+  def test_icbm_preactive_requires_icbm_availability(self):
+    """Test that non-ICBM vehicles don't get target in preActive state"""
+    # Set up non-ICBM vehicle (non-PCM)
     self.sla.pcm_op_long = False
-    self.sla.is_enabled = False
-    v_target_disabled = self.sla.get_v_target_from_control()
-    assert v_target_disabled == V_CRUISE_UNSET, "Disabled ICBM should not get target"
+    self.sla.CP_SP.intelligentCruiseButtonManagementAvailable = False
 
-    # Verify ICBM vehicles don't get target without speed limit
+    # Set up preActive state with speed limit
+    self.sla.state = SpeedLimitAssistState.preActive
     self.sla.is_enabled = True
-    self.sla._has_speed_limit = False
-    v_target_no_limit = self.sla.get_v_target_from_control()
-    assert v_target_no_limit == V_CRUISE_UNSET, "ICBM without speed limit should not get target"
+    self.sla.is_active = False
+    self.sla._has_speed_limit = True
+    self.sla._speed_limit_final_last = SPEED_LIMITS['city']
+
+    # Non-ICBM vehicles should not get target in preActive state
+    v_target = self.sla.get_v_target_from_control()
+    assert v_target == V_CRUISE_UNSET, "Non-ICBM vehicles should not get target in preActive state"
+
+  def test_icbm_preactive_requires_enabled_state(self):
+    """Test that disabled ICBM vehicles don't get target in preActive state"""
+    # Set up ICBM vehicle (non-PCM) but disabled
+    self.sla.pcm_op_long = False
+    self.sla.CP_SP.intelligentCruiseButtonManagementAvailable = True
+
+    # Set up preActive state with speed limit but disabled
+    self.sla.state = SpeedLimitAssistState.preActive
+    self.sla.is_enabled = False
+    self.sla.is_active = False
+    self.sla._has_speed_limit = True
+    self.sla._speed_limit_final_last = SPEED_LIMITS['city']
+
+    # Disabled ICBM vehicles should not get target
+    v_target = self.sla.get_v_target_from_control()
+    assert v_target == V_CRUISE_UNSET, "Disabled ICBM should not get target"
