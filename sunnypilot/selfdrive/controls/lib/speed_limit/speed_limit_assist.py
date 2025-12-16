@@ -129,7 +129,10 @@ class SpeedLimitAssist:
     if self._has_speed_limit:
       if self.pcm_op_long and self.is_enabled:
         return self._speed_limit_final_last
-      if not self.pcm_op_long and self.is_active:
+      # ICBM vehicles need target in preActive state to adjust cluster speed
+      # This breaks the circular dependency: SLA preActive -> ICBM adjusts cluster -> SLA becomes active
+      if not self.pcm_op_long and (self.is_active or
+                                   (self.is_enabled and self.state == SpeedLimitAssistState.preActive)):
         return self._speed_limit_final_last
 
     # Fallback
