@@ -213,6 +213,8 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
     self.tja_warn = 0
     self.hands = 0
 
+    def _update_params():
+      self.send_hands_free_cluster_msg = self.params.get_bool("send_hands_free_cluster_msg")
 
   def handle_post_lane_change_transition(self, path_angle, path_offset, desired_curvature_rate):
     """

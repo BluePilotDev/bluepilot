@@ -403,11 +403,31 @@ class CarControllerBase(ABC):
     self.CP_SP = CP_SP
     self.frame = 0
     self.secoc_key: bytes = b"00" * 16
+    self.schedule_updates()
+
+  def schedule_updates(self):
+    e = threading.Event()
+    t = threading.Thread(target=self.params_thread, args=(e, ))
+    try:
+      t.start()
+      while True:
+        self.step()
+        self.rk.monitor_time()
+    finally:
+      e.set()
+      t.join()
+
+  def params_thread(self, evt):
+    while not evt.is_set():
+      self._update_params()
+      time.sleep(0.1)
 
   @abstractmethod
   def update(self, CC: structs.CarControl, CC_SP: structs.CarControlSP, CS: CarStateBase, now_nanos: int) -> tuple[structs.CarControl.Actuators, list[CanData]]:
     pass
 
+  def _update_params():
+    pass
 
 INTERFACE_ATTR_FILE = {
   "FINGERPRINTS": "fingerprints",
