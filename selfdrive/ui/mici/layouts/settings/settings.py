@@ -7,6 +7,7 @@ from openpilot.common.params import Params
 from openpilot.system.ui.widgets.scroller import Scroller
 from openpilot.selfdrive.ui.mici.widgets.button import BigButton
 from openpilot.selfdrive.ui.mici.layouts.settings.toggles import TogglesLayoutMici
+from openpilot.selfdrive.ui.mici.layouts.settings.bluepilot import BluePilotLayoutMici
 from openpilot.selfdrive.ui.mici.layouts.settings.network import NetworkLayoutMici
 from openpilot.selfdrive.ui.mici.layouts.settings.device import DeviceLayoutMici, PairBigButton
 from openpilot.selfdrive.ui.mici.layouts.settings.developer import DeveloperLayoutMici
@@ -17,12 +18,12 @@ from openpilot.system.ui.widgets import Widget, NavWidget
 
 class PanelType(IntEnum):
   TOGGLES = 0
-  NETWORK = 1
-  DEVICE = 2
-  DEVELOPER = 3
-  USER_MANUAL = 4
-  FIREHOSE = 5
-
+  BLUEPILOT = 1
+  NETWORK = 2
+  DEVICE = 3
+  DEVELOPER = 4
+  USER_MANUAL = 5
+  FIREHOSE = 6
 
 @dataclass
 class PanelInfo:
@@ -38,6 +39,10 @@ class SettingsLayout(NavWidget):
 
     toggles_btn = BigButton("toggles", "", "icons_mici/settings/toggles_icon.png")
     toggles_btn.set_click_callback(lambda: self._set_current_panel(PanelType.TOGGLES))
+
+    bluepilot_btn = BigButton("bluepilot", "", "icons_mici/settings/toggles_icon.png")
+    bluepilot_btn.set_click_callback(lambda: self._set_current_panel(PanelType.BLUEPILOT))
+
     network_btn = BigButton("network", "", "icons_mici/settings/network/wifi_strength_full.png")
     network_btn.set_click_callback(lambda: self._set_current_panel(PanelType.NETWORK))
     device_btn = BigButton("device", "", "icons_mici/settings/device_icon.png")
@@ -50,6 +55,7 @@ class SettingsLayout(NavWidget):
 
     self._scroller = Scroller([
       toggles_btn,
+      bluepilot_btn,
       network_btn,
       device_btn,
       PairBigButton(),
@@ -64,6 +70,7 @@ class SettingsLayout(NavWidget):
 
     self._panels = {
       PanelType.TOGGLES: PanelInfo("Toggles", TogglesLayoutMici(back_callback=lambda: self._set_current_panel(None))),
+      PanelType.BLUEPILOT: PanelInfo("BluePilot", BluePilotLayoutMici(back_callback=lambda: self._set_current_panel(None))),
       PanelType.NETWORK: PanelInfo("Network", NetworkLayoutMici(back_callback=lambda: self._set_current_panel(None))),
       PanelType.DEVICE: PanelInfo("Device", DeviceLayoutMici(back_callback=lambda: self._set_current_panel(None))),
       PanelType.DEVELOPER: PanelInfo("Developer", DeveloperLayoutMici(back_callback=lambda: self._set_current_panel(None))),
