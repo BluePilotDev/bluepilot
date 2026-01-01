@@ -406,17 +406,13 @@ class CarControllerBase(ABC):
     self.secoc_key: bytes = b"00" * 16
     self.schedule_updates()
 
+  def __del__(self):
+    self.update_evt.set()
+
   def schedule_updates(self):
-    e = threading.Event()
-    t = threading.Thread(target=self.params_thread, args=(e, ))
-    try:
-      t.start()
-      while True:
-        self.step()
-        self.rk.monitor_time()
-    finally:
-      e.set()
-      t.join()
+    self.update_evt = threading.Event()
+    t = threading.Thread(target=self.params_thread, args=(self.update_evt, ))
+    t.start()
 
   def params_thread(self, evt):
     while not evt.is_set():
