@@ -8,6 +8,7 @@ from enum import StrEnum
 from typing import Any
 from collections.abc import Callable
 from functools import cache
+from common.params import Params
 
 from opendbc.car import DT_CTRL, apply_hysteresis, gen_empty_fingerprint, scale_rot_inertia, scale_tire_stiffness, STD_CARGO_KG
 from opendbc.car import structs
@@ -404,6 +405,7 @@ class CarControllerBase(ABC):
     self.CP_SP = CP_SP
     self.frame = 0
     self.secoc_key: bytes = b"00" * 16
+    self.params = Params()
     self.schedule_updates()
 
   def __del__(self):

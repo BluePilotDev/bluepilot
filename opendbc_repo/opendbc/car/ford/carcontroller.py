@@ -11,7 +11,6 @@ from opendbc.car.vehicle_model import VehicleModel
 from opendbc.car.ford import fordcan
 from opendbc.car.ford.values import CarControllerParams, FordFlags, CAR
 from opendbc.car.interfaces import CarControllerBase, V_CRUISE_MAX
-from common.params import Params
 from selfdrive.modeld.constants import ModelConstants  # for calculations
 from common.pid import PIDController # PID control of lateral
 
@@ -81,8 +80,6 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
   def __init__(self, dbc_names, CP, CP_SP):
     CarControllerBase.__init__(self, dbc_names, CP, CP_SP)
     # IntelligentCruiseButtonManagementInterface.__init__(self, CP, CP_SP)
-
-    self.params = Params()
 
     self.packer = CANPacker(dbc_names[Bus.pt])
     self.CAN = fordcan.CanBus(CP)
@@ -211,7 +208,7 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
     self.tja_msg = 0
     self.tja_warn = 0
     self.hands = 0
-    self._update_params
+    self._update_params()
 
   def _update_params(self):
     self.send_hands_free_cluster_msg = self.params.get_bool("send_hands_free_cluster_msg")
