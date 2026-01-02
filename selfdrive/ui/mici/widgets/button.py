@@ -164,6 +164,7 @@ class BigButton(Widget):
 
   def set_text(self, text: str):
     self.text = text
+    self._label.font_size=self._get_label_font_size()
     self._label.set_text(text)
 
   def set_value(self, value: str):

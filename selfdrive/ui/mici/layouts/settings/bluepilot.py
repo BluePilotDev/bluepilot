@@ -10,17 +10,42 @@ from openpilot.system.ui.widgets import NavWidget
 from openpilot.selfdrive.ui.layouts.settings.common import restart_needed_callback
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.selfdrive.ui.widgets.ssh_key import SshKeyAction
+from openpilot.common.params import Params
 
 class BluePilotLayoutMici(NavWidget):
   def __init__(self, back_callback: Callable):
     super().__init__()
     self.set_back_callback(back_callback)
+    self._params = Params()
+    self.lane_change_factor_high = float(self._params.get("lane_change_factor_high", return_default=True))
 
     # ******** Main Scroller ********
     self.show_hands_free_ui = BigParamControl("show hands-free ui", "send_hands_free_cluster_msg")
 
+    def lane_change_factor_high_clicked():
+      dlg = BigInputDialog("enter lane change factor high...", str(self.lane_change_factor_high),
+                           confirm_callback=lane_change_factor_high_callback)
+      gui_app.set_modal_overlay(dlg)
+
+    def lane_change_factor_high_callback(password: str):
+      if password:
+        try:
+          self.lane_change_factor_high = float(password)
+          self._params.put_nonblocking("lane_change_factor_high", self.lane_change_factor_high)
+          update_lane_change_factor_high_btn()
+        except ValueError:
+          pass
+
+    def update_lane_change_factor_high_btn():
+      self.lane_change_factor_high_btn.set_text(f"lane change factor high [{self.lane_change_factor_high}]")
+
+    self.lane_change_factor_high_btn = BigButton("", "")
+    update_lane_change_factor_high_btn()
+    self.lane_change_factor_high_btn.set_click_callback(lane_change_factor_high_clicked)
+
     self._scroller = Scroller([
       self.show_hands_free_ui,
+      self.lane_change_factor_high_btn,
     ], snap_items=False)
 
     # Toggle lists
