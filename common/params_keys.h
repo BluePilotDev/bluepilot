@@ -270,5 +270,15 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"TorqueParamsOverrideLatAccelFactor", {PERSISTENT | BACKUP, FLOAT, "2.5"}},
 
     // Blue Pilot
-    {"send_hands_free_cluster_msg", {PERSISTENT | BACKUP, BOOL}},
+    {"send_hands_free_cluster_msg", {PERSISTENT | BACKUP, BOOL, "0"}},
+    {"enable_human_turn_detection", {PERSISTENT | BACKUP, BOOL, "1"}},
+    {"lane_change_factor_high", {PERSISTENT | BACKUP, FLOAT, "0.85"}},
+    {"pc_blend_ratio_high_C_UI", {PERSISTENT | BACKUP, FLOAT, "0.4"}},
+    {"pc_blend_ratio_low_C_UI", {PERSISTENT | BACKUP, FLOAT, "0.4"}},
+    {"enable_lane_positioning", {PERSISTENT | BACKUP, BOOL, "0"}},
+    {"enable_adv_lane_pos", {PERSISTENT | BACKUP, BOOL, "0"}},
+    {"custom_path_offset", {PERSISTENT | BACKUP, FLOAT,"0.0"}},
+    {"enable_lane_full_mode", {PERSISTENT | BACKUP, BOOL, "0"}},
+    {"custom_profile", {PERSISTENT | BACKUP, INT, "0"}},
+    {"LC_PID_gain_UI", {PERSISTENT | BACKUP, FLOAT, "3.0"}},
 };
