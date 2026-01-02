@@ -2,7 +2,8 @@ name: Debug Discourse Posting
 
 on:
   push:
-
+    branches:
+      - main
 jobs:
   test-discourse-post:
     runs-on: ubuntu-latest
