@@ -5,9 +5,8 @@ from openpilot.common.params import Params
 from openpilot.system.ui.lib.application import gui_app, MousePos
 
 class BigParamFloatControl(BigButton):
-  def __init__(self, text: str, param: str, message: str, min: float = None, max: float = None):
+  def __init__(self, text: str, param: str, min: float = None, max: float = None):
     self.label_text = text
-    self.message = message
     self.min = min
     self.max = max
     super().__init__(text, "")
@@ -17,9 +16,11 @@ class BigParamFloatControl(BigButton):
     self.update_label()
 
   def _on_click(self):
-    message = self.message
     if self.min is not None or self.max is not None:
-      message += f" ({self.min}-{self.max})"
+      message = f"({self.min}-{self.max})"
+    else:
+      message = "enter a numberic value..."
+
     dlg = BigInputDialog(message, str(self.get_param()),
                          confirm_callback=self._callback, show_special_keys=True, minimum_length=0)
     gui_app.set_modal_overlay(dlg)
