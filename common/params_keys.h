@@ -276,7 +276,6 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"pc_blend_ratio_high_C_UI", {PERSISTENT | BACKUP, FLOAT, "0.4"}},
     {"pc_blend_ratio_low_C_UI", {PERSISTENT | BACKUP, FLOAT, "0.4"}},
     {"enable_lane_positioning", {PERSISTENT | BACKUP, BOOL, "0"}},
-    {"enable_adv_lane_pos", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"custom_path_offset", {PERSISTENT | BACKUP, FLOAT,"0.0"}},
     {"enable_lane_full_mode", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"custom_profile", {PERSISTENT | BACKUP, INT, "0"}},

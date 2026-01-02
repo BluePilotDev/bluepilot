@@ -1154,10 +1154,6 @@
     "title": "Ford Lateral Tuning Enable Lane Positioning",
     "description": ""
   },
-  "enable_adv_lane_pos": {
-    "title": "Ford Lateral Tuning Enable Advanced Lane Positioning",
-    "description": ""
-  },
   "custom_path_offset": {
     "title": "Ford Lateral Tuning Custom Path Offset",
     "min": -0.5,
