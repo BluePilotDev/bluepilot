@@ -24,12 +24,12 @@ class BluePilotLayoutMici(NavWidget):
     self.enable_human_turn_detection = BigParamControl("enable human turn detection", "enable_human_turn_detection")
     self.lane_change_factor_high = BigParamFloatControl("lane change factor high", "lane_change_factor_high", min=0.5, max=1.0)
     self.enable_lane_positioning = BigParamControl("enable lane positioning", "enable_lane_positioning")
-    self.custom_path_offset = BigParamFloatControl("custom path offset", "custom_path_offset", min=-0.5, max=0.5)
+    self.custom_path_offset = BigParamFloatControl("in-lane offset", "custom_path_offset", min=-0.5, max=0.5)
     self.enable_lane_full_mode = BigParamControl("enable lanefull mode", "enable_lane_full_mode")
-    self.custom_profile = BigParamControl("enable custom profile", "custom_profile")
-    self.pc_blend_ratio_high_C = BigParamFloatControl("pc blend ratio high C", "pc_blend_ratio_high_C_UI", min=0.0, max=1.0)
-    self.pc_blend_ratio_low_C = BigParamFloatControl("pc blend ratio low C", "pc_blend_ratio_low_C_UI", min=0.0, max=1.0)
-    self.LC_PID_gain = BigParamFloatControl("LC PID gain UI", "LC_PID_gain_UI", min=0.0, max=5.0)
+    self.custom_profile = BigParamControl("use custom tuning profile", "custom_profile")
+    self.pc_blend_ratio_high_C = BigParamFloatControl("predicted curvature blend ratio high", "pc_blend_ratio_high_C_UI", min=0.0, max=1.0)
+    self.pc_blend_ratio_low_C = BigParamFloatControl("predicted curvature blend ratio low", "pc_blend_ratio_low_C_UI", min=0.0, max=1.0)
+    self.LC_PID_gain = BigParamFloatControl("low curvature PID gain", "LC_PID_gain_UI", min=0.0, max=5.0)
     self.disable_BP_lat = BigParamControl("disable BP lateral control", "disable_BP_lat_UI")
 
     self._scroller = Scroller([
