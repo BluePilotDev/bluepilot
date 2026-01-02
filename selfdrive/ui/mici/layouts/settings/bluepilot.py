@@ -24,7 +24,7 @@ class BluePilotLayoutMici(NavWidget):
 
     def lane_change_factor_high_clicked():
       dlg = BigInputDialog("enter lane change factor high...", str(self.lane_change_factor_high),
-                           confirm_callback=lane_change_factor_high_callback)
+                           confirm_callback=lane_change_factor_high_callback, show_special_keys=True)
       gui_app.set_modal_overlay(dlg)
 
     def lane_change_factor_high_callback(password: str):

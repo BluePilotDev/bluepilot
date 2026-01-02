@@ -141,7 +141,7 @@ class CapsState(IntEnum):
 
 
 class MiciKeyboard(Widget):
-  def __init__(self):
+  def __init__(self, show_special_keys: bool = False):
     super().__init__()
 
     lower_chars = [
@@ -190,7 +190,12 @@ class MiciKeyboard(Widget):
 
     # set initial keys
     self._current_keys: list[list[Key]] = []
-    self._set_keys(self._lower_keys)
+
+    if show_special_keys:
+      self._set_keys(self._special_keys)
+    else:
+      self._set_keys(self._lower_keys)
+
     self._caps_state = CapsState.LOWER
     self._initialized = False
 
