@@ -37,7 +37,7 @@ class BluePilotLayoutMici(NavWidget):
           pass
 
     def update_lane_change_factor_high_btn():
-      self.lane_change_factor_high_btn.set_text(f"lane change factor high [{self.lane_change_factor_high}]")
+      self.lane_change_factor_high_btn.set_text(f"lane change factor high [{round(self.lane_change_factor_high,4)}]")
 
     self.lane_change_factor_high_btn = BigButton("", "")
     update_lane_change_factor_high_btn()
