@@ -21,6 +21,11 @@ class BluePilotLayoutMici(NavWidget):
 
     # ******** Main Scroller ********
     self.show_hands_free_ui = BigParamControl("show hands-free ui", "send_hands_free_cluster_msg")
+    self.enable_human_turn_detection = BigParamControl("enable human turn detection", "enable_human_turn_detection")
+    self.enable_lane_positioning = BigParamControl("enable lane positioning", "enable_lane_positioning")
+    self.enable_adv_lane_pos = BigParamControl("enable adv. lane positioning", "enable_adv_lane_pos")
+    self.enable_lane_full_mode = BigParamControl("enable lanefull mode", "enable_lane_full_mode")
+    self.custom_profile = BigParamControl("enable custom profile", "custom_profile")
 
     def lane_change_factor_high_clicked():
       dlg = BigInputDialog("enter lane change factor high...", str(self.lane_change_factor_high),
@@ -45,12 +50,23 @@ class BluePilotLayoutMici(NavWidget):
 
     self._scroller = Scroller([
       self.show_hands_free_ui,
+      self.enable_human_turn_detection,
       self.lane_change_factor_high_btn,
+      self.enable_lane_positioning,
+      self.enable_adv_lane_pos,
+      self.enable_lane_full_mode,
+      self.custom_profile,
+
     ], snap_items=False)
 
     # Toggle lists
     self._refresh_toggles = (
       ("send_hands_free_cluster_msg", self.show_hands_free_ui),
+      ("enable_human_turn_detection", self.enable_human_turn_detection),
+      ("enable_lane_positioning", self.enable_lane_positioning),
+      ("enable_adv_lane_pos", self.enable_adv_lane_pos),
+      ("enable_lane_full_mode", self.enable_lane_full_mode),
+      ("custom_profile", self.custom_profile),
     )
 
     ui_state.add_offroad_transition_callback(self._update_toggles)
