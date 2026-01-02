@@ -1123,5 +1123,71 @@
   "Version": {
     "title": "openpilot Version",
     "description": ""
+  },
+  "send_hands_free_cluster_msg": {
+    "title": "Show Hands-free UI",
+    "description": "Show the BlueCruise hands-free display"
+	},
+  "enable_human_turn_detection": {
+    "title": "Enable Human Turn Detection",
+    "description": ""
+  },
+  "lane_change_factor_high": {
+    "title": "Ford Lateral Tuning Lane Change Factor High",
+    "min": 0.5,
+    "max": 1.0,
+    "description": ""
+  },
+  "pc_blend_ratio_high_C_UI": {
+    "title": "Ford Lateral Tuning PC Blend Ratio High C",
+    "min": 0.0,
+    "max": 1.0,
+    "description": ""
+  },
+  "pc_blend_ratio_low_C_UI": {
+    "title": "Ford Lateral Tuning PC Blend Ratio Low C",
+    "min": 0.0,
+    "max": 1.0,
+    "description": ""
+  },
+  "enable_lane_positioning": {
+    "title": "Ford Lateral Tuning Enable Lane Positioning",
+    "description": ""
+  },
+  "enable_adv_lane_pos": {
+    "title": "Ford Lateral Tuning Enable Advanced Lane Positioning",
+    "description": ""
+  },
+  "custom_path_offset": {
+    "title": "Ford Lateral Tuning Custom Path Offset",
+    "min": -0.5,
+    "max": 0.5,
+    "description": ""
+  },
+  "enable_lane_full_mode": {
+    "title": "Ford Lateral Tuning Enable Lanefull Mode",
+    "description": ""
+  },
+  "custom_profile": {
+    "title": "Ford Lateral Tuning Profile",
+    "min": 0,
+    "max": 1,
+    "description": "",
+    "options": [
+    {
+      "value": 0,
+      "label": "Default Tuning"
+    },
+    {
+      "value": 1,
+      "label": "Use Custom Tuning Parameters"
+    }
+  ]
+  },
+  "LC_PID_gain_UI": {
+    "title": "Ford Lateral Tuning LC PID Gain",
+    "min": 0.0,
+    "max": 5.0,
+    "description": ""
   }
 }
