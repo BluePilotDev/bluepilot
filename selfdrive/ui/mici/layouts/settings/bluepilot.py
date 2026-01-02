@@ -30,6 +30,7 @@ class BluePilotLayoutMici(NavWidget):
     self.pc_blend_ratio_high_C = BigParamFloatControl("pc blend ratio high C", "pc_blend_ratio_high_C_UI", min=0.0, max=1.0)
     self.pc_blend_ratio_low_C = BigParamFloatControl("pc blend ratio low C", "pc_blend_ratio_low_C_UI", min=0.0, max=1.0)
     self.LC_PID_gain = BigParamFloatControl("LC PID gain UI", "LC_PID_gain_UI", min=0.0, max=5.0)
+    self.disable_BP_lat = BigParamControl("disable BP lateral control", "disable_BP_lat_UI")
 
     self._scroller = Scroller([
       self.show_hands_free_ui,
@@ -42,6 +43,7 @@ class BluePilotLayoutMici(NavWidget):
       self.pc_blend_ratio_high_C,
       self.pc_blend_ratio_low_C,
       self.LC_PID_gain,
+      self.disable_BP_lat,
     ], snap_items=False)
 
     # Toggle lists
@@ -51,6 +53,7 @@ class BluePilotLayoutMici(NavWidget):
       ("enable_lane_positioning", self.enable_lane_positioning),
       ("enable_lane_full_mode", self.enable_lane_full_mode),
       ("custom_profile", self.custom_profile),
+      ("disable_BP_lat_UI", self.disable_BP_lat),
     )
 
     ui_state.add_offroad_transition_callback(self._update_toggles)

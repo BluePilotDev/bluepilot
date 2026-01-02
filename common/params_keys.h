@@ -280,4 +280,5 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"enable_lane_full_mode", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"custom_profile", {PERSISTENT | BACKUP, INT, "0"}},
     {"LC_PID_gain_UI", {PERSISTENT | BACKUP, FLOAT, "3.0"}},
+    {"disable_BP_lat_UI", {PERSISTENT | BACKUP, BOOL, "0"}},
 };

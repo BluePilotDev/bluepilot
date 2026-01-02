@@ -1185,5 +1185,9 @@
     "min": 0.0,
     "max": 5.0,
     "description": ""
-  }
+  },
+  "disable_BP_lat": {
+    "title": "Disable BluePilot Lateral Control",
+    "description": "Use the stock OpenPilot lateral control instead of BluePilot"
+	}
 }
