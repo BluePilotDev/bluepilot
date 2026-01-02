@@ -229,20 +229,21 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
     self.tja_warn = 0
     self.hands = 0
     self.predictedSteeringAngleDeg_SP = 0.0
+    self._update_params()
 
   def _update_params(self):
-      self.send_hands_free_cluster_msg = self.params.get_bool("send_hands_free_cluster_msg")
-      self.enable_human_turn_detection = self.params.get_bool("enable_human_turn_detection")
-      # updated from UI: lane_change_factor at 40.23 m/s
-      self.lane_change_factor_high = float(self.params.get("lane_change_factor_high", return_default=True))
-      self.pc_blend_ratio_high_C_UI = float(self.params.get("pc_blend_ratio_high_C_UI", return_default=True))
-      self.pc_blend_ratio_low_C_UI = float(self.params.get("pc_blend_ratio_low_C_UI", return_default=True))
-      self.enable_lane_positioning = self.params.get_bool("enable_lane_positioning")
-      # updated from UI: applies a custom offset to help with in-lane positioning
-      self.custom_path_offset = float(self.params.get("custom_path_offset", return_default=True))
-      self.enable_lanefull_mode = self.params.get_bool("enable_lane_full_mode")
-      self.custom_profile = int(self.params.get("custom_profile", return_default=True))
-      self.LC_PID_gain_UI = float(self.params.get("LC_PID_gain_UI", return_default=True))
+    self.send_hands_free_cluster_msg = self.params.get_bool("send_hands_free_cluster_msg")
+    self.enable_human_turn_detection = self.params.get_bool("enable_human_turn_detection")
+    # updated from UI: lane_change_factor at 40.23 m/s
+    self.lane_change_factor_high = float(self.params.get("lane_change_factor_high", return_default=True))
+    self.pc_blend_ratio_high_C_UI = float(self.params.get("pc_blend_ratio_high_C_UI", return_default=True))
+    self.pc_blend_ratio_low_C_UI = float(self.params.get("pc_blend_ratio_low_C_UI", return_default=True))
+    self.enable_lane_positioning = self.params.get_bool("enable_lane_positioning")
+    # updated from UI: applies a custom offset to help with in-lane positioning
+    self.custom_path_offset = float(self.params.get("custom_path_offset", return_default=True))
+    self.enable_lanefull_mode = self.params.get_bool("enable_lane_full_mode")
+    self.custom_profile = int(self.params.get("custom_profile", return_default=True))
+    self.LC_PID_GAIN_UI = float(self.params.get("LC_PID_gain_UI", return_default=True))
 
   def handle_post_lane_change_transition(self, path_angle, path_offset, desired_curvature_rate):
     """
