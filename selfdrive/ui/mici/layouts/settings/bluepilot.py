@@ -22,21 +22,15 @@ class BluePilotLayoutMici(NavWidget):
     # ******** Main Scroller ********
     self.show_hands_free_ui = BigParamControl("show hands-free ui", "send_hands_free_cluster_msg")
     self.enable_human_turn_detection = BigParamControl("enable human turn detection", "enable_human_turn_detection")
-    self.lane_change_factor_high = BigParamFloatControl("lane change factor high", "lane_change_factor_high", "enter lane change factor high...")
-
-    self.pc_blend_ratio_high_C = BigParamFloatControl("pc blend ratio high C", "pc_blend_ratio_high_C_UI", "enter pc blend ratio high C...")
-    self.pc_blend_ratio_low_C = BigParamFloatControl("pc blend ratio low C", "pc_blend_ratio_low_C_UI", "enter pc blend ratio low C...")
-
+    self.lane_change_factor_high = BigParamFloatControl("lane change factor high", "lane_change_factor_high", "enter lane change factor high...", min=0.5, max=1.0)
+    self.pc_blend_ratio_high_C = BigParamFloatControl("pc blend ratio high C", "pc_blend_ratio_high_C_UI", "enter pc blend ratio high C...", min=0.0, max=1.0)
+    self.pc_blend_ratio_low_C = BigParamFloatControl("pc blend ratio low C", "pc_blend_ratio_low_C_UI", "enter pc blend ratio low C...", min=0.0, max=1.0)
     self.enable_lane_positioning = BigParamControl("enable lane positioning", "enable_lane_positioning")
-
-    self.custom_path_offset = BigParamFloatControl("custom path offset", "custom_path_offset", "enter custom path offset...")
-
-
+    self.custom_path_offset = BigParamFloatControl("custom path offset", "custom_path_offset", "enter custom path offset...", min=-0.5, max=0.5)
     self.enable_adv_lane_pos = BigParamControl("enable adv. lane positioning", "enable_adv_lane_pos")
     self.enable_lane_full_mode = BigParamControl("enable lanefull mode", "enable_lane_full_mode")
     self.custom_profile = BigParamControl("enable custom profile", "custom_profile")
-
-    self.LC_PID_gain = BigParamFloatControl("LC PID gain UI", "LC_PID_gain_UI", "enter LC PID gain...")
+    self.LC_PID_gain = BigParamFloatControl("LC PID gain UI", "LC_PID_gain_UI", "enter LC PID gain...", min=0.0, max=5.0)
 
     self._scroller = Scroller([
       self.show_hands_free_ui,
