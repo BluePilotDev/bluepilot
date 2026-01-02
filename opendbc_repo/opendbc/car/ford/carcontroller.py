@@ -49,7 +49,6 @@ def anti_overshoot(apply_curvature, apply_curvature_last, v_ego):
 
   return float(np.interp(v_ego, [5, 10], [apply_curvature, output_curvature]))
 
-
 def apply_ford_curvature_limits(apply_curvature, apply_curvature_last, current_curvature, v_ego_raw, steering_angle, lat_active, CP):
   # No blending at low speed due to lack of torque wind-up and inaccurate current curvature
   if v_ego_raw > 9:
@@ -114,10 +113,14 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
     self.human_turn = False  # have we detected a human override in a turn
     self.post_reset_ramp_active = False  # track if we're ramping after a steering reset
     self.reset_steering_last = False  # track previous reset_steering state
+    self.enable_lane_positioning = False # Updated from UI: enable Advanced Lane Positioning
+    self.enable_high_curvature_mode = False # Updated from UI: enable High Curvature Mode
+    self.custom_profile = 0 # updated from UI
     self.pc_blend_ratio = 0.5
     self.steer_warning = False # warning for steering limits exceeded
     self.steer_warning_count = 0 # count how many cycles the warning has existed
     self.steering_limited = 0 # count how many cycles the steering was limited
+    self.disable_BP_lat_UI = False # updated from UI: disable BP lateral control
     self.anti_overshoot_curvature_last = 0.0 # initialize anti_overshoot_curvature_last
 
     # Curvature variables
@@ -157,7 +160,9 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
 
     # path angle low curvature variables
     self.LC_PID_GAIN_CAN = 5.0
-    self.LC_PID_GAIN_CANFD = 3.0
+    self.LC_PID_GAIN_CANFD_SMALL_VEHICLE = 3.0
+    self.LC_PID_GAIN_CANFD_LARGE_VEHICLE = 3.0
+    self.LC_PID_GAIN_UI = 0.0 # gain for UI tuning
     self.LC_PID_GAIN = 0.0
     self.LC_PID_k_p = 0.25
     self.LC_PID_k_i = 0.05
@@ -168,6 +173,18 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
     self.LC_path_angle_ROC_v = [0.003, 0.0015, 0.002]  # match panda limits
     self.LC_path_angle_reset_counter = 0
     self.LC_path_angle_reset_duration = 1.5 # in seconds
+
+    # path angle high curvature variables
+    self.HC_PID_gain_UI = 0.5 # gain for UI tuning
+    self.HC_PID_k_p = 1.0
+    self.HC_PID_k_i = 0.05
+    self.HC_PID_controller = PIDController(k_p=self.HC_PID_k_p, k_i=self.HC_PID_k_i, rate=20)
+    self.wheel_angle_lookup_time = 0.05
+    self.HC_PID_curvature_bp = [0.0, 0.008, 0.01, 0.02]  # curvature breakpoints in 1/m
+    self.HC_PID_curvature_v = [0.0, 0.0, 1.0, 1.0]  # corresponding k_p values
+    self.HC_PID_speed_bp = [0.0, 20.00, 22.00, 25.00]  # what speeds to adjust path_angle_speed_factor over.
+    self.HC_PID_speed_v = [1.0, 1.0, 0.0, 0.0]
+    self.pswa_blend_ratio = 1.0
 
     # max absolute values for all four signals
     self.path_angle_max = 0.5  # from dbc files
@@ -180,6 +197,9 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
     self.path_offset_last = 0.0
     self.path_angle_last = 0.0
     self.curvature_rate = 0  # initialize curvature_rate
+
+    # Logging variables
+    debug(f'Car Fingerprint (CarController): {CP.carFingerprint}', True)
 
     # Lane change transition tracking
     self.post_lane_change_timer = 0
@@ -208,10 +228,21 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
     self.tja_msg = 0
     self.tja_warn = 0
     self.hands = 0
-    self._update_params()
+    self.predictedSteeringAngleDeg_SP = 0.0
 
   def _update_params(self):
-    self.send_hands_free_cluster_msg = self.params.get_bool("send_hands_free_cluster_msg")
+      self.send_hands_free_cluster_msg = self.params.get_bool("send_hands_free_cluster_msg")
+      self.enable_human_turn_detection = self.params.get_bool("enable_human_turn_detection")
+      # updated from UI: lane_change_factor at 40.23 m/s
+      self.lane_change_factor_high = float(self.params.get("lane_change_factor_high", return_default=True))
+      self.pc_blend_ratio_high_C_UI = float(self.params.get("pc_blend_ratio_high_C_UI", return_default=True))
+      self.pc_blend_ratio_low_C_UI = float(self.params.get("pc_blend_ratio_low_C_UI", return_default=True))
+      self.enable_lane_positioning = self.params.get_bool("enable_lane_positioning")
+      # updated from UI: applies a custom offset to help with in-lane positioning
+      self.custom_path_offset = float(self.params.get("custom_path_offset", return_default=True))
+      self.enable_lanefull_mode = self.params.get_bool("enable_lane_full_mode")
+      self.custom_profile = int(self.params.get("custom_profile", return_default=True))
+      self.LC_PID_gain_UI = float(self.params.get("LC_PID_gain_UI", return_default=True))
 
   def handle_post_lane_change_transition(self, path_angle, path_offset, desired_curvature_rate):
     """
@@ -288,14 +319,31 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
       sr = max(self.lp.steerRatio, 0.1)
       self.VM.update_params(x, sr)
 
+    self._update_params()
 
     actuators = CC.actuators
     hud_control = CC.hudControl
     main_on = CS.out.cruiseState.available
+    # if self.fordVariables is None:
+      # act = actuators.as_builder()
+      # self.fordVariables = act.fordVariables
 
     # Calculate steer_alert and fcw_alert
     steer_alert = False
     fcw_alert = hud_control.visualAlert == VisualAlert.fcw
+
+    # Compute the DM message values
+    if self.send_driver_monitor_can_msg:
+      # print(f'HudControl: {hud_control}')
+      # print(f'tja_msg: {self.tja_msg} | tja_warn: {self.tja_warn}')
+      if (self.frame % CarControllerParams.ACC_UI_STEP) == 0:
+        self.tja_msg, self.tja_warn, self.hands = compute_dm_msg_values(self.ss, hud_control, self.send_hands_free_cluster_msg, main_on, CS.out.cruiseState.standstill)
+    else:
+      steer_alert = hud_control.visualAlert in (VisualAlert.steerRequired, VisualAlert.ldw)
+      if steer_alert:
+        self.hands = 1
+      else:
+        self.hands = 0
 
     ### acc buttons ###
     if CC.cruiseControl.cancel:
@@ -308,6 +356,12 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
     # the stock system checks for steering pressed, and eventually disengages cruise control
     elif CS.acc_tja_status_stock_values["Tja_D_Stat"] != 0 and (self.frame % CarControllerParams.ACC_UI_STEP) == 0:
       can_sends.append(fordcan.create_button_msg(self.packer, self.CAN.camera, CS.buttons_stock_values, tja_toggle=True))
+
+    # Intelligent Cruise Button Management (ICBM)
+    icbm_can_sends, self.last_button_frame = IntelligentCruiseButtonManagementInterface.update(
+      self, CC_SP, CS, self.packer, self.CAN, self.frame, self.last_button_frame
+    )
+    can_sends.extend(icbm_can_sends)
 
     ### lateral control ###
 
@@ -325,15 +379,23 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
         steeringPressed = CS.out.steeringPressed
         steeringAngleDeg_PV = CS.out.steeringAngleDeg
 
+        # determine tuning profile
+        if self.custom_profile == 1: # custom tuning profile
+          self.pc_blend_ratio_low_C =  self.pc_blend_ratio_low_C_UI
+          self.pc_blend_ratio_high_C =  self.pc_blend_ratio_high_C_UI
+          self.LC_PID_GAIN = self.LC_PID_GAIN_UI
 
-        if self.CP.flags & FordFlags.CANFD:
+        elif self.CP.flags & FordFlags.CANFD:
           self.pc_blend_ratio_low_C = self.pc_blend_ratio_low_C_CANFD
           self.pc_blend_ratio_high_C = self.pc_blend_ratio_high_C_CANFD
-          self.LC_PID_GAIN = self.LC_PID_GAIN_CANFD
+          if (self.CP.carFingerprint == CAR.FORD_ESCAPE_MK4_5 or self.CP.carFingerprint == CAR.FORD_MUSTANG_MACH_E_MK1):
+            self.LC_PID_gain = self.LC_PID_GAIN_CANFD_SMALL_VEHICLE
+          else:
+            self.LC_PID_gain = self.LC_PID_GAIN_CANFD_LARGE_VEHICLE
         else:
           self.pc_blend_ratio_low_C = self.pc_blend_ratio_low_C_CAN
           self.pc_blend_ratio_high_C = self.pc_blend_ratio_high_C_CAN
-          self.LC_PID_GAIN = self.LC_PID_GAIN_CAN
+          self.LC_PID_gain = self.LC_PID_GAIN_CAN
 
         self.pc_blend_ratio_v = [self.pc_blend_ratio_low_C, self.pc_blend_ratio_high_C] # %-Predicted Curvature
 
@@ -345,9 +407,14 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
         if self.model is not None and len(self.model.orientation.x) >= 17:
           # compute curvature from model predicted orientationRate, and blend with desired curvature based on max predicted curvature magnitude
           curvatures = np.array(self.model.orientationRate.z) / max(0.01, CS.out.vEgoRaw)
+          predicted_steering_angle_curvature = interp(self.wheel_angle_lookup_time, ModelConstants.T_IDXS, curvatures)
           predicted_curvature = interp(self.curvature_lookup_time, ModelConstants.T_IDXS, curvatures)
         else:
           predicted_curvature = 0.0
+
+        # calculate predicted steering angle
+        self.predictedSteeringAngleDeg_SP = math.degrees(self.VM.get_steer_from_curvature(-predicted_steering_angle_curvature, CS.out.vEgoRaw, 0))
+        self.predictedSteeringAngleDeg_SP += self.lp.angleOffsetDeg
 
         # calculate blend ratio
         self.pc_blend_ratio = interp(abs(desired_curvature), self.pc_blend_ratio_bp, self.pc_blend_ratio_v)
@@ -514,7 +581,7 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
           path_offset = 0
 
         # Use the UI variable for adjustable Gain and set the PID gain to a fixed number, UI variable divided by 100 to make UI variable more closely match the 2.1 logic tuning.
-        path_offset_error = (path_offset * (self.LC_PID_GAIN/100))
+        path_offset_error = (path_offset * (self.LC_PID_gain_UI/100))
 
         # determine speed factor
         LC_PID_speed_factor = interp(CS.out.vEgoRaw, self.LC_PID_speed_bp, self.LC_PID_speed_v)
@@ -550,7 +617,11 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
         if self.LC_path_angle_reset_counter > self.LC_path_angle_reset_duration * 20: #20 scans per second
           self.LC_PID_controller.reset()
 
-        path_angle = path_angle_low_c
+        # path_angle_high_c is not used in the current implementation
+        path_angle_high_c = 0.0
+
+        # sum path_angle_low_c and path_angle_high_c
+        path_angle = path_angle_low_c + path_angle_high_c
 
         # Apply post lane change transition logic
         path_angle, path_offset, desired_curvature_rate = self.handle_post_lane_change_transition(
@@ -572,10 +643,29 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
         # if path_offset and path_angle disagree, it can result in a very uncomortable ride, since path_angle is so strong, zero out path_offset signal before it is sent over canbus
         path_offset = 0.0
 
+        if self.disable_BP_lat_UI:
+          reset_steering = 0
+          path_offset = 0
+          path_angle = 0
+          desired_curvature_rate = 0
+          ramp_type = 1
+
+          self.anti_overshoot_curvature_last = anti_overshoot(desired_curvature, self.anti_overshoot_curvature_last, CS.out.vEgoRaw)
+          apply_curvature = self.anti_overshoot_curvature_last
+
+          current_curvature = -CS.out.yawRate / max(CS.out.vEgoRaw, 0.1)
+
+          self.apply_curvature_last = apply_ford_curvature_limits(apply_curvature, self.apply_curvature_last, current_curvature,
+                                                              CS.out.vEgoRaw, 0., CC.latActive, self.CP)
+
+          #rem bluepilot sends apply_curvature, and at some point openpilot swapped to sending apply_curvature_last.
+          apply_curvature = self.apply_curvature_last
+
         # reset steering by setting all values to 0 and ramp_type to immediate
         if reset_steering == 1:
           ramp_type = 3
           self.path_angle_deque.clear()
+          self.HC_PID_controller.reset()
           self.LC_PID_controller.reset()
         else:
           ramp_type = 2
@@ -585,6 +675,7 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
         path_offset = 0.0
         path_angle = 0.0
         self.path_angle_deque.clear()
+        self.HC_PID_controller.reset()
         self.LC_PID_controller.reset()
         ramp_type = 0
 
@@ -722,5 +813,6 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
     new_actuators.curvature = float(apply_curvature)
     new_actuators.accel = float(self.accel)
     new_actuators.gas = float(self.gas)
+    new_actuators.steeringAngleDeg = float(self.predictedSteeringAngleDeg_SP)
     self.frame += 1
     return new_actuators, can_sends

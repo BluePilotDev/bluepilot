@@ -8,7 +8,6 @@ from enum import StrEnum
 from typing import Any
 from collections.abc import Callable
 from functools import cache
-from common.params import Params
 
 from opendbc.car import DT_CTRL, apply_hysteresis, gen_empty_fingerprint, scale_rot_inertia, scale_tire_stiffness, STD_CARGO_KG
 from opendbc.car import structs
@@ -405,27 +404,9 @@ class CarControllerBase(ABC):
     self.CP_SP = CP_SP
     self.frame = 0
     self.secoc_key: bytes = b"00" * 16
-    self.params = Params()
-    self.schedule_updates()
-
-  def __del__(self):
-    self.update_evt.set()
-
-  def schedule_updates(self):
-    self.update_evt = threading.Event()
-    t = threading.Thread(target=self.params_thread, args=(self.update_evt, ))
-    t.start()
-
-  def params_thread(self, evt):
-    while not evt.is_set():
-      self._update_params()
-      time.sleep(0.1)
 
   @abstractmethod
   def update(self, CC: structs.CarControl, CC_SP: structs.CarControlSP, CS: CarStateBase, now_nanos: int) -> tuple[structs.CarControl.Actuators, list[CanData]]:
-    pass
-
-  def _update_params():
     pass
 
 INTERFACE_ATTR_FILE = {
