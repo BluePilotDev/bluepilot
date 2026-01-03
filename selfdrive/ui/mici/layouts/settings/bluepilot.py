@@ -87,9 +87,9 @@ class BigChargingDialog(BigDialogBase):
     super().__init__(None, None)
 
     self._watt_label = MiciLabel("120kW", font_size=90)
+    self._watt_label.set_position(150,75)
 
   def _render(self, _):
-    self._watt_label.set_position(150,75)
     self._watt_label.render()
     return self._ret
 
