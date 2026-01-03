@@ -14,6 +14,7 @@ from opendbc.car.interfaces import CarControllerBase, V_CRUISE_MAX
 from selfdrive.modeld.constants import ModelConstants  # for calculations
 from common.pid import PIDController # PID control of lateral
 from opendbc.car.ford.helpers import compute_dm_msg_values
+from openpilot.common.params import Params
 #from opendbc.sunnypilot.car.ford.icbm import IntelligentCruiseButtonManagementInterface
 
 LongCtrlState = structs.CarControl.Actuators.LongControlState
@@ -80,6 +81,8 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
   def __init__(self, dbc_names, CP, CP_SP):
     CarControllerBase.__init__(self, dbc_names, CP, CP_SP)
     #IntelligentCruiseButtonManagementInterface.__init__(self, CP, CP_SP)
+
+    self.params = Params()
 
     self.packer = CANPacker(dbc_names[Bus.pt])
     self.CAN = fordcan.CanBus(CP)
