@@ -4,12 +4,13 @@ from collections.abc import Callable
 from openpilot.common.time_helpers import system_time_valid
 from openpilot.system.ui.widgets.scroller import Scroller
 from openpilot.selfdrive.ui.mici.widgets.button import BigButton, BigToggle, BigParamControl
+from openpilot.system.ui.widgets.label import gui_label, MiciLabel, UnifiedLabel
 from openpilot.selfdrive.ui.mici.widgets.floatbutton import BigParamFloatControl
-from openpilot.system.ui.lib.application import gui_app
-from openpilot.system.ui.widgets import NavWidget
+from openpilot.selfdrive.ui.mici.widgets.dialog import BigDialogBase
+from openpilot.system.ui.lib.application import gui_app, MousePos
+from openpilot.system.ui.widgets import NavWidget, DialogResult
 from openpilot.selfdrive.ui.layouts.settings.common import restart_needed_callback
 from openpilot.selfdrive.ui.ui_state import ui_state
-from openpilot.selfdrive.ui.widgets.ssh_key import SshKeyAction
 from openpilot.common.params import Params
 
 class BluePilotLayoutMici(NavWidget):
@@ -32,7 +33,11 @@ class BluePilotLayoutMici(NavWidget):
     self.LC_PID_gain = BigParamFloatControl("low curvature PID gain", "LC_PID_gain_UI", min=0.0, max=5.0)
     self.disable_BP_lat = BigParamControl("disable BP lateral control", "disable_BP_lat_UI")
 
+    self.charging_btn = BigButton("charging", "", "icons_mici/settings/charge_icon.png")
+    self.charging_btn.set_click_callback(lambda: self._show_charging_view())
+
     self._scroller = Scroller([
+      self.charging_btn,
       self.show_hands_free_ui,
       self.enable_human_turn_detection,
       self.lane_change_factor_high,
@@ -58,6 +63,10 @@ class BluePilotLayoutMici(NavWidget):
 
     ui_state.add_offroad_transition_callback(self._update_toggles)
 
+  def _show_charging_view(self):
+    dlg = BigChargingDialog()
+    gui_app.set_modal_overlay(dlg)
+
   def show_event(self):
     super().show_event()
     self._scroller.show_event()
@@ -72,3 +81,19 @@ class BluePilotLayoutMici(NavWidget):
     # Refresh toggles from params to mirror external changes
     for key, item in self._refresh_toggles:
       item.set_checked(ui_state.params.get_bool(key))
+
+class BigChargingDialog(BigDialogBase):
+  def __init__(self):
+    super().__init__(None, None)
+
+    self._watt_label = MiciLabel("120kW", font_size=90)
+
+  def _render(self, _):
+    self._watt_label.set_position(150,75)
+    self._watt_label.render()
+    return self._ret
+
+  def _update_state(self):
+    super()._update_state()
+    if self._swiping_away:
+      self._ret = DialogResult.CANCEL

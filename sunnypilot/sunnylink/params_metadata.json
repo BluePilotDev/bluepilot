@@ -1130,45 +1130,45 @@
 	},
   "enable_human_turn_detection": {
     "title": "Enable Human Turn Detection",
-    "description": ""
+    "description": "Reset steering so you don't fight the wheel making manual turns."
   },
   "lane_change_factor_high": {
-    "title": "Ford Lateral Tuning Lane Change Factor High",
+    "title": "Lane Change Factor High",
     "min": 0.5,
     "max": 1.0,
-    "description": ""
+    "description": "Adjust lane change curvature aggressiveness (lower = slower)."
   },
   "pc_blend_ratio_high_C_UI": {
-    "title": "Ford Lateral Tuning PC Blend Ratio High C",
+    "title": "Predicted Curvature Blend Ratio High",
     "min": 0.0,
     "max": 1.0,
-    "description": ""
+    "description": "Adjust the blend ratio of predicted curvature in curves."
   },
   "pc_blend_ratio_low_C_UI": {
-    "title": "Ford Lateral Tuning PC Blend Ratio Low C",
+    "title": "Predicted Curvature Blend Ratio Low",
     "min": 0.0,
     "max": 1.0,
-    "description": ""
+    "description": "Adjust the blend ratio of predicted curvature in straightaways."
   },
   "enable_lane_positioning": {
-    "title": "Ford Lateral Tuning Enable Lane Positioning",
-    "description": ""
+    "title": "Enable Advanced Lane Positioning",
+    "description": "Allows custom lane positioning and lanefull."
   },
   "custom_path_offset": {
-    "title": "Ford Lateral Tuning Custom Path Offset",
+    "title": "In Lane Offset",
     "min": -0.5,
     "max": 0.5,
-    "description": ""
+    "description": "Adjusts lane position - left (-) / right (+)"
   },
   "enable_lane_full_mode": {
-    "title": "Ford Lateral Tuning Enable Lanefull Mode",
-    "description": ""
+    "title": "Enable Lanefull Mode",
+    "description": "Enable Auto Lanefull Mode similar to legacy SunnyPilot"
   },
   "custom_profile": {
-    "title": "Ford Lateral Tuning Profile",
+    "title": "Use Custom Tuning Profile",
     "min": 0,
     "max": 1,
-    "description": "",
+    "description": "Use custom tuning profile for advanced lateral control",
     "options": [
     {
       "value": 0,
@@ -1181,13 +1181,13 @@
   ]
   },
   "LC_PID_gain_UI": {
-    "title": "Ford Lateral Tuning LC PID Gain",
+    "title": "Low Curvature PID Gain",
     "min": 0.0,
     "max": 5.0,
-    "description": ""
+    "description": "Adjust the gain of the PID controller for low curvature"
   },
   "disable_BP_lat": {
-    "title": "Disable BluePilot Lateral Control",
-    "description": "Use the stock OpenPilot lateral control instead of BluePilot"
+    "title": "Disable BluePilot Lateral Controls",
+    "description": "Use stock openpilot lateral controls"
 	}
 }
