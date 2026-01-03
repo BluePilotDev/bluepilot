@@ -247,7 +247,7 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
     self.custom_path_offset = float(self.params.get("custom_path_offset", return_default=True))
     self.enable_lanefull_mode = self.params.get_bool("enable_lane_full_mode")
     self.custom_profile = int(self.params.get("custom_profile", return_default=True))
-    self.LC_PID_GAIN_UI = float(self.params.get("LC_PID_gain_UI", return_default=True))
+    self.LC_PID_gain_UI = float(self.params.get("LC_PID_gain_UI", return_default=True))
 
   def handle_post_lane_change_transition(self, path_angle, path_offset, desired_curvature_rate):
     """
@@ -363,10 +363,10 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
       can_sends.append(fordcan.create_button_msg(self.packer, self.CAN.camera, CS.buttons_stock_values, tja_toggle=True))
 
     # Intelligent Cruise Button Management (ICBM)
-    icbm_can_sends, self.last_button_frame = IntelligentCruiseButtonManagementInterface.update(
-      self, CC_SP, CS, self.packer, self.CAN, self.frame, self.last_button_frame
-    )
-    can_sends.extend(icbm_can_sends)
+    #icbm_can_sends, self.last_button_frame = IntelligentCruiseButtonManagementInterface.update(
+    #  self, CC_SP, CS, self.packer, self.CAN, self.frame, self.last_button_frame
+    #)
+    #can_sends.extend(icbm_can_sends)
 
     ### lateral control ###
 
@@ -388,7 +388,7 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
         if self.custom_profile == 1: # custom tuning profile
           self.pc_blend_ratio_low_C =  self.pc_blend_ratio_low_C_UI
           self.pc_blend_ratio_high_C =  self.pc_blend_ratio_high_C_UI
-          self.LC_PID_GAIN = self.LC_PID_GAIN_UI
+          self.LC_PID_GAIN = self.LC_PID_gain_UI
 
         elif self.CP.flags & FordFlags.CANFD:
           self.pc_blend_ratio_low_C = self.pc_blend_ratio_low_C_CANFD
