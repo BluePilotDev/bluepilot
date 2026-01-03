@@ -200,7 +200,7 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
     self.curvature_rate = 0  # initialize curvature_rate
 
     # Logging variables
-    debug(f'Car Fingerprint (CarController): {CP.carFingerprint}', True)
+    #debug(f'Car Fingerprint (CarController): {CP.carFingerprint}', True)
 
     # Lane change transition tracking
     self.post_lane_change_timer = 0
