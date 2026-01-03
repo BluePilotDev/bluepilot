@@ -13,7 +13,9 @@ from opendbc.car.ford.values import CarControllerParams, FordFlags, CAR
 from opendbc.car.interfaces import CarControllerBase, V_CRUISE_MAX
 from selfdrive.modeld.constants import ModelConstants  # for calculations
 from common.pid import PIDController # PID control of lateral
-
+from opendbc.car.ford.helpers import compute_dm_msg_values
+from bluepilot.logger.bp_logger import debug, info, warning, error, critical
+from opendbc.sunnypilot.car.ford.icbm import IntelligentCruiseButtonManagementInterface
 
 LongCtrlState = structs.CarControl.Actuators.LongControlState
 VisualAlert = structs.CarControl.HUDControl.VisualAlert
@@ -75,10 +77,10 @@ def apply_creep_compensation(accel: float, v_ego: float) -> float:
   return float(accel)
 
 
-class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInterface):
+class CarController(CarControllerBase, IntelligentCruiseButtonManagementInterface):
   def __init__(self, dbc_names, CP, CP_SP):
     CarControllerBase.__init__(self, dbc_names, CP, CP_SP)
-    # IntelligentCruiseButtonManagementInterface.__init__(self, CP, CP_SP)
+    IntelligentCruiseButtonManagementInterface.__init__(self, CP, CP_SP)
 
     self.packer = CANPacker(dbc_names[Bus.pt])
     self.CAN = fordcan.CanBus(CP)
