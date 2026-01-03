@@ -34,10 +34,9 @@ class BluePilotLayoutMici(NavWidget):
     self.disable_BP_lat = BigParamControl("disable BP lateral control", "disable_BP_lat_UI")
 
     self.charging_btn = BigButton("charging", "", "icons_mici/settings/charge_icon.png")
-    self.charging_btn.set_click_callback(lambda: self._show_charging_view())
+    #self.charging_btn.set_click_callback(lambda: self._show_charging_view())
 
     self._scroller = Scroller([
-      self.charging_btn,
       self.show_hands_free_ui,
       self.enable_human_turn_detection,
       self.lane_change_factor_high,
@@ -82,18 +81,18 @@ class BluePilotLayoutMici(NavWidget):
     for key, item in self._refresh_toggles:
       item.set_checked(ui_state.params.get_bool(key))
 
-class BigChargingDialog(BigDialogBase):
-  def __init__(self):
-    super().__init__(None, None)
+# class BigChargingDialog(BigDialogBase):
+#   def __init__(self):
+#     super().__init__(None, None)
 
-    self._watt_label = MiciLabel("120kW", font_size=90)
-    self._watt_label.set_position(150,75)
+#     self._watt_label = MiciLabel("120kW", font_size=90)
+#     self._watt_label.set_position(150,75)
 
-  def _render(self, _):
-    self._watt_label.render()
-    return self._ret
+#   def _render(self, _):
+#     self._watt_label.render()
+#     return self._ret
 
-  def _update_state(self):
-    super()._update_state()
-    if self._swiping_away:
-      self._ret = DialogResult.CANCEL
+#   def _update_state(self):
+#     super()._update_state()
+#     if self._swiping_away:
+#       self._ret = DialogResult.CANCEL
