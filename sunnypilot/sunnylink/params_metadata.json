@@ -1195,5 +1195,12 @@
   "disable_BP_lat": {
     "title": "Disable BluePilot Lateral Controls",
     "description": "Use stock openpilot lateral controls"
-	}
+	},
+  "vbatt_pause_charging": {
+    "title": "Low Battery voltage shutdown",
+    "min": 11.0,
+    "max": 14.0,
+    "step": 0.1,
+    "description": "12V battery voltage threshold to pause bluepilot and avoid draining the car battery."
+  }
 }

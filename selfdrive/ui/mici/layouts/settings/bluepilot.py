@@ -32,8 +32,9 @@ class BluePilotLayoutMici(NavWidget):
     self.pc_blend_ratio_low_C = BigParamFloatControl("predicted curvature blend ratio low", "pc_blend_ratio_low_C_UI", min=0.0, max=1.0)
     self.LC_PID_gain = BigParamFloatControl("low curvature PID gain", "LC_PID_gain_UI", min=0.0, max=5.0)
     self.disable_BP_lat = BigParamControl("disable BP lateral control", "disable_BP_lat_UI")
+    self.vbatt_pause_charging = BigParamFloatControl("12V battery limit", "vbatt_pause_charging", min=11.0, max=14.0)
 
-    self.charging_btn = BigButton("charging", "", "icons_mici/settings/charge_icon.png")
+    #self.charging_btn = BigButton("charging", "", "icons_mici/settings/charge_icon.png")
     #self.charging_btn.set_click_callback(lambda: self._show_charging_view())
 
     self._scroller = Scroller([
@@ -47,6 +48,7 @@ class BluePilotLayoutMici(NavWidget):
       self.pc_blend_ratio_high_C,
       self.pc_blend_ratio_low_C,
       self.LC_PID_gain,
+      self.vbatt_pause_charging,
       self.disable_BP_lat,
     ], snap_items=False)
 
@@ -62,9 +64,9 @@ class BluePilotLayoutMici(NavWidget):
 
     ui_state.add_offroad_transition_callback(self._update_toggles)
 
-  def _show_charging_view(self):
-    dlg = BigChargingDialog()
-    gui_app.set_modal_overlay(dlg)
+  # def _show_charging_view(self):
+  #   dlg = BigChargingDialog()
+  #   gui_app.set_modal_overlay(dlg)
 
   def show_event(self):
     super().show_event()
