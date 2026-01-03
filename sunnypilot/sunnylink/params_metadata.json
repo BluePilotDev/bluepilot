@@ -1136,18 +1136,21 @@
     "title": "Lane Change Factor High",
     "min": 0.5,
     "max": 1.0,
+    "step": 0.05,
     "description": "Adjust lane change curvature aggressiveness (lower = slower)."
   },
   "pc_blend_ratio_high_C_UI": {
     "title": "Predicted Curvature Blend Ratio High",
     "min": 0.0,
     "max": 1.0,
+    "step": 0.05,
     "description": "Adjust the blend ratio of predicted curvature in curves."
   },
   "pc_blend_ratio_low_C_UI": {
     "title": "Predicted Curvature Blend Ratio Low",
     "min": 0.0,
     "max": 1.0,
+    "step": 0.05,
     "description": "Adjust the blend ratio of predicted curvature in straightaways."
   },
   "enable_lane_positioning": {
@@ -1158,6 +1161,7 @@
     "title": "In Lane Offset",
     "min": -0.5,
     "max": 0.5,
+    "step": 0.05,
     "description": "Adjusts lane position - left (-) / right (+)"
   },
   "enable_lane_full_mode": {
@@ -1168,6 +1172,7 @@
     "title": "Use Custom Tuning Profile",
     "min": 0,
     "max": 1,
+    "step": 0.05,
     "description": "Use custom tuning profile for advanced lateral control",
     "options": [
     {
@@ -1184,6 +1189,7 @@
     "title": "Low Curvature PID Gain",
     "min": 0.0,
     "max": 5.0,
+    "step": 0.05,
     "description": "Adjust the gain of the PID controller for low curvature"
   },
   "disable_BP_lat": {
