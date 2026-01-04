@@ -104,11 +104,12 @@ class BigCircleToggle(BigCircleButton):
 class BigButton(Widget):
   """A lightweight stand-in for the Qt BigButton, drawn & updated each frame."""
 
-  def __init__(self, text: str, value: str = "", icon: Union[str, rl.Texture] = ""):
+  def __init__(self, text: str, value: str = "", icon: Union[str, rl.Texture] = "", tint: rl.Color = rl.WHITE):
     super().__init__()
     self.set_rect(rl.Rectangle(0, 0, 402, 180))
     self.text = text
     self.value = value
+    self.tint = tint
     self.set_icon(icon)
 
     self._scale_filter = BounceFilter(1.0, 0.1, 1 / gui_app.target_fps)
@@ -220,7 +221,7 @@ class BigButton(Widget):
     scale = self._scale_filter.update(PRESSED_SCALE if self.is_pressed else 1.0)
     btn_x = self._rect.x + (self._rect.width * (1 - scale)) / 2
     btn_y = self._rect.y + (self._rect.height * (1 - scale)) / 2
-    rl.draw_texture_ex(txt_bg, (btn_x, btn_y), 0, scale, rl.WHITE)
+    rl.draw_texture_ex(txt_bg, (btn_x, btn_y), 0, scale, self.tint)
 
     # LABEL ------------------------------------------------------------------
     lx = self._rect.x + LABEL_HORIZONTAL_PADDING
@@ -252,8 +253,8 @@ class BigButton(Widget):
 
 
 class BigToggle(BigButton):
-  def __init__(self, text: str, value: str = "", initial_state: bool = False, toggle_callback: Callable = None):
-    super().__init__(text, value, "")
+  def __init__(self, text: str, value: str = "", initial_state: bool = False, toggle_callback: Callable = None, tint: rl.Color = rl.WHITE):
+    super().__init__(text, value, "", tint=tint)
     self._checked = initial_state
     self._toggle_callback = toggle_callback
 
@@ -346,8 +347,8 @@ class BigMultiParamToggle(BigMultiToggle):
 
 
 class BigParamControl(BigToggle):
-  def __init__(self, text: str, param: str, toggle_callback: Callable = None):
-    super().__init__(text, "", toggle_callback=toggle_callback)
+  def __init__(self, text: str, param: str, toggle_callback: Callable = None, tint: rl.Color = rl.WHITE):
+    super().__init__(text, "", toggle_callback=toggle_callback, tint=tint)
     self.param = param
     self.params = Params()
     self.set_checked(self.params.get_bool(self.param, False))

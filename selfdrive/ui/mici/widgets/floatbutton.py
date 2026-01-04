@@ -1,15 +1,16 @@
 
+import pyray as rl
 from openpilot.selfdrive.ui.mici.widgets.button import BigButton
 from openpilot.selfdrive.ui.mici.widgets.dialog import BigInputDialog
 from openpilot.common.params import Params
 from openpilot.system.ui.lib.application import gui_app, MousePos
 
 class BigParamFloatControl(BigButton):
-  def __init__(self, text: str, param: str, min: float = None, max: float = None):
+  def __init__(self, text: str, param: str, min: float = None, max: float = None, tint: rl.Color = rl.WHITE):
+    super().__init__(text, "", tint=tint)
     self.label_text = text
     self.min = min
     self.max = max
-    super().__init__(text, "")
     self.param = param
     self.params = Params()
     self.set_click_callback(self._on_click)

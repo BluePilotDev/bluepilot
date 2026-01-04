@@ -40,7 +40,7 @@ class SettingsLayout(NavWidget):
     toggles_btn = BigButton("toggles", "", "icons_mici/settings/toggles_icon.png")
     toggles_btn.set_click_callback(lambda: self._set_current_panel(PanelType.TOGGLES))
 
-    bluepilot_btn = BigButton("bluepilot", "", "icons_mici/settings/car_icon.png")
+    bluepilot_btn = BigButton("bluepilot", "", "icons_mici/settings/car_icon.png", tint=rl.BLUE)
     bluepilot_btn.set_click_callback(lambda: self._set_current_panel(PanelType.BLUEPILOT))
 
     network_btn = BigButton("network", "", "icons_mici/settings/network/wifi_strength_full.png")
