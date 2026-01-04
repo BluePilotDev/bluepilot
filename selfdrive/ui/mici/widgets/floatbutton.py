@@ -5,12 +5,23 @@ from openpilot.selfdrive.ui.mici.widgets.dialog import BigInputDialog
 from openpilot.common.params import Params
 from openpilot.system.ui.lib.application import gui_app, MousePos
 
+CONTENT_MARGIN = 20
+LINE_L = 40
+LINE_W = 8
+LABEL_HORIZONTAL_PADDING = 40
+
 class BigParamFloatControl(BigButton):
-  def __init__(self, text: str, param: str, min: float = None, max: float = None, tint: rl.Color = rl.WHITE):
+  def __init__(self, text: str, param: str, min: float = None, max: float = None, step: float = 0.05, tint: rl.Color = rl.WHITE):
     super().__init__(text, "", tint=tint)
-    self.label_text = text
     self.min = min
     self.max = max
+    self.step = step
+
+    self._sub_label.font_size = 22
+
+    self.margin = self._rect.width * 0.1
+    self.rect_size = LINE_L + 2 * CONTENT_MARGIN
+
     self.param = param
     self.params = Params()
     self.set_click_callback(self._on_click)
@@ -56,4 +67,45 @@ class BigParamFloatControl(BigButton):
   def update_label(self, value: float = None):
     if value is None:
       value = self.get_param()
-    self.set_text(f"{self.label_text} [{round(value,4)}]")
+    self.set_value(f"{round(value,4)}")
+
+  def _get_label_font_size(self):
+    font_size = super()._get_label_font_size()
+    return font_size - 5
+
+  def _render(self, _):
+    super()._render(_)
+
+    self.left = self._rect.x + self.margin
+    self.right = self._rect.x + self._rect.width - self.margin
+    self.top = self._rect.y + self.margin
+
+    self.minus_hit_rect = rl.Rectangle(
+      self.left - CONTENT_MARGIN, self.top - self.rect_size / 2, self.rect_size, self.rect_size
+    )
+    self.plus_hit_rect = rl.Rectangle(
+      self.right - self.rect_size / 2 - CONTENT_MARGIN, self.top - self.rect_size / 2, self.rect_size, self.rect_size
+    )
+
+    # rl.draw_rectangle_lines_ex(self.minus_hit_rect, 1, rl.RED)
+    # rl.draw_rectangle_lines_ex(self.plus_hit_rect, 1, rl.GREEN)
+
+    rl.draw_line_ex((self.left,self.top), (self.left+LINE_L, self.top), LINE_W, rl.WHITE)
+
+    rl.draw_line_ex((self.right-LINE_L,self.top), (self.right, self.top), LINE_W, rl.WHITE)
+    m = self.right - LINE_L/2
+    rl.draw_line_ex((m,self.top-LINE_L/2), (m, self.top+LINE_L/2), LINE_W, rl.WHITE)
+
+  def minus_clicked(self):
+    self.set_param(self.get_param() - self.step)
+
+  def plus_clicked(self):
+    self.set_param(self.get_param() + self.step)
+
+  def _handle_mouse_release(self, mouse_pos: MousePos):
+    if rl.check_collision_point_rec(mouse_pos, self.minus_hit_rect):
+      self.minus_clicked()
+    elif rl.check_collision_point_rec(mouse_pos, self.plus_hit_rect):
+      self.plus_clicked()
+    else:
+      super()._handle_mouse_release(mouse_pos)
