@@ -1190,7 +1190,7 @@
     "min": 0.0,
     "max": 5.0,
     "step": 0.05,
-    "description": "Controls how aggressive advanced lane positioning adjusts the car.  Higher values can result in tighter adherence to exact center of the path, but can caus twitchiness if set too high."
+    "description": "Controls how aggressive advanced lane positioning adjusts the car.  Higher values can result in tighter adherence to exact center of the path, but can cause twitchiness if set too high."
   },
   "disable_BP_lat": {
     "title": "BluePilot: Disable BluePilot Lateral Controls",
