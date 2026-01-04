@@ -71,7 +71,7 @@ class BigParamFloatControl(BigButton):
 
   def _get_label_font_size(self):
     font_size = super()._get_label_font_size()
-    return font_size - 5
+    return font_size - 6
 
   def _render(self, _):
     super()._render(_)
