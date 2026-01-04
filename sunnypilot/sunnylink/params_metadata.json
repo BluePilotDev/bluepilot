@@ -1137,7 +1137,7 @@
     "min": 0.5,
     "max": 1.0,
     "step": 0.05,
-    "description": "Controls how much steering is applied during a lane change, with lower values making it smoother (0.6–0.8 typically working best). Values that are too low can cause an over-correction by OpenPilot and lead to aggressive lane changes."
+    "description": "Controls how much steering is applied during a lane change, with lower values making it smoother (0.6–0.8 typically working best). Values that are too low can cause an over-correction by openpilot and lead to aggressive lane changes."
   },
   "pc_blend_ratio_high_C_UI": {
     "title": "BluePilot: Predicted Curvature Blend Ratio High",
@@ -1194,7 +1194,7 @@
   },
   "disable_BP_lat": {
     "title": "BluePilot: Disable BluePilot Lateral Controls",
-    "description": "Use stock OpenPilot lateral controls."
+    "description": "Use stock openpilot lateral controls."
 	},
   "vbatt_pause_charging": {
     "title": "BluePilot: Low Battery voltage shutdown",
