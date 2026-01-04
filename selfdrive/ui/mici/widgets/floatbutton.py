@@ -11,7 +11,7 @@ LINE_W = 8
 LABEL_HORIZONTAL_PADDING = 40
 
 class BigParamFloatControl(BigButton):
-  def __init__(self, text: str, param: str, min: float = None, max: float = None, step: float = 0.05, tint: rl.Color = rl.WHITE):
+  def __init__(self, text: str, param: str, en_param: str = None, min: float = None, max: float = None, step: float = 0.05, tint: rl.Color = rl.WHITE):
     super().__init__(text, "", tint=tint)
     self.min = min
     self.max = max
@@ -22,7 +22,11 @@ class BigParamFloatControl(BigButton):
     self.margin = self._rect.width * 0.1
     self.rect_size = LINE_L + 2 * CONTENT_MARGIN
 
+    self._txt_enabled_toggle = gui_app.texture("icons_mici/buttons/toggle_pill_enabled.png", 120, 66, keep_aspect_ratio=False)
+    self._txt_disabled_toggle = gui_app.texture("icons_mici/buttons/toggle_pill_disabled.png", 120, 66, keep_aspect_ratio=False)
+
     self.param = param
+    self.en_param = en_param
     self.params = Params()
     self.set_click_callback(self._on_click)
     self.update_label()
@@ -87,6 +91,16 @@ class BigParamFloatControl(BigButton):
       self.right - self.rect_size / 2 - CONTENT_MARGIN, self.top - self.rect_size / 2, self.rect_size, self.rect_size
     )
 
+    if self.en_param is not None:
+      x = self._rect.x + self._rect.width /2 - self._txt_enabled_toggle.width / 2
+      y = self._rect.y
+
+      enabled = self.params.get_bool(self.en_param)
+      if enabled:
+        rl.draw_texture(self._txt_enabled_toggle, int(x), int(y), rl.GREEN)
+      else:
+        rl.draw_texture(self._txt_disabled_toggle, int(x), int(y), rl.WHITE)
+
     # rl.draw_rectangle_lines_ex(self.minus_hit_rect, 1, rl.RED)
     # rl.draw_rectangle_lines_ex(self.plus_hit_rect, 1, rl.GREEN)
 
@@ -95,6 +109,8 @@ class BigParamFloatControl(BigButton):
     rl.draw_line_ex((self.right-LINE_L,self.top), (self.right, self.top), LINE_W, rl.WHITE)
     m = self.right - LINE_L/2
     rl.draw_line_ex((m,self.top-LINE_L/2), (m, self.top+LINE_L/2), LINE_W, rl.WHITE)
+
+
 
   def minus_clicked(self):
     self.set_param(self.get_param() - self.step)
