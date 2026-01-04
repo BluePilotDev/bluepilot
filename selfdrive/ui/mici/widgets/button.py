@@ -360,10 +360,10 @@ class BigMultiParamToggle(BigMultiToggle):
 
 
 class BigParamControl(BigToggle):
-  def __init__(self, text: str, param: str, en_param: str = None, toggle_callback: Callable = None, tint: rl.Color = rl.WHITE):
-    super().__init__(text, "", toggle_callback=toggle_callback, tint=tint, is_active=(lambda: Params().get_bool(en_param)) if en_param is not None else None)
+  def __init__(self, text: str, param: str, is_active_param: str = None, toggle_callback: Callable = None, tint: rl.Color = rl.WHITE):
+    super().__init__(text, "", toggle_callback=toggle_callback, tint=tint, is_active=(lambda: Params().get_bool(is_active_param)) if is_active_param is not None else None)
     self.param = param
-    self.en_param = en_param
+    self.is_active_param = is_active_param
     self.params = Params()
     self.set_checked(self.params.get_bool(self.param, False))
 
