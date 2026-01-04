@@ -1192,7 +1192,7 @@
     "step": 0.05,
     "description": "Controls how aggressive advanced lane positioning adjusts the car.  Higher values can result in tighter adherence to exact center of the path, but can cause twitchiness if set too high."
   },
-  "disable_BP_lat": {
+  "disable_BP_lat_UI": {
     "title": "BluePilot: Disable BluePilot Lateral Controls",
     "description": "Use stock openpilot lateral controls."
 	},
