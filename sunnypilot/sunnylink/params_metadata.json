@@ -1125,55 +1125,55 @@
     "description": ""
   },
   "send_hands_free_cluster_msg": {
-    "title": "Show Hands-free UI",
-    "description": "Show the BlueCruise hands-free display"
+    "title": "BluePilot: Enable Hands-Free UI",
+    "description": "Enables hands-free (BlueCruise icon) on the gauge cluster for supported vehicles."
 	},
   "enable_human_turn_detection": {
-    "title": "Enable Human Turn Detection",
-    "description": "Reset steering so you don't fight the wheel making manual turns."
+    "title": "BluePilot: Enable Human Turn Detection",
+    "description": "If enabled, steering will reset so you don't fight the wheel making manual turns."
   },
   "lane_change_factor_high": {
-    "title": "Lane Change Factor High",
+    "title": "BluePilot: Lane Change Factor High",
     "min": 0.5,
     "max": 1.0,
     "step": 0.05,
-    "description": "Adjust lane change curvature aggressiveness (lower = slower)."
+    "description": "Controls how much steering is applied during a lane change, with lower values making it smoother (0.6–0.8 typically working best). Values that are too low can cause an over-correction by openpilot and lead to aggressive lane changes."
   },
   "pc_blend_ratio_high_C_UI": {
-    "title": "Predicted Curvature Blend Ratio High",
+    "title": "BluePilot: Predicted Curvature Blend Ratio High",
     "min": 0.0,
     "max": 1.0,
     "step": 0.05,
-    "description": "Adjust the blend ratio of predicted curvature in curves."
+    "description": "Adjust the blend ratio of predicted curvature in curves (0.4–0.6 typically working best).  High values will help with ping-pong, but too high will cause wander and drift."
   },
   "pc_blend_ratio_low_C_UI": {
-    "title": "Predicted Curvature Blend Ratio Low",
+    "title": "BluePilot: Predicted Curvature Blend Ratio Low",
     "min": 0.0,
     "max": 1.0,
     "step": 0.05,
-    "description": "Adjust the blend ratio of predicted curvature in straightaways."
+    "description": "Adjust the blend ratio of predicted curvature in straightaways (0.4–0.6 typically working best). High values will help with ping-pong, but too high will cause wander and drift."
   },
   "enable_lane_positioning": {
-    "title": "Enable Advanced Lane Positioning",
-    "description": "Allows custom lane positioning and lanefull."
+    "title": "BluePilot: Enable Advanced Lane Positioning",
+    "description": "Allows custom lane positioning and lanefull mode."
   },
   "custom_path_offset": {
-    "title": "In Lane Offset",
+    "title": "BluePilot: In Lane Offset",
     "min": -0.5,
     "max": 0.5,
     "step": 0.05,
-    "description": "Adjusts lane position - left (-) / right (+)"
+    "description": "Manually adjust lane position - left (-) / right (+)"
   },
   "enable_lane_full_mode": {
-    "title": "Enable Lanefull Mode",
+    "title": "BluePilot: Enable Lanefull Mode",
     "description": "Enable Auto Lanefull Mode similar to legacy SunnyPilot"
   },
   "custom_profile": {
-    "title": "Use Custom Tuning Profile",
+    "title": "BluePilot: Use Custom Tuning Profile",
     "min": 0,
     "max": 1,
     "step": 0.05,
-    "description": "Use custom tuning profile for advanced lateral control",
+    "description": "Use custom tuning settings for lateral control instead of defaults.",
     "options": [
     {
       "value": 0,
@@ -1186,21 +1186,21 @@
   ]
   },
   "LC_PID_gain_UI": {
-    "title": "Low Curvature PID Gain",
+    "title": "BluePilot: Low Curvature PID Gain",
     "min": 0.0,
     "max": 5.0,
     "step": 0.05,
-    "description": "Adjust the gain of the PID controller for low curvature"
+    "description": "Controls how aggressive advanced lane positioning adjusts the car.  Higher values can result in tighter adherence to exact center of the path, but can cause twitchiness if set too high."
   },
-  "disable_BP_lat": {
-    "title": "Disable BluePilot Lateral Controls",
-    "description": "Use stock openpilot lateral controls"
+  "disable_BP_lat_UI": {
+    "title": "BluePilot: Disable BluePilot Lateral Controls",
+    "description": "Use stock openpilot lateral controls."
 	},
   "vbatt_pause_charging": {
-    "title": "Low Battery voltage shutdown",
+    "title": "BluePilot: Low Battery voltage shutdown",
     "min": 11.0,
     "max": 14.0,
     "step": 0.1,
-    "description": "12V battery voltage threshold to pause bluepilot and avoid draining the car battery."
+    "description": "Voltage at which BluePilot will shutdown and avoid draining the car battery."
   }
 }
