@@ -104,12 +104,13 @@ class BigCircleToggle(BigCircleButton):
 class BigButton(Widget):
   """A lightweight stand-in for the Qt BigButton, drawn & updated each frame."""
 
-  def __init__(self, text: str, value: str = "", icon: Union[str, rl.Texture] = "", tint: rl.Color = rl.WHITE):
+  def __init__(self, text: str, value: str = "", icon: Union[str, rl.Texture] = "", tint: rl.Color = rl.WHITE, is_active: Callable[[], bool] = None):
     super().__init__()
     self.set_rect(rl.Rectangle(0, 0, 402, 180))
     self.text = text
     self.value = value
     self.tint = tint
+    self.is_active = is_active
     self.set_icon(icon)
 
     self._scale_filter = BounceFilter(1.0, 0.1, 1 / gui_app.target_fps)
@@ -147,6 +148,8 @@ class BigButton(Widget):
     self._txt_pressed_bg = gui_app.texture("icons_mici/buttons/button_rectangle_pressed.png", 402, 180)
     self._txt_disabled_bg = gui_app.texture("icons_mici/buttons/button_rectangle_disabled.png", 402, 180)
     self._txt_hover_bg = gui_app.texture("icons_mici/buttons/button_rectangle_hover.png", 402, 180)
+    self._is_active = gui_app.texture("icons_mici/buttons/toggle_pill_enabled.png", 120, 66, keep_aspect_ratio=False)
+    self._is_non_active = gui_app.texture("icons_mici/buttons/toggle_pill_disabled.png", 120, 66, keep_aspect_ratio=False)
 
   def _get_label_font_size(self):
     if len(self.text) < 12:
@@ -223,6 +226,16 @@ class BigButton(Widget):
     btn_y = self._rect.y + (self._rect.height * (1 - scale)) / 2
     rl.draw_texture_ex(txt_bg, (btn_x, btn_y), 0, scale, self.tint)
 
+    if self.is_active is not None:
+      x = self._rect.x + self._rect.width / 2 - self._is_active.width / 2
+      y = self._rect.y
+
+      active = self.is_active()
+      if active:
+        rl.draw_texture(self._is_active, int(x), int(y), rl.GREEN)
+      else:
+        rl.draw_texture(self._is_non_active, int(x), int(y), rl.WHITE)
+
     # LABEL ------------------------------------------------------------------
     lx = self._rect.x + LABEL_HORIZONTAL_PADDING
     ly = btn_y + self._rect.height - 33  # - 40# - self._get_label_font_size() / 2
@@ -253,8 +266,8 @@ class BigButton(Widget):
 
 
 class BigToggle(BigButton):
-  def __init__(self, text: str, value: str = "", initial_state: bool = False, toggle_callback: Callable = None, tint: rl.Color = rl.WHITE):
-    super().__init__(text, value, "", tint=tint)
+  def __init__(self, text: str, value: str = "", initial_state: bool = False, toggle_callback: Callable = None, tint: rl.Color = rl.WHITE, is_active: Callable[[], bool] = None):
+    super().__init__(text, value, "", tint=tint, is_active=is_active)
     self._checked = initial_state
     self._toggle_callback = toggle_callback
 
@@ -347,9 +360,10 @@ class BigMultiParamToggle(BigMultiToggle):
 
 
 class BigParamControl(BigToggle):
-  def __init__(self, text: str, param: str, toggle_callback: Callable = None, tint: rl.Color = rl.WHITE):
-    super().__init__(text, "", toggle_callback=toggle_callback, tint=tint)
+  def __init__(self, text: str, param: str, is_active_param: str = None, toggle_callback: Callable = None, tint: rl.Color = rl.WHITE):
+    super().__init__(text, "", toggle_callback=toggle_callback, tint=tint, is_active=(lambda: Params().get_bool(is_active_param)) if is_active_param is not None else None)
     self.param = param
+    self.is_active_param = is_active_param
     self.params = Params()
     self.set_checked(self.params.get_bool(self.param, False))
 

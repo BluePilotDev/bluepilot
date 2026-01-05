@@ -11,8 +11,8 @@ LINE_W = 8
 LABEL_HORIZONTAL_PADDING = 40
 
 class BigParamFloatControl(BigButton):
-  def __init__(self, text: str, param: str, min: float = None, max: float = None, step: float = 0.05, tint: rl.Color = rl.WHITE):
-    super().__init__(text, "", tint=tint)
+  def __init__(self, text: str, param: str, is_active_param: str = None, min: float = None, max: float = None, step: float = 0.05, tint: rl.Color = rl.WHITE):
+    super().__init__(text, "", tint=tint, is_active=(lambda: Params().get_bool(is_active_param)) if is_active_param is not None else None)
     self.min = min
     self.max = max
     self.step = step
@@ -95,6 +95,8 @@ class BigParamFloatControl(BigButton):
     rl.draw_line_ex((self.right-LINE_L,self.top), (self.right, self.top), LINE_W, rl.WHITE)
     m = self.right - LINE_L/2
     rl.draw_line_ex((m,self.top-LINE_L/2), (m, self.top+LINE_L/2), LINE_W, rl.WHITE)
+
+
 
   def minus_clicked(self):
     self.set_param(self.get_param() - self.step)
