@@ -170,7 +170,7 @@ class TorqueBar(Widget):
     # torque line
     self._update_params()
     if ui_state.sm['controlsState'].lateralControlState.which() == 'angleState':
-      if self.curvature_limit > 0:
+      if self.curvature_limit > 0.0:
         self._torque_filter.update(min(max(ui_state.sm['carControl'].actuators.curvature / self.curvature_limit, -1), 1))
       else:
         #incomplete implementation?
@@ -192,7 +192,7 @@ class TorqueBar(Widget):
       self._torque_filter.update(-ui_state.sm['carOutput'].actuatorsOutput.torque)
 
   def _render(self, rect: rl.Rectangle) -> None:
-    if ui_state.sm['controlsState'].lateralControlState.which() == 'angleState' and self.curvature_limit == 0.0:
+    if ui_state.sm['controlsState'].lateralControlState.which() == 'angleState' and self.curvature_limit <= 0.0:
       return
 
     # adjust y pos with torque
