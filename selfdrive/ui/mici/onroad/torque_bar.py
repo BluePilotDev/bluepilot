@@ -162,21 +162,19 @@ class TorqueBar(Widget):
 
     # torque line
     if ui_state.sm['controlsState'].lateralControlState.which() == 'angleState':
-      self._torque_filter.update(-ui_state.sm['carOutput'].actuatorsOutput.curvature / 0.02)
+      controls_state = ui_state.sm['controlsState']
+      car_state = ui_state.sm['carState']
+      live_parameters = ui_state.sm['liveParameters']
+      lateral_acceleration = controls_state.curvature * car_state.vEgo ** 2 - live_parameters.roll * ACCELERATION_DUE_TO_GRAVITY
+      # TODO: pull from carparams
+      max_lateral_acceleration = 3
 
-      # controls_state = ui_state.sm['controlsState']
-      # car_state = ui_state.sm['carState']
-      # live_parameters = ui_state.sm['liveParameters']
-      # lateral_acceleration = controls_state.curvature * car_state.vEgo ** 2 - live_parameters.roll * ACCELERATION_DUE_TO_GRAVITY
-      # # TODO: pull from carparams
-      # max_lateral_acceleration = 3
+      # from selfdrived
+      actual_lateral_accel = controls_state.curvature * car_state.vEgo ** 2
+      desired_lateral_accel = controls_state.desiredCurvature * car_state.vEgo ** 2
+      accel_diff = (desired_lateral_accel - actual_lateral_accel)
 
-      # # from selfdrived
-      # actual_lateral_accel = controls_state.curvature * car_state.vEgo ** 2
-      # desired_lateral_accel = controls_state.desiredCurvature * car_state.vEgo ** 2
-      # accel_diff = (desired_lateral_accel - actual_lateral_accel)
-
-      # self._torque_filter.update(min(max(lateral_acceleration / max_lateral_acceleration + accel_diff, -1), 1))
+      self._torque_filter.update(min(max(lateral_acceleration / max_lateral_acceleration + accel_diff, -1), 1))
     else:
       self._torque_filter.update(-ui_state.sm['carOutput'].actuatorsOutput.torque)
 
