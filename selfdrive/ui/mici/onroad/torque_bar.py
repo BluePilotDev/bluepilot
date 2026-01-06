@@ -154,6 +154,9 @@ class TorqueBar(Widget):
     self._torque_line_alpha_filter = FirstOrderFilter(0.0, 0.1, 1 / gui_app.target_fps)
 
     self.params = Params()
+    self._update_params()
+
+  def _update_params(self):
     self.curvature_limit = float(self.params.get("curvature_limit") or 0.0)
 
   def update_filter(self, value: float):
@@ -165,6 +168,7 @@ class TorqueBar(Widget):
       return
 
     # torque line
+    self._update_params()
     if ui_state.sm['controlsState'].lateralControlState.which() == 'angleState':
       if self.curvature_limit > 0:
         self._torque_filter.update(min(max(ui_state.sm['carControl'].actuators.curvature / self.curvature_limit, -1), 1))
