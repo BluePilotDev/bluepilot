@@ -162,7 +162,7 @@ class TorqueBar(Widget):
 
     # torque line
     if ui_state.sm['controlsState'].lateralControlState.which() == 'angleState':
-      self._torque_filter.update(ui_state.sm['carControl'].actuators.curvature / 0.02)
+      self._torque_filter.update(min(max(ui_state.sm['carControl'].actuators.curvature / 0.02, -1), 1))
 
       # controls_state = ui_state.sm['controlsState']
       # car_state = ui_state.sm['carState']
