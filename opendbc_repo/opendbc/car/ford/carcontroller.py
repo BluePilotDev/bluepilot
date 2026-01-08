@@ -17,7 +17,7 @@ from opendbc.car.ford.helpers import compute_dm_msg_values
 from openpilot.common.params import Params
 #from opendbc.sunnypilot.car.ford.icbm import IntelligentCruiseButtonManagementInterface
 
-TORQUE_MESSAGE="TorqueMeter"
+TORQUE_MESSAGE="torqueMeter"
 
 LongCtrlState = structs.CarControl.Actuators.LongControlState
 VisualAlert = structs.CarControl.HUDControl.VisualAlert
