@@ -3,6 +3,7 @@ import time
 from functools import wraps
 from collections import OrderedDict
 from openpilot.common.params import Params
+import cereal.messaging as messaging
 
 import numpy as np
 import pyray as rl
@@ -14,11 +15,11 @@ from openpilot.system.ui.lib.shader_polygon import draw_polygon, Gradient
 from openpilot.system.ui.widgets import Widget
 from openpilot.common.filter_simple import FirstOrderFilter
 
+TORQUE_MESSAGE="TorqueMeter"
 # TODO: arc_bar_pts doesn't consider rounded end caps part of the angle span
 TORQUE_ANGLE_SPAN = 12.7
 
 DEBUG = False
-
 
 def quantized_lru_cache(maxsize=128):
   def decorator(func):
@@ -156,6 +157,8 @@ class TorqueBar(Widget):
     self.params = Params()
     self._update_params()
 
+    self.sm = messaging.SubMaster([TORQUE_MESSAGE])
+
   def _update_params(self):
     self.curvature_limit = float(self.params.get("curvature_limit") or 0.0)
 
@@ -170,8 +173,12 @@ class TorqueBar(Widget):
     # torque line
     self._update_params()
     if ui_state.sm['controlsState'].lateralControlState.which() == 'angleState':
-      if self.curvature_limit > 0.0:
-        self._torque_filter.update(min(max(ui_state.sm['carControl'].actuators.curvature / self.curvature_limit, -1), 1))
+      self.sm.update()
+      if self.sm.updated[TORQUE_MESSAGE]:
+        torqueValues = self.sm[TORQUE_MESSAGE]
+        self._torque_filter.update(min(max(torqueValues.lateralUncertainty, -1.2), 1.2))
+      elif self.curvature_limit > 0.0:
+        self._torque_filter.update(min(max(ui_state.sm['carControl'].actuators.curvature / self.curvature_limit, -1.2), 1.2))
       else:
         #incomplete implementation?
         controls_state = ui_state.sm['controlsState']

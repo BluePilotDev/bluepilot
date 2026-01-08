@@ -45,6 +45,11 @@ struct IntelligentCruiseButtonManagement {
   }
 }
 
+#torque meter data
+struct TorqueMeter {
+  lateralUncertainty @0 :Float32;
+}
+
 # Same struct as Log.RadarState.LeadData
 struct LeadData {
   dRel @0 :Float32;

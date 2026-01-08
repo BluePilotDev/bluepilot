@@ -17,6 +17,8 @@ from opendbc.car.ford.helpers import compute_dm_msg_values
 from openpilot.common.params import Params
 #from opendbc.sunnypilot.car.ford.icbm import IntelligentCruiseButtonManagementInterface
 
+TORQUE_MESSAGE="TorqueMeter"
+
 LongCtrlState = structs.CarControl.Actuators.LongControlState
 VisualAlert = structs.CarControl.HUDControl.VisualAlert
 
@@ -92,6 +94,8 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
 
     self.packer = CANPacker(dbc_names[Bus.pt])
     self.CAN = fordcan.CanBus(CP)
+
+    self.pm = messaging.PubMaster([TORQUE_MESSAGE])
 
     # Initialize control variables
     self.apply_curvature_last = 0
@@ -486,7 +490,13 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
                                                                 self.CP)
 
         lateral_uncertainty = requested_curvature / max_curvature
-        print(f'lateral_uncertainty: {lateral_uncertainty:.2f}, requested_curvature: {requested_curvature:.5f}, apply_curvature: {apply_curvature:.5f}, max_curvature: {max_curvature:.5f}')
+
+        torque_msg = messaging.new_message(TORQUE_MESSAGE)
+        torque_msg.valid = True
+        torque_msg.lateralUncertainty = lateral_uncertainty
+        self.pm.send(TORQUE_MESSAGE, torque_msg)
+
+        #print(f'lateral_uncertainty: {lateral_uncertainty:.2f}, requested_curvature: {requested_curvature:.5f}, apply_curvature: {apply_curvature:.5f}, max_curvature: {max_curvature:.5f}')
 
         #if reset_steering is 1, set apply_curvature to 0
         if reset_steering == 1:
