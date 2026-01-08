@@ -52,13 +52,17 @@ def anti_overshoot(apply_curvature, apply_curvature_last, v_ego):
   return float(np.interp(v_ego, [5, 10], [apply_curvature, output_curvature]))
 
 def apply_ford_curvature_limits(apply_curvature, apply_curvature_last, current_curvature, v_ego_raw, steering_angle, lat_active, CP):
+  max_curvature = 1 # large initial value
   # No blending at low speed due to lack of torque wind-up and inaccurate current curvature
   if v_ego_raw > 9:
     apply_curvature = np.clip(apply_curvature, current_curvature - CarControllerParams.CURVATURE_ERROR,
                               current_curvature + CarControllerParams.CURVATURE_ERROR)
+    max_curvature = current_curvature + CarControllerParams.CURVATURE_ERROR
 
   # Curvature rate limit after driver torque limit
   apply_curvature = apply_std_steer_angle_limits(apply_curvature, apply_curvature_last, v_ego_raw, steering_angle, lat_active, CarControllerParams.ANGLE_LIMITS)
+
+  max_curvature = np.minimum(max_curvature, get_std_steer_angle_limits(apply_curvature, apply_curvature_last, v_ego_raw, steering_angle, lat_active, CarControllerParams.ANGLE_LIMITS))
 
   # Ford Q4/CAN FD has more torque available compared to Q3/CAN so we limit it based on lateral acceleration.
   # Safety is not aware of the road roll so we subtract a conservative amount at all times
@@ -66,8 +70,9 @@ def apply_ford_curvature_limits(apply_curvature, apply_curvature_last, current_c
     # Limit curvature to conservative max lateral acceleration
     curvature_accel_limit = MAX_LATERAL_ACCEL / (max(v_ego_raw, 1) ** 2)
     apply_curvature = float(np.clip(apply_curvature, -curvature_accel_limit, curvature_accel_limit))
+    max_curvature = np.minimum(max_curvature, curvature_accel_limit)
 
-  return apply_curvature
+  return apply_curvature, max_curvature
 
 
 def apply_creep_compensation(accel: float, v_ego: float) -> float:
@@ -472,13 +477,16 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
           requested_curvature = 0.0
 
         # apply curvature limits
-        apply_curvature = apply_ford_curvature_limits(requested_curvature,
+        apply_curvature, max_curvature = apply_ford_curvature_limits(requested_curvature,
                                                                 self.apply_curvature_last,
                                                                 current_curvature,
                                                                 CS.out.vEgoRaw,
                                                                 0,
                                                                 CC.latActive,
                                                                 self.CP)
+
+        lateral_uncertainty = requested_curvature / max_curvature
+        print(f'lateral_uncertainty: {lateral_uncertainty:.2f}, requested_curvature: {requested_curvature:.5f}, apply_curvature: {apply_curvature:.5f}, max_curvature: {max_curvature:.5f}')
 
         #if reset_steering is 1, set apply_curvature to 0
         if reset_steering == 1:
@@ -497,6 +505,8 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
           # Use rate limits to gradually ramp up from 0 towards requested_curvature
           # This prevents blocked messages when transitioning out of reset
           apply_curvature = apply_std_steer_angle_limits(requested_curvature, self.apply_curvature_last,
+                                                         CS.out.vEgoRaw, 0, CC.latActive, CarControllerParams.ANGLE_LIMITS)
+          max_curvature = get_std_steer_angle_limits(requested_curvature, self.apply_curvature_last,
                                                          CS.out.vEgoRaw, 0, CC.latActive, CarControllerParams.ANGLE_LIMITS)
 
           # Check if we've ramped close enough to requested curvature (within 10% or 0.001, whichever is larger)
