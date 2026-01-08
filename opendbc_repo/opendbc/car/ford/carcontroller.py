@@ -6,7 +6,7 @@ from collections import deque
 from common.filter_simple import FirstOrderFilter
 from opendbc.can import CANPacker
 from opendbc.car import ACCELERATION_DUE_TO_GRAVITY, Bus, DT_CTRL, apply_hysteresis, structs
-from opendbc.car.lateral import ISO_LATERAL_ACCEL, apply_std_steer_angle_limits
+from opendbc.car.lateral import ISO_LATERAL_ACCEL, apply_std_steer_angle_limits, get_std_steer_angle_limits
 from opendbc.car.vehicle_model import VehicleModel
 from opendbc.car.ford import fordcan
 from opendbc.car.ford.values import CarControllerParams, FordFlags, CAR
