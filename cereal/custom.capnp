@@ -454,8 +454,8 @@ struct ModelDataV2SP @0xa1680744031fdb2d {
   }
 }
 
-#torque meter data
-struct TorqueMeter @0xcb9fd56c7057593a {
+#BluePilot CarController output
+struct CarControllerBP @0xcb9fd56c7057593a {
   lateralUncertainty @0 :Float32;
 }
 
