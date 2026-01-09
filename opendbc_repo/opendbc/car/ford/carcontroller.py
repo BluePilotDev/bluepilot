@@ -487,7 +487,7 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
 
         self.carcontroller_msg = messaging.new_message('carControllerBP')
         self.carcontroller_msg.valid = True
-        self.carcontroller_msg.lateralUncertainty = requested_curvature / max_curvature
+        self.carcontroller_msg.lateralUncertainty = float(requested_curvature / max_curvature)
         #print(f'lateral_uncertainty: {lateral_uncertainty:.2f}, requested_curvature: {requested_curvature:.5f}, apply_curvature: {apply_curvature:.5f}, max_curvature: {max_curvature:.5f}')
 
         #if reset_steering is 1, set apply_curvature to 0
