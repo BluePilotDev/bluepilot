@@ -454,9 +454,8 @@ struct ModelDataV2SP @0xa1680744031fdb2d {
   }
 }
 
-#BluePilot CarController output
-struct CarControllerBP @0xcb9fd56c7057593a {
-  lateralUncertainty @0 :Float32;
+struct ControllerStateBP @0xcb9fd56c7057593a {
+  lateralUncertainty @0 :Float32; #BluePilot
 }
 
 struct CustomReserved11 @0xc2243c65e0340384 {

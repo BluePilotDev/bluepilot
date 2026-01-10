@@ -72,7 +72,7 @@ class Car:
   def __init__(self, CI=None, RI=None) -> None:
     self.can_sock = messaging.sub_sock('can', timeout=20)
     self.sm = messaging.SubMaster(['pandaStates', 'carControl', 'onroadEvents'] + ['carControlSP', 'longitudinalPlanSP'])
-    self.pm = messaging.PubMaster(['sendcan', 'carState', 'carParams', 'carOutput', 'liveTracks'] + ['carParamsSP', 'carStateSP', 'carControllerBP'])
+    self.pm = messaging.PubMaster(['sendcan', 'carState', 'carParams', 'carOutput', 'liveTracks'] + ['carParamsSP', 'carStateSP', 'controllerStateBP'])
 
     self.can_rcv_cum_timeout_counter = 0
 
@@ -239,9 +239,6 @@ class Car:
       cp_send.carParams = self.CP
       self.pm.send('carParams', cp_send)
 
-    if hasattr(self.CI.CC, "carcontroller_msg"):
-      self.pm.send("carControllerBP", self.CI.CC.carcontroller_msg)
-
     # publish new carOutput
     co_send = messaging.new_message('carOutput')
     co_send.valid = self.sm.all_checks(['carControl'])
@@ -289,6 +286,15 @@ class Car:
       now_nanos = self.can_log_mono_time if REPLAY else int(time.monotonic() * 1e9)
       self.last_actuators_output, can_sends = self.CI.apply(CC, convert_carControlSP(CC_SP), now_nanos)
       self.pm.send('sendcan', can_list_to_can_capnp(can_sends, msgtype='sendcan', valid=CS.canValid))
+
+    if hasattr(self.CI.CC, "lateralUncertainty"):
+      cs_bp = structs.ControllerStateBP()
+      cs_bp.lateralUncertainty = self.CI.CC.lateralUncertainty
+      cs_bp_capnp = convert_to_capnp(cs_bp)
+      cs_bp_send = messaging.new_message('controllerStateBP')
+      cs_bp_send.valid = True
+      cs_bp_send.controllerStateBP = cs_bp_capnp
+      self.pm.send('controllerStateBP', cs_bp_send)
 
       self.CC_prev = CC
 

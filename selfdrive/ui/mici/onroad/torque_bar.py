@@ -15,7 +15,6 @@ from openpilot.system.ui.lib.shader_polygon import draw_polygon, Gradient
 from openpilot.system.ui.widgets import Widget
 from openpilot.common.filter_simple import FirstOrderFilter
 
-CARCONTROLLER_MESSAGE="carControllerBP"
 # TODO: arc_bar_pts doesn't consider rounded end caps part of the angle span
 TORQUE_ANGLE_SPAN = 12.7
 
@@ -157,8 +156,6 @@ class TorqueBar(Widget):
     self.params = Params()
     self._update_params()
 
-    self.sm = messaging.SubMaster([CARCONTROLLER_MESSAGE])
-
   def _update_params(self):
     self.curvature_limit = float(self.params.get("curvature_limit") or 0.0)
 
@@ -173,12 +170,11 @@ class TorqueBar(Widget):
     # torque line
     self._update_params()
     if ui_state.sm['controlsState'].lateralControlState.which() == 'angleState':
-      self.sm.update()
-      if self.sm.updated[CARCONTROLLER_MESSAGE]:
-        torqueValues = self.sm[CARCONTROLLER_MESSAGE]
-        self._torque_filter.update(min(max(torqueValues.lateralUncertainty, -1.2), 1.2))
-      elif self.curvature_limit > 0.0:
-        self._torque_filter.update(min(max(ui_state.sm['carControl'].actuators.curvature / self.curvature_limit, -1.2), 1.2))
+      if ui_state.sm.updated["controllerStateBP"]:
+        ctrlr_state = ui_state.sm['controllerStateBP']
+        self._torque_filter.update(min(max(ctrlr_state.lateralUncertainty, -1.2), 1.2))
+      # elif self.curvature_limit > 0.0:
+      #   self._torque_filter.update(min(max(ui_state.sm['carControl'].actuators.curvature / self.curvature_limit, -1.2), 1.2))
       else:
         #incomplete implementation?
         controls_state = ui_state.sm['controlsState']
@@ -199,7 +195,8 @@ class TorqueBar(Widget):
       self._torque_filter.update(-ui_state.sm['carOutput'].actuatorsOutput.torque)
 
   def _render(self, rect: rl.Rectangle) -> None:
-    if ui_state.sm['controlsState'].lateralControlState.which() == 'angleState' and self.curvature_limit <= 0.0:
+    if ui_state.sm['controlsState'].lateralControlState.which() == 'angleState' and self.curvature_limit <= 0.0 \
+        and not (ui_state.sm.updated("controllerStateBP") and ui_state.sm.valid("controllerStateBP")):
       return
 
     # adjust y pos with torque

@@ -103,7 +103,7 @@ _services: dict[str, tuple] = {
   "liveLocationKalman": (True, 20.),
 
   # bluepilot
-  "carControllerBP": (False, 100., 10),
+  "controllerStateBP": (True, 100., 10),
 
   # debug
   "uiDebug": (True, 0., 1),

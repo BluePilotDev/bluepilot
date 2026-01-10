@@ -111,7 +111,9 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
     self.steering_wheel_delta_adjusted = 0.0
     self.last_button_frame = 0  # Track last ICBM button press frame
 
-   ################################## lateral control parameters ##############################################
+    self.lateralUncertainty = 0.0
+
+    ################################## lateral control parameters ##############################################
 
 
     # Toggles
@@ -485,9 +487,7 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
                                                                 CC.latActive,
                                                                 self.CP)
 
-        self.carcontroller_msg = messaging.new_message('carControllerBP')
-        self.carcontroller_msg.valid = True
-        self.carcontroller_msg.lateralUncertainty = float(requested_curvature / max_curvature)
+        self.lateralUncertainty = float(requested_curvature / max_curvature)
         #print(f'lateral_uncertainty: {lateral_uncertainty:.2f}, requested_curvature: {requested_curvature:.5f}, apply_curvature: {apply_curvature:.5f}, max_curvature: {max_curvature:.5f}')
 
         #if reset_steering is 1, set apply_curvature to 0

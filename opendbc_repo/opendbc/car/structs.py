@@ -170,3 +170,7 @@ class CarControlSP:
 @auto_dataclass
 class CarStateSP:
   speedLimit: float = auto_field()
+
+@auto_dataclass
+class ControllerStateBP:
+  lateralUncertainty: float = auto_field()
