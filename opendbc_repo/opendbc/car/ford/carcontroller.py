@@ -58,7 +58,7 @@ def apply_ford_curvature_limits(self, apply_curvature, apply_curvature_last, cur
   if v_ego_raw > 9:
     apply_curvature = np.clip(apply_curvature, current_curvature - CarControllerParams.CURVATURE_ERROR,
                               current_curvature + CarControllerParams.CURVATURE_ERROR)
-    max_curvature = current_curvature + CarControllerParams.CURVATURE_ERROR
+    max_curvature = abs(current_curvature) + CarControllerParams.CURVATURE_ERROR
     self.lateral_limiter = "Curvature Error Limit"
 
   # Curvature rate limit after driver torque limit
@@ -67,7 +67,7 @@ def apply_ford_curvature_limits(self, apply_curvature, apply_curvature_last, cur
   std_steer_angle_limit = get_std_steer_angle_limits(apply_curvature, apply_curvature_last, v_ego_raw, steering_angle, lat_active, CarControllerParams.ANGLE_LIMITS)
   if std_steer_angle_limit < max_curvature:
     self.lateral_limiter = "Std Steer Angle Limit"
-  max_curvature = np.minimum(max_curvature, std_steer_angle_limit)
+  max_curvature = np.minimum(max_curvature, abs(std_steer_angle_limit))
 
   # Ford Q4/CAN FD has more torque available compared to Q3/CAN so we limit it based on lateral acceleration.
   # Safety is not aware of the road roll so we subtract a conservative amount at all times
@@ -77,7 +77,9 @@ def apply_ford_curvature_limits(self, apply_curvature, apply_curvature_last, cur
     apply_curvature = float(np.clip(apply_curvature, -curvature_accel_limit, curvature_accel_limit))
     if curvature_accel_limit < max_curvature:
       self.lateral_limiter = "CANFD Lat Accel Limit"
-    max_curvature = np.minimum(max_curvature, curvature_accel_limit)
+
+    max_curvature = np.minimum(max_curvature, abs(curvature_accel_limit))
+    max_curvature = np.maximum(max_curvature, abs(apply_curvature)) #limit max_curvature is not less than apply_curvature
 
   return apply_curvature, max_curvature
 
@@ -495,12 +497,12 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
         self.lateralUncertainty = float(requested_curvature / max_curvature)
 
         #debug log
-        LOG_PATH = "/data/community/logs/"
-        LOG_FILE = "ford_lateral_log.txt"
-        if not os.path.exists(LOG_PATH):
-          os.makedirs(LOG_PATH)
-        with open(LOG_PATH + LOG_FILE, "a") as f:
-          f.write(f"lat_uncert: {self.lateralUncertainty:.2f}, req: {requested_curvature:.5f}, apply: {apply_curvature:.5f}, max: {max_curvature:.5f}:{self.lateral_limiter}\n")
+        # LOG_PATH = "/data/community/logs/"
+        # LOG_FILE = "ford_lateral_log.txt"
+        # if not os.path.exists(LOG_PATH):
+        #   os.makedirs(LOG_PATH)
+        # with open(LOG_PATH + LOG_FILE, "a") as f:
+        #   f.write(f"lat_uncert: {self.lateralUncertainty:.2f}, req: {requested_curvature:.5f}, apply: {apply_curvature:.5f}, max: {max_curvature:.5f}:{self.lateral_limiter}\n")
 
         #if reset_steering is 1, set apply_curvature to 0
         if reset_steering == 1:
