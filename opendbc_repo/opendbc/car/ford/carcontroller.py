@@ -75,7 +75,7 @@ def apply_ford_curvature_limits(self, apply_curvature, apply_curvature_last, cur
     # Limit curvature to conservative max lateral acceleration
     curvature_accel_limit = MAX_LATERAL_ACCEL / (max(v_ego_raw, 1) ** 2)
     apply_curvature = float(np.clip(apply_curvature, -curvature_accel_limit, curvature_accel_limit))
-    if curvature_accel_limit < max_curvature:
+    if abs(curvature_accel_limit) < max_curvature:
       self.lateral_limiter = "CANFD Lat Accel Limit"
 
     max_curvature = np.minimum(max_curvature, abs(curvature_accel_limit))
@@ -521,8 +521,6 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
           # Use rate limits to gradually ramp up from 0 towards requested_curvature
           # This prevents blocked messages when transitioning out of reset
           apply_curvature = apply_std_steer_angle_limits(requested_curvature, self.apply_curvature_last,
-                                                         CS.out.vEgoRaw, 0, CC.latActive, CarControllerParams.ANGLE_LIMITS)
-          max_curvature = get_std_steer_angle_limits(requested_curvature, self.apply_curvature_last,
                                                          CS.out.vEgoRaw, 0, CC.latActive, CarControllerParams.ANGLE_LIMITS)
 
           # Check if we've ramped close enough to requested curvature (within 10% or 0.001, whichever is larger)
