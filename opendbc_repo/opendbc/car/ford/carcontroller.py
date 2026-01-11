@@ -52,22 +52,22 @@ def anti_overshoot(apply_curvature, apply_curvature_last, v_ego):
 
   return float(np.interp(v_ego, [5, 10], [apply_curvature, output_curvature]))
 
-def apply_ford_curvature_limits(apply_curvature, apply_curvature_last, current_curvature, v_ego_raw, steering_angle, lat_active, CP):
+def apply_ford_curvature_limits(self, apply_curvature, apply_curvature_last, current_curvature, v_ego_raw, steering_angle, lat_active, CP):
   max_curvature = 1 # large initial value
   # No blending at low speed due to lack of torque wind-up and inaccurate current curvature
   if v_ego_raw > 9:
     apply_curvature = np.clip(apply_curvature, current_curvature - CarControllerParams.CURVATURE_ERROR,
                               current_curvature + CarControllerParams.CURVATURE_ERROR)
     max_curvature = current_curvature + CarControllerParams.CURVATURE_ERROR
-    self.lateral_limiter = "CUR + CURVATURE_ERROR"
+    self.lateral_limiter = "Curvature Error Limit"
 
   # Curvature rate limit after driver torque limit
   apply_curvature = apply_std_steer_angle_limits(apply_curvature, apply_curvature_last, v_ego_raw, steering_angle, lat_active, CarControllerParams.ANGLE_LIMITS)
 
   std_steer_angle_limit = get_std_steer_angle_limits(apply_curvature, apply_curvature_last, v_ego_raw, steering_angle, lat_active, CarControllerParams.ANGLE_LIMITS)
+  if std_steer_angle_limit < max_curvature:
+    self.lateral_limiter = "Std Steer Angle Limit"
   max_curvature = np.minimum(max_curvature, std_steer_angle_limit)
-  if max_curvature < std_steer_angle_limit:
-    self.lateral_limiter = "STD STEER ANGLE"
 
   # Ford Q4/CAN FD has more torque available compared to Q3/CAN so we limit it based on lateral acceleration.
   # Safety is not aware of the road roll so we subtract a conservative amount at all times
@@ -75,10 +75,8 @@ def apply_ford_curvature_limits(apply_curvature, apply_curvature_last, current_c
     # Limit curvature to conservative max lateral acceleration
     curvature_accel_limit = MAX_LATERAL_ACCEL / (max(v_ego_raw, 1) ** 2)
     apply_curvature = float(np.clip(apply_curvature, -curvature_accel_limit, curvature_accel_limit))
-
-    if max_curvature > curvature_accel_limit:
-      self.lateral_limiter = "MAX LAT ACCEL"
-
+    if curvature_accel_limit < max_curvature:
+      self.lateral_limiter = "CANFD Lat Accel Limit"
     max_curvature = np.minimum(max_curvature, curvature_accel_limit)
 
   return apply_curvature, max_curvature
@@ -118,12 +116,10 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
     self.accel_pitch_compensated = 0.0
     self.steering_wheel_delta_adjusted = 0.0
     self.last_button_frame = 0  # Track last ICBM button press frame
-
     self.lateralUncertainty = 0.0
-    self.lateral_limiter = "MAX"
+    self.lateral_limiter = "None"  # for logging
 
     ################################## lateral control parameters ##############################################
-
 
     # Toggles
     self.enable_human_turn_detection = True
@@ -504,7 +500,7 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
         if not os.path.exists(LOG_PATH):
           os.makedirs(LOG_PATH)
         with open(LOG_PATH + LOG_FILE, "a") as f:
-          f.write(f"f'lat_uncert: {self.lateralUncertainty:.2f}, req: {requested_curvature:.5f}, apply: {apply_curvature:.5f}, max: {max_curvature:.5f}:{self.lateral_limiter}\n")
+          f.write(f"lat_uncert: {self.lateralUncertainty:.2f}, req: {requested_curvature:.5f}, apply: {apply_curvature:.5f}, max: {max_curvature:.5f}:{self.lateral_limiter}\n")
 
         #if reset_steering is 1, set apply_curvature to 0
         if reset_steering == 1:
