@@ -484,7 +484,7 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
           requested_curvature = 0.0
 
         # apply curvature limits
-        apply_curvature, max_curvature = apply_ford_curvature_limits(requested_curvature,
+        apply_curvature, max_curvature = apply_ford_curvature_limits(self, requested_curvature,
                                                                 self.apply_curvature_last,
                                                                 current_curvature,
                                                                 CS.out.vEgoRaw,
