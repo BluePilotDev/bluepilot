@@ -161,7 +161,6 @@ class TorqueBar(Widget):
       return
 
     # torque line
-    self._update_params()
     if ui_state.sm['controlsState'].lateralControlState.which() == 'angleState':
       if ui_state.sm.updated["controllerStateBP"]:
         ctrlr_state = ui_state.sm['controllerStateBP']
