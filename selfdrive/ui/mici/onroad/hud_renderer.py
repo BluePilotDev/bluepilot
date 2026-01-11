@@ -172,7 +172,6 @@ class HudRenderer(Widget):
   def _render(self, rect: rl.Rectangle) -> None:
     """Render HUD elements to the screen."""
 
-    #if ui_state.sm['controlsState'].lateralControlState.which() != 'angleState':
     self._torque_bar.render(rect)
 
     if self.is_cruise_set:

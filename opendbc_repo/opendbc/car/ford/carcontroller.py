@@ -88,7 +88,6 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
     #IntelligentCruiseButtonManagementInterface.__init__(self, CP, CP_SP)
 
     self.params = Params()
-    self.params.put("curvature_limit", CarControllerParams.CURVATURE_MAX)  # Ford system max curvature
 
     self.packer = CANPacker(dbc_names[Bus.pt])
     self.CAN = fordcan.CanBus(CP)
