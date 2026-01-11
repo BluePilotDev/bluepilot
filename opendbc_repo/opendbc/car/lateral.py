@@ -94,7 +94,7 @@ def get_std_steer_angle_limits(apply_angle: float, apply_angle_last: float, v_eg
                                  lat_active: bool, limits: AngleSteeringLimits) -> float:
   # angle is current steering wheel angle when inactive on all angle cars
   if not lat_active:
-    return None
+    return apply_angle
 
   # pick angle rate limits based on wind up/down
   steer_up = apply_angle_last * apply_angle >= 0. and abs(apply_angle) > abs(apply_angle_last)
@@ -103,7 +103,7 @@ def get_std_steer_angle_limits(apply_angle: float, apply_angle_last: float, v_eg
   angle_rate_lim = np.interp(v_ego, rate_limits[0], rate_limits[1])
   apply_angle_max = apply_angle_last + angle_rate_lim
 
-  return float(np.clip(apply_angle_max, -limits.STEER_ANGLE_MAX, limits.STEER_ANGLE_MAX))
+  return float(np.minimum(apply_angle_max, limits.STEER_ANGLE_MAX))
 
 
 def get_max_angle_delta_vm(v_ego_raw: float, VM: VehicleModel, limits):
