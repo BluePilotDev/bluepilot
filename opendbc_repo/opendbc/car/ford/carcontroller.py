@@ -80,7 +80,7 @@ def apply_ford_curvature_limits(self, apply_curvature, apply_curvature_last, cur
       self.lateral_limiter = "CANFD Lat Accel Limit"
     max_curvature = np.minimum(max_curvature, abs(curvature_accel_limit))
 
-  max_curvature = np.maximum(max_curvature, abs(apply_curvature)) #limit max_curvature is not less than apply_curvature
+  #max_curvature = np.maximum(max_curvature, abs(apply_curvature)) #limit max_curvature is not less than apply_curvature
 
   return apply_curvature, max_curvature
 
@@ -500,12 +500,12 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
         lateralUncertainty = float(requested_curvature / max_curvature)
 
         #debug log
-        LOG_PATH = "/data/community/logs/"
-        LOG_FILE = "ford_lateral_log.csv"
-        if not os.path.exists(LOG_PATH):
-          os.makedirs(LOG_PATH)
-        with open(LOG_PATH + LOG_FILE, "a") as f:
-          f.write(f"{lateralUncertainty:.2f},{CS.out.vEgoRaw},{requested_curvature:.5f},{apply_curvature:.5f},{max_curvature:.5f},{self.lateral_limiter}\n")
+        # LOG_PATH = "/data/community/logs/"
+        # LOG_FILE = "ford_lateral_log.csv"
+        # if not os.path.exists(LOG_PATH):
+        #   os.makedirs(LOG_PATH)
+        # with open(LOG_PATH + LOG_FILE, "a") as f:
+        #   f.write(f"{lateralUncertainty:.2f},{CS.out.vEgoRaw},{requested_curvature:.5f},{apply_curvature:.5f},{max_curvature:.5f},{self.lateral_limiter}\n")
 
         #if reset_steering is 1, set apply_curvature to 0
         if reset_steering == 1:
