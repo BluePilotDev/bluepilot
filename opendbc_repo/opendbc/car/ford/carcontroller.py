@@ -344,8 +344,6 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
 
     self._update_params()
 
-    lateralUncertainty = 0.0
-
     actuators = CC.actuators
     hud_control = CC.hudControl
     main_on = CS.out.cruiseState.available
@@ -499,6 +497,8 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
                                                                 CC.latActive,
                                                                 self.CP)
 
+
+        max_curvature = np.clip(max_curvature, apply_curvature, self.curvature_max)  # ensure max_curvature is within reasonable bounds
         lateralUncertainty = float(requested_curvature / max_curvature)
 
         #debug log
@@ -713,7 +713,9 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
         self.HC_PID_controller.reset()
         self.LC_PID_controller.reset()
         ramp_type = 0
+        lateralUncertainty = 0.0
 
+      self.lateralUncertainty = lateralUncertainty
       self.apply_curvature_last = apply_curvature
       self.curvature_rate_last = desired_curvature_rate
       self.path_offset_last = path_offset
@@ -842,7 +844,6 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
     self.steer_alert_last = steer_alert
     self.fcw_alert_last = fcw_alert
     self.lead_distance_bars_last = hud_control.leadDistanceBars
-    self.lateralUncertainty = lateralUncertainty
 
     new_actuators = actuators.as_builder()
     new_actuators.torqueOutputCan = float(self.steer_warning)
