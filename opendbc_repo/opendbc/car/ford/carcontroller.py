@@ -505,7 +505,7 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
         if not os.path.exists(LOG_PATH):
           os.makedirs(LOG_PATH)
         with open(LOG_PATH + LOG_FILE, "a") as f:
-          f.write(f"{self.lateralUncertainty:.2f},{CS.out.vEgoRaw},{requested_curvature:.5f},{apply_curvature:.5f},{max_curvature:.5f},{self.lateral_limiter}\n")
+          f.write(f"{lateralUncertainty:.2f},{CS.out.vEgoRaw},{requested_curvature:.5f},{apply_curvature:.5f},{max_curvature:.5f},{self.lateral_limiter}\n")
 
         #if reset_steering is 1, set apply_curvature to 0
         if reset_steering == 1:
