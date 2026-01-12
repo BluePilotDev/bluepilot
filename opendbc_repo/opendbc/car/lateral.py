@@ -90,6 +90,7 @@ def apply_std_steer_angle_limits(apply_angle: float, apply_angle_last: float, v_
 
   return float(np.clip(new_apply_angle, -limits.STEER_ANGLE_MAX, limits.STEER_ANGLE_MAX))
 
+
 def get_max_angle_delta_vm(v_ego_raw: float, VM: VehicleModel, limits):
   """Calculate the maximum steering angle rate based on lateral jerk limits."""
   max_curvature_rate_sec = limits.ANGLE_LIMITS.MAX_LATERAL_JERK / (v_ego_raw ** 2)  # (1/m)/s
