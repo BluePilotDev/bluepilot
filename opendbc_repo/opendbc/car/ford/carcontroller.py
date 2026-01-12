@@ -66,7 +66,7 @@ def apply_ford_curvature_limits(self, apply_curvature, apply_curvature_last, cur
 
   steer_up = apply_curvature_last * apply_curvature >= 0. and abs(apply_curvature) > abs(apply_curvature_last)
   rate_limits = CarControllerParams.ANGLE_LIMITS.ANGLE_RATE_LIMIT_UP if steer_up else CarControllerParams.ANGLE_LIMITS.ANGLE_RATE_LIMIT_DOWN
-  std_steer_angle_rate_limit =  np.interp(v_ego, rate_limits[0], rate_limits[1])
+  std_steer_angle_rate_limit = np.interp(v_ego_raw, rate_limits[0], rate_limits[1])
   std_steer_angle_limit = abs(apply_curvature_last) + abs(std_steer_angle_rate_limit)
   if std_steer_angle_limit < max_curvature:
     self.lateral_limiter = "Std Steer Angle Limit"
