@@ -64,10 +64,10 @@ def apply_ford_curvature_limits(self, apply_curvature, apply_curvature_last, cur
   # Curvature rate limit after driver torque limit
   apply_curvature = apply_std_steer_angle_limits(apply_curvature, apply_curvature_last, v_ego_raw, steering_angle, lat_active, CarControllerParams.ANGLE_LIMITS)
 
-  std_steer_angle_limit = abs(apply_std_steer_angle_limits(max_curvature * np.sign(apply_curvature), apply_curvature_last, v_ego_raw, steering_angle, lat_active, CarControllerParams.ANGLE_LIMITS))
-  if std_steer_angle_limit < max_curvature:
-    self.lateral_limiter = "Std Steer Angle Limit"
-  max_curvature = np.minimum(max_curvature, std_steer_angle_limit)
+  # std_steer_angle_limit = abs(apply_std_steer_angle_limits(max_curvature * np.sign(apply_curvature), apply_curvature_last, v_ego_raw, steering_angle, lat_active, CarControllerParams.ANGLE_LIMITS))
+  # if std_steer_angle_limit < max_curvature:
+  #   self.lateral_limiter = "Std Steer Angle Limit"
+  # max_curvature = np.minimum(max_curvature, std_steer_angle_limit)
 
   # Ford Q4/CAN FD has more torque available compared to Q3/CAN so we limit it based on lateral acceleration.
   # Safety is not aware of the road roll so we subtract a conservative amount at all times
