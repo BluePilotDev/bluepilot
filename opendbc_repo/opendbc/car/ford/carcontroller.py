@@ -7,7 +7,7 @@ from collections import deque
 from common.filter_simple import FirstOrderFilter
 from opendbc.can import CANPacker
 from opendbc.car import ACCELERATION_DUE_TO_GRAVITY, Bus, DT_CTRL, apply_hysteresis, structs
-from opendbc.car.lateral import ISO_LATERAL_ACCEL, apply_std_steer_angle_limits, get_std_steer_angle_limits
+from opendbc.car.lateral import ISO_LATERAL_ACCEL, apply_std_steer_angle_limits
 from opendbc.car.vehicle_model import VehicleModel
 from opendbc.car.ford import fordcan
 from opendbc.car.ford.values import CarControllerParams, FordFlags, CAR
@@ -64,10 +64,10 @@ def apply_ford_curvature_limits(self, apply_curvature, apply_curvature_last, cur
   # Curvature rate limit after driver torque limit
   apply_curvature = apply_std_steer_angle_limits(apply_curvature, apply_curvature_last, v_ego_raw, steering_angle, lat_active, CarControllerParams.ANGLE_LIMITS)
 
-  std_steer_angle_limit = get_std_steer_angle_limits(apply_curvature, apply_curvature_last, v_ego_raw, steering_angle, lat_active, CarControllerParams.ANGLE_LIMITS)
+  std_steer_angle_limit = abs(apply_std_steer_angle_limits(max_curvature * np.sign(apply_curvature), apply_curvature_last, v_ego_raw, steering_angle, lat_active, CarControllerParams.ANGLE_LIMITS))
   if std_steer_angle_limit < max_curvature:
     self.lateral_limiter = "Std Steer Angle Limit"
-  max_curvature = np.minimum(max_curvature, abs(std_steer_angle_limit))
+  max_curvature = np.minimum(max_curvature, std_steer_angle_limit)
 
   # Ford Q4/CAN FD has more torque available compared to Q3/CAN so we limit it based on lateral acceleration.
   # Safety is not aware of the road roll so we subtract a conservative amount at all times
@@ -77,9 +77,9 @@ def apply_ford_curvature_limits(self, apply_curvature, apply_curvature_last, cur
     apply_curvature = float(np.clip(apply_curvature, -curvature_accel_limit, curvature_accel_limit))
     if abs(curvature_accel_limit) < max_curvature:
       self.lateral_limiter = "CANFD Lat Accel Limit"
-
     max_curvature = np.minimum(max_curvature, abs(curvature_accel_limit))
-    max_curvature = np.maximum(max_curvature, abs(apply_curvature)) #limit max_curvature is not less than apply_curvature
+
+  max_curvature = np.maximum(max_curvature, abs(apply_curvature)) #limit max_curvature is not less than apply_curvature
 
   return apply_curvature, max_curvature
 
@@ -341,6 +341,8 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
 
     self._update_params()
 
+    lateralUncertainty = 0.0
+
     actuators = CC.actuators
     hud_control = CC.hudControl
     main_on = CS.out.cruiseState.available
@@ -494,15 +496,15 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
                                                                 CC.latActive,
                                                                 self.CP)
 
-        self.lateralUncertainty = float(requested_curvature / max_curvature)
+        lateralUncertainty = float(requested_curvature / max_curvature)
 
         #debug log
-        # LOG_PATH = "/data/community/logs/"
-        # LOG_FILE = "ford_lateral_log.txt"
-        # if not os.path.exists(LOG_PATH):
-        #   os.makedirs(LOG_PATH)
-        # with open(LOG_PATH + LOG_FILE, "a") as f:
-        #   f.write(f"lat_uncert: {self.lateralUncertainty:.2f}, req: {requested_curvature:.5f}, apply: {apply_curvature:.5f}, max: {max_curvature:.5f}:{self.lateral_limiter}\n")
+        LOG_PATH = "/data/community/logs/"
+        LOG_FILE = "ford_lateral_log.csv"
+        if not os.path.exists(LOG_PATH):
+          os.makedirs(LOG_PATH)
+        with open(LOG_PATH + LOG_FILE, "a") as f:
+          f.write(f"{self.lateralUncertainty:.2f},{CS.out.vEgoRaw},{requested_curvature:.5f},{apply_curvature:.5f},{max_curvature:.5f},{self.lateral_limiter}\n")
 
         #if reset_steering is 1, set apply_curvature to 0
         if reset_steering == 1:
@@ -837,6 +839,7 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
     self.steer_alert_last = steer_alert
     self.fcw_alert_last = fcw_alert
     self.lead_distance_bars_last = hud_control.leadDistanceBars
+    self.lateralUncertainty = lateralUncertainty
 
     new_actuators = actuators.as_builder()
     new_actuators.torqueOutputCan = float(self.steer_warning)
