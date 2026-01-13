@@ -287,6 +287,8 @@ class Car:
       self.last_actuators_output, can_sends = self.CI.apply(CC, convert_carControlSP(CC_SP), now_nanos)
       self.pm.send('sendcan', can_list_to_can_capnp(can_sends, msgtype='sendcan', valid=CS.canValid))
 
+      self.CC_prev = CC
+
     if hasattr(self.CI.CC, "lateralUncertainty"):
       cs_bp = structs.ControllerStateBP()
       cs_bp.lateralUncertainty = self.CI.CC.lateralUncertainty
@@ -296,7 +298,6 @@ class Car:
       cs_bp_send.controllerStateBP = cs_bp_capnp
       self.pm.send('controllerStateBP', cs_bp_send)
 
-      self.CC_prev = CC
 
   def step(self):
     CS, CS_SP, RD = self.state_update()
