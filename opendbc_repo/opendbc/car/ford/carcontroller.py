@@ -676,10 +676,11 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
 
           self.apply_curvature_last, max_curvature = apply_ford_curvature_limits(apply_curvature, self.apply_curvature_last, current_curvature,
                                                               CS.out.vEgoRaw, 0., CC.latActive, self.CP)
-          lateralUncertainty = self.calculate_lateral_uncertainty(requested_curvature, apply_curvature, max_curvature)
 
           #rem bluepilot sends apply_curvature, and at some point openpilot swapped to sending apply_curvature_last.
           apply_curvature = self.apply_curvature_last
+
+          lateralUncertainty = self.calculate_lateral_uncertainty(requested_curvature, apply_curvature, max_curvature)
 
         # reset steering by setting all values to 0 and ramp_type to immediate
         if reset_steering == 1:
