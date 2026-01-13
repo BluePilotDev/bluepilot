@@ -673,8 +673,9 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
 
           current_curvature = -CS.out.yawRate / max(CS.out.vEgoRaw, 0.1)
 
-          self.apply_curvature_last = apply_ford_curvature_limits(apply_curvature, self.apply_curvature_last, current_curvature,
+          self.apply_curvature_last, _ = apply_ford_curvature_limits(apply_curvature, self.apply_curvature_last, current_curvature,
                                                               CS.out.vEgoRaw, 0., CC.latActive, self.CP)
+          lateralUncertainty = 0.0
 
           #rem bluepilot sends apply_curvature, and at some point openpilot swapped to sending apply_curvature_last.
           apply_curvature = self.apply_curvature_last
