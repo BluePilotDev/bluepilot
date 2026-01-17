@@ -7,6 +7,7 @@ from openpilot.system.ui.lib.application import gui_app, FontWeight
 from openpilot.system.ui.lib.multilang import tr
 from openpilot.system.ui.lib.text_measure import measure_text_cached
 from openpilot.system.ui.widgets import Widget
+from openpilot.selfdrive.ui.mici.onroad.torque_bar import TorqueBar
 
 # Constants
 SET_SPEED_NA = 255
@@ -65,6 +66,7 @@ class HudRenderer(Widget):
     self.set_speed: float = SET_SPEED_NA
     self.speed: float = 0.0
     self.v_ego_cluster_seen: bool = False
+    self._torque_bar = TorqueBar(radius=3300)
 
     self._font_semi_bold: rl.Font = gui_app.font(FontWeight.SEMI_BOLD)
     self._font_bold: rl.Font = gui_app.font(FontWeight.BOLD)
@@ -99,6 +101,7 @@ class HudRenderer(Widget):
     v_ego = v_ego_cluster if self.v_ego_cluster_seen else car_state.vEgo
     speed_conversion = CV.MS_TO_KPH if ui_state.is_metric else CV.MS_TO_MPH
     self.speed = max(0.0, v_ego * speed_conversion)
+    self._torque_bar._update_state()
 
   def _render(self, rect: rl.Rectangle) -> None:
     """Render HUD elements to the screen."""
@@ -111,6 +114,8 @@ class HudRenderer(Widget):
       COLORS.HEADER_GRADIENT_START,
       COLORS.HEADER_GRADIENT_END,
     )
+
+    self._torque_bar.render(rect)
 
     if self.is_cruise_available:
       self._draw_set_speed(rect)
