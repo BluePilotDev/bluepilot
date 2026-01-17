@@ -146,20 +146,30 @@ def arc_bar_pts(cx: float, cy: float,
 
 
 class TorqueBar(Widget):
-  def __init__(self, demo: bool = False, radius: float = 1200):
+  def __init__(self, demo: bool = False, radius: float = 1200, line_height_min: int = 14, line_height_max: int = 56) -> None:
     super().__init__()
     self._demo = demo
     self._radius = radius
     self._torque_filter = FirstOrderFilter(0, 0.1, 1 / gui_app.target_fps)
     self._torque_line_alpha_filter = FirstOrderFilter(0.0, 0.1, 1 / gui_app.target_fps)
+    self._torque_line_height_min=line_height_min
+    self._torque_line_height_max=line_height_max
 
-    self._demo_increment = 0.05
+    # self._demo_torque = 0.0
+    # self._demo_increment = 0.03
 
   def update_filter(self, value: float):
     """Update the torque filter value (for demo mode)."""
     self._torque_filter.update(value)
 
   def _update_state(self):
+    # if (self._torque_filter.x > 1.1):
+    #   self._demo_increment = -0.03
+    # elif (self._torque_filter.x < -1.1):
+    #   self._demo_increment = 0.03
+    # self._demo_torque += self._demo_increment
+    # self.update_filter(self._demo_torque)
+
     if self._demo:
       return
 
@@ -194,7 +204,7 @@ class TorqueBar(Widget):
 
     # adjust y pos with torque
     torque_line_offset = np.interp(abs(self._torque_filter.x), [0.5, 1], [22, 26])
-    torque_line_height = np.interp(abs(self._torque_filter.x), [0.5, 1], [14, 56])
+    torque_line_height = np.interp(abs(self._torque_filter.x), [0.5, 1], [self._torque_line_height_min, self._torque_line_height_max])
 
     # animate alpha and angle span
     if not self._demo:

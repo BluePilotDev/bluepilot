@@ -66,7 +66,7 @@ class HudRenderer(Widget):
     self.set_speed: float = SET_SPEED_NA
     self.speed: float = 0.0
     self.v_ego_cluster_seen: bool = False
-    self._torque_bar = TorqueBar(radius=3300)
+    self._torque_bar = TorqueBar(radius=3300, line_height_min=24, line_height_max=76)
 
     self._font_semi_bold: rl.Font = gui_app.font(FontWeight.SEMI_BOLD)
     self._font_bold: rl.Font = gui_app.font(FontWeight.BOLD)
