@@ -72,7 +72,7 @@ class Car:
   def __init__(self, CI=None, RI=None) -> None:
     self.can_sock = messaging.sub_sock('can', timeout=20)
     self.sm = messaging.SubMaster(['pandaStates', 'carControl', 'onroadEvents'] + ['carControlSP', 'longitudinalPlanSP'])
-    self.pm = messaging.PubMaster(['sendcan', 'carState', 'carParams', 'carOutput', 'liveTracks'] + ['carParamsSP', 'carStateSP'])
+    self.pm = messaging.PubMaster(['sendcan', 'carState', 'carParams', 'carOutput', 'liveTracks'] + ['carParamsSP', 'carStateSP', 'controllerStateBP'])
 
     self.can_rcv_cum_timeout_counter = 0
 
@@ -288,6 +288,16 @@ class Car:
       self.pm.send('sendcan', can_list_to_can_capnp(can_sends, msgtype='sendcan', valid=CS.canValid))
 
       self.CC_prev = CC
+
+    if hasattr(self.CI.CC, "lateralUncertainty"):
+      cs_bp = structs.ControllerStateBP()
+      cs_bp.lateralUncertainty = self.CI.CC.lateralUncertainty
+      cs_bp_capnp = convert_to_capnp(cs_bp)
+      cs_bp_send = messaging.new_message('controllerStateBP')
+      cs_bp_send.valid = True
+      cs_bp_send.controllerStateBP = cs_bp_capnp
+      self.pm.send('controllerStateBP', cs_bp_send)
+
 
   def step(self):
     CS, CS_SP, RD = self.state_update()

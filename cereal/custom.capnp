@@ -463,7 +463,8 @@ struct CustomReserved11 @0xc2243c65e0340384 {
 struct CustomReserved12 @0x9ccdc8676701b412 {
 }
 
-struct CustomReserved13 @0xcd96dafb67a082d0 {
+struct ControllerStateBP @0xcd96dafb67a082d0 {
+    lateralUncertainty @0 :Float32; #BluePilot
 }
 
 struct CustomReserved14 @0xb057204d7deadf3f {
