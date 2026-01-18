@@ -22,12 +22,16 @@ class LeadVehicleRenderer(Widget):
     self._faster_color = np.array([0, 255,  0], dtype=float)
     self._font_color: rl.Color = rl.Color(255, 255, 255, 180)
     self._car_state = None
+    self._should_render = False
 
     self.params = Params()
 
+  def _update_state(self):
+     self._should_render = self.params.get_bool("show_lead_speed")
+
   def _render(self, rect: rl.Rectangle) -> None:
     """Draw the first lead vehicle speed and unit."""
-    if not self.params.get_bool("show_lead_speed"):
+    if not self._should_render:
       return
 
     sm = ui_state.sm
