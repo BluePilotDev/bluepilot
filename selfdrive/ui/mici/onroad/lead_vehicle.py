@@ -11,6 +11,7 @@ from openpilot.common.params import Params
 FONT_SIZE = 68
 UNIT_FONT_SIZE = 24
 WIDTH = 80
+COLOR_DELTA_MS = 4.5  # ~ 10MPH
 
 class LeadVehicleRenderer(Widget):
   def __init__(self):
@@ -46,13 +47,13 @@ class LeadVehicleRenderer(Widget):
     speed_delta = lead_one.vRel * speed_conversion
     self.speed = max(0.0, self._car_state.vEgoCluster * speed_conversion + speed_delta)
 
-    color_delta_ms = 4.5  # ~ 10MPH
-    v_delta = np.clip(lead_one.vRel, -color_delta_ms, color_delta_ms)
+
+    v_delta = np.clip(lead_one.vRel, -COLOR_DELTA_MS, COLOR_DELTA_MS)
     if v_delta <= 0:
-        t = (v_delta + color_delta_ms) / color_delta_ms
+        t = (v_delta + COLOR_DELTA_MS) / COLOR_DELTA_MS
         result = (1 - t) * self._slower_color + t * self._color
     else:
-        t = v_delta / color_delta_ms
+        t = v_delta / COLOR_DELTA_MS
         result = (1 - t) * self._color + t * self._faster_color
 
     color = result.astype(int)
