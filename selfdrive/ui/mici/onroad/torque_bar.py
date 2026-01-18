@@ -2,7 +2,6 @@ import math
 import time
 from functools import wraps
 from collections import OrderedDict
-import cereal.messaging as messaging
 
 import numpy as np
 import pyray as rl
@@ -155,21 +154,11 @@ class TorqueBar(Widget):
     self._torque_line_height_min=line_height_min
     self._torque_line_height_max=line_height_max
 
-    # self._demo_torque = 0.0
-    # self._demo_increment = 0.03
-
   def update_filter(self, value: float):
     """Update the torque filter value (for demo mode)."""
     self._torque_filter.update(value)
 
   def _update_state(self):
-    # if (self._torque_filter.x > 1.1):
-    #   self._demo_increment = -0.03
-    # elif (self._torque_filter.x < -1.1):
-    #   self._demo_increment = 0.03
-    # self._demo_torque += self._demo_increment
-    # self.update_filter(self._demo_torque)
-
     if self._demo:
       return
 

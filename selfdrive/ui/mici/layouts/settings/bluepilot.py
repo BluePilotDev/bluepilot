@@ -22,6 +22,7 @@ class BluePilotLayoutMici(NavWidget):
 
     # ******** Main Scroller ********
     self.show_hands_free_ui = BigParamControl("show hands-free ui", "send_hands_free_cluster_msg")
+    self.show_lead_vehicle = BigParamControl("show lead vehicle speed", "show_lead_speed")
     self.enable_human_turn_detection = BigParamControl("enable human turn detection", "enable_human_turn_detection")
     self.lane_change_factor_high = BigParamFloatControl("lane change factor high", "lane_change_factor_high", min=0.5, max=1.0)
     self.enable_lane_positioning = BigParamControl("enable lane positioning", "enable_lane_positioning", tint=rl.GREEN)
@@ -39,6 +40,7 @@ class BluePilotLayoutMici(NavWidget):
 
     self._scroller = Scroller([
       self.show_hands_free_ui,
+      self.show_lead_vehicle,
       self.enable_human_turn_detection,
       self.lane_change_factor_high,
       self.enable_lane_positioning,
@@ -55,6 +57,7 @@ class BluePilotLayoutMici(NavWidget):
     # Toggle lists
     self._refresh_toggles = (
       ("send_hands_free_cluster_msg", self.show_hands_free_ui),
+      ("show_lead_speed", self.show_lead_vehicle),
       ("enable_human_turn_detection", self.enable_human_turn_detection),
       ("enable_lane_positioning", self.enable_lane_positioning),
       ("enable_lane_full_mode", self.enable_lane_full_mode),

@@ -1202,5 +1202,9 @@
     "max": 14.0,
     "step": 0.1,
     "description": "Voltage at which BluePilot will shutdown and avoid draining the car battery."
+  },
+  "show_lead_speed": {
+    "title": "BluePilot: Show Lead Vehicle Speed",
+    "description": "Show the lead vehicle's speed in the UI."
   }
 }
