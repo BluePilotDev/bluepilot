@@ -39,7 +39,8 @@ class LeadVehicleRenderer(Widget):
     self._car_state = sm['carState']
     self._radar_state = sm['radarState'] if sm.valid['radarState'] else None
     lead_one = self._radar_state.leadOne if self._radar_state else None
-    render_lead_indicator = self._radar_state is not None and lead_one is not None
+    has_lead_one = lead_one.status if lead_one else False
+    render_lead_indicator = self._radar_state is not None and has_lead_one
     if not render_lead_indicator:
       return
 
