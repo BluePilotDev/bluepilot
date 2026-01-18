@@ -24,11 +24,12 @@ def draw_circle_gradient(center_x: float, center_y: float, radius: int,
 
 
 class ConfidenceBall(Widget, ConfidenceBallSP):
-  def __init__(self, demo: bool = False):
+  def __init__(self, demo: bool = False, radius: float=24):
     Widget.__init__(self)
     ConfidenceBallSP.__init__(self)
     self._demo = demo
     self._confidence_filter = FirstOrderFilter(-0.5, 0.5, 1 / gui_app.target_fps)
+    self._status_dot_radius = radius
 
   def update_filter(self, value: float):
     self._confidence_filter.update(value)
@@ -54,8 +55,7 @@ class ConfidenceBall(Widget, ConfidenceBallSP):
       self.rect.height,
     )
 
-    status_dot_radius = 24
-    dot_height = (1 - self._confidence_filter.x) * (content_rect.height - 2 * status_dot_radius) + status_dot_radius
+    dot_height = (1 - self._confidence_filter.x) * (content_rect.height - 2 * self._status_dot_radius) + self._status_dot_radius
     dot_height = self._rect.y + dot_height
 
     # confidence zones
@@ -81,6 +81,6 @@ class ConfidenceBall(Widget, ConfidenceBallSP):
       top_dot_color = rl.Color(50, 50, 50, 255)
       bottom_dot_color = rl.Color(13, 13, 13, 255)
 
-    draw_circle_gradient(content_rect.x + content_rect.width - status_dot_radius,
-                         dot_height, status_dot_radius,
+    draw_circle_gradient(content_rect.x + content_rect.width - self._status_dot_radius,
+                         dot_height, self._status_dot_radius,
                          top_dot_color, bottom_dot_color)

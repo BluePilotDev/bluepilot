@@ -13,6 +13,7 @@ from openpilot.selfdrive.ui.onroad.cameraview import CameraView
 from openpilot.system.ui.lib.application import gui_app
 from openpilot.common.transformations.camera import DEVICE_CAMERAS, DeviceCameraConfig, view_frame_from_device_frame
 from openpilot.common.transformations.orientation import rot_from_euler
+from openpilot.selfdrive.ui.mici.onroad.confidence_ball import ConfidenceBall
 
 if gui_app.sunnypilot_ui():
   from openpilot.selfdrive.ui.sunnypilot.onroad.hud_renderer import HudRendererSP as HudRenderer
@@ -55,6 +56,7 @@ class AugmentedRoadView(CameraView):
     self._hud_renderer = HudRenderer()
     self.alert_renderer = AlertRenderer()
     self.driver_state_renderer = DriverStateRenderer()
+    self._confidence_ball = ConfidenceBall(radius=50)
 
     # debug
     self._pm = messaging.PubMaster(['uiDebug'])
@@ -71,12 +73,13 @@ class AugmentedRoadView(CameraView):
     self._update_calibration()
 
     # Create inner content area with border padding
-    self._content_rect = rl.Rectangle(
-      rect.x + UI_BORDER_SIZE,
-      rect.y + UI_BORDER_SIZE,
-      rect.width - 2 * UI_BORDER_SIZE,
-      rect.height - 2 * UI_BORDER_SIZE,
-    )
+    # self._content_rect = rl.Rectangle(
+    #   rect.x + UI_BORDER_SIZE,
+    #   rect.y + UI_BORDER_SIZE,
+    #   rect.width - 2 * UI_BORDER_SIZE,
+    #   rect.height - 2 * UI_BORDER_SIZE,
+    # )
+    self._content_rect = rect
 
     # Enable scissor mode to clip all rendering within content rectangle boundaries
     # This creates a rendering viewport that prevents graphics from drawing outside the border
@@ -91,6 +94,7 @@ class AugmentedRoadView(CameraView):
     super()._render(rect)
 
     # Draw all UI overlays
+    self._confidence_ball.render(self.rect)
     self.model_renderer.render(self._content_rect)
     self._hud_renderer.render(self._content_rect)
     self.alert_renderer.render(self._content_rect)
@@ -103,7 +107,7 @@ class AugmentedRoadView(CameraView):
     rl.end_scissor_mode()
 
     # Draw colored border based on driving state
-    self._draw_border(rect)
+    #self._draw_border(rect)
 
     # publish uiDebug
     msg = messaging.new_message('uiDebug')
