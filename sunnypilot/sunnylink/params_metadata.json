@@ -163,7 +163,29 @@
   },
   "ChevronInfo": {
     "title": "Chevron Info",
-    "description": ""
+    "description": "",
+    "options": [
+      {
+        "value": 0,
+        "label": "Off"
+      },
+      {
+        "value": 1,
+        "label": "Distance"
+      },
+      {
+        "value": 2,
+        "label": "Speed"
+      },
+      {
+        "value": 3,
+        "label": "Time ahead (s)"
+      },
+      {
+        "value": 4,
+        "label": "All"
+      }
+    ]
   },
   "CompletedSunnylinkConsentVersion": {
     "title": "Completed sunnylink Consent Version",
