@@ -12,6 +12,7 @@ FONT_SIZE = 68
 UNIT_FONT_SIZE = 24
 WIDTH = 80
 COLOR_DELTA_MS = 4.5  # ~ 10MPH
+SHADOW_DEPTH = 3
 
 class LeadVehicleRenderer(Widget):
   def __init__(self):
@@ -19,8 +20,8 @@ class LeadVehicleRenderer(Widget):
     self.speed: float = 0.0
     self._font_bold: rl.Font = gui_app.font(FontWeight.BOLD)
     self._color = np.array([255, 255, 255], dtype=float)
-    self._slower_color = np.array([255,  0,  0], dtype=float)
-    self._faster_color = np.array([0, 255,  0], dtype=float)
+    self._slower_color = np.array([255,  160,  0], dtype=float) #orangish
+    self._faster_color = np.array([0, 255,  0], dtype=float) #green
     self._font_color: rl.Color = rl.Color(255, 255, 255, 180)
     self._car_state = None
     self._should_render = False
@@ -58,17 +59,24 @@ class LeadVehicleRenderer(Widget):
         result = (1 - t) * self._color + t * self._faster_color
 
     color = result.astype(int)
-    self._font_color = rl.Color(color[0], color[1], color[2], 180)
+    self._font_color = rl.Color(color[0], color[1], color[2], 220)
+    shadow_color = rl.Color(0, 0, 0, 180)
 
     speed_text = str(round(self.speed))
     speed_text_size = measure_text_cached(self._font_bold, speed_text, FONT_SIZE)
     pos_x = rect.x + rect.width - WIDTH - 5
     speed_pos = rl.Vector2(pos_x + ((WIDTH - speed_text_size.x) / 2), rect.y + rect.height * 0.66 - speed_text_size.y / 2)
+    rl.draw_text_ex(self._font_bold, speed_text, speed_pos, FONT_SIZE, 0, shadow_color)
+    speed_pos.x -= SHADOW_DEPTH
+    speed_pos.y -= SHADOW_DEPTH
     rl.draw_text_ex(self._font_bold, speed_text, speed_pos, FONT_SIZE, 0, self._font_color)
 
     unit_text = tr("km/h") if ui_state.is_metric else tr("mph")
     unit_text_size = measure_text_cached(self._font_bold, unit_text, UNIT_FONT_SIZE)
     unit_pos = rl.Vector2(pos_x + WIDTH / 2 - unit_text_size.x / 2, speed_pos.y + speed_text_size.y - 15)
+    rl.draw_text_ex(self._font_bold, unit_text, unit_pos, UNIT_FONT_SIZE, 0, shadow_color)
+    unit_pos.x -= SHADOW_DEPTH
+    unit_pos.y -= SHADOW_DEPTH
     rl.draw_text_ex(self._font_bold, unit_text, unit_pos, UNIT_FONT_SIZE, 0, self._font_color)
 
     size = 20

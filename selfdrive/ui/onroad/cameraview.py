@@ -214,8 +214,8 @@ class CameraView(Widget):
     x_offset = rect.x + (rect.width - scale_x) / 2
     y_offset = rect.y + (rect.height - scale_y) / 2
 
-    # x_offset += transform[0, 2] * rect.width / 2
-    # y_offset += transform[1, 2] * rect.height / 2
+    x_offset += transform[0, 2] * rect.width / 2
+    y_offset += transform[1, 2] * rect.height / 2
 
     dst_rect = rl.Rectangle(x_offset, y_offset, scale_x, scale_y)
 

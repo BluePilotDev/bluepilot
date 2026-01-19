@@ -37,7 +37,8 @@ BORDER_COLORS = {
 WIDE_CAM_MAX_SPEED = 10.0  # m/s (22 mph)
 ROAD_CAM_MIN_SPEED = 15.0  # m/s (34 mph)
 INF_POINT = np.array([1000.0, 0.0, 0.0])
-
+CONFIDENCE_BALL_R = 50
+CONFIDENCE_BALL_W = CONFIDENCE_BALL_R + 15
 
 class AugmentedRoadView(CameraView):
   def __init__(self, stream_type: VisionStreamType = VisionStreamType.VISION_STREAM_ROAD):
@@ -53,7 +54,7 @@ class AugmentedRoadView(CameraView):
     self._content_rect = rl.Rectangle()
 
     self.model_renderer = ModelRenderer()
-    self._hud_renderer = HudRenderer()
+    self._hud_renderer = HudRenderer(CONFIDENCE_BALL_W)
     self.alert_renderer = AlertRenderer()
     self.driver_state_renderer = DriverStateRenderer()
     self._confidence_ball = ConfidenceBall(radius=50)
@@ -94,11 +95,24 @@ class AugmentedRoadView(CameraView):
     super()._render(rect)
 
     # Draw all UI overlays
-    self._confidence_ball.render(self.rect)
+    confidence_ball_rect = rl.Rectangle(
+      self.rect.x + CONFIDENCE_BALL_R,
+      self.rect.y,
+      CONFIDENCE_BALL_R,
+      self.rect.height,
+    )
+    self._confidence_ball.render(confidence_ball_rect)
+
+    left_rect = rl.Rectangle(
+      self.rect.x + CONFIDENCE_BALL_W,
+      self.rect.y,
+      self.rect.width - CONFIDENCE_BALL_W,
+      self.rect.height,
+    )
     self.model_renderer.render(self._content_rect)
     self._hud_renderer.render(self._content_rect)
     self.alert_renderer.render(self._content_rect)
-    self.driver_state_renderer.render(self._content_rect)
+    self.driver_state_renderer.render(left_rect)
 
     # Custom UI extension point - add custom overlays here
     # Use self._content_rect for positioning within camera bounds

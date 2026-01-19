@@ -11,8 +11,8 @@ from openpilot.selfdrive.ui.sunnypilot.onroad.developer_ui import DeveloperUiRen
 
 
 class HudRendererSP(HudRenderer):
-  def __init__(self):
-    super().__init__()
+  def __init__(self, left_offset:int = 0):
+    super().__init__(left_offset=left_offset)
     self.developer_ui = DeveloperUiRenderer()
 
   def _render(self, rect: rl.Rectangle) -> None:

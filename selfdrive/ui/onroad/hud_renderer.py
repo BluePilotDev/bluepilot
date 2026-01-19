@@ -58,9 +58,10 @@ COLORS = Colors()
 
 
 class HudRenderer(Widget):
-  def __init__(self):
+  def __init__(self, left_offset:int = 0):
     super().__init__()
     """Initialize the HUD renderer."""
+    self._left_offset = left_offset
     self.is_cruise_set: bool = False
     self.is_cruise_available: bool = True
     self.set_speed: float = SET_SPEED_NA
@@ -133,7 +134,7 @@ class HudRenderer(Widget):
   def _draw_set_speed(self, rect: rl.Rectangle) -> None:
     """Draw the MAX speed indicator box."""
     set_speed_width = UI_CONFIG.set_speed_width_metric if ui_state.is_metric else UI_CONFIG.set_speed_width_imperial
-    x = rect.x + 60 + (UI_CONFIG.set_speed_width_imperial - set_speed_width) // 2
+    x = rect.x + 60 + self._left_offset + (UI_CONFIG.set_speed_width_imperial - set_speed_width) // 2
     y = rect.y + 45
 
     set_speed_rect = rl.Rectangle(x, y, set_speed_width, UI_CONFIG.set_speed_height)
