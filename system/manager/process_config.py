@@ -101,6 +101,14 @@ def uploader_ready(started: bool, params: Params, CP: car.CarParams) -> bool:
 
   return always_run(started, params, CP)
 
+def portal_enabled(started: bool, params: Params, CP: car.CarParams) -> bool:
+  """BluePilot Portal - always run when enabled (rate-limited onroad)"""
+  return params.get_bool("BPPortalEnabled")
+
+def route_preprocessor_enabled(started: bool, params: Params, CP: car.CarParams) -> bool:
+  """Route preprocessor - only run when portal enabled and offroad"""
+  return params.get_bool("BPPortalEnabled") and only_offroad(started, params, CP)
+
 def or_(*fns):
   return lambda *args: operator.or_(*(fn(*args) for fn in fns))
 
@@ -182,6 +190,14 @@ procs += [
 
   # locationd
   NativeProcess("locationd_llk", "sunnypilot/selfdrive/locationd", ["./locationd"], only_onroad),
+]
+
+# bluepilot
+procs += [
+  # BluePilot Portal (routes, video streaming, exports, system metrics)
+  PythonProcess("bp_portal", "bluepilot.backend.bp_portal", portal_enabled),
+  # Route preprocessor (runs in background during idle time)
+  PythonProcess("bp_route_preprocessor", "bluepilot.backend.routes.preprocessor", route_preprocessor_enabled),
 ]
 
 if os.path.exists("./github_runner.sh"):
