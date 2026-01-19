@@ -273,15 +273,6 @@ export const Home = ({ deviceStatus = 'checking' }: HomeProps) => {
               <h2>Quick Access</h2>
             </div>
             <div className="quick-links-grid">
-              <button className="quick-link-card settings" onClick={() => navigate('/settings')}>
-                <div className="quick-link-icon">
-                  <Icon name="settings" />
-                </div>
-                <div className="quick-link-copy">
-                  <span className="label">Settings</span>
-                  <span className="subtext">Configure BluePilot</span>
-                </div>
-              </button>
               <button
                 className={`quick-link-card routes ${deviceStatus === 'onroad' ? 'disabled' : ''}`}
                 onClick={() => deviceStatus !== 'onroad' && navigate('/routes')}
