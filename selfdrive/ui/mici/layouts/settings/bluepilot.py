@@ -21,6 +21,7 @@ class BluePilotLayoutMici(NavWidget):
     self.lane_change_factor_high = float(self._params.get("lane_change_factor_high", return_default=True))
 
     # ******** Main Scroller ********
+    self.enable_web_routes = BigParamControl("enable web routes server", "BPPortalEnabled")
     self.show_hands_free_ui = BigParamControl("show hands-free ui", "send_hands_free_cluster_msg")
     self.show_lead_vehicle = BigParamControl("show lead vehicle speed", "show_lead_speed")
     self.enable_human_turn_detection = BigParamControl("enable human turn detection", "enable_human_turn_detection")
@@ -39,6 +40,7 @@ class BluePilotLayoutMici(NavWidget):
     #self.charging_btn.set_click_callback(lambda: self._show_charging_view())
 
     self._scroller = Scroller([
+      self.enable_web_routes,
       self.show_hands_free_ui,
       self.show_lead_vehicle,
       self.enable_human_turn_detection,
@@ -56,6 +58,7 @@ class BluePilotLayoutMici(NavWidget):
 
     # Toggle lists
     self._refresh_toggles = (
+      ("BPPortalEnabled", self.enable_web_routes),
       ("send_hands_free_cluster_msg", self.show_hands_free_ui),
       ("show_lead_speed", self.show_lead_vehicle),
       ("enable_human_turn_detection", self.enable_human_turn_detection),
