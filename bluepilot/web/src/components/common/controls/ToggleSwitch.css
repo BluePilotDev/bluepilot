@@ -1,0 +1,91 @@
+.bp-toggle-switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  cursor: pointer;
+  user-select: none;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.bp-toggle-switch input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.bp-toggle-switch__slider {
+  position: relative;
+  width: 64px;
+  height: 30px;
+  border-radius: 999px;
+  background: linear-gradient(145deg, #181818, #101010);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: background var(--transition-normal), border-color var(--transition-normal);
+  display: inline-block;
+}
+
+.bp-toggle-switch__slider::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #f4f4f4;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4), inset 0 -2px 4px rgba(0, 0, 0, 0.15);
+  transition: left var(--transition-normal), background var(--transition-normal);
+}
+
+.bp-toggle-switch input:checked + .bp-toggle-switch__slider {
+  background: linear-gradient(135deg, #ffa726, #ff7043);
+  border-color: transparent;
+  box-shadow: 0 4px 16px rgba(255, 152, 0, 0.4);
+}
+
+.bp-toggle-switch input:checked + .bp-toggle-switch__slider::after {
+  left: calc(100% - 27px);
+  background: #ffffff;
+}
+
+.bp-toggle-switch input:disabled + .bp-toggle-switch__slider {
+  opacity: 0.4;
+}
+
+.bp-toggle-switch__label {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.bp-toggle-switch--compact .bp-toggle-switch__slider {
+  width: 48px;
+  height: 24px;
+}
+
+.bp-toggle-switch--compact .bp-toggle-switch__slider::after {
+  width: 18px;
+  height: 18px;
+  top: 3px;
+  left: 3px;
+}
+
+.bp-toggle-switch--compact input:checked + .bp-toggle-switch__slider::after {
+  left: calc(100% - 21px);
+}
+
+.bp-toggle-switch--label-start {
+  flex-direction: row-reverse;
+}
+
+@media (max-width: 768px) {
+  .bp-toggle-switch {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .bp-toggle-switch__label {
+    font-size: 0.85rem;
+  }
+}

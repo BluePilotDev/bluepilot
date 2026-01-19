@@ -1,0 +1,106 @@
+.control-card {
+  position: relative;
+  width: 100%;
+  border-radius: var(--radius-2xl);
+  border: 1px solid var(--border-color);
+  background: var(--panel-card-gradient);
+  box-shadow: var(--panel-card-shadow);
+  padding: var(--spacing-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  transition: border-color var(--transition-normal),
+    transform var(--transition-normal);
+  height: 100%;
+  min-height: 140px; /* Ensure enough space for favorite button */
+}
+
+.control-card:not(.control-card--disabled):hover {
+  border-color: var(--primary-color);
+  transform: translateY(-1px);
+}
+
+.control-card--inline {
+  flex-direction: row;
+  align-items: center;
+}
+
+.control-card--disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.control-card__main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  flex-grow: 1;
+}
+
+.control-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.control-card__title-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.control-card__title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.control-card__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  background: var(--warning-bg);
+  padding: 0.15rem 0.65rem;
+  border-radius: var(--radius-full);
+}
+
+.control-card__meta {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.control-card__description {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.control-card__aside {
+  display: flex;
+  align-items: center;
+  margin-left: auto;
+}
+
+.control-card__footer {
+  margin-top: auto;
+}
+
+@media (max-width: 768px) {
+  .control-card--inline {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .control-card__aside {
+    margin-left: 0;
+  }
+}

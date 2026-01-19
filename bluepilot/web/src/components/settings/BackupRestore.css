@@ -1,0 +1,42 @@
+.backup-restore {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+.backup-restore-card .control-card__footer {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.backup-result-details {
+  margin-top: var(--spacing-md);
+  padding: var(--spacing-md);
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: var(--radius-md);
+  border-left: 4px solid var(--primary-color);
+}
+
+.backup-result-details p {
+  margin: 0.4rem 0;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.backup-result-details strong {
+  color: var(--text-primary);
+  margin-right: 0.5rem;
+}
+
+.backup-restore-modal-actions {
+  margin-top: var(--spacing-lg);
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--spacing-md);
+}
+
+@media (max-width: 768px) {
+  .backup-restore-card .control-card__footer {
+    width: 100%;
+  }
+}

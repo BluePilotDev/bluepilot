@@ -1,0 +1,9 @@
+.material-icons {
+  user-select: none;
+  -webkit-user-select: none;
+  vertical-align: middle;
+}
+
+.material-icons.clickable {
+  cursor: pointer;
+}

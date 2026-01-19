@@ -1,0 +1,143 @@
+.toast-container {
+  position: fixed;
+  top: 80px;
+  right: 20px;
+  z-index: 5000;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  pointer-events: none;
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.875rem 1.25rem;
+  background: var(--bp-bg-secondary);
+  border: 1px solid var(--bp-border);
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  min-width: 250px;
+  max-width: 400px;
+  animation: slideInRight 0.3s ease;
+  pointer-events: auto;
+  position: relative;
+}
+
+.toast--success {
+  border-left: 3px solid #4caf50;
+}
+
+.toast--error {
+  border-left: 3px solid #f44336;
+}
+
+.toast--info {
+  border-left: 3px solid var(--bp-accent-blue);
+}
+
+.toast__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  font-weight: bold;
+  font-size: 0.75rem;
+  flex-shrink: 0;
+}
+
+.toast--success .toast__icon {
+  background: #4caf50;
+  color: white;
+}
+
+.toast--error .toast__icon {
+  background: #f44336;
+  color: white;
+}
+
+.toast--info .toast__icon {
+  background: var(--bp-accent-blue);
+  color: white;
+}
+
+.toast__message {
+  flex: 1;
+  color: var(--bp-text-primary);
+  font-size: 0.9rem;
+  line-height: 1.4;
+  padding-right: 8px;
+}
+
+.toast__close {
+  background: none;
+  border: none;
+  color: var(--bp-text-secondary);
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  padding: 4px 8px;
+  margin: -4px -8px -4px 0;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  opacity: 0.6;
+  flex-shrink: 0;
+}
+
+.toast__close:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.toast__close:active {
+  transform: scale(0.95);
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(400px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fadeOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@media (max-width: 768px) {
+  .toast-container {
+    top: 20px;
+    bottom: auto;
+    right: 10px;
+    left: 10px;
+  }
+
+  .toast {
+    width: 100%;
+    max-width: none;
+    animation: slideInDown 0.3s ease;
+  }
+}
+
+@keyframes slideInDown {
+  from {
+    transform: translateY(-100px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}

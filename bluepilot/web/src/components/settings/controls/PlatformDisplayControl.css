@@ -1,0 +1,34 @@
+.platform-display-control {
+  border-left: 4px solid var(--bp-accent-blue);
+  padding-left: 1.5rem;
+}
+
+.platform-display-control.status-auto {
+  border-left-color: #4caf50;
+}
+
+.platform-display-control.status-manual {
+  border-left-color: var(--bp-accent-blue);
+}
+
+.platform-display-control.status-unknown {
+  border-left-color: #ff9800;
+}
+
+.platform-display-value {
+  padding: 0.875rem;
+  background: var(--bp-bg-secondary);
+  border: 1px solid var(--bp-border);
+  border-radius: 12px;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--bp-accent-blue);
+  text-align: center;
+  word-break: break-word;
+}
+
+@media (max-width: 768px) {
+  .platform-display-control {
+    padding-left: 1.25rem;
+  }
+}

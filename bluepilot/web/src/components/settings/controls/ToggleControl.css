@@ -1,0 +1,9 @@
+.toggle-control-card .control-card__aside {
+  justify-content: flex-end;
+}
+
+@media (max-width: 768px) {
+  .toggle-control-card .control-card__aside {
+    justify-content: flex-start;
+  }
+}

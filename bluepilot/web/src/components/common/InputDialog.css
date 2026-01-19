@@ -1,0 +1,27 @@
+.input-dialog-message {
+  margin-bottom: 1rem;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: var(--text-secondary, #666);
+}
+
+.input-dialog-input {
+  width: 100%;
+  padding: 0.75rem;
+  font-size: 1rem;
+  border: 1px solid var(--border-color, #ddd);
+  border-radius: 4px;
+  background-color: var(--input-bg, #fff);
+  color: var(--text-primary, #000);
+  transition: border-color 0.2s;
+}
+
+.input-dialog-input:focus {
+  outline: none;
+  border-color: var(--primary-color, #007bff);
+  box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+}
+
+.input-dialog-input::placeholder {
+  color: var(--text-muted, #999);
+}

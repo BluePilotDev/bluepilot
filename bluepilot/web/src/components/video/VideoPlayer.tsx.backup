@@ -1,0 +1,575 @@
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { useRoutesStore } from '@/stores/useRoutesStore'
+import { ExportBackupModal } from '@/components/modals'
+import type { RouteDetails, CameraType } from '@/types'
+import { VehicleInfoPanel } from './panels/VehicleInfoPanel'
+import { LogsPanel } from './panels/LogsPanel'
+import { CerealDataPanel } from './panels/CerealDataPanel'
+import { FFmpegDebugPanel } from './panels/FFmpegDebugPanel'
+import {
+  detectBrowserCapabilities,
+  loadHLSScript,
+  getHLSConfig,
+  canUseNativeHLS,
+  type BrowserCapabilities
+} from '@/utils/videoPlayback'
+import './VideoPlayer.css'
+
+interface VideoPlayerProps {
+  route: RouteDetails
+  onClose: () => void
+}
+
+export const VideoPlayer: React.FC<VideoPlayerProps> = ({ route, onClose }) => {
+  const navigate = useNavigate()
+  const { deleteRoute, preserveRoute } = useRoutesStore()
+  const [showExportModal, setShowExportModal] = useState(false)
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  const [currentCamera, setCurrentCamera] = useState<CameraType>('front')
+  const [currentSegment, setCurrentSegment] = useState(0)
+  const [currentTime, setCurrentTime] = useState(0)
+  const [buffering, setBuffering] = useState(false)
+  const [showDebugPanel, setShowDebugPanel] = useState(false)
+  const [browserCaps, setBrowserCaps] = useState<BrowserCapabilities | null>(null)
+  const [availableCameras, setAvailableCameras] = useState<CameraType[]>(['front'])
+
+  // HLS instance (will be initialized if needed)
+  const hlsRef = useRef<any>(null)
+  const retryCountRef = useRef(0)
+  const maxRetries = 3
+  const lastPlaybackTimeRef = useRef(0)
+
+  // Detect browser capabilities on mount
+  useEffect(() => {
+    const init = async () => {
+      // Load HLS.js script
+      try {
+        await loadHLSScript()
+      } catch (e) {
+        console.error('Failed to load HLS.js:', e)
+      }
+
+      // Detect capabilities
+      const caps = await detectBrowserCapabilities()
+      setBrowserCaps(caps)
+    }
+
+    init()
+  }, [])
+
+  // Detect available cameras from route segments
+  useEffect(() => {
+    if (route.segments && route.segments.length > 0) {
+      const cameras = new Set<CameraType>()
+      route.segments.forEach(segment => {
+        Object.keys(segment.videos).forEach(camera => {
+          cameras.add(camera as CameraType)
+        })
+      })
+      const cameraList = Array.from(cameras).sort((a, b) => {
+        const order: CameraType[] = ['front', 'wide', 'driver', 'lq']
+        return order.indexOf(a) - order.indexOf(b)
+      })
+      setAvailableCameras(cameraList)
+
+      // Set initial camera to front if available, otherwise first available
+      if (cameraList.length > 0) {
+        setCurrentCamera(cameraList.includes('front') ? 'front' : cameraList[0])
+      }
+    }
+  }, [route])
+
+  // Handle camera switching with playback time sync
+  const handleCameraChange = useCallback((newCamera: CameraType) => {
+    const video = videoRef.current
+    if (!video) return
+
+    // Store current playback time before switching
+    lastPlaybackTimeRef.current = video.currentTime
+    setCurrentCamera(newCamera)
+  }, [])
+
+  // Load video for current camera
+  // Cloned from app_old.js fallbackToStandardVideo()
+  const loadVideo = useCallback(() => {
+    const video = videoRef.current
+    if (!video || !browserCaps) return
+
+    console.log('Loading HLS route playlist for camera:', currentCamera)
+
+    // Clean up any existing HLS instance
+    if (hlsRef.current) {
+      try {
+        hlsRef.current.destroy()
+        console.log('HLS.js instance destroyed')
+      } catch (e) {
+        console.error('Error destroying HLS:', e)
+      }
+      hlsRef.current = null
+    }
+
+    // Use HLS.js for full route streaming (allows scrubbing across all segments)
+    const hlsUrl = `/api/hls/${route.baseName}/${currentCamera}/playlist.m3u8`
+
+    console.log('=== Video Playback Strategy ===')
+    console.log('Camera:', currentCamera)
+    console.log('HLS URL:', hlsUrl)
+    console.log('HLS.js supported:', browserCaps.hlsSupported)
+    console.log('Safari:', browserCaps.isSafari)
+    console.log('Native HLS:', canUseNativeHLS())
+
+    // Safari with native HLS support - use native playback
+    if (browserCaps.isSafari && canUseNativeHLS()) {
+      console.log('Using Safari native HLS')
+      console.log('Loading HLS URL:', hlsUrl)
+
+      // Add handlers for native HLS
+      const handleLoadedMetadata = () => {
+        console.log('Native HLS loaded, total duration:', video.duration)
+
+        // Sync to stored playback time when switching cameras
+        if (lastPlaybackTimeRef.current > 0) {
+          console.log(`Seeking to synced time: ${lastPlaybackTimeRef.current}s`)
+          video.currentTime = lastPlaybackTimeRef.current
+          lastPlaybackTimeRef.current = 0
+        }
+      }
+
+      const handleError = () => {
+        console.error('Native HLS video error')
+        const err = video.error
+        if (err) {
+          console.error('Error Code:', err.code, 'Message:', err.message)
+        }
+        setBuffering(false)
+      }
+
+      video.addEventListener('loadedmetadata', handleLoadedMetadata, { once: true })
+      video.addEventListener('error', handleError, { once: true })
+
+      video.src = hlsUrl
+      return
+    }
+
+    // All other browsers - use HLS.js for consistent behavior
+    if (typeof window.Hls !== 'undefined' && window.Hls.isSupported()) {
+      console.log('Using HLS.js for route playback')
+
+      const hls = new window.Hls(getHLSConfig())
+
+      hls.loadSource(hlsUrl)
+      hls.attachMedia(video)
+
+      hls.on(window.Hls.Events.MANIFEST_PARSED, () => {
+        console.log('HLS manifest parsed - full route available for scrubbing')
+
+        // Sync to stored playback time when switching cameras
+        if (lastPlaybackTimeRef.current > 0) {
+          console.log(`Seeking to synced time: ${lastPlaybackTimeRef.current}s`)
+          video.currentTime = lastPlaybackTimeRef.current
+          lastPlaybackTimeRef.current = 0 // Reset after use
+        }
+      })
+
+      hls.on(window.Hls.Events.ERROR, (_event: any, data: any) => {
+        console.error('HLS error:', data)
+
+        if (data.fatal) {
+          switch (data.type) {
+            case window.Hls.ErrorTypes.NETWORK_ERROR:
+              console.error('Fatal network error, trying to recover...')
+              if (retryCountRef.current < maxRetries) {
+                retryCountRef.current++
+                setTimeout(() => {
+                  console.log(`Retry attempt ${retryCountRef.current}`)
+                  hls.startLoad()
+                }, 1000)
+              } else {
+                console.error('Max retries reached')
+                setBuffering(false)
+              }
+              break
+
+            case window.Hls.ErrorTypes.MEDIA_ERROR:
+              console.error('Fatal media error, trying to recover...')
+              hls.recoverMediaError()
+              break
+
+            default:
+              console.error('Unrecoverable HLS error')
+              hls.destroy()
+              setBuffering(false)
+              break
+          }
+        }
+      })
+
+      hlsRef.current = hls
+    } else if (canUseNativeHLS()) {
+      // Fallback to native HLS for browsers that support it
+      console.log('Using native HLS (fallback)')
+
+      const handleError = () => {
+        console.error('Native HLS fallback error')
+        const err = video.error
+        if (err) {
+          console.error('Error Code:', err.code, 'Message:', err.message)
+        }
+        setBuffering(false)
+      }
+
+      video.addEventListener('error', handleError, { once: true })
+      video.src = hlsUrl
+    } else {
+      console.error('No HLS support available')
+      setBuffering(false)
+    }
+  }, [route.baseName, currentCamera, browserCaps])
+
+  // Initialize video player
+  useEffect(() => {
+    loadVideo()
+
+    return () => {
+      if (hlsRef.current) {
+        hlsRef.current.destroy()
+      }
+    }
+  }, [loadVideo])
+
+  // Video event handlers
+  useEffect(() => {
+    const video = videoRef.current
+    if (!video) return
+
+    const handleTimeUpdate = () => {
+      const time = video.currentTime
+      setCurrentTime(time)
+
+      // Track which segment we're in during HLS playback for auto-reloading logs/cereal
+      if (hlsRef.current && route.segments.length > 0) {
+        const calculatedSegment = Math.floor(time / 60) // Each segment is 60 seconds
+
+        // If we've moved to a different segment, update
+        if (
+          calculatedSegment !== currentSegment &&
+          calculatedSegment < route.segments.length &&
+          calculatedSegment >= 0
+        ) {
+          console.log(`Segment changed: ${currentSegment} → ${calculatedSegment}`)
+          setCurrentSegment(calculatedSegment)
+        }
+      }
+    }
+
+    const handleLoadStart = () => {
+      console.log('Video loadstart event')
+      setBuffering(true)
+    }
+
+    const handleLoadedMetadata = () => {
+      console.log('Video metadata loaded:', {
+        duration: video.duration,
+        videoWidth: video.videoWidth,
+        videoHeight: video.videoHeight,
+      })
+    }
+
+    const handlePlay = () => {
+      setBuffering(false)
+    }
+
+    const handlePlaying = () => {
+      console.log('Video is playing')
+      setBuffering(false)
+    }
+
+    const handleWaiting = () => {
+      setBuffering(true)
+    }
+
+    const handleCanPlay = () => {
+      console.log('Video can play')
+      setBuffering(false)
+    }
+
+    video.addEventListener('loadstart', handleLoadStart)
+    video.addEventListener('loadedmetadata', handleLoadedMetadata)
+    video.addEventListener('timeupdate', handleTimeUpdate)
+    video.addEventListener('play', handlePlay)
+    video.addEventListener('playing', handlePlaying)
+    video.addEventListener('waiting', handleWaiting)
+    video.addEventListener('canplay', handleCanPlay)
+
+    return () => {
+      video.removeEventListener('loadstart', handleLoadStart)
+      video.removeEventListener('loadedmetadata', handleLoadedMetadata)
+      video.removeEventListener('timeupdate', handleTimeUpdate)
+      video.removeEventListener('play', handlePlay)
+      video.removeEventListener('playing', handlePlaying)
+      video.removeEventListener('waiting', handleWaiting)
+      video.removeEventListener('canplay', handleCanPlay)
+    }
+  }, [currentSegment, route.segments])
+
+  // Native video controls handle all interactions
+
+  const handleBack = () => {
+    onClose()
+    navigate('/routes')
+  }
+
+  const handlePreserve = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    try {
+      await preserveRoute(route.baseName || route.id || '')
+    } catch (error) {
+      console.error('Failed to preserve route:', error)
+    }
+  }
+
+  const handleDelete = async (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (confirm(`Delete route "${route.date}"? This action cannot be undone.`)) {
+      try {
+        await deleteRoute(route.baseName || route.id || '')
+        handleBack() // Close player and return to routes list
+      } catch (error) {
+        console.error('Failed to delete route:', error)
+        alert('Failed to delete route. Please try again.')
+      }
+    }
+  }
+
+  return (
+    <>
+      <ExportBackupModal
+        isOpen={showExportModal}
+        onClose={() => setShowExportModal(false)}
+        route={route}
+      />
+      <div className="video-player" ref={containerRef}>
+        <div className="video-header">
+          <div className="video-header-left">
+            <button
+              className="video-back-btn"
+              onClick={handleBack}
+              title="Back to routes"
+            >
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <polyline points="15 18 9 12 15 6"></polyline>
+                <line x1="9" y1="12" x2="21" y2="12"></line>
+              </svg>
+              <span>Routes</span>
+            </button>
+            <div className="video-title-container">
+              <h2 className="video-title">{route.date}</h2>
+              <div className="video-route-id">{route.baseName}</div>
+            </div>
+          </div>
+          <div className="video-header-actions">
+            <button
+              type="button"
+              className="icon-btn"
+              title="Toggle FFmpeg Debug Logs"
+              aria-label="Toggle debug logs"
+              onClick={() => setShowDebugPanel(!showDebugPanel)}
+            >
+              <svg
+                width="24"
+                height="24"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+              >
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                <line x1="9" y1="9" x2="15" y2="9" />
+                <line x1="9" y1="15" x2="15" y2="15" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+      <div className="player-container">
+        <div className="video-section">
+          <div className="video-wrapper">
+            <video
+              ref={videoRef}
+              className="video-element"
+              controls
+              playsInline
+              preload="metadata"
+              style={{ width: '100%', height: '100%', backgroundColor: '#000' }}
+            />
+
+            {buffering && (
+              <div className="video-loading">
+                <div className="spinner"></div>
+              </div>
+            )}
+          </div>
+
+          {/* Player Footer - Camera Selector and Segment Info */}
+          <div className="player-footer">
+            <div className="player-footer-content">
+              {availableCameras.length > 1 && (
+                <div className="camera-buttons">
+                  {availableCameras.map((camera) => (
+                    <button
+                      key={camera}
+                      type="button"
+                      className={`camera-btn ${camera === currentCamera ? 'active' : ''}`}
+                      onClick={() => handleCameraChange(camera)}
+                    >
+                      {camera.charAt(0).toUpperCase() + camera.slice(1)}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <div className="segment-status">
+                <span className="segment-status-label">Active Segment</span>
+                <span className="segment-status-value">
+                  Segment {currentSegment + 1} of {route.segments.length} - {currentCamera.toUpperCase()}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Sidebar Section */}
+        <div className="player-sidebar">
+          {/* Route Details */}
+          <div className="sidebar-group sidebar-header">
+            <h2 className="player-route-title">Route Details</h2>
+            <div className="player-route-summary">
+              <div className="player-route-time">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="12" r="10" />
+                  <polyline points="12 6 12 12 16 14" />
+                </svg>
+                <span>{route.start_time || route.baseName}</span>
+              </div>
+              {(route.start_location || route.end_location) && (
+                <div className="player-route-location">
+                  <span className="location-label">Route</span>
+                  <div className="location-path">
+                    <span>{route.start_location || 'N/A'}</span>
+                    <span className="location-arrow">→</span>
+                    <span>{route.end_location || 'N/A'}</span>
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="player-route-stats">
+              <div className="player-route-stat">
+                <span className="stat-label">Duration</span>
+                <span className="stat-value">{route.duration || '--'}</span>
+              </div>
+              <div className="player-route-stat">
+                <span className="stat-label">Segments</span>
+                <span className="stat-value">{route.segments.length}</span>
+              </div>
+              <div className="player-route-stat">
+                <span className="stat-label">Size</span>
+                <span className="stat-value">{route.size || '--'}</span>
+              </div>
+              <div className="player-route-stat">
+                <span className="stat-label">Distance</span>
+                <span className="stat-value">{route.distance || route.mileage || '--'}</span>
+              </div>
+              <div className="player-route-stat">
+                <span className="stat-label">Avg Speed</span>
+                <span className="stat-value">{route.avg_speed || route.avgSpeed || '--'}</span>
+              </div>
+              <div className="player-route-stat">
+                <span className="stat-label">Top Speed</span>
+                <span className="stat-value">{route.top_speed || route.topSpeed || '--'}</span>
+              </div>
+              <div className="player-route-stat">
+                <span className="stat-label">OP Engaged</span>
+                <span className="stat-value">
+                  {route.op_engaged_percent !== undefined
+                    ? `${Math.round(route.op_engaged_percent)}%`
+                    : route.driveStats?.opEngagedPercent !== undefined
+                    ? `${Math.round(route.driveStats.opEngagedPercent)}%`
+                    : '--'}
+                </span>
+              </div>
+              <div className="player-route-stat">
+                <span className="stat-label">Disengagements</span>
+                <span className="stat-value">
+                  {route.disengagements || route.driveStats?.disengagementCount || '--'}
+                </span>
+              </div>
+              <div className="player-route-stat">
+                <span className="stat-label">Alerts</span>
+                <span className="stat-value">
+                  {route.alert_count || route.alerts || route.driveStats?.alertCount || '--'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Route Actions */}
+          <div className="sidebar-group">
+            <h3 className="sidebar-group-title">Actions</h3>
+            <div className="route-actions-sidebar">
+              <button type="button" className={`btn btn-secondary ${route.preserved ? 'active' : ''}`} onClick={handlePreserve} title={route.preserved ? 'Preserved' : 'Preserve this route'}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill={route.preserved ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2">
+                  <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                </svg>
+                <span>{route.preserved ? 'Preserved' : 'Preserve'}</span>
+              </button>
+              <button type="button" className="btn btn-primary" title="Export videos and backup route data" onClick={() => setShowExportModal(true)}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+                Export & Backup
+              </button>
+              <button type="button" className="btn btn-danger" onClick={handleDelete}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <polyline points="3 6 5 6 21 6" />
+                  <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+                </svg>
+                Delete Route
+              </button>
+            </div>
+            <div className="route-actions-info">
+              <strong>Tip:</strong> Preserved routes are protected from automatic deletion but still count towards storage usage.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Bottom Panels */}
+      <div className="bottom-panels">
+        <FFmpegDebugPanel show={showDebugPanel} />
+        <VehicleInfoPanel route={route} />
+        <LogsPanel
+          route={route}
+          currentSegment={currentSegment}
+          videoCurrentTime={currentTime}
+        />
+        <CerealDataPanel
+          route={route}
+          currentSegment={currentSegment}
+          videoCurrentTime={currentTime}
+        />
+      </div>
+      </div>
+    </>
+  )
+}

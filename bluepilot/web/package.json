@@ -1,0 +1,40 @@
+{
+  "name": "bluepilot-web",
+  "version": "2.1.0",
+  "type": "module",
+  "private": true,
+  "description": "BluePilot Web Interface - React Frontend",
+  "scripts": {
+    "dev": "vite",
+    "build": "npm run clean:assets && tsc && vite build",
+    "build:no-clean": "tsc && vite build",
+    "clean:assets": "rm -rf public/assets public/sw.js public/workbox-*.js public/registerSW.js public/manifest.webmanifest",
+    "clean": "rm -rf public/assets public/index.html public/sw.js public/workbox-*.js public/registerSW.js public/manifest.webmanifest",
+    "preview": "vite preview",
+    "preview:device": "VITE_BACKEND_URL=http://10.0.1.125:8088 vite preview",
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@tanstack/react-virtual": "^3.13.12",
+    "axios": "^1.6.2",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.21.0",
+    "zustand": "^4.4.7"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.43",
+    "@types/react-dom": "^18.2.17",
+    "@typescript-eslint/eslint-plugin": "^6.14.0",
+    "@typescript-eslint/parser": "^6.14.0",
+    "@vitejs/plugin-react": "^4.2.1",
+    "eslint": "^8.55.0",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "eslint-plugin-react-refresh": "^0.4.5",
+    "terser": "^5.44.0",
+    "typescript": "^5.2.2",
+    "vite": "^5.0.8",
+    "vite-plugin-pwa": "^0.20.5"
+  }
+}

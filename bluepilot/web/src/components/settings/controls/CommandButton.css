@@ -1,0 +1,41 @@
+.command-button-control .control-card__footer {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.command-button-result {
+  margin-top: 0.75rem;
+  padding: 0.65rem 0.85rem;
+  border-radius: var(--radius-md);
+  font-size: 0.85rem;
+  border: 1px solid transparent;
+}
+
+.command-button-result.success {
+  background: rgba(76, 175, 80, 0.1);
+  color: var(--success-color);
+  border-color: rgba(76, 175, 80, 0.35);
+}
+
+.command-button-result.error {
+  background: rgba(244, 67, 54, 0.12);
+  color: var(--error-color);
+  border-color: rgba(244, 67, 54, 0.35);
+}
+
+.command-button-device-notice {
+  margin-top: 0.5rem;
+  padding: 0.5rem 0.7rem;
+  border-radius: var(--radius-md);
+  background: #ffc1071a;
+  border: 1px solid rgba(255, 193, 7, 0.35);
+  color: var(--text-secondary);
+  font-size: 0.7rem;
+  line-height: 1.4;
+}
+
+@media (max-width: 768px) {
+  .command-button-control .control-card__footer {
+    width: 100%;
+  }
+}

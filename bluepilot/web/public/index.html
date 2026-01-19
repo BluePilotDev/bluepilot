@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/png" href="/icons/icon-192.png" />
+    <link rel="stylesheet" href="/vendor/material-icons.css" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
+
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#151515" />
+    <meta name="mobile-web-app-capable" content="yes" />
+
+    <!-- iOS PWA Meta Tags -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta
+      name="apple-mobile-web-app-status-bar-style"
+      content="black-translucent"
+    />
+    <meta name="apple-mobile-web-app-title" content="BluePilot" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+
+    <!-- Windows PWA Meta Tags -->
+    <meta name="msapplication-TileColor" content="#151515" />
+    <meta name="msapplication-TileImage" content="/icons/icon-144.png" />
+
+    <meta
+      name="description"
+      content="BluePilot Portal - Route Manager and System Monitor"
+    />
+    <title>BluePilot Portal</title>
+
+    <!-- WebGL Capability Detection -->
+    <script>
+      // Check WebGL support on page load
+      window.webglSupport = (function () {
+        try {
+          const canvas = document.createElement("canvas");
+          const gl =
+            canvas.getContext("webgl") ||
+            canvas.getContext("experimental-webgl");
+          if (gl) {
+            const vendor = gl.getParameter(gl.VENDOR);
+            const renderer = gl.getParameter(gl.RENDERER);
+            console.log("WebGL detected:", { vendor, renderer });
+            return { supported: true, vendor, renderer };
+          }
+        } catch (e) {
+          console.warn("WebGL detection failed:", e);
+        }
+        return { supported: false, error: "WebGL not available" };
+      })();
+    </script>
+
+    <!-- Video Player Libraries Loader -->
+    <script>
+      const HLS_LOCAL_SRC = "/vendor/hls/hls.min.js";
+      const H265_LOCAL_BASE = "/vendor/h265-web-player/";
+
+      window.__h265UseCdn = false;
+
+      function loadScriptWithFallback(localSrc, onLocalFail) {
+        return new Promise((resolve, reject) => {
+          const script = document.createElement("script");
+          script.src = localSrc;
+          script.onload = () => resolve("local");
+          script.onerror = () => {
+            console.warn(`Failed to load ${localSrc}`);
+            if (typeof onLocalFail === "function") {
+              try {
+                onLocalFail();
+              } catch (e) {
+                console.warn("onLocalFail handler threw:", e);
+              }
+            }
+            // For React app, we just log the error and continue
+            // The app will handle missing libraries gracefully
+            resolve("failed");
+          };
+          document.head.appendChild(script);
+        });
+      }
+
+      (async function initPlayers() {
+        try {
+          // Load HLS.js
+          await loadScriptWithFallback(HLS_LOCAL_SRC);
+
+          // Setup Module for h265-web-player WASM
+          window.Module = window.Module || {};
+          window.Module.locateFile = function (path) {
+            if (path.endsWith(".wasm") || path.endsWith(".data")) {
+              return H265_LOCAL_BASE + path;
+            }
+            return path;
+          };
+
+          // Global canvas variable for h265-web-player compatibility
+          window.canvas = null;
+
+          // Load h265-web-player scripts in order
+          await loadScriptWithFallback(`${H265_LOCAL_BASE}webgl.js`);
+          await loadScriptWithFallback(`${H265_LOCAL_BASE}pcm-player.js`);
+          await loadScriptWithFallback(`${H265_LOCAL_BASE}decoder.js`);
+          await loadScriptWithFallback(`${H265_LOCAL_BASE}player.js`);
+
+          console.log("Video player libraries loaded successfully");
+        } catch (error) {
+          console.error("Error loading media dependencies:", error);
+        }
+      })();
+    </script>
+    <script type="module" crossorigin src="/assets/index-BnunYI4A.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-BtyvOnug.css">
+  <link rel="manifest" href="/manifest.webmanifest"><script id="vite-plugin-pwa:register-sw" src="/registerSW.js"></script></head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>

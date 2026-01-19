@@ -1,0 +1,175 @@
+/* Base button class - defines shape, size, and default styling */
+.btn {
+  /* Layout */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-sm);
+  position: relative;
+
+  /* Default size (medium) */
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+
+  /* Typography */
+  font-family: inherit;
+  font-weight: 600;
+  white-space: nowrap;
+
+  /* Shape */
+  border: none;
+  border-radius: var(--radius-lg);
+
+  /* Default colors (secondary style) */
+  background: var(--bp-bg-tertiary);
+  color: var(--bp-text-primary);
+
+  /* Effects */
+  cursor: pointer;
+  transition: all var(--transition-normal);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* Default hover state */
+.btn:hover:not(:disabled) {
+  background: #3a3a3a;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn:focus-visible {
+  outline: 2px solid var(--bp-accent-blue);
+  outline-offset: 2px;
+}
+
+/* Size modifiers - override default medium size */
+.btn--small {
+  padding: 0.375rem 0.75rem;    /* 0.5rem 1rem */
+  font-size: 0.8125rem;                             /* 14px */
+}
+
+.btn--medium {
+  /* Default size - explicitly defined for clarity */
+  padding: 0.5rem 1rem;                       /* 10px 20px */
+  font-size: 0.875rem;                            /* 15px */
+}
+
+.btn--large {
+  padding: 0.75rem 1.25rem;    /* 1rem 1.5rem */
+  font-size: 0.9375rem;                                 /* 16px */
+}
+
+/* Color variants - override default secondary colors */
+
+/* Primary: Blue accent for main actions (Submit, Save, Export) */
+.btn--primary {
+  background: var(--bp-accent-blue);
+  color: white;
+  box-shadow: 0 4px 12px rgba(33, 150, 243, 0.25);
+}
+
+.btn--primary:hover:not(:disabled) {
+  background: var(--bp-accent-blue-hover);
+  box-shadow: 0 6px 16px rgba(33, 150, 243, 0.35);
+}
+
+/* Secondary: Default gray for standard actions (Cancel, Close) */
+.btn--secondary {
+  background: var(--bp-bg-tertiary);
+  color: var(--bp-text-primary);
+  border: 1px solid var(--bp-border);
+}
+
+.btn--secondary:hover:not(:disabled) {
+  background: #3a3a3a;
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Danger: Red for destructive actions (Delete, Reset) */
+.btn--danger {
+  background: var(--bp-error);
+  color: white;
+}
+
+.btn--danger:hover:not(:disabled) {
+  background: #d32f2f;
+}
+
+/* Success: Green for positive actions (Confirm, Apply) */
+.btn--success {
+  background: var(--bp-success);
+  color: white;
+}
+
+.btn--success:hover:not(:disabled) {
+  background: #388e3c;
+}
+
+/* Ghost: Transparent for subtle actions (Learn More, Details) */
+.btn--ghost {
+  background: transparent;
+  color: var(--bp-text-primary);
+  border: 1px solid var(--bp-border);
+  box-shadow: none;
+}
+
+.btn--ghost:hover:not(:disabled) {
+  background: var(--bp-bg-tertiary);
+}
+
+/* Settings-specific button styling */
+.settings-btn {
+  min-width: 120px;
+  font-weight: 700;
+}
+
+@media (max-width: 768px) {
+  .settings-btn {
+    width: 100%;
+  }
+}
+
+/* Full width */
+.btn--full-width {
+  width: 100%;
+}
+
+/* Loading state */
+.btn--loading {
+  pointer-events: none;
+}
+
+.btn-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+.btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-text {
+  display: inline-block;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

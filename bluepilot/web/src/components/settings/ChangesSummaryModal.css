@@ -1,0 +1,213 @@
+/* Changes Summary Modal Styles */
+.changes-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.changes-summary-error {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: rgba(226, 44, 44, 0.1);
+  border: 1px solid var(--error-color);
+  border-radius: var(--radius-md);
+  color: var(--error-color);
+  font-size: 0.875rem;
+}
+
+.changes-summary-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  color: var(--text-secondary);
+  text-align: center;
+}
+
+.changes-summary-empty svg {
+  color: var(--success-color);
+  margin-bottom: 0.5rem;
+}
+
+.changes-summary-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  max-height: 400px;
+  overflow-y: auto;
+  padding-right: 0.5rem;
+}
+
+.changes-summary-group {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.changes-summary-group-title {
+  margin: 0;
+  padding: 0.625rem 1rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.03);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.changes-summary-items {
+  display: flex;
+  flex-direction: column;
+}
+
+.changes-summary-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.changes-summary-item:last-child {
+  border-bottom: none;
+}
+
+.changes-summary-item-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.changes-summary-item-title {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.changes-summary-item-values {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+}
+
+.changes-summary-value {
+  padding: 0.125rem 0.5rem;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono, monospace);
+}
+
+.changes-summary-value--old {
+  background: rgba(226, 44, 44, 0.15);
+  color: #ff6b6b;
+  text-decoration: line-through;
+}
+
+.changes-summary-value--new {
+  background: rgba(76, 175, 80, 0.15);
+  color: #69db7c;
+}
+
+.changes-summary-arrow {
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+.changes-summary-revert-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--transition-normal);
+  flex-shrink: 0;
+}
+
+.changes-summary-revert-btn:hover {
+  border-color: var(--warning-color);
+  color: var(--warning-color);
+  background: rgba(255, 193, 7, 0.1);
+}
+
+/* Auto-save toggle section */
+.changes-summary-autosave {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.875rem 1rem;
+  background: rgba(66, 165, 245, 0.08);
+  border: 1px solid rgba(66, 165, 245, 0.25);
+  border-radius: var(--radius-md);
+}
+
+.changes-summary-autosave-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.changes-summary-autosave-label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.changes-summary-autosave-desc {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.changes-summary-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.changes-summary-count {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.changes-summary-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Mobile adjustments */
+@media (max-width: 480px) {
+  .changes-summary-footer {
+    flex-direction: column;
+    gap: 0.75rem;
+  }
+
+  .changes-summary-actions {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .changes-summary-actions .btn {
+    flex: 1;
+  }
+
+  .changes-summary-item-values {
+    flex-wrap: wrap;
+  }
+}

@@ -1,0 +1,127 @@
+/* Metrics Modal */
+.metrics-modal .modal-content {
+  max-width: 800px;
+  width: 90vw;
+}
+
+.metrics-loading {
+  text-align: center;
+  padding: 3rem;
+  color: var(--bp-text-secondary);
+}
+
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1.5rem;
+  padding: 1rem;
+}
+
+.metric-card {
+  background: var(--bp-bg-tertiary);
+  border-radius: 12px;
+  padding: 1.5rem;
+  border: 1px solid var(--bp-border);
+}
+
+.metric-card h3 {
+  margin: 0 0 1rem 0;
+  font-size: 0.875rem;
+  color: var(--bp-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.metric-value {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.value-large {
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: var(--bp-text-primary);
+  line-height: 1;
+}
+
+.value-large.temp-warning {
+  color: var(--bp-warning);
+}
+
+.value-large.temp-critical {
+  color: var(--bp-error);
+  animation: pulse-critical 1s ease-in-out infinite;
+}
+
+.unit {
+  font-size: 1rem;
+  color: var(--bp-text-secondary);
+}
+
+.metric-bar {
+  height: 8px;
+  background: var(--bp-bg-secondary);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 1rem;
+}
+
+.metric-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--bp-accent-blue), var(--bp-accent-purple));
+  border-radius: 4px;
+  transition: width 0.5s ease;
+}
+
+.metric-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.metric-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.875rem;
+}
+
+.metric-row span:first-child {
+  color: var(--bp-text-secondary);
+}
+
+.metric-row span:last-child {
+  color: var(--bp-text-primary);
+  font-weight: 500;
+}
+
+.status-normal {
+  color: var(--bp-success);
+  text-transform: capitalize;
+}
+
+.status-warning {
+  color: var(--bp-warning);
+  text-transform: capitalize;
+}
+
+.status-critical {
+  color: var(--bp-error);
+  text-transform: capitalize;
+}
+
+@keyframes pulse-critical {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+@media (max-width: 768px) {
+  .metrics-grid {
+    grid-template-columns: 1fr;
+  }
+}

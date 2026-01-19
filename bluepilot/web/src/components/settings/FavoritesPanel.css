@@ -1,0 +1,106 @@
+.favorites-panel {
+  padding: 0.5rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.favorites-info {
+  padding: 0.25rem 1rem;
+  border-radius: 18px;
+  background: rgba(33, 150, 243, 0.1);
+  border: 1px solid rgba(33, 150, 243, 0.25);
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  /* box-shadow: var(--panel-card-shadow); */
+}
+
+.favorites-info strong {
+  color: var(--text-primary);
+}
+
+.favorites-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem 2.5rem;
+  text-align: center;
+  border-radius: 22px;
+  border: 1px dashed var(--border-color);
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.favorites-empty-icon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+  opacity: 0.35;
+}
+
+.favorites-empty h3 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.3rem;
+  color: var(--text-primary);
+}
+
+.favorites-empty p {
+  margin: 0;
+  max-width: 460px;
+  line-height: 1.6;
+}
+
+.favorites-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 2rem;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+}
+
+.favorites-loading p {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.favorites-section {
+  padding: 1.35rem 1.5rem 1.75rem;
+  border-radius: 22px;
+  border: 1px solid var(--border-color);
+  background: rgba(24, 24, 24, 0.95);
+  box-shadow: var(--panel-card-shadow);
+}
+
+.favorites-section-title {
+  margin: 0 0 1rem 0;
+  padding-bottom: 0.35rem;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.favorites-controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 1.25rem;
+}
+
+@media (max-width: 768px) {
+  .favorites-controls {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .favorites-empty {
+    padding: 3rem 1.5rem;
+  }
+
+  .favorites-empty-icon {
+    font-size: 3.2rem;
+  }
+}

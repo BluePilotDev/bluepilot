@@ -1,0 +1,13 @@
+.static-text-desc {
+  color: var(--bp-text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+.static-text-desc p {
+  margin: 0 0 0.5rem 0;
+}
+
+.static-text-desc p:last-child {
+  margin-bottom: 0;
+}

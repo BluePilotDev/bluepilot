@@ -1,0 +1,435 @@
+{
+  "params": [
+    {
+      "name": "FordSelectedVehicleModel",
+      "default": "",
+      "type": "string",
+      "flags": ["PERSISTENT", "BACKUP"],
+      "create_default": false,
+      "enabled": true
+    },
+    {
+      "name": "FordPrefSendHandsFreeCanMsg",
+      "default": false,
+      "type": "bool",
+      "flags": ["PERSISTENT", "BACKUP"],
+      "ccProp": "send_hands_free_cluster_msg",
+      "create_default": true,
+      "enabled": true
+    },
+    {
+      "name": "FordPrefDisableBP_lat_UI",
+      "default": false,
+      "type": "bool",
+      "flags": ["PERSISTENT", "BACKUP"],
+      "ccProp": "disable_BP_lat_UI",
+      "create_default": true,
+      "enabled": true
+    },
+    {
+      "name": "FordPrefHumanTurnDetectionEnable",
+      "default": true,
+      "type": "bool",
+      "flags": ["PERSISTENT", "BACKUP"],
+      "ccProp": "enable_human_turn_detection",
+      "create_default": true,
+      "enabled": true
+    },
+    {
+      "name": "FordPrefLaneDepartCanMsg",
+      "default": false,
+      "type": "bool",
+      "flags": ["PERSISTENT", "BACKUP"],
+      "ccProp": "send_lane_depart_can_msg",
+      "create_default": true,
+      "enabled": true
+    },
+    {
+      "name": "FordPrefDriverMonitorCanMsg",
+      "default": false,
+      "type": "bool",
+      "flags": ["PERSISTENT", "BACKUP"],
+      "ccProp": "send_driver_monitor_can_msg",
+      "create_default": true,
+      "enabled": true
+    },
+    {
+      "name": "FordPrefEnableDebugLogs",
+      "default": false,
+      "type": "bool",
+      "flags": ["PERSISTENT", "BACKUP"],
+      "create_default": true,
+      "enabled": true
+    },
+    {
+      "name": "FordPrefSupportsHybridDrive",
+      "default": false,
+      "type": "bool",
+      "flags": ["PERSISTENT", "BACKUP"],
+      "create_default": false,
+      "enabled": true
+    },
+    {
+      "name": "FordPrefHybridDriveOverlay",
+      "default": false,
+      "type": "bool",
+      "flags": ["PERSISTENT", "BACKUP"],
+      "create_default": true,
+      "enabled": true
+    },
+    {
+      "name": "FordPrefHybridDriveGaugeSize",
+      "default": 1,
+      "type": "int",
+      "flags": ["PERSISTENT", "BACKUP"],
+      "create_default": true,
+      "enabled": true
+    },
+    {
+      "name": "FordPrefHybridBatteryOverlay",
+      "default": false,
+      "type": "bool",
+      "flags": ["PERSISTENT", "BACKUP"],
+      "create_default": true,
+      "enabled": true
+    },
+    {
+      "name": "FordPrefHideSteerSaturatedAlerts",
+      "default": false,
+      "type": "bool",
+      "flags": ["PERSISTENT", "BACKUP"],
+      "create_default": true,
+      "enabled": true
+    },
+    {
+      "name": "BPUseBluepilotAlerts",
+      "default": true,
+      "type": "bool",
+      "flags": ["PERSISTENT", "BACKUP"],
+      "create_default": true,
+      "enabled": true
+    },
+    {
+      "name": "FordPrefShowAnimatedWheelAngle",
+      "default": true,
+      "type": "bool",
+      "flags": ["PERSISTENT", "BACKUP"],
+      "create_default": true,
+      "enabled": true
+    },
+    {
+      "name": "FordPrefShowRadarLeadOverlay",
+      "default": true,
+      "type": "bool",
+      "flags": ["PERSISTENT", "BACKUP"],
+      "create_default": true,
+      "enabled": true
+    },
+    {
+      "name": "FordPrefRadarOverlaySize",
+      "default": 1,
+      "type": "int",
+      "flags": ["PERSISTENT", "BACKUP"],
+      "create_default": true,
+      "enabled": true
+    },
+    {
+      "name": "FordLatTuningLaneChgFactorHigh",
+      "default": 0.85,
+      "min": 0.5,
+      "max": 1.0,
+      "type": "float",
+      "flags": ["PERSISTENT", "BACKUP"],
+      "ccProp": "lane_change_factor_high",
+      "create_default": true,
+      "enabled": true
+    },
+    {
+      "name": "FordLatTuningPCBlendRatio_high_C",
+      "default": 0.4,
+      "min": 0.0,
+      "max": 1.0,
+      "type": "float",
+      "flags": ["PERSISTENT", "BACKUP"],
+      "ccProp": "pc_blend_ratio_high_C_UI",
+      "create_default": true,
+      "enabled": true
+    },
+    {
+      "name": "FordLatTuningPCBlendRatio_low_C",
+      "default": 0.4,
+      "min": 0.0,
+      "max": 1.0,
+      "type": "float",
+      "flags": ["PERSISTENT", "BACKUP"],
+      "ccProp": "pc_blend_ratio_low_C_UI",
+      "create_default": true,
+      "enabled": true
+    },
+    {
+      "name": "FordLatTuningEnableLanePositioning",
+      "default": false,
+      "type": "bool",
+      "flags": ["PERSISTENT", "BACKUP"],
+      "ccProp": "enable_lane_positioning",
+      "create_default": false,
+      "enabled": true
+    },
+    {
+      "name": "FordLatTuningEnableHighCurvatureMode",
+      "default": false,
+      "type": "bool",
+      "flags": ["PERSISTENT", "BACKUP"],
+      "ccProp": "enable_high_curvature_mode",
+      "create_default": false,
+      "enabled": true
+    },
+    {
+      "name": "FordLatTuningCustomPathOffset",
+      "default": 0.0,
+      "min": -0.5,
+      "max": 0.5,
+      "type": "float",
+      "flags": ["PERSISTENT", "BACKUP"],
+      "ccProp": "custom_path_offset",
+      "create_default": true,
+      "enabled": true
+    },
+    {
+      "name": "FordLatTuningWheelAngleLookupTime",
+      "default": 0.0,
+      "min": 0.0,
+      "max": 0.8,
+      "type": "float",
+      "flags": ["PERSISTENT", "BACKUP"],
+      "ccProp": "wheel_angle_lookup_time",
+      "create_default": true,
+      "enabled": true
+    },
+    {
+      "name": "FordLatTuningPathOffsetLookupTime",
+      "default": 0.0,
+      "min": 0.0,
+      "max": 0.8,
+      "type": "float",
+      "flags": ["PERSISTENT", "BACKUP"],
+      "ccProp": "path_offset_lookup_time",
+      "create_default": true,
+      "enabled": true
+    },
+    {
+      "name": "FordLatTuningEnableLanefullMode",
+      "default": false,
+      "type": "bool",
+      "flags": ["PERSISTENT", "BACKUP"],
+      "ccProp": "enable_lane_full_mode",
+      "create_default": true,
+      "enabled": true
+    },
+    {
+      "name": "FordLatTuningTuningCustomProfile",
+      "default": 0,
+      "min": 0,
+      "max": 1,
+      "type": "int",
+      "flags": ["PERSISTENT", "BACKUP"],
+      "ccProp": "custom_profile",
+      "create_default": true,
+      "enabled": true
+    },
+    {
+      "name": "FordLatTuningLCPIDGainUI",
+      "default": 3.0,
+      "min": 0.0,
+      "max": 5.0,
+      "type": "float",
+      "flags": ["PERSISTENT", "BACKUP"],
+      "ccProp": "LC_PID_gain_UI",
+      "create_default": true,
+      "enabled": true
+    },
+    {
+      "name": "FordLatTuningHCPIDGainUI",
+      "default": 1.0,
+      "min": 0.0,
+      "max": 5.0,
+      "type": "float",
+      "flags": ["PERSISTENT", "BACKUP"],
+      "ccProp": "HC_PID_gain_UI",
+      "create_default": true,
+      "enabled": true
+    },
+    {
+      "name": "CustomModelPathColor",
+      "default": "Stock",
+      "type": "string",
+      "flags": ["PERSISTENT", "BACKUP"],
+      "create_default": false,
+      "enabled": true
+    },
+    {
+      "name": "ShowGForceMeter",
+      "default": false,
+      "type": "bool",
+      "flags": ["PERSISTENT", "BACKUP"],
+      "create_default": true,
+      "enabled": true
+    },
+    {
+      "name": "Blindspot",
+      "default": true,
+      "type": "bool",
+      "flags": ["PERSISTENT", "BACKUP"],
+      "create_default": false,
+      "enabled": true
+    },
+    {
+      "name": "ShowStopIndicatorOverlay",
+      "default": true,
+      "type": "bool",
+      "flags": ["PERSISTENT", "BACKUP"],
+      "create_default": true,
+      "enabled": true
+    },
+    {
+      "name": "FordPrefHevDataAvailable",
+      "default": false,
+      "type": "bool",
+      "flags": ["PERSISTENT", "BACKUP"],
+      "create_default": false,
+      "enabled": true
+    },
+    {
+      "name": "FordPrefHevBattDataAvailable",
+      "default": false,
+      "type": "bool",
+      "flags": ["PERSISTENT", "BACKUP"],
+      "create_default": false,
+      "enabled": true
+    },
+    {
+      "name": "ShowGForceMeter",
+      "default": false,
+      "type": "bool",
+      "flags": ["PERSISTENT", "BACKUP"],
+      "create_default": false,
+      "enabled": true
+    },
+    {
+      "name": "ShowWideCameraAtLowSpeed",
+      "default": false,
+      "type": "bool",
+      "flags": ["PERSISTENT", "BACKUP"],
+      "create_default": false,
+      "enabled": true
+    },
+    {
+      "name": "ShowBrakeStatus",
+      "default": false,
+      "type": "bool",
+      "flags": ["PERSISTENT", "BACKUP"],
+      "create_default": true,
+      "enabled": true
+    },
+    {
+      "name": "BPLastSeenVersion",
+      "default": "",
+      "type": "string",
+      "flags": ["PERSISTENT", "BACKUP"],
+      "create_default": false,
+      "enabled": true
+    },
+    {
+      "name": "LaneLineCalibrationRequired",
+      "default": false,
+      "type": "bool",
+      "flags": ["PERSISTENT", "BACKUP"],
+      "create_default": false,
+      "enabled": true
+    },
+    {
+      "name": "OffroadDisplayTest",
+      "default": true,
+      "type": "bool",
+      "flags": ["PERSISTENT", "BACKUP"],
+      "create_default": false,
+      "enabled": true
+    },
+    {
+      "name": "DisableGPSAlert",
+      "default": false,
+      "type": "bool",
+      "flags": ["PERSISTENT", "BACKUP"],
+      "create_default": false,
+      "enabled": true
+    },
+    {
+      "name": "BpDisplayBrightnessTimeout",
+      "default": 30,
+      "min": 10,
+      "max": 120,
+      "type": "int",
+      "flags": ["PERSISTENT", "BACKUP"],
+      "create_default": true,
+      "enabled": true
+    },
+    {
+      "name": "BluepilotShowEnhancedOnroadUI",
+      "default": true,
+      "type": "bool",
+      "flags": ["PERSISTENT", "BACKUP"],
+      "create_default": true,
+      "enabled": true
+    },
+    {
+      "name": "BPUiTextSize",
+      "default": 1,
+      "type": "int",
+      "flags": ["PERSISTENT", "BACKUP"],
+      "create_default": true,
+      "enabled": true,
+      "min": 0,
+      "max": 2
+    },
+    {
+      "name": "BPPortalEnabled",
+      "default": false,
+      "type": "bool",
+      "flags": ["PERSISTENT", "BACKUP"],
+      "create_default": false,
+      "enabled": true
+    },
+    {
+      "name": "BPPortalPort",
+      "default": 8088,
+      "type": "int",
+      "flags": ["PERSISTENT", "BACKUP"],
+      "create_default": true,
+      "enabled": true
+    },
+    {
+      "name": "BPPortalCrashCount",
+      "default": 0,
+      "type": "int",
+      "flags": ["PERSISTENT"],
+      "create_default": false,
+      "enabled": true
+    },
+    {
+      "name": "BPPortalLastCrash",
+      "default": 0,
+      "type": "int",
+      "flags": ["PERSISTENT"],
+      "create_default": false,
+      "enabled": true
+    },
+    {
+      "name": "EnableTethering",
+      "default": false,
+      "type": "bool",
+      "flags": ["PERSISTENT", "BACKUP"],
+      "create_default": false,
+      "enabled": true
+    }
+  ]
+}

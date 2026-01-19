@@ -1,0 +1,129 @@
+.timeline-container {
+  background: var(--bp-bg-secondary);
+  padding: 1rem;
+  border-top: 1px solid var(--bp-border);
+}
+
+.segment-selector {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.segment-btn {
+  padding: 0.5rem 1rem;
+  background: var(--bp-bg-tertiary);
+  border: 1px solid var(--bp-border);
+  border-radius: 8px;
+  color: var(--bp-text-secondary);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  min-width: 50px;
+}
+
+.segment-btn:hover {
+  background: var(--bp-bg-primary);
+  border-color: var(--bp-accent-blue);
+  color: var(--bp-accent-blue);
+}
+
+.segment-btn.active {
+  background: var(--bp-accent-blue);
+  border-color: var(--bp-accent-blue);
+  color: white;
+  font-weight: 600;
+}
+
+.timeline {
+  position: relative;
+  height: 60px;
+  cursor: pointer;
+  margin-bottom: 1rem;
+}
+
+.timeline-background {
+  position: relative;
+  height: 100%;
+  background: var(--bp-bg-tertiary);
+  border: 2px solid var(--bp-border);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.timeline-progress {
+  height: 100%;
+  background: linear-gradient(90deg, var(--bp-accent-blue), var(--bp-accent-blue-hover));
+  transition: width 0.1s linear;
+}
+
+.timeline-handle {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 20px;
+  height: 20px;
+  background: white;
+  border: 2px solid var(--bp-accent-blue);
+  border-radius: 50%;
+  cursor: grab;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  transition: transform 0.2s;
+}
+
+.timeline-handle:hover {
+  transform: translate(-50%, -50%) scale(1.2);
+}
+
+.timeline-handle:active {
+  cursor: grabbing;
+}
+
+.timeline-hover-indicator {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: rgba(255, 255, 255, 0.4);
+  pointer-events: none;
+  transform: translateX(-50%);
+  z-index: 9;
+}
+
+.timeline-hover-time {
+  position: absolute;
+  bottom: -30px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.85);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  .timeline {
+    height: 40px;
+  }
+
+  .timeline-handle {
+    width: 16px;
+    height: 16px;
+  }
+
+  .segment-selector {
+    gap: 0.25rem;
+  }
+
+  .segment-btn {
+    padding: 0.4rem 0.75rem;
+    font-size: 0.75rem;
+    min-width: 40px;
+  }
+}

@@ -1,0 +1,72 @@
+/* BluePilot Theme Variables */
+
+:root {
+  /* Match BluePilot Qt panel colors */
+  --bp-bg-primary: #1a1a1a;
+  --bp-bg-secondary: #242424;
+  --bp-bg-tertiary: #303030;
+  --bp-accent-blue: #2196f3;
+  --bp-accent-blue-hover: #1976d2;
+  --bp-text-primary: #e4e4e4;
+  --bp-text-secondary: #aaaaaa;
+  --bp-border: rgba(255, 255, 255, 0.1);
+  --bp-success: #4caf50;
+  --bp-warning: #ff9800;
+  --bp-error: #f44336;
+
+  /* Semantic aliases used across the web UI */
+  --text-primary: var(--bp-text-primary);
+  --text-secondary: #b5b5b5;
+  --text-tertiary: #7d7d7d;
+
+  --primary-color: var(--bp-accent-blue);
+  --success-color: var(--bp-success);
+  --warning-color: var(--bp-warning);
+  --error-color: var(--bp-error);
+
+  --card-bg: var(--bp-bg-secondary);
+  --bg-secondary: #1d1d1d;
+  --input-bg: #1a1a1a;
+  --hover-bg: rgba(255, 255, 255, 0.06);
+
+  --border-color: rgba(255, 255, 255, 0.08);
+  --control-border-color: rgba(255, 255, 255, 0.16);
+  --panel-border-strong: rgba(255, 255, 255, 0.16);
+
+  --info-bg: rgba(33, 150, 243, 0.12);
+  --warning-bg: rgba(255, 193, 7, 0.18);
+
+  --panel-card-shadow: 0 18px 40px rgba(0, 0, 0, 0.55);
+  --panel-card-gradient: linear-gradient(135deg, #2e2e2e 0%, #1c1c1c 65%);
+
+  /* Spacing */
+  --spacing-xs: 0.25rem;
+  --spacing-sm: 0.5rem;
+  --spacing-md: 1rem;
+  --spacing-lg: 1.5rem;
+  --spacing-xl: 2rem;
+
+  /* Border radius */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 18px;
+  --radius-2xl: 20px;
+  --radius-full: 9999px;
+
+  /* Transitions */
+  --transition-fast: 0.15s ease;
+  --transition-normal: 0.2s ease;
+  --transition-slow: 0.3s ease;
+
+  /* Shadows */
+  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 8px 16px rgba(0, 0, 0, 0.4);
+
+  /* Z-index layers */
+  --z-modal: 3000;
+  --z-dropdown: 500;
+  --z-header: 100;
+  --z-overlay: 900;
+}

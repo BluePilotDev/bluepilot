@@ -1,0 +1,82 @@
+.dynamic-control-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.dynamic-control-wrapper.has-pending-change {
+  /* Subtle left border indicator for modified controls */
+}
+
+.dynamic-control-wrapper.has-pending-change .dynamic-control-content > * {
+  border-left: 3px solid var(--primary-color);
+}
+
+.dynamic-control-content {
+  width: 100%;
+  position: relative;
+}
+
+.dynamic-control-content > * {
+  height: 100%;
+}
+
+.dynamic-control-actions {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  z-index: 10;
+}
+
+.dynamic-control-modified-badge {
+  padding: 0.125rem 0.5rem;
+  background: rgba(33, 150, 243, 0.15);
+  border: 1px solid var(--primary-color);
+  border-radius: var(--radius-full);
+  color: var(--primary-color);
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+.dynamic-control-favorite {
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+  color: var(--text-secondary);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.2s ease;
+}
+
+.dynamic-control-favorite:hover {
+  border-color: var(--primary-color);
+  color: var(--primary-color);
+  background: rgba(33, 150, 243, 0.2);
+  transform: scale(1.1);
+}
+
+.dynamic-control-favorite.favorited {
+  background: var(--primary-color);
+  color: #fff;
+  border-color: var(--primary-color);
+  box-shadow: 0 2px 8px rgba(33, 150, 243, 0.3);
+}
+
+@media (max-width: 768px) {
+  .dynamic-control-favorite {
+    width: 22px;
+    height: 22px;
+    font-size: 0.75rem;
+    top: 0.625rem;
+    right: 0.625rem;
+  }
+}
