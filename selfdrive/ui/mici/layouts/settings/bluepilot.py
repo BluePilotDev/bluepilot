@@ -22,8 +22,9 @@ class BluePilotLayoutMici(NavWidget):
     self.lane_change_factor_high = float(self._params.get("lane_change_factor_high", return_default=True))
 
     # ******** Main Scroller ********
-    self.enable_web_routes = BigParamControl("enable web routes server", "BPPortalEnabled", 
-                                             toggle_callback=self._handle_web_routes_toggle)
+    self.enable_web_routes = BigParamControl("enable web routes server", "BPPortalEnabled")
+    self.show_web_routes_qr = BigButton("show QR code", "", "icons_mici/settings/network/wifi_strength_full.png")
+    self.show_web_routes_qr.set_click_callback(self._show_qr_dialog)
     self.show_hands_free_ui = BigParamControl("show hands-free ui", "send_hands_free_cluster_msg")
     self.show_lead_vehicle = BigParamControl("show lead vehicle speed", "show_lead_speed")
     self.enable_human_turn_detection = BigParamControl("enable human turn detection", "enable_human_turn_detection")
@@ -43,6 +44,7 @@ class BluePilotLayoutMici(NavWidget):
 
     self._scroller = Scroller([
       self.enable_web_routes,
+      self.show_web_routes_qr,
       self.show_hands_free_ui,
       self.show_lead_vehicle,
       self.enable_human_turn_detection,
@@ -80,17 +82,24 @@ class BluePilotLayoutMici(NavWidget):
     super().show_event()
     self._scroller.show_event()
     self._update_toggles()
+    self._update_buttons()
 
   def _render(self, rect: rl.Rectangle):
     self._scroller.render(rect)
 
-  def _handle_web_routes_toggle(self, checked: bool):
-    """Handle web routes server toggle - show QR dialog when enabling."""
-    if checked:
-      # Show QR code dialog when enabling
+  def _show_qr_dialog(self):
+    """Show QR code dialog for webserver access."""
+    # Only show if server is enabled
+    if self._params.get_bool("BPPortalEnabled"):
       qr_dialog = WebServerQRDialog(back_callback=lambda: gui_app.set_modal_overlay(None))
       gui_app.set_modal_overlay(qr_dialog)
-    # If disabling, the param is already updated by BigParamControl
+    # If disabled, could show a message dialog, but for now just do nothing
+  
+  def _update_buttons(self):
+    """Update button enabled state based on server status."""
+    ui_state.update_params()
+    server_enabled = ui_state.params.get_bool("BPPortalEnabled")
+    self.show_web_routes_qr.set_enabled(server_enabled)
 
   def _update_toggles(self):
     ui_state.update_params()
@@ -98,6 +107,9 @@ class BluePilotLayoutMici(NavWidget):
     # Refresh toggles from params to mirror external changes
     for key, item in self._refresh_toggles:
       item.set_checked(ui_state.params.get_bool(key))
+    
+    # Also update button state
+    self._update_buttons()
 
 # class BigChargingDialog(BigDialogBase):
 #   def __init__(self):
