@@ -283,4 +283,8 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"disable_BP_lat_UI", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"vbatt_pause_charging", {PERSISTENT | BACKUP, FLOAT, "11.8"}},
     {"show_lead_speed", {PERSISTENT | BACKUP, BOOL, "1"}},
+
+    // BluePilot Portal (Web Routes Server)
+    {"BPPortalEnabled", {PERSISTENT | BACKUP, BOOL, "0"}},
+    {"BPPortalPort", {PERSISTENT | BACKUP, INT, "8088"}},
 };
