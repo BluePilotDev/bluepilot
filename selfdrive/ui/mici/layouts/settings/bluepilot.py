@@ -12,6 +12,7 @@ from openpilot.system.ui.widgets import NavWidget, DialogResult
 from openpilot.selfdrive.ui.layouts.settings.common import restart_needed_callback
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.common.params import Params
+from openpilot.selfdrive.ui.mici.widgets.web_server_qr_dialog import WebServerQRDialog
 
 class BluePilotLayoutMici(NavWidget):
   def __init__(self, back_callback: Callable):
@@ -21,7 +22,8 @@ class BluePilotLayoutMici(NavWidget):
     self.lane_change_factor_high = float(self._params.get("lane_change_factor_high", return_default=True))
 
     # ******** Main Scroller ********
-    self.enable_web_routes = BigParamControl("enable web routes server", "BPPortalEnabled")
+    self.enable_web_routes = BigParamControl("enable web routes server", "BPPortalEnabled", 
+                                             toggle_callback=self._handle_web_routes_toggle)
     self.show_hands_free_ui = BigParamControl("show hands-free ui", "send_hands_free_cluster_msg")
     self.show_lead_vehicle = BigParamControl("show lead vehicle speed", "show_lead_speed")
     self.enable_human_turn_detection = BigParamControl("enable human turn detection", "enable_human_turn_detection")
@@ -81,6 +83,14 @@ class BluePilotLayoutMici(NavWidget):
 
   def _render(self, rect: rl.Rectangle):
     self._scroller.render(rect)
+
+  def _handle_web_routes_toggle(self, checked: bool):
+    """Handle web routes server toggle - show QR dialog when enabling."""
+    if checked:
+      # Show QR code dialog when enabling
+      qr_dialog = WebServerQRDialog(back_callback=lambda: gui_app.set_modal_overlay(None))
+      gui_app.set_modal_overlay(qr_dialog)
+    # If disabling, the param is already updated by BigParamControl
 
   def _update_toggles(self):
     ui_state.update_params()
