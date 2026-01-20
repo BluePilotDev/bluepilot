@@ -9,7 +9,7 @@ from openpilot.system.ui.lib.application import gui_app
 from openpilot.system.ui.lib.multilang import tr, tr_noop
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.selfdrive.ui.widgets.web_server_qr_dialog_tici import WebServerQRDialogTici
-from openpilot.selfdrive.ui.widgets.float_input_dialog_tici import FloatInputDialogTici
+from openpilot.selfdrive.ui.widgets.float_control_item import float_control_item
 
 
 class BluePilotLayout(Widget):
@@ -86,15 +86,15 @@ class BluePilotLayout(Widget):
     )
     
     # Lane change factor high (float)
-    lane_change_factor_high = self._get_float_param("lane_change_factor_high", 0.5)
-    self._lane_change_factor_high = button_item(
+    self._lane_change_factor_high = float_control_item(
       lambda: tr("Lane Change Factor High"),
-      lambda: tr("EDIT"),
       lambda: tr("Adjust the high-speed lane change factor (0.5-1.0)."),
-      callback=self._edit_lane_change_factor_high
+      param="lane_change_factor_high",
+      min_value=0.5,
+      max_value=1.0,
+      step=0.05,
+      icon="speed_limit.png"
     )
-    self._lane_change_factor_high.set_icon("speed_limit.png")
-    self._lane_change_factor_high.action_item.set_value(lambda: f"{lane_change_factor_high:.2f}")
     
     # Enable lane positioning toggle
     self._enable_lane_positioning = toggle_item(
@@ -106,16 +106,16 @@ class BluePilotLayout(Widget):
     )
     
     # Custom path offset (float, conditional on lane positioning)
-    custom_path_offset = self._get_float_param("custom_path_offset", 0.0)
-    self._custom_path_offset = button_item(
+    self._custom_path_offset = float_control_item(
       lambda: tr("In-Lane Offset"),
-      lambda: tr("EDIT"),
       lambda: tr("Adjust the in-lane offset (-0.5 to 0.5)."),
-      callback=self._edit_custom_path_offset,
-      enabled=lambda: self._params.get_bool("enable_lane_positioning")
+      param="custom_path_offset",
+      min_value=-0.5,
+      max_value=0.5,
+      step=0.05,
+      enabled=lambda: self._params.get_bool("enable_lane_positioning"),
+      icon="chffr_wheel.png"
     )
-    self._custom_path_offset.set_icon("chffr_wheel.png")
-    self._custom_path_offset.action_item.set_value(lambda: f"{custom_path_offset:.2f}")
     
     # Enable lanefull mode toggle (conditional on lane positioning)
     self._enable_lane_full_mode = toggle_item(
@@ -137,51 +137,52 @@ class BluePilotLayout(Widget):
     )
     
     # Predicted curvature blend ratio high (float, conditional on custom profile)
-    pc_blend_ratio_high_C = self._get_float_param("pc_blend_ratio_high_C_UI", 0.0)
-    self._pc_blend_ratio_high_C = button_item(
+    self._pc_blend_ratio_high_C = float_control_item(
       lambda: tr("Predicted Curvature Blend Ratio High"),
-      lambda: tr("EDIT"),
       lambda: tr("Adjust the high curvature blend ratio (0.0-1.0)."),
-      callback=self._edit_pc_blend_ratio_high_C,
-      enabled=lambda: self._params.get_bool("custom_profile")
+      param="pc_blend_ratio_high_C_UI",
+      min_value=0.0,
+      max_value=1.0,
+      step=0.05,
+      enabled=lambda: self._params.get_bool("custom_profile"),
+      icon="chffr_wheel.png"
     )
-    self._pc_blend_ratio_high_C.set_icon("chffr_wheel.png")
-    self._pc_blend_ratio_high_C.action_item.set_value(lambda: f"{pc_blend_ratio_high_C:.2f}")
     
     # Predicted curvature blend ratio low (float, conditional on custom profile)
-    pc_blend_ratio_low_C = self._get_float_param("pc_blend_ratio_low_C_UI", 0.0)
-    self._pc_blend_ratio_low_C = button_item(
+    self._pc_blend_ratio_low_C = float_control_item(
       lambda: tr("Predicted Curvature Blend Ratio Low"),
-      lambda: tr("EDIT"),
       lambda: tr("Adjust the low curvature blend ratio (0.0-1.0)."),
-      callback=self._edit_pc_blend_ratio_low_C,
-      enabled=lambda: self._params.get_bool("custom_profile")
+      param="pc_blend_ratio_low_C_UI",
+      min_value=0.0,
+      max_value=1.0,
+      step=0.05,
+      enabled=lambda: self._params.get_bool("custom_profile"),
+      icon="chffr_wheel.png"
     )
-    self._pc_blend_ratio_low_C.set_icon("chffr_wheel.png")
-    self._pc_blend_ratio_low_C.action_item.set_value(lambda: f"{pc_blend_ratio_low_C:.2f}")
     
     # Low curvature PID gain (float, conditional on custom profile)
-    lc_pid_gain = self._get_float_param("LC_PID_gain_UI", 0.0)
-    self._lc_pid_gain = button_item(
+    self._lc_pid_gain = float_control_item(
       lambda: tr("Low Curvature PID Gain"),
-      lambda: tr("EDIT"),
       lambda: tr("Adjust the low curvature PID gain (0.0-5.0)."),
-      callback=self._edit_lc_pid_gain,
-      enabled=lambda: self._params.get_bool("custom_profile")
+      param="LC_PID_gain_UI",
+      min_value=0.0,
+      max_value=5.0,
+      step=0.1,
+      enabled=lambda: self._params.get_bool("custom_profile"),
+      icon="chffr_wheel.png"
     )
-    self._lc_pid_gain.set_icon("chffr_wheel.png")
-    self._lc_pid_gain.action_item.set_value(lambda: f"{lc_pid_gain:.2f}")
     
     # 12V battery limit (float)
-    vbatt_pause_charging = self._get_float_param("vbatt_pause_charging", 12.0)
-    self._vbatt_pause_charging = button_item(
+    self._vbatt_pause_charging = float_control_item(
       lambda: tr("12V Battery Limit"),
-      lambda: tr("EDIT"),
       lambda: tr("Set the 12V battery charging pause limit (11.0-14.0V)."),
-      callback=self._edit_vbatt_pause_charging
+      param="vbatt_pause_charging",
+      min_value=11.0,
+      max_value=14.0,
+      step=0.1,
+      suffix="V",
+      icon="warning.png"
     )
-    self._vbatt_pause_charging.set_icon("warning.png")
-    self._vbatt_pause_charging.action_item.set_value(lambda: f"{vbatt_pause_charging:.1f}V")
     
     # Disable BP lateral control toggle
     self._disable_BP_lat = toggle_item(
@@ -228,88 +229,6 @@ class BluePilotLayout(Widget):
       qr_dialog = WebServerQRDialogTici()
       gui_app.set_modal_overlay(qr_dialog)
   
-  def _edit_lane_change_factor_high(self):
-    """Edit lane change factor high."""
-    current = self._get_float_param("lane_change_factor_high", 0.5)
-    dialog = FloatInputDialogTici(
-      title=tr("Lane Change Factor High"),
-      current_value=current,
-      min_value=0.5,
-      max_value=1.0,
-      callback=lambda value: self._set_float_param("lane_change_factor_high", value, self._lane_change_factor_high)
-    )
-    gui_app.set_modal_overlay(dialog)
-  
-  def _edit_custom_path_offset(self):
-    """Edit custom path offset."""
-    current = self._get_float_param("custom_path_offset", 0.0)
-    dialog = FloatInputDialogTici(
-      title=tr("In-Lane Offset"),
-      current_value=current,
-      min_value=-0.5,
-      max_value=0.5,
-      callback=lambda value: self._set_float_param("custom_path_offset", value, self._custom_path_offset)
-    )
-    gui_app.set_modal_overlay(dialog)
-  
-  def _edit_pc_blend_ratio_high_C(self):
-    """Edit predicted curvature blend ratio high."""
-    current = self._get_float_param("pc_blend_ratio_high_C_UI", 0.0)
-    dialog = FloatInputDialogTici(
-      title=tr("Predicted Curvature Blend Ratio High"),
-      current_value=current,
-      min_value=0.0,
-      max_value=1.0,
-      callback=lambda value: self._set_float_param("pc_blend_ratio_high_C_UI", value, self._pc_blend_ratio_high_C)
-    )
-    gui_app.set_modal_overlay(dialog)
-  
-  def _edit_pc_blend_ratio_low_C(self):
-    """Edit predicted curvature blend ratio low."""
-    current = self._get_float_param("pc_blend_ratio_low_C_UI", 0.0)
-    dialog = FloatInputDialogTici(
-      title=tr("Predicted Curvature Blend Ratio Low"),
-      current_value=current,
-      min_value=0.0,
-      max_value=1.0,
-      callback=lambda value: self._set_float_param("pc_blend_ratio_low_C_UI", value, self._pc_blend_ratio_low_C)
-    )
-    gui_app.set_modal_overlay(dialog)
-  
-  def _edit_lc_pid_gain(self):
-    """Edit low curvature PID gain."""
-    current = self._get_float_param("LC_PID_gain_UI", 0.0)
-    dialog = FloatInputDialogTici(
-      title=tr("Low Curvature PID Gain"),
-      current_value=current,
-      min_value=0.0,
-      max_value=5.0,
-      callback=lambda value: self._set_float_param("LC_PID_gain_UI", value, self._lc_pid_gain)
-    )
-    gui_app.set_modal_overlay(dialog)
-  
-  def _edit_vbatt_pause_charging(self):
-    """Edit 12V battery limit."""
-    current = self._get_float_param("vbatt_pause_charging", 12.0)
-    dialog = FloatInputDialogTici(
-      title=tr("12V Battery Limit"),
-      current_value=current,
-      min_value=11.0,
-      max_value=14.0,
-      step=0.1,
-      callback=lambda value: self._set_float_param("vbatt_pause_charging", value, self._vbatt_pause_charging, suffix="V")
-    )
-    gui_app.set_modal_overlay(dialog)
-  
-  def _set_float_param(self, param: str, value: float, button_item, suffix: str = ""):
-    """Set float parameter and update button display."""
-    self._params.put_nonblocking(param, value)
-    # Update button value display - use lambda to always get current value
-    if suffix == "V":
-      button_item.action_item.set_value(lambda: f"{self._get_float_param(param, value):.1f}{suffix}")
-    else:
-      button_item.action_item.set_value(lambda: f"{self._get_float_param(param, value):.2f}{suffix}")
-  
   def _update_toggles(self):
     """Update toggle states from params."""
     ui_state.update_params()
@@ -325,25 +244,6 @@ class BluePilotLayout(Widget):
     self._pc_blend_ratio_high_C.action_item.set_enabled(ui_state.params.get_bool("custom_profile"))
     self._pc_blend_ratio_low_C.action_item.set_enabled(ui_state.params.get_bool("custom_profile"))
     self._lc_pid_gain.action_item.set_enabled(ui_state.params.get_bool("custom_profile"))
-    
-    # Update float button values
-    lane_change_factor_high = self._get_float_param("lane_change_factor_high", 0.5)
-    self._lane_change_factor_high.action_item.set_value(lambda: f"{lane_change_factor_high:.2f}")
-    
-    custom_path_offset = self._get_float_param("custom_path_offset", 0.0)
-    self._custom_path_offset.action_item.set_value(lambda: f"{custom_path_offset:.2f}")
-    
-    pc_blend_ratio_high_C = self._get_float_param("pc_blend_ratio_high_C_UI", 0.0)
-    self._pc_blend_ratio_high_C.action_item.set_value(lambda: f"{pc_blend_ratio_high_C:.2f}")
-    
-    pc_blend_ratio_low_C = self._get_float_param("pc_blend_ratio_low_C_UI", 0.0)
-    self._pc_blend_ratio_low_C.action_item.set_value(lambda: f"{pc_blend_ratio_low_C:.2f}")
-    
-    lc_pid_gain = self._get_float_param("LC_PID_gain_UI", 0.0)
-    self._lc_pid_gain.action_item.set_value(lambda: f"{lc_pid_gain:.2f}")
-    
-    vbatt_pause_charging = self._get_float_param("vbatt_pause_charging", 12.0)
-    self._vbatt_pause_charging.action_item.set_value(lambda: f"{vbatt_pause_charging:.1f}V")
   
   def show_event(self):
     super().show_event()
