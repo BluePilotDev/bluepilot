@@ -188,23 +188,21 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
     self.LC_path_angle_reset_duration = 1.5 # in seconds
 
     # path angle high curvature variables
-    self.HC_PID_GAIN_CAN = 0.5
-    self.HC_PID_GAIN_CANFD_SMALL_VEHICLE = 0.5
-    self.HC_PID_GAIN_CANFD_LARGE_VEHICLE = 0.5
-    self.HC_PID_GAIN_UI = 0.5 # gain for UI tuning
-    self.HC_PID_GAIN = 0.0
+    self.HC_PID_gain_UI = 0.5 # gain for UI tuning
     self.HC_PID_k_p = 1.0
-    self.HC_PID_k_i = 0.1
+    self.HC_PID_k_i = 0.05
     self.HC_PID_controller = PIDController(k_p=self.HC_PID_k_p, k_i=self.HC_PID_k_i, rate=20)
+    self.wheel_angle_lookup_time = 0.05
     self.HC_PID_curvature_bp = [0.0, 0.008, 0.01, 0.02]  # curvature breakpoints in 1/m
     self.HC_PID_curvature_v = [0.0, 0.0, 1.0, 1.0]  # corresponding k_p values
     self.HC_PID_speed_bp = [0.0, 20.00, 22.00, 25.00]  # what speeds to adjust path_angle_speed_factor over.
     self.HC_PID_speed_v = [1.0, 1.0, 0.0, 0.0]
+    self.pswa_blend_ratio = 1.0
 
     # max absolute values for all four signals
     self.path_angle_max = 0.5  # from dbc files
     self.path_offset_max = 2.0  # too much path offset causes issues
-    self.curvature_max = 0.02  # 0.02 is max from dbc files, but more than 0.012 can cause windup in big curves
+    self.curvature_max = 0.0115  # 0.02 is max from dbc files, but more than 0.012 can cause windup in big curves
     self.curvature_rate_max = 0.001023  # from dbc files
 
     # values from previous frame
@@ -398,31 +396,25 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
         self.precision_type = 1
         steeringPressed = CS.out.steeringPressed
         steeringAngleDeg_PV = CS.out.steeringAngleDeg
-        steeringAngleDeg_SP = actuators.steeringAngleDeg
 
         # determine tuning profile
         if self.custom_profile == 1: # custom tuning profile
           self.pc_blend_ratio_low_C =  self.pc_blend_ratio_low_C_UI
           self.pc_blend_ratio_high_C =  self.pc_blend_ratio_high_C_UI
           self.LC_PID_GAIN = self.LC_PID_gain_UI
-          self.HC_PID_gain = self.HC_PID_GAIN_UI
 
         elif self.CP.flags & FordFlags.CANFD:
           self.pc_blend_ratio_low_C = self.pc_blend_ratio_low_C_CANFD
           self.pc_blend_ratio_high_C = self.pc_blend_ratio_high_C_CANFD
           if (self.CP.carFingerprint == CAR.FORD_ESCAPE_MK4_5 or self.CP.carFingerprint == CAR.FORD_MUSTANG_MACH_E_MK1):
             self.LC_PID_gain = self.LC_PID_GAIN_CANFD_SMALL_VEHICLE
-            self.HC_PID_gain = self.HC_PID_GAIN_CANFD_SMALL_VEHICLE
           else:
             self.LC_PID_gain = self.LC_PID_GAIN_CANFD_LARGE_VEHICLE
-            self.HC_PID_gain = self.HC_PID_GAIN_CANFD_LARGE_VEHICLE
         else:
           self.pc_blend_ratio_low_C = self.pc_blend_ratio_low_C_CAN
           self.pc_blend_ratio_high_C = self.pc_blend_ratio_high_C_CAN
           self.LC_PID_gain = self.LC_PID_GAIN_CAN
-          self.HC_PID_gain = self.HC_PID_GAIN_CAN
 
-        # calculate pc blend ratio range
         self.pc_blend_ratio_v = [self.pc_blend_ratio_low_C, self.pc_blend_ratio_high_C] # %-Predicted Curvature
 
         # calculate current curvature and model desired curvature
@@ -433,9 +425,14 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
         if self.model is not None and len(self.model.orientation.x) >= 17:
           # compute curvature from model predicted orientationRate, and blend with desired curvature based on max predicted curvature magnitude
           curvatures = np.array(self.model.orientationRate.z) / max(0.01, CS.out.vEgoRaw)
+          predicted_steering_angle_curvature = interp(self.wheel_angle_lookup_time, ModelConstants.T_IDXS, curvatures)
           predicted_curvature = interp(self.curvature_lookup_time, ModelConstants.T_IDXS, curvatures)
         else:
           predicted_curvature = 0.0
+
+        # calculate predicted steering angle
+        self.predictedSteeringAngleDeg_SP = math.degrees(self.VM.get_steer_from_curvature(-predicted_steering_angle_curvature, CS.out.vEgoRaw, 0))
+        self.predictedSteeringAngleDeg_SP += self.lp.angleOffsetDeg
 
         # calculate blend ratio
         self.pc_blend_ratio = interp(abs(desired_curvature), self.pc_blend_ratio_bp, self.pc_blend_ratio_v)
@@ -495,9 +492,6 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
                                                                 CC.latActive,
                                                                 self.CP)
         lateralUncertainty = self.calculate_lateral_uncertainty(requested_curvature, apply_curvature, max_curvature)
-
-        # skip curvature limits for testing purpose
-        apply_curvature = requested_curvature
 
         #if reset_steering is 1, set apply_curvature to 0
         if reset_steering == 1:
@@ -642,26 +636,8 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
         if self.LC_path_angle_reset_counter > self.LC_path_angle_reset_duration * 20: #20 scans per second
           self.LC_PID_controller.reset()
 
-        # path_angle_high_c is used for large curves
-
-        # calculate steering angle associated with the base path (predicted_curvature)
-        steering_wheel_delta = steeringAngleDeg_PV - steeringAngleDeg_SP
-
-        # calculate wheel angle from path_offset
-        path_angle_high_c_raw = steering_wheel_delta * self.path_angle_wheel_angle_conversion * self.HC_PID_gain
-
-        # Apply curvature-based filtering: take full value at high curvature (>0.01), none at low curvature
-        path_angle_curvature_factor = interp(abs(predicted_curvature), self.HC_PID_curvature_bp, self.HC_PID_curvature_v)
-
-        # Apply speed-based filtering: reduce to zero at higher speeds
-        path_angle_speed_factor = interp(CS.out.vEgoRaw, self.HC_PID_speed_bp, self.HC_PID_speed_v)
-
-
-        # Apply both filters: multiply factors together to ensure we don't get large values at low curvature or high speed
-        path_angle_high_c_error = path_angle_high_c_raw * path_angle_curvature_factor * path_angle_speed_factor
-
-        # use PID controller to calculate path_angle_high_c
-        path_angle_high_c = self.HC_PID_controller.update(path_angle_high_c_error)
+        # path_angle_high_c is not used in the current implementation
+        path_angle_high_c = 0.0
 
         # sum path_angle_low_c and path_angle_high_c
         path_angle = path_angle_low_c + path_angle_high_c
@@ -710,6 +686,7 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
         if reset_steering == 1:
           ramp_type = 3
           self.path_angle_deque.clear()
+          self.HC_PID_controller.reset()
           self.LC_PID_controller.reset()
         else:
           ramp_type = 2
@@ -719,6 +696,7 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
         path_offset = 0.0
         path_angle = 0.0
         self.path_angle_deque.clear()
+        self.HC_PID_controller.reset()
         self.LC_PID_controller.reset()
         ramp_type = 0
         lateralUncertainty = 0.0
