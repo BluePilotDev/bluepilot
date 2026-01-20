@@ -91,9 +91,9 @@ class BluePilotLayout(Widget):
       lambda: tr("Lane Change Factor High"),
       lambda: tr("EDIT"),
       lambda: tr("Adjust the high-speed lane change factor (0.5-1.0)."),
-      callback=self._edit_lane_change_factor_high,
-      icon="speed_limit.png"
+      callback=self._edit_lane_change_factor_high
     )
+    self._lane_change_factor_high.set_icon("speed_limit.png")
     self._lane_change_factor_high.action_item.set_value(lambda: f"{lane_change_factor_high:.2f}")
     
     # Enable lane positioning toggle
@@ -112,9 +112,9 @@ class BluePilotLayout(Widget):
       lambda: tr("EDIT"),
       lambda: tr("Adjust the in-lane offset (-0.5 to 0.5)."),
       callback=self._edit_custom_path_offset,
-      enabled=lambda: self._params.get_bool("enable_lane_positioning"),
-      icon="chffr_wheel.png"
+      enabled=lambda: self._params.get_bool("enable_lane_positioning")
     )
+    self._custom_path_offset.set_icon("chffr_wheel.png")
     self._custom_path_offset.action_item.set_value(lambda: f"{custom_path_offset:.2f}")
     
     # Enable lanefull mode toggle (conditional on lane positioning)
@@ -143,9 +143,9 @@ class BluePilotLayout(Widget):
       lambda: tr("EDIT"),
       lambda: tr("Adjust the high curvature blend ratio (0.0-1.0)."),
       callback=self._edit_pc_blend_ratio_high_C,
-      enabled=lambda: self._params.get_bool("custom_profile"),
-      icon="chffr_wheel.png"
+      enabled=lambda: self._params.get_bool("custom_profile")
     )
+    self._pc_blend_ratio_high_C.set_icon("chffr_wheel.png")
     self._pc_blend_ratio_high_C.action_item.set_value(lambda: f"{pc_blend_ratio_high_C:.2f}")
     
     # Predicted curvature blend ratio low (float, conditional on custom profile)
@@ -155,9 +155,9 @@ class BluePilotLayout(Widget):
       lambda: tr("EDIT"),
       lambda: tr("Adjust the low curvature blend ratio (0.0-1.0)."),
       callback=self._edit_pc_blend_ratio_low_C,
-      enabled=lambda: self._params.get_bool("custom_profile"),
-      icon="chffr_wheel.png"
+      enabled=lambda: self._params.get_bool("custom_profile")
     )
+    self._pc_blend_ratio_low_C.set_icon("chffr_wheel.png")
     self._pc_blend_ratio_low_C.action_item.set_value(lambda: f"{pc_blend_ratio_low_C:.2f}")
     
     # Low curvature PID gain (float, conditional on custom profile)
@@ -167,9 +167,9 @@ class BluePilotLayout(Widget):
       lambda: tr("EDIT"),
       lambda: tr("Adjust the low curvature PID gain (0.0-5.0)."),
       callback=self._edit_lc_pid_gain,
-      enabled=lambda: self._params.get_bool("custom_profile"),
-      icon="chffr_wheel.png"
+      enabled=lambda: self._params.get_bool("custom_profile")
     )
+    self._lc_pid_gain.set_icon("chffr_wheel.png")
     self._lc_pid_gain.action_item.set_value(lambda: f"{lc_pid_gain:.2f}")
     
     # 12V battery limit (float)
@@ -178,9 +178,9 @@ class BluePilotLayout(Widget):
       lambda: tr("12V Battery Limit"),
       lambda: tr("EDIT"),
       lambda: tr("Set the 12V battery charging pause limit (11.0-14.0V)."),
-      callback=self._edit_vbatt_pause_charging,
-      icon="warning.png"
+      callback=self._edit_vbatt_pause_charging
     )
+    self._vbatt_pause_charging.set_icon("warning.png")
     self._vbatt_pause_charging.action_item.set_value(lambda: f"{vbatt_pause_charging:.1f}V")
     
     # Disable BP lateral control toggle
