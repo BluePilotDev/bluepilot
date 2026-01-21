@@ -29,7 +29,7 @@ class LeadVehicleRenderer(Widget):
     self._font_color: rl.Color = rl.Color(255, 255, 255, 180)
     self._car_state = None
     self._should_render = False
-    self._last_radar = 0.0
+    self._last_active_time = 0.0
 
     self.params = Params()
 
@@ -52,14 +52,14 @@ class LeadVehicleRenderer(Widget):
     render_lead_indicator = self._radar_state is not None and has_lead_one and in_gear
 
     if render_lead_indicator:
-      self._last_radar = time.monotonic()
+      self._last_active_time = time.monotonic()
       speed_conversion = CV.MS_TO_KPH if ui_state.is_metric else CV.MS_TO_MPH
       speed_delta = lead_one.vRel * speed_conversion
       self.speed = max(0.0, self._car_state.vEgoCluster * speed_conversion + speed_delta)
       self.vRel = lead_one.vRel
       fade_ratio = 1.0
     else:
-      delay_time = time.monotonic() - self._last_radar
+      delay_time = time.monotonic() - self._last_active_time
       if delay_time > DELAY:
         return
       else:
