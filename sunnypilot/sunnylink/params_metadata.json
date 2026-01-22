@@ -1227,7 +1227,7 @@
   },
   "mici_complication": {
     "title": "BluePilot: Comma 4 Lower Right",
-    "description": "Show data the lower right of the UI.",
+    "description": "Show data in the lower right of the Comma 4 UI.",
     "options": [
       {
         "value": 0,
