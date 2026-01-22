@@ -1225,8 +1225,30 @@
     "step": 0.1,
     "description": "Voltage at which BluePilot will shutdown and avoid draining the car battery."
   },
-  "show_lead_speed": {
-    "title": "BluePilot: Show Lead Vehicle Speed",
-    "description": "Show the lead vehicle's speed in the UI."
+  "mici_complication": {
+    "title": "BluePilot: Comma 4 Lower Right",
+    "description": "Show data the lower right of the UI.",
+    "options": [
+      {
+        "value": 0,
+        "label": "Off"
+      },
+      {
+        "value": 1,
+        "label": "Lead Car Speed"
+      },
+      {
+        "value": 2,
+        "label": "Speed"
+      },
+      {
+        "value": 3,
+        "label": "Distance to Lead Car"
+      },
+      {
+        "value": 4,
+        "label": "Time to Lead Car"
+      }
+    ]
   }
 }

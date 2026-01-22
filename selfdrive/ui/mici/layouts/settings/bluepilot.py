@@ -3,7 +3,7 @@ from collections.abc import Callable
 
 from openpilot.common.time_helpers import system_time_valid
 from openpilot.system.ui.widgets.scroller import Scroller
-from openpilot.selfdrive.ui.mici.widgets.button import BigButton, BigToggle, BigParamControl
+from openpilot.selfdrive.ui.mici.widgets.button import BigButton, BigToggle, BigParamControl, BigMultiParamToggle
 from openpilot.system.ui.widgets.label import gui_label, MiciLabel, UnifiedLabel
 from openpilot.selfdrive.ui.mici.widgets.floatbutton import BigParamFloatControl
 from openpilot.selfdrive.ui.mici.widgets.dialog import BigDialogBase
@@ -26,7 +26,7 @@ class BluePilotLayoutMici(NavWidget):
     self.show_web_routes_qr = BigButton("show QR code", "", "icons_mici/settings/network/wifi_strength_full.png")
     self.show_web_routes_qr.set_click_callback(self._show_qr_dialog)
     self.show_hands_free_ui = BigParamControl("show hands-free ui", "send_hands_free_cluster_msg")
-    self.show_lead_vehicle = BigParamControl("show lead vehicle speed", "show_lead_speed")
+    self.show_lead_vehicle = BigMultiParamToggle("Lower Right Display", "mici_complication", ["off", "lead car speed", "speed", "lead car distance", "time to lead car"])
     self.enable_human_turn_detection = BigParamControl("enable human turn detection", "enable_human_turn_detection")
     self.lane_change_factor_high = BigParamFloatControl("lane change factor high", "lane_change_factor_high", min=0.5, max=1.0)
     self.enable_lane_positioning = BigParamControl("enable lane positioning", "enable_lane_positioning", tint=rl.GREEN)
@@ -64,7 +64,6 @@ class BluePilotLayoutMici(NavWidget):
     self._refresh_toggles = (
       ("BPPortalEnabled", self.enable_web_routes),
       ("send_hands_free_cluster_msg", self.show_hands_free_ui),
-      ("show_lead_speed", self.show_lead_vehicle),
       ("enable_human_turn_detection", self.enable_human_turn_detection),
       ("enable_lane_positioning", self.enable_lane_positioning),
       ("enable_lane_full_mode", self.enable_lane_full_mode),
@@ -94,7 +93,11 @@ class BluePilotLayoutMici(NavWidget):
       qr_dialog = WebServerQRDialog(back_callback=lambda: gui_app.set_modal_overlay(None))
       gui_app.set_modal_overlay(qr_dialog)
     # If disabled, could show a message dialog, but for now just do nothing
-  
+
+  def _update_state(self):
+    super()._update_state()
+    self.show_lead_vehicle._load_value()
+
   def _update_buttons(self):
     """Update button enabled state based on server status."""
     ui_state.update_params()
@@ -107,7 +110,7 @@ class BluePilotLayoutMici(NavWidget):
     # Refresh toggles from params to mirror external changes
     for key, item in self._refresh_toggles:
       item.set_checked(ui_state.params.get_bool(key))
-    
+
     # Also update button state
     self._update_buttons()
 

@@ -336,9 +336,13 @@ class BigMultiToggle(BigToggle):
     x = self._rect.x + self._rect.width - self._txt_enabled_toggle.width
     y = self._rect.y
 
-    for i in range(len(self._options)):
+    num_options = len(self._options)
+    for i in range(num_options):
+      dist = 35
+      if num_options > 4:
+        dist = self._rect.height / int(num_options + 1)
       self._draw_pill(x, y, checked_idx == i)
-      y += 35
+      y += dist
 
 
 class BigMultiParamToggle(BigMultiToggle):
