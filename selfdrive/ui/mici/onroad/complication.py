@@ -17,7 +17,7 @@ COLOR_DELTA_MS = 4.5  # ~ 10MPH
 SHADOW_DEPTH = 3
 DELAY = 3.0 #seconds to remove last lead car speed
 
-class LeadVehicleRenderer(Widget):
+class MiciComplication(Widget):
   def __init__(self):
     super().__init__()
     self.speed: float = 0.0
