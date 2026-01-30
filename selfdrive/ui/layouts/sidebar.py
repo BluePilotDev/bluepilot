@@ -24,7 +24,7 @@ SMALL_FONT_SIZE = 20
 
 # Button positions (right column)
 SETTINGS_BTN_WIDTH = 75  # Width of settings button
-SETTINGS_BTN_HEIGHT = 75  # Height of settings button (square button)
+SETTINGS_BTN_HEIGHT = int(75 * (104 / 169))  # Height of settings button (to aspect ratio)
 SETTINGS_BTN_Y = 0  # Will be positioned at bottom
 FAN_ICON_SIZE = 50
 FAN_SPEED_Y_OFFSET = 60
@@ -67,14 +67,13 @@ NETWORK_TYPES = {
   NetworkType.cell5G: tr_noop("5G"),
 }
 
-
 class Sidebar(Widget):
   def __init__(self):
     super().__init__()
     # Network data
     self._net_ssid = "--"
     self._net_strength = 0
-    
+
     # System metrics
     self._cpu_util = 0
     self._cpu_temp = 0.0
@@ -83,21 +82,22 @@ class Sidebar(Widget):
     self._memory_util = 0
     self._fan_speed = 0
     self._fan_rotation = 0.0  # For animation
-    
+    self._fan: rl.Texture = gui_app.texture('images/button_fan.png', FAN_ICON_SIZE, FAN_ICON_SIZE)
+
     # Status colors
     self._vehicle_color = Colors.OFFLINE_YELLOW
     self._connect_color = Colors.OFFLINE_YELLOW
     self._sunnylink_color = Colors.OFFLINE_YELLOW
-    
+
     # Fonts
     self._font_regular = gui_app.font(FontWeight.NORMAL)
     self._font_bold = gui_app.font(FontWeight.SEMI_BOLD)
-    
+
     # Icons
     # Load settings icon at original size, we'll scale it when drawing
-    self._settings_img = gui_app.texture("images/button_settings.png", 50, 50)  # Original size
+    self._settings_img = gui_app.texture("images/button_settings.png", 169, 104)  # Original size
     # Fan icon will be drawn procedurally (no texture needed)
-    
+
     # Callbacks
     self._on_settings_click: Callable | None = None
     self._on_flag_click: Callable | None = None
@@ -112,14 +112,14 @@ class Sidebar(Widget):
   def _render(self, rect: rl.Rectangle):
     # Background - dark grey
     rl.draw_rectangle_rec(rect, Colors.SIDEBAR_BG)
-    
+
     # Calculate column positions
     left_col_x = rect.x + PANEL_MARGIN
     right_col_x = rect.x + LEFT_COLUMN_WIDTH + PANEL_MARGIN * 2
-    
+
     # Draw left column (status panels)
     self._draw_left_column(left_col_x, rect.y, LEFT_COLUMN_WIDTH, rect.height)
-    
+
     # Draw right column (fan and gear)
     self._draw_right_column(right_col_x, rect.y, RIGHT_COLUMN_WIDTH, rect.height)
 
@@ -129,16 +129,16 @@ class Sidebar(Widget):
       return
 
     device_state = sm['deviceState']
-    
+
     # Update network status
     self._update_network_status(device_state)
-    
+
     # Update system metrics
     self._update_system_metrics(device_state)
-    
+
     # Update status colors
     self._update_status_colors(device_state)
-    
+
     # Update fan animation
     if self._fan_speed > 0:
       self._fan_rotation += self._fan_speed * 0.1
@@ -152,7 +152,7 @@ class Sidebar(Widget):
       self._net_strength = max(0, min(5, strength.raw + 1)) if strength.raw > 0 else 0
     except (AttributeError, ValueError):
       self._net_strength = 0
-    
+
     # Get SSID from networkInfo.state (for WiFi) or use network type
     try:
       if device_state.networkType == NetworkType.wifi:
@@ -182,7 +182,7 @@ class Sidebar(Widget):
         self._cpu_util = 0
     except (AttributeError, ValueError, TypeError):
       self._cpu_util = 0
-    
+
     try:
       # CPU temperature (max of all cores)
       cpu_temps = device_state.cpuTempC
@@ -192,13 +192,13 @@ class Sidebar(Widget):
         self._cpu_temp = 0.0
     except (AttributeError, ValueError, TypeError):
       self._cpu_temp = 0.0
-    
+
     try:
       # GPU utilization
       self._gpu_util = int(device_state.gpuUsagePercent) if device_state.gpuUsagePercent else 0
     except (AttributeError, ValueError, TypeError):
       self._gpu_util = 0
-    
+
     try:
       # GPU temperature (max of all sensors)
       gpu_temps = device_state.gpuTempC
@@ -208,13 +208,13 @@ class Sidebar(Widget):
         self._gpu_temp = 0.0
     except (AttributeError, ValueError, TypeError):
       self._gpu_temp = 0.0
-    
+
     try:
       # Memory utilization
       self._memory_util = int(device_state.memoryUsagePercent) if device_state.memoryUsagePercent else 0
     except (AttributeError, ValueError, TypeError):
       self._memory_util = 0
-    
+
     try:
       # Fan speed
       self._fan_speed = int(device_state.fanSpeedPercentDesired) if device_state.fanSpeedPercentDesired else 0
@@ -230,7 +230,7 @@ class Sidebar(Widget):
         self._vehicle_color = Colors.GOOD
     except (AttributeError, ValueError):
       self._vehicle_color = Colors.OFFLINE_YELLOW
-    
+
     try:
       # Connect status
       last_ping = device_state.lastAthenaPingTime
@@ -242,7 +242,7 @@ class Sidebar(Widget):
         self._connect_color = Colors.DANGER
     except (AttributeError, ValueError, TypeError):
       self._connect_color = Colors.OFFLINE_YELLOW
-    
+
     # Sunnylink status
     try:
       if hasattr(ui_state, 'sunnylink_state') and ui_state.sunnylink_state:
@@ -261,7 +261,7 @@ class Sidebar(Widget):
     # Gear button top is at: height - SETTINGS_BTN_HEIGHT - PANEL_MARGIN
     gear_button_top = height - SETTINGS_BTN_HEIGHT - PANEL_MARGIN
     available_height = gear_button_top - PANEL_MARGIN  # Subtract top margin
-    
+
     # We have 7 panels with 6 gaps between them
     # Make panels 10% taller by reducing gap space proportionally
     num_panels = 7
@@ -270,46 +270,46 @@ class Sidebar(Widget):
     adjusted_gap = PANEL_MARGIN * 0.9
     total_gap_height = num_gaps * adjusted_gap
     panel_height = (available_height - total_gap_height) / num_panels * 1.1  # 10% taller
-    
+
     current_y = y + PANEL_MARGIN
-    
+
     # Network panel
-    current_y = self._draw_status_panel(x, current_y, width, "Network", 
+    current_y = self._draw_status_panel(x, current_y, width, "Network",
                                         bottom_left=self._net_ssid,
-                                        bottom_right_callback=self._draw_signal_bars, 
+                                        bottom_right_callback=self._draw_signal_bars,
                                         status_color=self._get_network_status_color(),
                                         panel_height=panel_height)
-    
+
     # CPU panel
     current_y = self._draw_status_panel(x, current_y, width, "CPU",
                                         bottom_left=f"{self._cpu_util}%",
                                         bottom_right=f"{int(self._cpu_temp)}°C",
                                         status_color=self._get_temp_status_color(self._cpu_temp),
                                         panel_height=panel_height)
-    
+
     # GPU panel
     current_y = self._draw_status_panel(x, current_y, width, "GPU",
                                         bottom_left=f"{self._gpu_util}%",
                                         bottom_right=f"{int(self._gpu_temp)}°C",
                                         status_color=self._get_temp_status_color(self._gpu_temp),
                                         panel_height=panel_height)
-    
+
     # Memory panel
     current_y = self._draw_status_panel(x, current_y, width, "Memory",
                                         bottom_left=f"{self._memory_util}%",
                                         status_color=self._get_util_status_color(self._memory_util),
                                         panel_height=panel_height)
-    
+
     # Vehicle panel (label only)
     current_y = self._draw_status_panel(x, current_y, width, "Vehicle",
                                         status_color=self._vehicle_color,
                                         panel_height=panel_height)
-    
+
     # Connect panel (label only)
     current_y = self._draw_status_panel(x, current_y, width, "Connect",
                                         status_color=self._connect_color,
                                         panel_height=panel_height)
-    
+
     # Sunnylink panel (label only)
     current_y = self._draw_status_panel(x, current_y, width, "Sunnylink",
                                         status_color=self._sunnylink_color,
@@ -322,29 +322,29 @@ class Sidebar(Widget):
                         panel_height: float = 125) -> float:
     """Draw a status panel with colored left edge. Returns next Y position."""
     panel_rect = rl.Rectangle(x, y, width, panel_height)
-    
+
     # Draw panel background (medium grey rounded rectangle)
     rl.draw_rectangle_rounded(panel_rect, 0.2, 10, Colors.PANEL_BG)
-    
+
     # Draw colored left edge (~5% of width)
     edge_width = width * 0.05
     edge_rect = rl.Rectangle(panel_rect.x, panel_rect.y, edge_width, panel_rect.height)
     rl.draw_rectangle_rounded(edge_rect, 0.2, 10, status_color)
-    
+
     # Draw label (upper left)
     label_y = y + PANEL_PADDING
     label_pos = rl.Vector2(x + edge_width + PANEL_PADDING, label_y)
     rl.draw_text_ex(self._font_bold, label, label_pos, LABEL_FONT_SIZE, 0, Colors.WHITE)
-    
+
     # Draw bottom content
     if bottom_left or bottom_right or bottom_right_callback:
       content_y = y + panel_height - PANEL_PADDING - VALUE_FONT_SIZE * FONT_SCALE
-      
+
       # Bottom left
       if bottom_left:
         left_pos = rl.Vector2(x + edge_width + PANEL_PADDING, content_y)
         rl.draw_text_ex(self._font_regular, str(bottom_left), left_pos, VALUE_FONT_SIZE, 0, Colors.WHITE_DIM)
-      
+
       # Bottom right (or callback)
       if bottom_right_callback:
         bottom_right_callback(x + width - PANEL_PADDING, content_y)
@@ -352,7 +352,7 @@ class Sidebar(Widget):
         right_text_size = measure_text_cached(self._font_regular, bottom_right, VALUE_FONT_SIZE)
         right_pos = rl.Vector2(x + width - PANEL_PADDING - right_text_size.x, content_y)
         rl.draw_text_ex(self._font_regular, bottom_right, right_pos, VALUE_FONT_SIZE, 0, Colors.WHITE_DIM)
-    
+
     # Use adjusted gap for spacing between panels
     adjusted_gap = PANEL_MARGIN * 0.9
     return y + panel_height + adjusted_gap
@@ -362,26 +362,28 @@ class Sidebar(Widget):
     bar_width = 4
     bar_spacing = 2
     bar_heights = [8, 12, 16, 20, 24]  # Increasing heights
-    
+
     for i in range(5):
       bar_height = bar_heights[i]
       bar_x = x - (5 - i) * (bar_width + bar_spacing) - bar_width
       bar_y = y - bar_height
-      
+
       # Color based on signal strength
       if i < self._net_strength:
         color = Colors.WHITE
       else:
         color = Colors.GRAY
-      
+
       rl.draw_rectangle(int(bar_x), int(bar_y), bar_width, bar_height, color)
 
   def _draw_right_column(self, x: float, y: float, width: float, height: float):
     """Draw fan icon, fan speed, and gear icon in right column"""
     # Fan icon (top)
+
+    fan_x = x + width // 2 + FAN_ICON_SIZE // 2
     fan_y = y + PANEL_MARGIN
-    self._draw_fan_icon(x + (width - FAN_ICON_SIZE) / 2, fan_y, FAN_ICON_SIZE)
-    
+    self._draw_fan_icon(fan_x, fan_y)
+
     # Fan speed percentage (below fan)
     fan_speed_y = fan_y + FAN_ICON_SIZE + 10
     fan_speed_text = f"{self._fan_speed}%"
@@ -389,7 +391,7 @@ class Sidebar(Widget):
     text_x = x + (width - text_size.x) / 2
     text_pos = rl.Vector2(text_x, fan_speed_y)
     rl.draw_text_ex(self._font_regular, fan_speed_text, text_pos, SMALL_FONT_SIZE, 0, Colors.WHITE_DIM)
-    
+
     # Gear icon (bottom) - position at bottom of sidebar, extend upward
     # Button bottom should be at: y + height - PANEL_MARGIN
     # Button top should be at: y + height - PANEL_MARGIN - SETTINGS_BTN_HEIGHT
@@ -398,77 +400,30 @@ class Sidebar(Widget):
     button_top_y = button_bottom_y - SETTINGS_BTN_HEIGHT
     self._draw_settings_button(x + (width - SETTINGS_BTN_WIDTH) / 2, y + button_top_y, SETTINGS_BTN_WIDTH, SETTINGS_BTN_HEIGHT)
 
-  def _draw_fan_icon(self, x: float, y: float, size: float):
+  def _draw_fan_icon(self, x: float, y: float):
     """Draw static fan icon (QT-style fan shape with 4 curved blades)"""
-    center_x = x + size / 2
-    center_y = y + size / 2
-    outer_radius = size / 2 - 4
-    inner_radius = size / 5
-    
-    # Draw 4 fan blades
-    num_blades = 4
-    blade_angle = 2 * math.pi / num_blades
-    
-    for i in range(num_blades):
-      angle = i * blade_angle
-      
-      # Each blade is a curved shape
-      # Create polygon points for curved blade
-      blade_points = []
-      
-      # Start at inner radius, angle offset slightly
-      start_angle = angle - blade_angle * 0.15
-      end_angle = angle + blade_angle * 0.85
-      
-      # Inner arc points
-      for j in range(3):
-        t = j / 2.0
-        arc_angle = start_angle + t * (end_angle - start_angle)
-        px = center_x + inner_radius * math.cos(arc_angle)
-        py = center_y + inner_radius * math.sin(arc_angle)
-        blade_points.append(rl.Vector2(px, py))
-      
-      # Outer arc points (curved outward)
-      for j in range(3):
-        t = j / 2.0
-        arc_angle = start_angle + t * (end_angle - start_angle)
-        px = center_x + outer_radius * math.cos(arc_angle)
-        py = center_y + outer_radius * math.sin(arc_angle)
-        blade_points.append(rl.Vector2(px, py))
-      
-      # Draw blade as filled polygon (reverse outer points for proper winding)
-      if len(blade_points) >= 3:
-        # Draw as triangles
-        for k in range(len(blade_points) - 2):
-          rl.draw_triangle(
-            blade_points[0],
-            blade_points[k + 1],
-            blade_points[k + 2],
-            Colors.WHITE_DIM
-          )
-    
-    # Draw center hub circle
-    hub_radius = inner_radius * 0.7
-    rl.draw_circle(int(center_x), int(center_y), int(hub_radius), Colors.PANEL_BG)
-    rl.draw_circle_lines(int(center_x), int(center_y), int(hub_radius), Colors.WHITE_DIM)
-    
-    # Draw outer circle border
-    rl.draw_circle_lines(int(center_x), int(center_y), int(outer_radius), Colors.WHITE_DIM)
+
+    src_rect = rl.Rectangle(0, 0, self._fan.width, self._fan.height)
+    origin_offset_w = self._fan.width // 2
+    origin_offset_h = self._fan.height // 2
+    origin = (origin_offset_w, origin_offset_h)
+    dest_rect = rl.Rectangle(x - origin_offset_w, y + origin_offset_h, self._fan.width, self._fan.height)
+    rl.draw_texture_pro(self._fan, src_rect, dest_rect, origin, self._fan_rotation, rl.WHITE)
 
   def _draw_settings_button(self, x: float, y: float, width: float, height: float):
     """Draw gear icon button"""
     mouse_pos = rl.get_mouse_position()
     mouse_down = self.is_pressed and rl.is_mouse_button_down(rl.MouseButton.MOUSE_BUTTON_LEFT)
-    
+
     button_rect = rl.Rectangle(x, y, width, height)
     settings_down = mouse_down and rl.check_collision_point_rec(mouse_pos, button_rect)
-    
+
     tint = Colors.BUTTON_PRESSED if settings_down else Colors.BUTTON_NORMAL
     # Scale texture to desired size
     src_rect = rl.Rectangle(0, 0, self._settings_img.width, self._settings_img.height)
     dest_rect = rl.Rectangle(x, y, width, height)
     rl.draw_texture_pro(self._settings_img, src_rect, dest_rect, rl.Vector2(0, 0), 0, tint)
-    
+
     # Store button rect for click handling
     self._settings_btn_rect = button_rect
 
