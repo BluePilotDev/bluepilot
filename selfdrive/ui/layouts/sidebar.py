@@ -79,7 +79,7 @@ class Sidebar(Widget):
     self._gpu_util = 0
     self._gpu_temp = 0.0
     self._memory_util = 0
-    self._fan_speed = 100
+    self._fan_speed = 0
     self._fan_rotation = 0.0  # For animation
     self._fan: rl.Texture = gui_app.texture('images/button_fan.png', FAN_ICON_SIZE, FAN_ICON_SIZE)
 
