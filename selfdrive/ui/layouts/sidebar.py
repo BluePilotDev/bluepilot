@@ -24,7 +24,7 @@ SMALL_FONT_SIZE = 20
 
 # Button positions (right column)
 SETTINGS_BTN_WIDTH = 75  # Width of settings button
-SETTINGS_BTN_HEIGHT = int(75 * (104 / 169))  # Height of settings button (to aspect ratio)
+SETTINGS_BTN_HEIGHT = 75  # Height of settings button (square)
 SETTINGS_BTN_Y = 0  # Will be positioned at bottom
 FAN_ICON_SIZE = 50
 FAN_SPEED_Y_OFFSET = 60
@@ -95,7 +95,7 @@ class Sidebar(Widget):
 
     # Icons
     # Load settings icon at original size, we'll scale it when drawing
-    self._settings_img = gui_app.texture("images/button_settings.png", 169, 104)  # Original size
+    self._settings_img = gui_app.texture("images/button_settings2.png", 120, 120)  # Original size
     # Fan icon will be drawn procedurally (no texture needed)
 
     # Callbacks
