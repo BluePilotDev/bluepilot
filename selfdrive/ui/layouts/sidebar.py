@@ -1,6 +1,5 @@
 import pyray as rl
 import time
-import math
 from collections.abc import Callable
 from cereal import log
 from openpilot.selfdrive.ui.ui_state import ui_state
@@ -26,7 +25,7 @@ SMALL_FONT_SIZE = 20
 SETTINGS_BTN_WIDTH = 75  # Width of settings button
 SETTINGS_BTN_HEIGHT = 75  # Height of settings button (square)
 SETTINGS_BTN_Y = 0  # Will be positioned at bottom
-FAN_ICON_SIZE = 50
+FAN_ICON_SIZE = 80
 FAN_SPEED_Y_OFFSET = 60
 
 ThermalStatus = log.DeviceState.ThermalStatus
@@ -80,7 +79,7 @@ class Sidebar(Widget):
     self._gpu_util = 0
     self._gpu_temp = 0.0
     self._memory_util = 0
-    self._fan_speed = 0
+    self._fan_speed = 100
     self._fan_rotation = 0.0  # For animation
     self._fan: rl.Texture = gui_app.texture('images/button_fan.png', FAN_ICON_SIZE, FAN_ICON_SIZE)
 
@@ -387,10 +386,10 @@ class Sidebar(Widget):
     # Fan speed percentage (below fan)
     fan_speed_y = fan_y + FAN_ICON_SIZE + 10
     fan_speed_text = f"{self._fan_speed}%"
-    text_size = measure_text_cached(self._font_regular, fan_speed_text, SMALL_FONT_SIZE)
+    text_size = measure_text_cached(self._font_regular, fan_speed_text, LABEL_FONT_SIZE)
     text_x = x + (width - text_size.x) / 2
     text_pos = rl.Vector2(text_x, fan_speed_y)
-    rl.draw_text_ex(self._font_regular, fan_speed_text, text_pos, SMALL_FONT_SIZE, 0, Colors.WHITE_DIM)
+    rl.draw_text_ex(self._font_regular, fan_speed_text, text_pos, LABEL_FONT_SIZE, 0, Colors.WHITE_DIM)
 
     # Gear icon (bottom) - position at bottom of sidebar, extend upward
     # Button bottom should be at: y + height - PANEL_MARGIN
