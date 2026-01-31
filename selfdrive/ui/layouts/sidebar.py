@@ -138,12 +138,6 @@ class Sidebar(Widget):
     # Update status colors
     self._update_status_colors(device_state)
 
-    # Update fan animation
-    if self._fan_speed > 0:
-      self._fan_rotation += self._fan_speed * 0.1
-      if self._fan_rotation >= 360:
-        self._fan_rotation -= 360
-
   def _update_network_status(self, device_state):
     # Get network strength (0-5 bars)
     try:
@@ -401,6 +395,13 @@ class Sidebar(Widget):
 
   def _draw_fan_icon(self, x: float, y: float):
     """Draw static fan icon (QT-style fan shape with 4 curved blades)"""
+    # Update fan animation
+    if self._fan_speed > 0:
+      self._fan_rotation += self._fan_speed * 0.1
+      if self._fan_rotation >= 360:
+        self._fan_rotation -= 360
+    else:
+        self._fan_rotation = 0
 
     src_rect = rl.Rectangle(0, 0, self._fan.width, self._fan.height)
     origin_offset_w = self._fan.width // 2
