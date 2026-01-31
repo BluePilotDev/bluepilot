@@ -31,7 +31,6 @@ FAN_SPEED_Y_OFFSET = 60
 ThermalStatus = log.DeviceState.ThermalStatus
 NetworkType = log.DeviceState.NetworkType
 
-
 # Color scheme
 class Colors:
   # Background colors
@@ -397,11 +396,9 @@ class Sidebar(Widget):
     """Draw static fan icon (QT-style fan shape with 4 curved blades)"""
     # Update fan animation
     if self._fan_speed > 0:
-      self._fan_rotation += self._fan_speed * 0.1
-      if self._fan_rotation >= 360:
-        self._fan_rotation -= 360
+      self._fan_rotation = (self._fan_rotation + self._fan_speed * 0.1) % 360.0
     else:
-        self._fan_rotation = 0
+      self._fan_rotation = 0
 
     src_rect = rl.Rectangle(0, 0, self._fan.width, self._fan.height)
     origin_offset_w = self._fan.width // 2
