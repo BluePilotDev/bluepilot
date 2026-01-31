@@ -396,7 +396,9 @@ class Sidebar(Widget):
     """Draw static fan icon (QT-style fan shape with 4 curved blades)"""
     # Update fan animation
     if self._fan_speed > 0:
-      self._fan_rotation = (self._fan_rotation + self._fan_speed * 0.1) % 360.0
+      self._fan_rotation += self._fan_speed * 0.1
+      if self._fan_rotation >= 360:
+        self._fan_rotation -= 360
     else:
       self._fan_rotation = 0
 
