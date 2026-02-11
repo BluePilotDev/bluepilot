@@ -93,7 +93,6 @@ class BluePilotLayoutMici(NavWidget):
     self._refresh_toggles = (
       ("BPPortalEnabled", self.enable_web_routes),
       ("send_hands_free_cluster_msg", self.show_hands_free_ui),
-      ("FordPrefHybridPowerFlow", self._show_hybrid_power_flow),
       ("ShowBrakeStatus", self.show_brake_status),
       ("Blindspot", self.show_blindspot_ui),
       ("RainbowMode", self.rainbow_mode),
