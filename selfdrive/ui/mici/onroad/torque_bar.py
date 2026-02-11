@@ -202,9 +202,6 @@ class TorqueBar(Widget):
       #print(f"Torque:  { -ui_state.sm['carOutput'].actuatorsOutput.torque }")
 
   def _render(self, rect: rl.Rectangle) -> None:
-    if ui_state.sm['controlsState'].lateralControlState.which() == 'angleState' and not ui_state.sm.updated["controllerStateBP"]:
-      return
-
     # adjust y pos with torque
     torque_line_offset = np.interp(abs(self._torque_filter.x), [0.5, 1], [22, 26])
     torque_line_height = np.interp(abs(self._torque_filter.x), [0.5, 1], [self._torque_line_height_min, self._torque_line_height_max])
