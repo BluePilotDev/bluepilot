@@ -5,32 +5,9 @@ from openpilot.selfdrive.ui.ui_state import ui_state, UIStatus
 from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.lib.application import gui_app
 from openpilot.common.filter_simple import FirstOrderFilter
+from openpilot.system.ui.lib.shader_polygon import draw_circle_gradient
 
 from openpilot.selfdrive.ui.sunnypilot.mici.onroad.confidence_ball import ConfidenceBallSP
-
-
-def draw_circle_gradient(center_x: float, center_y: float, radius: int,
-                         top: rl.Color, bottom: rl.Color, ring: rl.Color) -> None:
-  # Draw a square with vertical gradient (top to bottom)
-  rl.draw_rectangle_gradient_v(int(center_x - radius), int(center_y - radius),
-                               radius * 2, radius * 2,
-                               top, bottom)
-
-  # Paint over square with a ring (border thickness is 1/4 of original visible thickness, then reduced by 25%)
-  # Original: outer_radius = math.ceil(radius * math.sqrt(2)) + 1, thickness ≈ radius * (sqrt(2) - 1) + 1
-  # For radius=50: outer_radius ≈ 71, thickness ≈ 21
-  # Square diagonal extends to radius * sqrt(2), so outer_radius must be at least that to cover square corners
-  # Then add 1/4 of the original visible border thickness, reduced by 25% (so 3/16 of original)
-  square_diagonal_radius = radius * math.sqrt(2)
-  original_outer_radius = math.ceil(radius * math.sqrt(2)) + 1
-  original_visible_thickness = original_outer_radius - radius
-  new_visible_thickness = max(1.0, original_visible_thickness / 4.0 * 0.75)  # 1/4 of original, then 25% smaller (3/16 total)
-  # Ensure ring covers square corners, then add thin border
-  outer_radius = max(square_diagonal_radius, radius + new_visible_thickness)
-  rl.draw_ring(rl.Vector2(int(center_x), int(center_y)), radius, outer_radius,
-               0.0, 360.0,
-               20, ring)
-
 
 class ConfidenceBall(Widget, ConfidenceBallSP):
   def __init__(self, demo: bool = False, radius: float=24):
@@ -123,6 +100,7 @@ class ConfidenceBall(Widget, ConfidenceBallSP):
     else:
       # Bar is wide enough - position ball aligned to right edge of bar (original behavior)
       ball_center_x = content_rect.x + content_rect.width - self._status_dot_radius
-    draw_circle_gradient(ball_center_x,
-                         dot_height, self._status_dot_radius,
-                         top_dot_color, bottom_dot_color, ring_color)
+
+
+    draw_circle_gradient(self.rect, ball_center_x, dot_height, self._status_dot_radius,
+                         top_dot_color, bottom_dot_color)

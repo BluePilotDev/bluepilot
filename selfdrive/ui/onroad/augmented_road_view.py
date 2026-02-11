@@ -40,8 +40,9 @@ BORDER_COLORS = {
 WIDE_CAM_MAX_SPEED = 10.0  # m/s (22 mph)
 ROAD_CAM_MIN_SPEED = 15.0  # m/s (34 mph)
 INF_POINT = np.array([1000.0, 0.0, 0.0])
-CONFIDENCE_BALL_R = 50  # Bar width for TICI (doubled from 25 to cover blank space on left)
-CONFIDENCE_BALL_W = CONFIDENCE_BALL_R + 15
+CONFIDENCE_BALL_R = 25  # Bar width for TICI (was 50, now 25 for thinner bar - half the original)
+CONFIDENCE_BALL_MARGIN = 5
+CONFIDENCE_BALL_W = CONFIDENCE_BALL_R * 2 + CONFIDENCE_BALL_MARGIN
 
 class AugmentedRoadView(CameraView):
   def __init__(self, stream_type: VisionStreamType = VisionStreamType.VISION_STREAM_ROAD):
@@ -60,7 +61,7 @@ class AugmentedRoadView(CameraView):
     self._hud_renderer = HudRenderer(CONFIDENCE_BALL_W)
     self.alert_renderer = AlertRenderer()
     self.driver_state_renderer = DriverStateRenderer()
-    self._confidence_ball = ConfidenceBall(radius=30)  # 50% bigger than 20 (20 * 1.5 = 30)
+    self._confidence_ball = ConfidenceBall(radius=CONFIDENCE_BALL_R)  # Doubled from 10 to 20 for better visibility
     self._battery_gauge = HybridBatteryGauge()
 
     # Blindspot screen edge indicators (MICI style)
@@ -107,18 +108,21 @@ class AugmentedRoadView(CameraView):
     # Draw blindspot screen edge indicators (MICI style) - draw early so it's behind other UI elements
     self._draw_blindspot_screen_edges(rect)
 
+    self.model_renderer.render(self._content_rect)
+
     # Draw all UI overlays
     # Confidence ball bar starts at left edge and has width CONFIDENCE_BALL_R
     confidence_ball_rect = rl.Rectangle(
-      self.rect.x,
+      self.rect.x + CONFIDENCE_BALL_MARGIN,
       self.rect.y,
-      CONFIDENCE_BALL_R,
+      CONFIDENCE_BALL_W,
       self.rect.height,
     )
+
     # Draw dark grey background for the confidence ball bar area (where video doesn't extend)
     dark_grey = rl.Color(40, 40, 40, 255)  # Dark grey instead of black
-    rl.draw_rectangle(int(confidence_ball_rect.x), int(confidence_ball_rect.y), 
-                     int(confidence_ball_rect.width), int(confidence_ball_rect.height), dark_grey)
+    rl.draw_rectangle_rec(confidence_ball_rect, dark_grey)
+    confidence_ball_rect.x -= CONFIDENCE_BALL_MARGIN
     self._confidence_ball.render(confidence_ball_rect)
 
     left_rect = rl.Rectangle(
@@ -127,12 +131,11 @@ class AugmentedRoadView(CameraView):
       self.rect.width - CONFIDENCE_BALL_W,
       self.rect.height,
     )
-    self.model_renderer.render(self._content_rect)
     self._hud_renderer.render(self._content_rect)
     self.alert_renderer.set_speed_right(self._hud_renderer.get_speed_right())
     self.alert_renderer.render(self._content_rect)
     self.driver_state_renderer.render(left_rect)
-    
+
     # Render hybrid battery gauge (bottom right of driver monitor)
     # Pass left_rect.x as the left_offset so battery gauge positions relative to driver monitor
     self._battery_gauge.render(self._content_rect, left_rect.x)
@@ -166,16 +169,16 @@ class AugmentedRoadView(CameraView):
     # Screen edge width - wider for TICI's larger screen to start the gradient sooner
     # TICI screen is ~1920x1080, MICI is ~1920x720, so we use a wider edge
     BLIND_SPOT_W = 250  # Width of red edge indicator in pixels (wider for TICI to start gradient sooner)
-    
+
     # Pulse animation: creates a brightness pulse effect
     PULSE_DURATION = 3.0  # seconds for one complete pulse cycle (twice as slow)
     current_time = time.monotonic()
     pulse_phase = ((current_time - self._blindspot_pulse_start_time) % PULSE_DURATION) / PULSE_DURATION
-    
+
     # Gradient opacity: starts at 75% and fades to 0% (fully transparent)
     EDGE_ALPHA_START = 0.75  # 75% opacity at the edge
     EDGE_ALPHA_END = 0.0     # 0% opacity at the inside edge (fully transparent)
-    
+
     x = int(rect.x)
     y = int(rect.y)
     h = int(rect.height)
