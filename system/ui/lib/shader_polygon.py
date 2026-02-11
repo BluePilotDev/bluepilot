@@ -107,6 +107,36 @@ void main()
 }
 """
 
+CIRCLE_SHADER = GL_VERSION + """
+out vec4 finalColor;
+
+uniform vec2 center;
+uniform float radius;
+uniform vec4 topColor;
+uniform vec4 bottomColor;
+
+void main()
+{
+    // Pixel coordinates
+    vec2 uv = gl_FragCoord.xy;
+
+    // Distance in pixel space (no aspect distortion)
+    float dist = distance(uv, center);
+
+    // Mask outside the circle
+    if (dist > radius) {
+        finalColor = vec4(0.0, 0.0, 0.0, 0.0);
+        return;
+    }
+
+    // Gradient factor
+    float t = clamp(dist / radius, 0.0, 1.0);
+
+    // Radial gradient
+    finalColor = mix(topColor, bottomColor, t);
+}
+"""
+
 # Default vertex shader
 VERTEX_SHADER = GL_VERSION + """
 in vec3 vertexPosition;
@@ -141,6 +171,7 @@ class ShaderState:
     self.initialized = False
     self.shader = None
     self.exp_shader = None
+    self.circle_shader = None
     self.rainbow_shader = None
     self.rainbow_shader_offset = 0.0
     self.last_time = rl.get_time()
@@ -163,6 +194,13 @@ class ShaderState:
       'offset': None,
     }
 
+    self.circle_locations = {
+      'center': None,
+      'radius': None,
+      'topColor': None,
+      'bottomColor': None,
+    }
+
     # Pre-allocated FFI objects
     self.fill_color_ptr = rl.ffi.new("float[]", [0.0, 0.0, 0.0, 0.0])
     self.use_gradient_ptr = rl.ffi.new("int[]", [0])
@@ -174,12 +212,18 @@ class ShaderState:
     self.square_size = ffi.new("float *", 0.0)
     self.offset_val = ffi.new("float *", 0.0)
 
+    self.circle_center = ffi.new("float[2]", [0, 0])
+    self.circle_radius = ffi.new("float *", 0.0)
+    self.circle_top_color = ffi.new("float[4]", [0.0, 0.0, 0.0, 0.0])
+    self.circle_bottom_color = ffi.new("float[4]", [0.0, 0.0, 0.0, 0.0])
+
   def initialize(self):
     if self.initialized:
       return
 
     self.exp_shader = rl.load_shader_from_memory(VERTEX_SHADER, FRAGMENT_SHADER)
     self.rainbow_shader = rl.load_shader_from_memory(VERTEX_SHADER, RAINBOW_SHADER)
+    self.circle_shader = rl.load_shader_from_memory(VERTEX_SHADER, CIRCLE_SHADER)
 
     # Cache all uniform locations
     for uniform in self.locations.keys():
@@ -187,6 +231,9 @@ class ShaderState:
 
     for uniform in self.rainbow_locations.keys():
       self.rainbow_locations[uniform] = rl.get_shader_location(self.rainbow_shader, uniform)
+
+    for uniform in self.circle_locations.keys():
+      self.circle_locations[uniform] = rl.get_shader_location(self.circle_shader, uniform)
 
     # Orthographic MVP (origin top-left)
     proj = rl.matrix_ortho(0, gui_app.width, gui_app.height, 0, -1, 1)
@@ -303,6 +350,28 @@ def draw_polygon(origin_rect: rl.Rectangle, points: np.ndarray,
   # Draw strip, color here doesn't matter
   rl.begin_shader_mode(state.shader)
   rl.draw_triangle_strip(tri_strip, len(tri_strip), rl.WHITE)
+  rl.end_shader_mode()
+
+def draw_circle_gradient(rect: rl.Rectangle, center_x: float, center_y: float, radius: float, top_color: rl.Color, bottom_color: rl.Color) -> None:
+  state = ShaderState.get_instance()
+  state.initialize()
+
+  state.circle_center[0:2] = [center_x, center_y]
+  state.circle_radius[0] = radius
+  state.circle_top_color[0:4] = [top_color.r / 255.0, top_color.g / 255.0, top_color.b / 255.0, top_color.a / 255.0]
+  state.circle_bottom_color[0:4] = [bottom_color.r / 255.0, bottom_color.g / 255.0, bottom_color.b / 255.0, bottom_color.a / 255.0]
+
+  rl.set_shader_value(state.circle_shader, state.circle_locations['center'], state.circle_center, rl.SHADER_UNIFORM_VEC2)
+  rl.set_shader_value(state.circle_shader, state.circle_locations['radius'], state.circle_radius, rl.SHADER_UNIFORM_FLOAT)
+  rl.set_shader_value(state.circle_shader, state.circle_locations['topColor'], state.circle_top_color, rl.SHADER_UNIFORM_VEC4)
+  rl.set_shader_value(state.circle_shader, state.circle_locations['bottomColor'], state.circle_bottom_color, rl.SHADER_UNIFORM_VEC4)
+
+  # Draw quad covering the circle area; shader will discard pixels outside the radius
+  # square_pos = (center[0] - radius, center[1] - radius)
+  # square_size = int(radius * 2)
+
+  rl.begin_shader_mode(state.circle_shader)
+  rl.draw_rectangle_rec(rect, rl.WHITE)
   rl.end_shader_mode()
 
 
