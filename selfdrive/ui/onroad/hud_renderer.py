@@ -72,7 +72,7 @@ class HudRenderer(Widget):
     self.set_speed: float = SET_SPEED_NA
     self.speed: float = 0.0
     self.v_ego_cluster_seen: bool = False
-    self._torque_bar = TorqueBar(radius=3300, line_height_min=24, line_height_max=76)
+    self._torque_bar = TorqueBar(scale=3.0, always=True)
     self.speed_right = 0
     self._powerflow_gauge = PowerflowGauge()
 
@@ -112,7 +112,7 @@ class HudRenderer(Widget):
     v_ego = v_ego_cluster if self.v_ego_cluster_seen else car_state.vEgo
     speed_conversion = CV.MS_TO_KPH if ui_state.is_metric else CV.MS_TO_MPH
     self.speed = max(0.0, v_ego * speed_conversion)
-    
+
     # Check brake status if enabled
     if self._params.get_bool("ShowBrakeStatus"):
       if sm.valid['carStateBP']:
@@ -126,7 +126,7 @@ class HudRenderer(Widget):
         self._brakes_on = False
     else:
       self._brakes_on = False
-    
+
     self._torque_bar._update_state()
     self._powerflow_gauge._update_state()
 
@@ -144,7 +144,7 @@ class HudRenderer(Widget):
 
     # Render powerflow gauge above torque bar
     self._powerflow_gauge.render(rect)
-    
+
     if ui_state.sm['controlsState'].lateralControlState.which() != 'angleState' or ui_state.sm.updated["controllerStateBP"]:
       self._torque_bar.render(rect)
 
@@ -267,7 +267,7 @@ class HudRenderer(Widget):
     speed_text_size = measure_text_cached(self._font_bold, speed_text, FONT_SIZES.current_speed)
     speed_pos = rl.Vector2(rect.x + rect.width / 2 - speed_text_size.x / 2, 180 - speed_text_size.y / 2)
     self.speed_right = speed_pos.x + speed_text_size.x
-    
+
     # Show red when braking if brake status is enabled
     speed_color = rl.Color(255, 60, 60, 255) if self._brakes_on else COLORS.WHITE
     rl.draw_text_ex(self._font_bold, speed_text, speed_pos, FONT_SIZES.current_speed, 0, speed_color)
