@@ -144,13 +144,14 @@ def create_acc_msg(packer, CAN: CanBus, long_active: bool, gas: float, accel: fl
 
   Frequency is 50Hz.
   """
+  # Ford stock: AccPrpl_A_Pred = AccPrpl_A_Rq when not braking, else AccBrkTot_A_Rq
+  acc_prpl_a_pred = gas if not brake_actuate else accel
+
   values = {
     "AccBrkTot_A_Rq": accel,                          # Brake total accel request: [-20|11.9449] m/s^2
     "Cmbb_B_Enbl": 1 if long_active else 0,           # Enabled: 0=No, 1=Yes
     "AccPrpl_A_Rq": gas,                              # Acceleration request: [-5|5.23] m/s^2
-    # No observed acceleration seen from this signal alone. During stock system operation, it appears to
-    # be the raw acceleration request (AccPrpl_A_Rq when positive, AccBrkTot_A_Rq when negative)
-    "AccPrpl_A_Pred": -5.0,                           # Acceleration request: [-5|5.23] m/s^2
+    "AccPrpl_A_Pred": acc_prpl_a_pred,                # Predicted accel: gas when not braking, else brake total (per Ford stock)
     "AccResumEnbl_B_Rq": 1 if long_active else 0,
     # No observed acceleration seen from this signal alone
     "AccVeh_V_Trg": v_ego_kph,                        # Target speed: [0|255] km/h

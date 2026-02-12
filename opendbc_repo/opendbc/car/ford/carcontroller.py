@@ -120,9 +120,11 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
     self.brake_actuate_last = 0
     self.precharge_actuate_last = 0
     self.precharge_actuate_ts = 0
-    self.brake_actuator_activate = -0.14   # accel threshold to activate brake
+    self.brake_actuator_activate = -0.14   # accel threshold to activate brake (AccBrkDecel_B_Rq)
     self.brake_actuator_release_delta = 0.08  # hysteresis gap to release brake
-    self.precharge_actuator_target_delta = 0.02  # precharge engages slightly before brake
+    # Precharge (AccBrkPrchg_B_Rq) from Ford stock logs: true when AccBrkTot_A_Rq < -0.25, false when > -0.1
+    self.precharge_actuator_activate = -0.25
+    self.precharge_actuator_release_delta = 0.15   # release at -0.25 + 0.15 = -0.1
     self.target_speed_multiplier = 1.0
     # Brake/gas cooldown: don't re-apply brake or gas within this many seconds after releasing (only when TTC >= MIN_TTC_FOR_SMOOTHING)
     self._long_brake_sent_last = False
@@ -774,7 +776,8 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
     # send acc msg at 50Hz
     if self.CP.openpilotLongitudinalControl and (self.frame % CarControllerParams.ACC_CONTROL_STEP) == 0:
       if not self.disable_BP_long_UI:
-        # BluePilot longitudinal: TTC-based coasting, actuators_calc hysteresis, brake/gas cooldown
+        # BluePilot longitudinal: TTC-based coasting, actuators_calc hysteresis, brake/gas cooldown.
+        # AccBrkDecel_B_Rq (brake_actuate) controls brake pedal vs engine braking: false = coasting, true = brake applied.
         # Time-to-collision (TTC): only brake when there is collision risk. When not closing, coast until speed matches lead.
         # TTC = dRel / (-vRel) when vRel < 0 (closing). No precomputed TTC in radar msg; we compute it.
         ttc_sec = 10.0   # set the default to min coasting and applying brake

@@ -20,8 +20,9 @@ def actuators_calc(cc_self, brake): # cc_self is the CarController object (self)
   brake_actuate = hysteresis(brake, cc_self.brake_actuate_last, cc_self.brake_actuator_activate, cc_self.brake_actuator_release_delta)
   cc_self.brake_actuate_last = brake_actuate
 
+  # Precharge thresholds from Ford stock logs: on when accel < -0.25, off when accel > -0.1
   precharge_actuate = hysteresis(
-    brake, cc_self.precharge_actuate_last, (cc_self.brake_actuator_activate+cc_self.precharge_actuator_target_delta), (cc_self.brake_actuator_release_delta-cc_self.precharge_actuator_target_delta)
+    brake, cc_self.precharge_actuate_last, cc_self.precharge_actuator_activate, cc_self.precharge_actuator_release_delta
   )
 
   if precharge_actuate and not cc_self.precharge_actuate_last:
