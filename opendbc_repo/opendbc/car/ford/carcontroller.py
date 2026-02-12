@@ -101,6 +101,7 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
     self.apply_curvature_last = 0
     self.accel = 0.0
     self.gas = 0.0
+    self.accel_pred = -5.0  # AccPrpl_A_Pred: safe inactive until we send; avoids cruise fault on crank
     self.brake_request = False
     self.main_on_last = False
     self.lkas_enabled_last = False
@@ -781,6 +782,7 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
     ### longitudinal control ###
     # send acc msg at 50Hz
     if self.CP.openpilotLongitudinalControl and (self.frame % CarControllerParams.ACC_CONTROL_STEP) == 0:
+      self.accel_pred = -5.0  # safe default each time we're about to send ACC
       if not self.disable_BP_long_UI:
         # BluePilot longitudinal: TTC-based coasting, actuators_calc hysteresis, brake/gas cooldown.
         # AccBrkDecel_B_Rq (brake_actuate) controls brake pedal vs engine braking: false = coasting, true = brake applied.
@@ -868,11 +870,11 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
         if not CC.longActive and getattr(hud_control, "setSpeed", None) is not None:
           target_speed = hud_control.setSpeed
 
-        # AccPrpl_A_Pred: hardcoded -5 until exact combination that causes ACC cancel is known
-        accel_pred = -5.0
+        # AccPrpl_A_Pred: -5 until exact combination that causes ACC cancel is known
+        self.accel_pred = -5.0
 
         can_sends.append(fordcan.create_acc_msg(
-          self.packer, self.CAN, CC.longActive, gas, accel, accel_pred, stopping,
+          self.packer, self.CAN, CC.longActive, gas, accel, self.accel_pred, stopping,
           brake_actuate, precharge_actuate, v_ego_kph=target_speed
         ))
       else:
@@ -905,10 +907,10 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
         if not CC.longActive and getattr(hud_control, "setSpeed", None) is not None:
           target_speed = hud_control.setSpeed
 
-        accel_pred = -5.0  # same as BluePilot branch until safe logic is confirmed
+        self.accel_pred = -5.0  # same as BluePilot branch until safe logic is confirmed
         # Stock uses single brake_request for both precharge and brake bits
         can_sends.append(fordcan.create_acc_msg(
-          self.packer, self.CAN, CC.longActive, gas, accel, accel_pred, stopping,
+          self.packer, self.CAN, CC.longActive, gas, accel, self.accel_pred, stopping,
           brake_request, brake_request, v_ego_kph=target_speed
         ))
 
