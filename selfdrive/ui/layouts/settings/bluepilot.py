@@ -29,6 +29,7 @@ class BluePilotLayout(Widget):
       ("send_hands_free_cluster_msg", self._show_hands_free_ui),
       ("BlindSpot", self._show_blindspot),
       ("ShowBrakeStatus", self._show_brake_status),
+      ("RoadNameToggle", self._show_road_name),
       ("FordPrefShowRadarLeadOverlay", self._show_ford_radar_overlay),
       ("FordPrefHybridBatteryStatus", self._show_hybrid_battery_status),
       ("FordPrefHybridPowerFlow", self._show_hybrid_power_flow),
@@ -37,6 +38,7 @@ class BluePilotLayout(Widget):
       ("enable_lane_full_mode", self._enable_lane_full_mode),
       ("custom_profile", self._custom_profile),
       ("disable_BP_lat_UI", self._disable_BP_lat),
+      ("disable_BP_long_UI", self._disable_BP_long),
     )
 
     ui_state.add_offroad_transition_callback(self._update_toggles)
@@ -89,6 +91,15 @@ class BluePilotLayout(Widget):
       icon="warning.png"
     )
 
+    # Road name display toggle (uses map data from mapd)
+    self._show_road_name = toggle_item(
+      lambda: tr("Display Road Name"),
+      lambda: tr("Show current road name from map data in a pill on the driving screen."),
+      initial_state=(self._params.get("RoadNameToggle") or "1") == "1",
+      callback=lambda state: self._params.put("RoadNameToggle", "1" if state else "0"),
+      icon="speed_limit.png"
+    )
+
     # Ford radar lead overlay toggle
     self._show_ford_radar_overlay = toggle_item(
       lambda: tr("Show Radar Lead Overlay (Ford ACC)"),
@@ -134,6 +145,18 @@ class BluePilotLayout(Widget):
       min_value=8.0,
       max_value=60.0,
       step=1.0,
+      suffix="s",
+      icon="speed_limit.png"
+    )
+
+    # Ford long brake/gas cooldown: wait this long (s) after releasing brake or gas before re-applying (reduces tapping at coasting limit).
+    self._long_brake_gas_cooldown = float_control_item(
+      lambda: tr("Brake/Gas Cooldown (s)"),
+      lambda: tr("Seconds to wait after releasing brake or gas before re-applying (1–10 s). Reduces tapping at coasting limit."),
+      param="FordLongBrakeGasCooldown",
+      min_value=1.0,
+      max_value=10.0,
+      step=0.1,
       suffix="s",
       icon="speed_limit.png"
     )
@@ -255,17 +278,28 @@ class BluePilotLayout(Widget):
       icon="chffr_wheel.png"
     )
 
+    # Bypass BP longitudinal control toggle (use stock long logic)
+    self._disable_BP_long = toggle_item(
+      lambda: tr("Bypass BP Longitudinal Control"),
+      lambda: tr("Use stock longitudinal logic instead of BluePilot TTC/coasting tuning."),
+      initial_state=self._params.get_bool("disable_BP_long_UI"),
+      callback=lambda state: self._toggle_callback(state, "disable_BP_long_UI"),
+      icon="chffr_wheel.png"
+    )
+
     return [
       self._enable_web_routes,
       self._show_web_routes_qr,
       self._show_hands_free_ui,
       self._show_blindspot,
       self._show_brake_status,
+      self._show_road_name,
       self._show_ford_radar_overlay,
       self._show_hybrid_battery_status,
       self._show_hybrid_power_flow,
       self._min_coasting_ttc,
       self._max_coasting_ttc,
+      self._long_brake_gas_cooldown,
       self._enable_human_turn_detection,
       self._lane_change_factor_high,
       self._enable_lane_positioning,
@@ -277,6 +311,7 @@ class BluePilotLayout(Widget):
       self._lc_pid_gain,
       self._vbatt_pause_charging,
       self._disable_BP_lat,
+      self._disable_BP_long,
     ]
 
   def _get_float_param(self, param: str, default: float) -> float:
@@ -303,7 +338,10 @@ class BluePilotLayout(Widget):
 
     # Refresh toggles from params to mirror external changes
     for key, item in self._refresh_toggles:
-      item.action_item.set_state(ui_state.params.get_bool(key))
+      if key == "RoadNameToggle":
+        item.action_item.set_state((ui_state.params.get(key) or "1") == "1")
+      else:
+        item.action_item.set_state(ui_state.params.get_bool(key))
 
     # Update button enabled states
     self._show_web_routes_qr.action_item.set_enabled(ui_state.params.get_bool("BPPortalEnabled"))

@@ -633,7 +633,7 @@ class ModelRenderer(Widget, ChevronMetrics, ModelRendererSP):
       rl.draw_line_ex(
         rl.Vector2(left_edge[i][0], left_edge[i][1]),
         rl.Vector2(left_edge[i + 1][0], left_edge[i + 1][1]),
-        2.0,  # Line thickness
+        4.0,  # Line thickness (doubled from 2.0)
         edge_color
       )
     
@@ -642,7 +642,7 @@ class ModelRenderer(Widget, ChevronMetrics, ModelRendererSP):
       rl.draw_line_ex(
         rl.Vector2(right_edge[i][0], right_edge[i][1]),
         rl.Vector2(right_edge[i + 1][0], right_edge[i + 1][1]),
-        2.0,  # Line thickness
+        4.0,  # Line thickness (doubled from 2.0)
         edge_color
       )
     
@@ -651,7 +651,7 @@ class ModelRenderer(Widget, ChevronMetrics, ModelRendererSP):
       rl.draw_line_ex(
         rl.Vector2(left_edge[-1][0], left_edge[-1][1]),  # Last left point (far)
         rl.Vector2(right_edge[-1][0], right_edge[-1][1]),  # Last right point (far)
-        2.0,  # Line thickness
+        4.0,  # Line thickness (doubled from 2.0)
         edge_color
       )
 

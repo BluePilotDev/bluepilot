@@ -35,6 +35,7 @@ class FontSizes:
   speed_unit: int = 66
   max_speed: int = 40
   set_speed: int = 90
+  road_name: int = 36
 
 
 @dataclass(frozen=True)
@@ -53,6 +54,7 @@ class Colors:
   BORDER_TRANSLUCENT = rl.Color(255, 255, 255, 75)
   HEADER_GRADIENT_START = rl.Color(0, 0, 0, 114)
   HEADER_GRADIENT_END = rl.BLANK
+  ROAD_NAME_PILL_BG = rl.Color(45, 45, 45, 255)  # Dark grey pill for road name
 
 
 UI_CONFIG = UIConfig()
@@ -70,7 +72,7 @@ class HudRenderer(Widget):
     self.set_speed: float = SET_SPEED_NA
     self.speed: float = 0.0
     self.v_ego_cluster_seen: bool = False
-    self._torque_bar = TorqueBar(radius=3300, line_height_min=24, line_height_max=76)
+    self._torque_bar = TorqueBar(scale=3.0, always=True)
     self.speed_right = 0
     self._powerflow_gauge = PowerflowGauge()
 
@@ -110,7 +112,7 @@ class HudRenderer(Widget):
     v_ego = v_ego_cluster if self.v_ego_cluster_seen else car_state.vEgo
     speed_conversion = CV.MS_TO_KPH if ui_state.is_metric else CV.MS_TO_MPH
     self.speed = max(0.0, v_ego * speed_conversion)
-    
+
     # Check brake status if enabled
     if self._params.get_bool("ShowBrakeStatus"):
       if sm.valid['carStateBP']:
@@ -124,7 +126,7 @@ class HudRenderer(Widget):
         self._brakes_on = False
     else:
       self._brakes_on = False
-    
+
     self._torque_bar._update_state()
     self._powerflow_gauge._update_state()
 
@@ -142,13 +144,14 @@ class HudRenderer(Widget):
 
     # Render powerflow gauge above torque bar
     self._powerflow_gauge.render(rect)
-    
+
     if ui_state.sm['controlsState'].lateralControlState.which() != 'angleState' or ui_state.sm.updated["controllerStateBP"]:
       self._torque_bar.render(rect)
 
     if self.is_cruise_available:
       self._draw_set_speed(rect)
 
+    self._draw_road_name(rect)
     self._draw_current_speed(rect)
 
     button_x = rect.x + rect.width - UI_CONFIG.border_size - UI_CONFIG.button_size
@@ -204,13 +207,67 @@ class HudRenderer(Widget):
   def get_speed_right(self) -> int:
     return self.speed_right
 
+  def _draw_road_name(self, rect: rl.Rectangle) -> None:
+    """Draw road name in a dark grey pill between max speed setpoint and current speed."""
+    # RoadNameToggle: "1" = on, "0" = off. Default to on when param not set.
+    if (self._params.get("RoadNameToggle") or "1") != "1":
+      return
+
+    # Get road name from liveMapDataSP (preferred) or Params fallback
+    road_name = ""
+    if ui_state.sm.valid.get("liveMapDataSP", False):
+      try:
+        road_name = (ui_state.sm["liveMapDataSP"].roadName or "").strip()
+      except (KeyError, AttributeError):
+        pass
+    if not road_name:
+      road_name = (self._params.get("RoadName") or "").strip()
+    if not road_name:
+      return
+
+    # Truncate long road names
+    max_chars = 25
+    if len(road_name) > max_chars:
+      road_name = road_name[: max_chars - 1] + "…"
+
+    # Layout: pill between set speed (left) and current speed (center)
+    set_speed_width = UI_CONFIG.set_speed_width_metric if ui_state.is_metric else UI_CONFIG.set_speed_width_imperial
+    set_speed_x = rect.x + 60 + self._left_offset + (UI_CONFIG.set_speed_width_imperial - set_speed_width) // 2
+    pill_left = set_speed_x + set_speed_width + 24  # Gap after set speed box
+    # Right edge: leave space before current speed (center - ~200px)
+    pill_max_width = int(rect.x + rect.width / 2 - 220 - pill_left)
+    if pill_max_width < 60:
+      return
+
+    text_size = measure_text_cached(self._font_semi_bold, road_name, FONT_SIZES.road_name)
+    pill_padding_h = 20
+    pill_height = 56
+    pill_width = min(int(text_size.x) + 2 * pill_padding_h, pill_max_width)
+    pill_x = pill_left
+    pill_y = rect.y + 100  # Vertically between set speed area and current speed
+
+    pill_rect = rl.Rectangle(pill_x, pill_y, pill_width, pill_height)
+    rl.draw_rectangle_rounded(pill_rect, 0.75, 10, COLORS.ROAD_NAME_PILL_BG)
+
+    # Center text in pill
+    text_x = pill_x + (pill_width - text_size.x) / 2
+    text_y = pill_y + (pill_height - text_size.y) / 2
+    rl.draw_text_ex(
+      self._font_semi_bold,
+      road_name,
+      rl.Vector2(text_x, text_y),
+      FONT_SIZES.road_name,
+      0,
+      COLORS.WHITE_TRANSLUCENT,
+    )
+
   def _draw_current_speed(self, rect: rl.Rectangle) -> None:
     """Draw the current vehicle speed and unit."""
     speed_text = str(round(self.speed))
     speed_text_size = measure_text_cached(self._font_bold, speed_text, FONT_SIZES.current_speed)
     speed_pos = rl.Vector2(rect.x + rect.width / 2 - speed_text_size.x / 2, 180 - speed_text_size.y / 2)
     self.speed_right = speed_pos.x + speed_text_size.x
-    
+
     # Show red when braking if brake status is enabled
     speed_color = rl.Color(255, 60, 60, 255) if self._brakes_on else COLORS.WHITE
     rl.draw_text_ex(self._font_bold, speed_text, speed_pos, FONT_SIZES.current_speed, 0, speed_color)
