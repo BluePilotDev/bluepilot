@@ -859,8 +859,11 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
         if not CC.longActive and getattr(hud_control, "setSpeed", None) is not None:
           target_speed = hud_control.setSpeed
 
+        # AccPrpl_A_Pred: hardcoded -5 until exact combination that causes ACC cancel is known
+        accel_pred = -5.0
+
         can_sends.append(fordcan.create_acc_msg(
-          self.packer, self.CAN, CC.longActive, gas, accel, stopping,
+          self.packer, self.CAN, CC.longActive, gas, accel, accel_pred, stopping,
           brake_actuate, precharge_actuate, v_ego_kph=target_speed
         ))
       else:
@@ -893,9 +896,10 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
         if not CC.longActive and getattr(hud_control, "setSpeed", None) is not None:
           target_speed = hud_control.setSpeed
 
+        accel_pred = -5.0  # same as BluePilot branch until safe logic is confirmed
         # Stock uses single brake_request for both precharge and brake bits
         can_sends.append(fordcan.create_acc_msg(
-          self.packer, self.CAN, CC.longActive, gas, accel, stopping,
+          self.packer, self.CAN, CC.longActive, gas, accel, accel_pred, stopping,
           brake_request, brake_request, v_ego_kph=target_speed
         ))
 
