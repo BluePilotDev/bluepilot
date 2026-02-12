@@ -161,6 +161,17 @@ class BluePilotLayout(Widget):
       icon="speed_limit.png"
     )
 
+    # Gas value (AccPrpl_A_Rq) when in coasting TTC range; Ford stock uses slightly positive gas, slightly negative brake.
+    self._coasting_accel = float_control_item(
+      lambda: tr("Coasting Accel (gas)"),
+      lambda: tr("Gas value when coasting (-1 to 1.5 m/s²). Ford uses slightly positive for smoother coast."),
+      param="FordCoastingAccel",
+      min_value=-1.0,
+      max_value=1.5,
+      step=0.05,
+      icon="speed_limit.png"
+    )
+
     # Human turn detection toggle
     self._enable_human_turn_detection = toggle_item(
       lambda: tr("Enable Human Turn Detection"),
@@ -300,6 +311,7 @@ class BluePilotLayout(Widget):
       self._min_coasting_ttc,
       self._max_coasting_ttc,
       self._long_brake_gas_cooldown,
+      self._coasting_accel,
       self._enable_human_turn_detection,
       self._lane_change_factor_high,
       self._enable_lane_positioning,

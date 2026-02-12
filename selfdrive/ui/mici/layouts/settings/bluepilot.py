@@ -46,6 +46,7 @@ class BluePilotLayoutMici(NavWidget):
     self.vbatt_pause_charging = BigParamFloatControl("12V battery limit", "vbatt_pause_charging", min=11.0, max=14.0, step=0.1)
     self.min_coasting_ttc = BigParamFloatControl("min coasting TTC (s)", "MIN_COASTING_TTC", min=5.0, max=30.0, step=1.0)
     self.max_coasting_ttc = BigParamFloatControl("max coasting TTC (s)", "MAX_COASTING_TTC", min=15.0, max=60.0, step=1.0)
+    self.coasting_accel = BigParamFloatControl("coasting accel (gas)", "FordCoastingAccel", min=-1.0, max=1.5, step=0.05)
 
     def power_flow_callback(value: str):
       match value:
@@ -74,6 +75,7 @@ class BluePilotLayoutMici(NavWidget):
       self.show_hybrid_power_flow,
       self.min_coasting_ttc,
       self.max_coasting_ttc,
+      self.coasting_accel,
       self.rainbow_mode,
       self.enable_human_turn_detection,
       self.lane_change_factor_high,

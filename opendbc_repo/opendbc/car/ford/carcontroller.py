@@ -291,6 +291,12 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
       self.long_brake_gas_cooldown_sec = 3.0
     self.long_brake_gas_cooldown_sec = float(np.clip(self.long_brake_gas_cooldown_sec, 1.0, 10.0))
     self.disable_BP_long_UI = self.params.get_bool("disable_BP_long_UI")
+    # Gas value (AccPrpl_A_Rq) when in coasting TTC range (Ford: gas slightly positive, brake slightly negative)
+    try:
+      self.coasting_accel = float(self.params.get("FordCoastingAccel", return_default=True))
+    except (TypeError, ValueError):
+      self.coasting_accel = 0.25
+    self.coasting_accel = float(np.clip(self.coasting_accel, -1.0, 1.5))
 
   def handle_post_lane_change_transition(self, path_angle, path_offset, desired_curvature_rate):
     """
@@ -826,6 +832,9 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
         # When brake is actuated, send no gas (match stock Ford)
         if brake_actuate:
           gas = CarControllerParams.INACTIVE_GAS
+        # In coasting TTC range, send coasting_accel as gas (Ford: gas slightly positive, brake slightly negative)
+        elif use_smoothing:
+          gas = self.coasting_accel
 
         # When TTC >= 8s: cooldown hysteresis – don't re-apply brake or gas within cooldown_sec after releasing.
         # Long press of either is OK; only the re-application after release is delayed.
