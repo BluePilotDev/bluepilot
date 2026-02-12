@@ -172,6 +172,18 @@ class BluePilotLayout(Widget):
       icon="speed_limit.png"
     )
 
+    # Accel ramp-down rate (m/s² per s) when leaving coasting toward a lead; only applied in negative direction when brake allowed.
+    self._accel_rate_limit = float_control_item(
+      lambda: tr("Accel Ramp-Down Rate"),
+      lambda: tr("Max accel decrease per second when leaving coasting (0.05–2 m/s²/s). Reduces wind-up brake slam."),
+      param="FordAccelRateLimit",
+      min_value=0.05,
+      max_value=2.0,
+      step=0.05,
+      suffix=" m/s²/s",
+      icon="speed_limit.png"
+    )
+
     # Human turn detection toggle
     self._enable_human_turn_detection = toggle_item(
       lambda: tr("Enable Human Turn Detection"),
@@ -312,6 +324,7 @@ class BluePilotLayout(Widget):
       self._max_coasting_ttc,
       self._long_brake_gas_cooldown,
       self._coasting_accel,
+      self._accel_rate_limit,
       self._enable_human_turn_detection,
       self._lane_change_factor_high,
       self._enable_lane_positioning,

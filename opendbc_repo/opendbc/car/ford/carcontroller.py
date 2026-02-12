@@ -298,6 +298,12 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
     except (TypeError, ValueError):
       self.coasting_accel = 0.25
     self.coasting_accel = float(np.clip(self.coasting_accel, -1.0, 1.5))
+    # Accel ramp-down rate (m/s² per s) when leaving coasting toward a lead to avoid wind-up slam; only applied in negative direction when brake_allowed
+    try:
+      self.accel_rate_limit_per_sec = float(self.params.get("FordAccelRateLimit", return_default=True))
+    except (TypeError, ValueError):
+      self.accel_rate_limit_per_sec = 0.25
+    self.accel_rate_limit_per_sec = float(np.clip(self.accel_rate_limit_per_sec, 0.05, 2.0))
 
   def handle_post_lane_change_transition(self, path_angle, path_offset, desired_curvature_rate):
     """
@@ -796,10 +802,11 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
           if lead and getattr(lead, 'status', False):
             d_rel = float(getattr(lead, 'dRel', 0))
             v_rel = float(getattr(lead, 'vRel', 0))
-            if d_rel > 0 and v_rel < -0.5:   # closing (we're faster than lead)
+            # Any closing (v_rel < 0) counts; use -0.1 so slow approach (~0.5 m/s) doesn't flutter in/out and drop out of coasting zone (which would pass full planner accel to brake and cause slam).
+            if d_rel > 0 and v_rel < -0.1:
               ttc_sec = d_rel / (-v_rel)
               has_closing_lead = True
-            # else: not closing (v_rel >= 0) or too close -> keep ttc_sec large so we coast
+            # else: not closing (v_rel >= -0.1) or too close -> keep ttc_sec large so we coast
         ttc_sec = float(np.clip(ttc_sec, 0.2, 60.0))
 
         # Below this TTC we never modify braking: always obey model (no coasting band, no brake/gas cooldown).
@@ -809,6 +816,8 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
         max_ttc = max(self.min_coasting_ttc, self.max_coasting_ttc)
         # Only use coasting_accel for gas when we have a lead and TTC is in the coasting band (so we're actually coasting, not accelerating to set speed).
         in_coasting_zone = has_closing_lead and use_smoothing and (ttc_sec >= min_ttc)
+        # Brake only when all three are true: we have a lead, we're gaining on it, and TTC is below threshold. Otherwise coast (no friction brake).
+        brake_allowed = has_closing_lead and (ttc_sec < MIN_TTC_FOR_SMOOTHING)
 
         # Dynamic coasting by TTC (only when use_smoothing). Below MIN_TTC_FOR_SMOOTHING use MIN_GAS (no coasting band).
         min_gas_close = CarControllerParams.MIN_GAS
@@ -826,6 +835,13 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
           accel = max(accel, self.accel - (3.5 * CarControllerParams.ACC_CONTROL_STEP * DT_CTRL))
         accel = float(np.clip(accel, CarControllerParams.ACCEL_MIN, CarControllerParams.ACCEL_MAX))
 
+        # Rate limit only when we've left coasting (brake_allowed) and we're ramping down (more negative) to avoid wind-up slam. No limit when coasting or when accelerating.
+        if brake_allowed and accel < self.accel:
+          dt_long = DT_CTRL * CarControllerParams.ACC_CONTROL_STEP
+          max_delta_down = self.accel_rate_limit_per_sec * dt_long
+          accel = max(accel, self.accel - max_delta_down)
+          accel = float(np.clip(accel, CarControllerParams.ACCEL_MIN, CarControllerParams.ACCEL_MAX))
+
         gas = accel
         # Stock Ford ACC: only send INACTIVE_GAS (-5) when long off or when brake is actuated.
         # When coasting (no brake), send requested accel as gas so engine braking matches request and coast is smoother.
@@ -833,8 +849,8 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
           gas = CarControllerParams.INACTIVE_GAS
 
         # Hysteresis for precharge/brake so we don't chatter and we get smooth coast -> brake.
-        # In coasting zone we want no friction brake (AccBrkDecel_B_Rq false): pass accel above brake threshold so actuators_calc returns brake_actuate=False. We still send planner accel to AccBrkTot_A_Rq.
-        accel_for_actuators = max(accel, 0.0) if in_coasting_zone else accel
+        # Only allow friction brake when brake_allowed (lead + gaining + TTC below threshold). Otherwise pass accel above brake threshold so we coast.
+        accel_for_actuators = accel if brake_allowed else max(accel, 0.0)
         precharge_actuate, brake_actuate = actuators_calc(self, accel_for_actuators)
 
         # When brake is actuated, send no gas (match stock Ford)

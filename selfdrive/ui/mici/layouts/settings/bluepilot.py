@@ -47,6 +47,7 @@ class BluePilotLayoutMici(NavWidget):
     self.min_coasting_ttc = BigParamFloatControl("min coasting TTC (s)", "MIN_COASTING_TTC", min=5.0, max=30.0, step=1.0)
     self.max_coasting_ttc = BigParamFloatControl("max coasting TTC (s)", "MAX_COASTING_TTC", min=15.0, max=60.0, step=1.0)
     self.coasting_accel = BigParamFloatControl("coasting accel (gas)", "FordCoastingAccel", min=-1.0, max=1.5, step=0.05)
+    self.accel_rate_limit = BigParamFloatControl("accel ramp-down rate (m/s²/s)", "FordAccelRateLimit", min=0.05, max=2.0, step=0.05)
 
     def power_flow_callback(value: str):
       match value:
@@ -76,6 +77,7 @@ class BluePilotLayoutMici(NavWidget):
       self.min_coasting_ttc,
       self.max_coasting_ttc,
       self.coasting_accel,
+      self.accel_rate_limit,
       self.rainbow_mode,
       self.enable_human_turn_detection,
       self.lane_change_factor_high,
