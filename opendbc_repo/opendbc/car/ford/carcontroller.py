@@ -834,8 +834,8 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
         # When brake is actuated, send no gas (match stock Ford)
         if brake_actuate:
           gas = CarControllerParams.INACTIVE_GAS
-        # In coasting TTC range, send coasting_accel as gas (Ford: gas slightly positive, brake slightly negative)
-        elif use_smoothing:
+        # In coasting TTC range with long active, send coasting_accel as gas (Ford: gas slightly positive, brake slightly negative)
+        elif use_smoothing and CC.longActive:
           gas = self.coasting_accel
 
         # When TTC >= 8s: cooldown hysteresis – don't re-apply brake or gas within cooldown_sec after releasing.
