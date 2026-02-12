@@ -832,8 +832,10 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
         if not CC.longActive:
           gas = CarControllerParams.INACTIVE_GAS
 
-        # Hysteresis for precharge/brake so we don't chatter and we get smooth coast -> brake
-        precharge_actuate, brake_actuate = actuators_calc(self, accel)
+        # Hysteresis for precharge/brake so we don't chatter and we get smooth coast -> brake.
+        # In coasting zone we want no friction brake (AccBrkDecel_B_Rq false): pass accel above brake threshold so actuators_calc returns brake_actuate=False. We still send planner accel to AccBrkTot_A_Rq.
+        accel_for_actuators = max(accel, 0.0) if in_coasting_zone else accel
+        precharge_actuate, brake_actuate = actuators_calc(self, accel_for_actuators)
 
         # When brake is actuated, send no gas (match stock Ford)
         if brake_actuate:
