@@ -144,8 +144,10 @@ def create_acc_msg(packer, CAN: CanBus, long_active: bool, gas: float, accel: fl
 
   Frequency is 50Hz.
   """
-  # Ford stock: AccPrpl_A_Pred = AccPrpl_A_Rq when not braking, else AccBrkTot_A_Rq
-  acc_prpl_a_pred = gas if not brake_actuate else accel
+  # Ford stock: AccPrpl_A_Pred = AccPrpl_A_Rq when not braking, else AccBrkTot_A_Rq.
+  # Safety: if AccPrpl_A_Pred hits min_gas (-5) during decel, ACC can cancel. Use accel (brake path) when
+  # brake_actuate is true or gas < -1.5 so we never send min_gas on AccPrpl_A_Pred.
+  acc_prpl_a_pred = accel if (brake_actuate or gas < -1.5) else gas
 
   values = {
     "AccBrkTot_A_Rq": accel,                          # Brake total accel request: [-20|11.9449] m/s^2

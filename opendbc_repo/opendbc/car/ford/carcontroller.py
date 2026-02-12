@@ -815,13 +815,15 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
         accel = float(np.clip(accel, CarControllerParams.ACCEL_MIN, CarControllerParams.ACCEL_MAX))
 
         gas = accel
-        if not CC.longActive or gas < dynamic_min_gas:
+        # Stock Ford ACC: only send INACTIVE_GAS (-5) when long off or when brake is actuated.
+        # When coasting (no brake), send requested accel as gas so engine braking matches request and coast is smoother.
+        if not CC.longActive:
           gas = CarControllerParams.INACTIVE_GAS
 
         # Hysteresis for precharge/brake so we don't chatter and we get smooth coast -> brake
         precharge_actuate, brake_actuate = actuators_calc(self, accel)
 
-        # Never apply gas and brake at the same time: when braking, send no gas
+        # When brake is actuated, send no gas (match stock Ford)
         if brake_actuate:
           gas = CarControllerParams.INACTIVE_GAS
 
