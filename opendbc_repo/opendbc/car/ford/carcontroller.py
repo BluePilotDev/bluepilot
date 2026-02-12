@@ -789,6 +789,7 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
         # Time-to-collision (TTC): only brake when there is collision risk. When not closing, coast until speed matches lead.
         # TTC = dRel / (-vRel) when vRel < 0 (closing). No precomputed TTC in radar msg; we compute it.
         ttc_sec = 10.0   # set the default to min coasting and applying brake
+        has_closing_lead = False
         if self.sm.valid.get('radarState', False):
           rs = self.sm['radarState']
           lead = getattr(rs, 'leadOne', None)
@@ -797,16 +798,19 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
             v_rel = float(getattr(lead, 'vRel', 0))
             if d_rel > 0 and v_rel < -0.5:   # closing (we're faster than lead)
               ttc_sec = d_rel / (-v_rel)
+              has_closing_lead = True
             # else: not closing (v_rel >= 0) or too close -> keep ttc_sec large so we coast
         ttc_sec = float(np.clip(ttc_sec, 0.2, 60.0))
 
         # Below this TTC we never modify braking: always obey model (no coasting band, no brake/gas cooldown).
         MIN_TTC_FOR_SMOOTHING = 8.0
         use_smoothing = ttc_sec >= MIN_TTC_FOR_SMOOTHING
-
-        # Dynamic coasting by TTC (only when use_smoothing). Below MIN_TTC_FOR_SMOOTHING use MIN_GAS (no coasting band).
         min_ttc = min(self.min_coasting_ttc, self.max_coasting_ttc)
         max_ttc = max(self.min_coasting_ttc, self.max_coasting_ttc)
+        # Only use coasting_accel for gas when we have a lead and TTC is in the coasting band (so we're actually coasting, not accelerating to set speed).
+        in_coasting_zone = has_closing_lead and use_smoothing and (ttc_sec >= min_ttc)
+
+        # Dynamic coasting by TTC (only when use_smoothing). Below MIN_TTC_FOR_SMOOTHING use MIN_GAS (no coasting band).
         min_gas_close = CarControllerParams.MIN_GAS
         min_gas_far = 0.0   # cap at 0 so positive accel always gets gas (no pulsing to maintain speed)
         if use_smoothing:
@@ -834,8 +838,8 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
         # When brake is actuated, send no gas (match stock Ford)
         if brake_actuate:
           gas = CarControllerParams.INACTIVE_GAS
-        # In coasting TTC range with long active, send coasting_accel as gas (Ford: gas slightly positive, brake slightly negative)
-        elif use_smoothing and CC.longActive:
+        # When actually coasting toward a lead (in coasting zone), send coasting_accel as gas (Ford: gas slightly positive, brake slightly negative). Otherwise use planner accel so we can accelerate to set speed.
+        elif in_coasting_zone and CC.longActive:
           gas = self.coasting_accel
 
         # When TTC >= 8s: cooldown hysteresis – don't re-apply brake or gas within cooldown_sec after releasing.
