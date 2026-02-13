@@ -877,7 +877,7 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
           if accel_stock < 0:
             highway_accel = float(np.interp(lead_time_sec, [lead_time_low, lead_time_high], [accel_stock, self.bp_PRECHARGE_ACTIVATE]))
           else:
-            highway_accel = 0 # temporary set no accel in the coast zone # accel_stock
+            highway_accel = accel_stock
         highway_accel = float(np.clip(highway_accel, CarControllerParams.ACCEL_MIN, CarControllerParams.ACCEL_MAX))
 
         bp_accel = (1.0 - blend) * accel_stock + blend * highway_accel
@@ -910,7 +910,7 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
       # Only use BP values when BP long is enabled and we're above 45 mph (highway). Otherwise always send stock.
       gasPressed = CS.out.gasPressed
       brakePressed = CS.out.brakePressed
-      bp_long_available = (self.disable_BP_long_UI == False) and (v_ego_mph > self.MAX_URBAN_SPEED_MPH) and (gasPressed == False) and (brakePressed == False) and (ttc_sec > self.target_ttc_low)
+      bp_long_available = (self.disable_BP_long_UI == False) and (v_ego_mph > self.MAX_URBAN_SPEED_MPH) and (gasPressed == False) and (brakePressed == False) # and (ttc_sec > self.target_ttc_low)
       if bp_long_available:
         accel = bp_accel
         gas = bp_gas
