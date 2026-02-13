@@ -127,26 +127,6 @@ class BluePilotLayout(Widget):
       icon="warning.png"
     )
 
-    # Ford long: rate-of-change limits when following a lead (per scan)
-    self._following_gas_roc = float_control_item(
-      lambda: tr("Following Gas ROC"),
-      lambda: tr("Max change in gas per cycle when following a lead (rate limit to avoid stomping)."),
-      param="FordFollowingGasROC",
-      min_value=0.01,
-      max_value=0.5,
-      step=0.01,
-      icon="speed_limit.png"
-    )
-    self._following_accel_roc = float_control_item(
-      lambda: tr("Following Accel ROC"),
-      lambda: tr("Max change in accel per cycle when following a lead (rate limit brake application)."),
-      param="FordFollowingAccelROC",
-      min_value=0.005,
-      max_value=0.2,
-      step=0.005,
-      icon="speed_limit.png"
-    )
-
     # Human turn detection toggle
     self._enable_human_turn_detection = toggle_item(
       lambda: tr("Enable Human Turn Detection"),
@@ -283,8 +263,6 @@ class BluePilotLayout(Widget):
       self._show_ford_radar_overlay,
       self._show_hybrid_battery_status,
       self._show_hybrid_power_flow,
-      self._following_gas_roc,
-      self._following_accel_roc,
       self._enable_human_turn_detection,
       self._lane_change_factor_high,
       self._enable_lane_positioning,
