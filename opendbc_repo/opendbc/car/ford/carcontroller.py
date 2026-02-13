@@ -877,7 +877,7 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
           if accel_stock < 0:
             highway_accel = float(np.interp(lead_time_sec, [lead_time_low, lead_time_high], [accel_stock, self.bp_PRECHARGE_ACTIVATE]))
           else:
-            highway_accel = accel_stock
+            highway_accel = 0 # temporary set no accel in the coast zone # accel_stock
         highway_accel = float(np.clip(highway_accel, CarControllerParams.ACCEL_MIN, CarControllerParams.ACCEL_MAX))
 
         bp_accel = (1.0 - blend) * accel_stock + blend * highway_accel
