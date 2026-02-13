@@ -908,8 +908,8 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
         # now let's apply some rate limits, to keep the places where we choose op_accel or op_gas from moving too fast
         # but only apply the limits if there is no imminent chance of a collision
         if ttc_sec > 8.0 and lead_time_sec > 0.5:
-          bp_gas = clip(bp_gas, self.bp_gas_last - self.following_gas_ROC/10, self.bp_gas_last + self.following_gas_ROC/10)
-          bp_accel = clip(bp_accel, self.bp_accel_last - self.following_accel_ROC/10, self.bp_accel_last + self.following_accel_ROC/10)
+          bp_gas = clip(bp_gas, self.bp_gas_last - self.following_gas_ROC/100, self.bp_gas_last + self.following_gas_ROC/100)
+          bp_accel = clip(bp_accel, self.bp_accel_last - self.following_accel_ROC/100, self.bp_accel_last + self.following_accel_ROC/100)
 
         # Set brake_actuate and precharge_actuate flags (initialized False above)
         if bp_accel < self.brake_actuate_target:
