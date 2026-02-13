@@ -823,6 +823,9 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
         precharge_actuate = 1 if accel < PRECHARGE_ACTIVATE else 0
         if brake_actuate:
           gas = CarControllerParams.INACTIVE_GAS
+        # Ford expects AccPrpl_A_Rq (gas) slightly positive when coasting, not negative. Sending negative gas can cause cruise fault (e.g. at 45 mph when blend kicks in).
+        elif accel < 0:
+          gas = 0.2
 
         stopping = CC.actuators.longControlState == LongCtrlState.stopping
         target_speed = float(np.clip(actuators.speed * self.target_speed_multiplier, 0, V_CRUISE_MAX))
