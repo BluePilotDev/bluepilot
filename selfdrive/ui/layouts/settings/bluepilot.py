@@ -127,10 +127,10 @@ class BluePilotLayout(Widget):
       icon="warning.png"
     )
 
-    # Ford long coasting TTC (time-to-collision) – no coast below min, full coast above max
+    # Ford long: min_TTC (below this we pass through model); target highway TTC (above this we coast or pass positive accel)
     self._min_coasting_ttc = float_control_item(
       lambda: tr("Min Coasting TTC (s)"),
-      lambda: tr("No coasting below this TTC (seconds). Brake when closer."),
+      lambda: tr("Below this TTC (s) we use full model. Above it we use highway coast/accel logic."),
       param="MIN_COASTING_TTC",
       min_value=5.0,
       max_value=30.0,
@@ -138,49 +138,14 @@ class BluePilotLayout(Widget):
       suffix="s",
       icon="speed_limit.png"
     )
-    self._max_coasting_ttc = float_control_item(
-      lambda: tr("Max Coasting TTC (s)"),
-      lambda: tr("Full coasting above this TTC (seconds). Blend between min and max."),
-      param="MAX_COASTING_TTC",
-      min_value=8.0,
+    self._target_highway_ttc = float_control_item(
+      lambda: tr("Target Highway TTC (s)"),
+      lambda: tr("Above this TTC we pass positive accel or coast. Between this and Min Coasting TTC we send slight decel (no brake)."),
+      param="FordTargetHighwayTTC",
+      min_value=5.0,
       max_value=60.0,
       step=1.0,
       suffix="s",
-      icon="speed_limit.png"
-    )
-
-    # Ford long brake/gas cooldown: wait this long (s) after releasing brake or gas before re-applying (reduces tapping at coasting limit).
-    self._long_brake_gas_cooldown = float_control_item(
-      lambda: tr("Brake/Gas Cooldown (s)"),
-      lambda: tr("Seconds to wait after releasing brake or gas before re-applying (1–10 s). Reduces tapping at coasting limit."),
-      param="FordLongBrakeGasCooldown",
-      min_value=1.0,
-      max_value=10.0,
-      step=0.1,
-      suffix="s",
-      icon="speed_limit.png"
-    )
-
-    # Gas value (AccPrpl_A_Rq) when in coasting TTC range; Ford stock uses slightly positive gas, slightly negative brake.
-    self._coasting_accel = float_control_item(
-      lambda: tr("Coasting Accel (gas)"),
-      lambda: tr("Gas value when coasting (-1 to 1.5 m/s²). Ford uses slightly positive for smoother coast."),
-      param="FordCoastingAccel",
-      min_value=-1.0,
-      max_value=1.5,
-      step=0.05,
-      icon="speed_limit.png"
-    )
-
-    # Accel ramp-down rate (m/s² per s) when leaving coasting toward a lead; only applied in negative direction when brake allowed.
-    self._accel_rate_limit = float_control_item(
-      lambda: tr("Accel Ramp-Down Rate"),
-      lambda: tr("Max accel decrease per second when leaving coasting (0.05–2 m/s²/s). Reduces wind-up brake slam."),
-      param="FordAccelRateLimit",
-      min_value=0.05,
-      max_value=2.0,
-      step=0.05,
-      suffix=" m/s²/s",
       icon="speed_limit.png"
     )
 
@@ -321,10 +286,7 @@ class BluePilotLayout(Widget):
       self._show_hybrid_battery_status,
       self._show_hybrid_power_flow,
       self._min_coasting_ttc,
-      self._max_coasting_ttc,
-      self._long_brake_gas_cooldown,
-      self._coasting_accel,
-      self._accel_rate_limit,
+      self._target_highway_ttc,
       self._enable_human_turn_detection,
       self._lane_change_factor_high,
       self._enable_lane_positioning,
