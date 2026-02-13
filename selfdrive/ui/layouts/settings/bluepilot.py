@@ -127,37 +127,23 @@ class BluePilotLayout(Widget):
       icon="warning.png"
     )
 
-    # Ford long: Target TTC Low/High for brake ramp
-    self._target_ttc_low = float_control_item(
-      lambda: tr("Target TTC Low (s)"),
-      lambda: tr("Below this TTC we use full model. Ramp goes from precharge at High to model at Low (no jump)."),
-      param="FordTargetHighwayTTC",
-      min_value=5.0,
-      max_value=60.0,
-      step=1.0,
-      suffix="s",
+    # Ford long: rate-of-change limits when following a lead (per scan)
+    self._following_gas_roc = float_control_item(
+      lambda: tr("Following Gas ROC"),
+      lambda: tr("Max change in gas per cycle when following a lead (rate limit to avoid stomping)."),
+      param="FordFollowingGasROC",
+      min_value=0.01,
+      max_value=0.5,
+      step=0.01,
       icon="speed_limit.png"
     )
-    self._target_ttc_high = float_control_item(
-      lambda: tr("Target TTC High (s)"),
-      lambda: tr("Above this TTC we do not brake (coast or accel only). Brake ramp is between Low and High."),
-      param="FordTargetHighwayTTCHigh",
-      min_value=10.0,
-      max_value=60.0,
-      step=1.0,
-      suffix="s",
-      icon="speed_limit.png"
-    )
-
-    # Ford long: coast margin (s) beyond personality follow time; brake ramp from (T_FOLLOW + margin) to T_FOLLOW
-    self._bp_coast_margin = float_control_item(
-      lambda: tr("BP Coast Margin (s)"),
-      lambda: tr("Extra seconds beyond follow time before coast. Ramp goes from (T_FOLLOW + margin) to T_FOLLOW (matches MPC)."),
-      param="FordBPCoastMargin",
-      min_value=0.0,
-      max_value=3.0,
-      step=0.1,
-      suffix="s",
+    self._following_accel_roc = float_control_item(
+      lambda: tr("Following Accel ROC"),
+      lambda: tr("Max change in accel per cycle when following a lead (rate limit brake application)."),
+      param="FordFollowingAccelROC",
+      min_value=0.005,
+      max_value=0.2,
+      step=0.005,
       icon="speed_limit.png"
     )
 
@@ -297,9 +283,8 @@ class BluePilotLayout(Widget):
       self._show_ford_radar_overlay,
       self._show_hybrid_battery_status,
       self._show_hybrid_power_flow,
-      self._target_ttc_low,
-      self._target_ttc_high,
-      self._bp_coast_margin,
+      self._following_gas_roc,
+      self._following_accel_roc,
       self._enable_human_turn_detection,
       self._lane_change_factor_high,
       self._enable_lane_positioning,

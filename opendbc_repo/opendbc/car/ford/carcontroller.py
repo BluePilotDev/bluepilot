@@ -155,11 +155,18 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
     self.disable_BP_lat_UI = False   # updated from UI: disable BP lateral control
     self.disable_BP_long_UI = False  # updated from UI: bypass BP longitudinal (use stock logic)
     self.anti_overshoot_curvature_last = 0.0 # initialize anti_overshoot_curvature_last
+    self._bp_long_active_last = False  # True if we sent BP long values last frame (for clean transition off BP long)
+    self.bp_gas_last = 0.0
+    self.bp_accel_last = 0.0
 
     # Long Control Variables
     self.MAX_URBAN_SPEED_MPH = 45.0
-    self.MIN_HIGHWAY_SPEED_MPH = 55.0
-    self._bp_long_active_last = False  # True if we sent BP long values last frame (for clean transition off BP long)
+    self.following_gas_ROC = 0.05 # amount that gas can change per scan when in following mode
+    self.following_accel_ROC = 0.025  # amount that accel can change per scan when in following mode
+    self.brake_actuate_target = -0.12 # at what accel limit do we engage brakes
+    self.brake_actuate_release = -0.04 # at what accel limit do we release brakes
+    self.precharge_actuate_target = -0.08 # at what accel limit do we engage precharge
+    self.precharge_actuate_release = -0.04 # at what accel limit do we release precharge
 
     # # Curvature variables
     self.curvature_lookup_time = 0.42 #from lagd
@@ -282,23 +289,17 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
     self.enable_lanefull_mode = self.params.get_bool("enable_lane_full_mode")
     self.custom_profile = int(self.params.get("custom_profile", return_default=True))
     self.LC_PID_gain_UI = float(self.params.get("LC_PID_gain_UI", return_default=True))
-    # Ford long: Target TTC Low/High for brake ramp
+    # Ford long: rate-of-change limits when following a lead (gas and accel per scan)
     try:
-      self.target_ttc_low = float(self.params.get("FordTargetHighwayTTC", return_default=True))
+      self.following_gas_ROC = float(self.params.get("FordFollowingGasROC", return_default=True))
     except (TypeError, ValueError):
-      self.target_ttc_low = 15.0
-    self.target_ttc_low = float(np.clip(self.target_ttc_low, 5.0, 60.0))
+      self.following_gas_ROC = 0.05
+    self.following_gas_ROC = float(np.clip(self.following_gas_ROC, 0.01, 0.5))
     try:
-      self.target_ttc_high = float(self.params.get("FordTargetHighwayTTCHigh", return_default=True))
+      self.following_accel_ROC = float(self.params.get("FordFollowingAccelROC", return_default=True))
     except (TypeError, ValueError):
-      self.target_ttc_high = 25.0
-    self.target_ttc_high = float(np.clip(self.target_ttc_high, 10.0, 60.0))
-    # Ford long: coast margin (s) beyond T_FOLLOW before we allow coast; ramp from (T_FOLLOW + margin) to T_FOLLOW
-    try:
-      self.bp_coast_margin = float(self.params.get("FordBPCoastMargin", return_default=True))
-    except (TypeError, ValueError):
-      self.bp_coast_margin = 0.5
-    self.bp_coast_margin = float(np.clip(self.bp_coast_margin, 0.0, 3.0))
+      self.following_accel_ROC = 0.025
+    self.following_accel_ROC = float(np.clip(self.following_accel_ROC, 0.005, 0.2))
     self.disable_BP_long_UI = self.params.get_bool("disable_BP_long_UI")
 
   def handle_post_lane_change_transition(self, path_angle, path_offset, desired_curvature_rate):
@@ -820,120 +821,119 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
       # TODO return to this signal later, it might help with highway control, but sending values ford doesn't like causes ACC to cancel.
       self.accel_pred = -5.0  # same as BluePilot branch until safe logic is confirmed
 
-      # TTC (s): computed always so bp_long_available can require ttc_sec > target_ttc_low (safety: don't engage BP long when close).
-      ttc_sec = 120.0
-      if self.sm.valid.get('radarState', False):
-        rs = self.sm['radarState']
-        lead = getattr(rs, 'leadOne', None)
-        if lead and getattr(lead, 'status', False):
-          d_rel = float(getattr(lead, 'dRel', 0))
-          v_rel = float(getattr(lead, 'vRel', 0))
-          if d_rel > 0 and v_rel < 0:
-            ttc_sec = d_rel / (-v_rel)
-          else:
-            ttc_sec = 60.0
-      ttc_sec = float(np.clip(ttc_sec, 0.2, 120.0))
-
-      # BluePilot longitudinal: lead-time-based brake ramp (same metric as actuators.accel), TTC kept for safety. No hysteresis.
+      # BluePilot longitudinal: gas limits when following + rate-limited accel/brake to avoid stomping.
       if not self.disable_BP_long_UI:
 
-        # Lead time (s): time to reach lead at current speed. Same concept as MPC follow distance.
+        # Lead time (s) and lead state
         v_ego = max(CS.out.vEgo, 0.5)
-        lead_time_sec = 999.0  # no lead: treat as far so we coast
+        lead_time_sec = 999.0  # no lead: treat as far
+        lead = None
+        v_rel = 0.0
         if self.sm.valid.get('radarState', False):
           rs = self.sm['radarState']
           lead = getattr(rs, 'leadOne', None)
           if lead and getattr(lead, 'status', False):
             d_rel = float(getattr(lead, 'dRel', 0))
+            v_rel = float(getattr(lead, 'vRel', 0))
             if d_rel > 0:
               lead_time_sec = d_rel / v_ego
         lead_time_sec = float(np.clip(lead_time_sec, 0.0, 999.0))
 
-        # T_FOLLOW from driving personality (matches long_mpc.get_T_FOLLOW).
-        personality = getattr(self.sm['selfdriveState'], 'personality', log.LongitudinalPersonality.standard) if self.sm.valid.get('selfdriveState', False) else log.LongitudinalPersonality.standard
-        T_FOLLOW = _get_T_FOLLOW(personality)
-        lead_time_low = T_FOLLOW
-        lead_time_high = T_FOLLOW + self.bp_coast_margin
+        # Defaults: pass through op_* when no lead or no mode; brake/precharge off until thresholds
+        gaining = False
+        pacing = False
+        trailing = False
+        max_follow_gas = op_gas
+        min_follow_gas = op_gas
+        max_follow_accel = op_accel
+        min_follow_accel = op_accel
+        bp_brake_actuate = False
+        bp_precharge_actuate = False
 
-        # Stock accel (works well for urban)
-        accel_stock = op_accel
-        if CC.longActive:
-          accel_stock = apply_creep_compensation(accel_stock, CS.out.vEgo)
-          accel_stock = max(accel_stock, self.accel - (3.5 * CarControllerParams.ACC_CONTROL_STEP * DT_CTRL))
-        accel_stock = float(np.clip(accel_stock, CarControllerParams.ACCEL_MIN, CarControllerParams.ACCEL_MAX))
-
-        # Urban vs highway blend: 100% stock below 45 mph, 100% highway above 55 mph, linear blend between
-        blend = float(np.clip((v_ego_mph - self.MAX_URBAN_SPEED_MPH) / (self.MIN_HIGHWAY_SPEED_MPH - self.MAX_URBAN_SPEED_MPH), 0.0, 1.0))
-
-        # Highway accel: ramp by lead time. At lead_time <= T_FOLLOW use full model; at lead_time >= T_FOLLOW+coast_margin use coast (or accel if model wants); between = interp precharge to model.
-        if lead_time_sec <= lead_time_low:
-          highway_accel = accel_stock
-        elif lead_time_sec >= lead_time_high:
-          if accel_stock > 0:
-            highway_accel = accel_stock
+        # Gaining on lead, pacing, or trailing away
+        if lead:
+          if v_rel < -0.1:
+            gaining = True
+          elif v_rel > 0.1:
+            trailing = True
           else:
-            highway_accel = self.bp_MIN_HIGHWAY_ACCEL
+            pacing = True
+
+        # limits when gaining
+        if gaining:
+          if lead_time_sec < 2.5:
+              max_follow_gas = 0.0 # if we are within 2.5 seconds and gaining, why press the gas?
+              min_follow_gas = 0.0
+          else:
+             max_follow_gas = op_gas
+             min_follow_gas = op_gas
+          max_follow_accel = op_accel
+          min_follow_accel = op_accel # following braking for our primary target
+
+
+        # limits when pacing
+        if pacing:
+          max_follow_gas = 0.2 + accel_due_to_pitch # don't get too happy with the gas when pacing.
+          min_follow_gas = 0.0
+          max_follow_accel = op_accel
+          min_follow_accel = op_accel # we will always target op_accel for braking
+
+        # limits when trailing
+        if trailing:
+          max_follow_gas = op_gas
+          min_follow_gas = op_gas
+          max_follow_accel = op_accel
+          min_follow_accel = op_accel
+
+        # apply our bp gas and accel targets
+        bp_gas = clip(op_gas, min_follow_gas, max_follow_gas)
+        bp_accel = clip(op_accel, min_follow_accel, max_follow_accel)
+
+        # now let's apply some rate limits, to keep the places where we choose op_accel or op_gas from moving too fast
+        bp_gas = clip(bp_gas, self.bp_gas_last - self.following_gas_ROC, self.bp_gas_last + self.following_gas_ROC)
+        bp_accel = clip(bp_accel, self.bp_accel_last - self.following_accel_ROC, self.bp_accel_last + self.following_accel_ROC)
+
+        # Set brake_actuate and precharge_actuate flags (initialized False above)
+        if bp_accel < self.brake_actuate_target:
+          bp_brake_actuate = True
+        if bp_accel > self.brake_actuate_release:
+          bp_brake_actuate = False
+        if bp_accel < self.precharge_actuate_target:
+          bp_precharge_actuate = True
+        if bp_accel > self.precharge_actuate_release:
+          bp_precharge_actuate = False
+
+        # Determine if we will use bp smoothing
+        gasPressed = CS.out.gasPressed
+        brakePressed = CS.out.brakePressed
+        apply_bp_long = (self.disable_BP_long_UI == False) and (v_ego_mph > self.MAX_URBAN_SPEED_MPH) and (gasPressed == False) and (brakePressed == False)
+
+        if apply_bp_long:
+          accel = bp_accel
+          gas = bp_gas
+          brake_actuate = bp_brake_actuate
+          precharge_actuate = bp_precharge_actuate
         else:
-          if accel_stock < 0:
-            highway_accel = float(np.interp(lead_time_sec, [lead_time_low, lead_time_high], [accel_stock, self.bp_PRECHARGE_ACTIVATE]))
-          else:
-            highway_accel = 0 # accel_stock
-        highway_accel = float(np.clip(highway_accel, CarControllerParams.ACCEL_MIN, CarControllerParams.ACCEL_MAX))
+          accel = op_accel
+          gas = op_gas
+          brake_actuate = op_brake_actuate
+          precharge_actuate = op_brake_actuate
 
-        bp_accel = (1.0 - blend) * accel_stock + blend * highway_accel
-        bp_accel = float(np.clip(bp_accel, CarControllerParams.ACCEL_MIN, CarControllerParams.ACCEL_MAX))
-
-        bp_brake_actuate = 1 if bp_accel < self.bp_BRAKE_ACTIVATE else 0
-        bp_precharge_actuate = 1 if bp_accel < self.bp_PRECHARGE_ACTIVATE else 0
-
-        # Gas: apply same rules as stock so we never send illegal values (cruise fault at 45 mph etc.)
-        bp_gas = bp_accel
-        if not CC.longActive:
-          bp_gas = CarControllerParams.INACTIVE_GAS
-        elif bp_brake_actuate:
-          bp_gas = CarControllerParams.INACTIVE_GAS
-        elif bp_gas < CarControllerParams.MIN_GAS:
-          # Stock: gas < MIN_GAS (-0.5) → INACTIVE_GAS. Never send gas in (-5, -0.5).
-          bp_gas = CarControllerParams.INACTIVE_GAS
-        elif bp_accel < 0:
-          # Ford expects AccPrpl_A_Rq slightly positive when coasting (not braking). Avoid negative gas.
-          bp_gas = max(bp_gas, 0.0)
-
-        stopping = CC.actuators.longControlState == LongCtrlState.stopping
-        target_speed = float(np.clip(actuators.speed * self.target_speed_multiplier, 0, V_CRUISE_MAX))
-        if not CC.longActive and getattr(hud_control, "setSpeed", None) is not None:
-          target_speed = hud_control.setSpeed
-
-        # TODO Come back to accel_pred later, it might help with highway control, but sending values ford doesn't like causes ACC to cancel.
-        self.accel_pred = -5.0
-
-      # Only use BP values when BP long is enabled and we're above 45 mph (highway). Otherwise always send stock.
-      gasPressed = CS.out.gasPressed
-      brakePressed = CS.out.brakePressed
-      bp_long_available = (self.disable_BP_long_UI == False) and (v_ego_mph > self.MAX_URBAN_SPEED_MPH) and (gasPressed == False) and (brakePressed == False) # and (ttc_sec > self.target_ttc_low)
-      if bp_long_available:
-        accel = bp_accel
-        gas = bp_gas
-        brake_actuate = bp_brake_actuate
-        precharge_actuate = bp_precharge_actuate
+        self.bp_gas_last = bp_gas
+        self.bp_accel_last = bp_accel
+        bp_long_used = apply_bp_long
       else:
         accel = op_accel
         gas = op_gas
         brake_actuate = op_brake_actuate
         precharge_actuate = op_brake_actuate
+        bp_long_used = False
 
-      # Transition from BP long to non-BP (brake/gas/speed/disable): send one frame of clean exit so Ford doesn't fault on abrupt accel/gas/brake change.
-      if self._bp_long_active_last and not bp_long_available:
-        accel = 0.0
-        gas = CarControllerParams.INACTIVE_GAS
-        brake_actuate = False
-        precharge_actuate = False
-
-      # Clip to ford.h ACCDATA safety limits so we never violate longitudinal_*_checks
+      # Clip to ford.h ACCDATA safety limits
       accel = float(clip(accel, CarControllerParams.ACCEL_MIN, CarControllerParams.ACCEL_MAX))
       if gas != CarControllerParams.INACTIVE_GAS:
         gas = float(clip(gas, CarControllerParams.MIN_GAS, CarControllerParams.ACCEL_MAX))
-      accel_pred_send = float(clip(self.accel_pred, CarControllerParams.MIN_GAS, CarControllerParams.ACCEL_MAX)) if self.accel_pred != CarControllerParams.INACTIVE_GAS else CarControllerParams.INACTIVE_GAS
+      accel_pred_send = CarControllerParams.INACTIVE_GAS
 
       can_sends.append(fordcan.create_acc_msg(
         self.packer, self.CAN, CC.longActive, gas, accel, accel_pred_send, stopping,
@@ -942,7 +942,7 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
 
       self.accel = accel
       self.gas = gas
-      self._bp_long_active_last = bp_long_available
+      self._bp_long_active_last = bp_long_used
 
     ### ui ###
     send_ui = (self.main_on_last != main_on) or (self.lkas_enabled_last != CC.latActive) or (self.steer_alert_last != steer_alert)
