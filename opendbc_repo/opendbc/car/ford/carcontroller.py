@@ -1,5 +1,6 @@
 import math
 import cereal.messaging as messaging
+from cereal import log
 import numpy as np
 from numpy import clip, interp
 from collections import deque
@@ -19,6 +20,17 @@ from openpilot.common.params import Params
 
 LongCtrlState = structs.CarControl.Actuators.LongControlState
 VisualAlert = structs.CarControl.HUDControl.VisualAlert
+
+
+def _get_T_FOLLOW(personality):
+  """Match long_mpc.get_T_FOLLOW: follow time (s) from driving personality (relaxed/standard/aggressive)."""
+  if personality == log.LongitudinalPersonality.relaxed:
+    return 1.75
+  if personality == log.LongitudinalPersonality.standard:
+    return 1.45
+  if personality == log.LongitudinalPersonality.aggressive:
+    return 1.25
+  return 1.45  # default standard if unknown
 
 def index_function(idx, max_val=192, max_idx=32):
   return (max_val) * ((idx/max_idx)**2)
@@ -147,6 +159,7 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
     # Long Control Variables
     self.MAX_URBAN_SPEED_MPH = 45.0
     self.MIN_HIGHWAY_SPEED_MPH = 55.0
+    self._bp_long_active_last = False  # True if we sent BP long values last frame (for clean transition off BP long)
 
     # # Curvature variables
     self.curvature_lookup_time = 0.42 #from lagd
@@ -280,6 +293,12 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
     except (TypeError, ValueError):
       self.target_ttc_high = 25.0
     self.target_ttc_high = float(np.clip(self.target_ttc_high, 10.0, 60.0))
+    # Ford long: coast margin (s) beyond T_FOLLOW before we allow coast; ramp from (T_FOLLOW + margin) to T_FOLLOW
+    try:
+      self.bp_coast_margin = float(self.params.get("FordBPCoastMargin", return_default=True))
+    except (TypeError, ValueError):
+      self.bp_coast_margin = 0.5
+    self.bp_coast_margin = float(np.clip(self.bp_coast_margin, 0.0, 3.0))
     self.disable_BP_long_UI = self.params.get_bool("disable_BP_long_UI")
 
   def handle_post_lane_change_transition(self, path_angle, path_offset, desired_curvature_rate):
@@ -801,14 +820,23 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
       # TODO return to this signal later, it might help with highway control, but sending values ford doesn't like causes ACC to cancel.
       self.accel_pred = -5.0  # same as BluePilot branch until safe logic is confirmed
 
-      # BluePilot longitudinal: TTC-based coasting, simple brake/precharge thresholds (no hysteresis).
+      # BluePilot longitudinal: lead-time-based brake ramp (same metric as actuators.accel), TTC kept for safety. No hysteresis.
       if not self.disable_BP_long_UI:
 
-        # Time-to-collision (TTC) logic:
-        #   No lead → TTC = 120 s
-        #   Lead but lead is faster than us (not closing) → TTC = 60 s
-        #   Lead and we're faster than lead (closing) → TTC = d_rel / (-v_rel)
-        ttc_sec = 120.0   # no lead: use large TTC so we never treat as collision risk
+        # Lead time (s): time to reach lead at current speed. Same concept as MPC follow distance.
+        v_ego = max(CS.out.vEgo, 0.5)
+        lead_time_sec = 999.0  # no lead: treat as far so we coast
+        if self.sm.valid.get('radarState', False):
+          rs = self.sm['radarState']
+          lead = getattr(rs, 'leadOne', None)
+          if lead and getattr(lead, 'status', False):
+            d_rel = float(getattr(lead, 'dRel', 0))
+            if d_rel > 0:
+              lead_time_sec = d_rel / v_ego
+        lead_time_sec = float(np.clip(lead_time_sec, 0.0, 999.0))
+
+        # TTC (s): keep for possible safety override (e.g. force full model when TTC very low).
+        ttc_sec = 120.0
         if self.sm.valid.get('radarState', False):
           rs = self.sm['radarState']
           lead = getattr(rs, 'leadOne', None)
@@ -816,17 +844,16 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
             d_rel = float(getattr(lead, 'dRel', 0))
             v_rel = float(getattr(lead, 'vRel', 0))
             if d_rel > 0 and v_rel < 0:
-              # We're faster than lead (closing): TTC = distance / closing speed
               ttc_sec = d_rel / (-v_rel)
             else:
-              # Lead is faster than us or same speed (not closing): use 60 s
               ttc_sec = 60.0
         ttc_sec = float(np.clip(ttc_sec, 0.2, 120.0))
 
-        # Target TTC Low/High: below Low we pass through; above High no brake (coast/accel); between = smooth brake ramp toward model.
-        target_TTC_low = self.target_ttc_low
-        target_TTC_high = self.target_ttc_high
-
+        # T_FOLLOW from driving personality (matches long_mpc.get_T_FOLLOW).
+        personality = getattr(self.sm['selfdriveState'], 'personality', log.LongitudinalPersonality.standard) if self.sm.valid.get('selfdriveState', False) else log.LongitudinalPersonality.standard
+        T_FOLLOW = _get_T_FOLLOW(personality)
+        lead_time_low = T_FOLLOW
+        lead_time_high = T_FOLLOW + self.bp_coast_margin
 
         # Stock accel (works well for urban)
         accel_stock = op_accel
@@ -838,18 +865,17 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
         # Urban vs highway blend: 100% stock below 45 mph, 100% highway above 55 mph, linear blend between
         blend = float(np.clip((v_ego_mph - self.MAX_URBAN_SPEED_MPH) / (self.MIN_HIGHWAY_SPEED_MPH - self.MAX_URBAN_SPEED_MPH), 0.0, 1.0))
 
-        # Highway accel: above TTC High = no brake (coast or accel). Between Low and High = ramp from PRECHARGE_ACTIVATE at High to accel_stock at Low (no jump at boundary). Below Low = full model.
-        if ttc_sec <= target_TTC_low:
+        # Highway accel: ramp by lead time. At lead_time <= T_FOLLOW use full model; at lead_time >= T_FOLLOW+coast_margin use coast (or accel if model wants); between = interp precharge to model.
+        if lead_time_sec <= lead_time_low:
           highway_accel = accel_stock
-        elif ttc_sec > target_TTC_high:
+        elif lead_time_sec >= lead_time_high:
           if accel_stock > 0:
             highway_accel = accel_stock
           else:
             highway_accel = self.bp_MIN_HIGHWAY_ACCEL
         else:
-          # target_TTC_low < ttc_sec <= target_TTC_high: ramp from precharge at High to model at Low; only when model wants brake (accel_stock < 0)
           if accel_stock < 0:
-            highway_accel = float(np.interp(ttc_sec, [target_TTC_low, target_TTC_high], [accel_stock, self.bp_PRECHARGE_ACTIVATE]))
+            highway_accel = float(np.interp(lead_time_sec, [lead_time_low, lead_time_high], [accel_stock, self.bp_PRECHARGE_ACTIVATE]))
           else:
             highway_accel = accel_stock
         highway_accel = float(np.clip(highway_accel, CarControllerParams.ACCEL_MIN, CarControllerParams.ACCEL_MAX))
@@ -896,6 +922,13 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
         brake_actuate = op_brake_actuate
         precharge_actuate = op_brake_actuate
 
+      # Transition from BP long to non-BP (brake/gas/speed/disable): send one frame of clean exit so Ford doesn't fault on abrupt accel/gas/brake change.
+      if self._bp_long_active_last and not bp_long_available:
+        accel = 0.0
+        gas = CarControllerParams.INACTIVE_GAS
+        brake_actuate = False
+        precharge_actuate = False
+
       # Clip to ford.h ACCDATA safety limits so we never violate longitudinal_*_checks
       accel = float(clip(accel, CarControllerParams.ACCEL_MIN, CarControllerParams.ACCEL_MAX))
       if gas != CarControllerParams.INACTIVE_GAS:
@@ -909,6 +942,7 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
 
       self.accel = accel
       self.gas = gas
+      self._bp_long_active_last = bp_long_available
 
     ### ui ###
     send_ui = (self.main_on_last != main_on) or (self.lkas_enabled_last != CC.latActive) or (self.steer_alert_last != steer_alert)

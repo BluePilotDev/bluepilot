@@ -149,6 +149,18 @@ class BluePilotLayout(Widget):
       icon="speed_limit.png"
     )
 
+    # Ford long: coast margin (s) beyond personality follow time; brake ramp from (T_FOLLOW + margin) to T_FOLLOW
+    self._bp_coast_margin = float_control_item(
+      lambda: tr("BP Coast Margin (s)"),
+      lambda: tr("Extra seconds beyond follow time before coast. Ramp goes from (T_FOLLOW + margin) to T_FOLLOW (matches MPC)."),
+      param="FordBPCoastMargin",
+      min_value=0.0,
+      max_value=3.0,
+      step=0.1,
+      suffix="s",
+      icon="speed_limit.png"
+    )
+
     # Human turn detection toggle
     self._enable_human_turn_detection = toggle_item(
       lambda: tr("Enable Human Turn Detection"),
@@ -287,6 +299,7 @@ class BluePilotLayout(Widget):
       self._show_hybrid_power_flow,
       self._target_ttc_low,
       self._target_ttc_high,
+      self._bp_coast_margin,
       self._enable_human_turn_detection,
       self._lane_change_factor_high,
       self._enable_lane_positioning,
