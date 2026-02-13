@@ -891,9 +891,14 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
         brake_actuate = op_brake_actuate
         precharge_actuate = op_brake_actuate
 
+      # Clip to ford.h ACCDATA safety limits so we never violate longitudinal_*_checks
+      accel = float(clip(accel, CarControllerParams.ACCEL_MIN, CarControllerParams.ACCEL_MAX))
+      if gas != CarControllerParams.INACTIVE_GAS:
+        gas = float(clip(gas, CarControllerParams.MIN_GAS, CarControllerParams.ACCEL_MAX))
+      accel_pred_send = float(clip(self.accel_pred, CarControllerParams.MIN_GAS, CarControllerParams.ACCEL_MAX)) if self.accel_pred != CarControllerParams.INACTIVE_GAS else CarControllerParams.INACTIVE_GAS
 
       can_sends.append(fordcan.create_acc_msg(
-        self.packer, self.CAN, CC.longActive, gas, accel, self.accel_pred, stopping,
+        self.packer, self.CAN, CC.longActive, gas, accel, accel_pred_send, stopping,
         brake_actuate, precharge_actuate, v_ego_kph=target_speed
       ))
 
