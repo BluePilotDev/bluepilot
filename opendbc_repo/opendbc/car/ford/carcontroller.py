@@ -820,6 +820,20 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
       # TODO return to this signal later, it might help with highway control, but sending values ford doesn't like causes ACC to cancel.
       self.accel_pred = -5.0  # same as BluePilot branch until safe logic is confirmed
 
+      # TTC (s): computed always so bp_long_available can require ttc_sec > target_ttc_low (safety: don't engage BP long when close).
+      ttc_sec = 120.0
+      if self.sm.valid.get('radarState', False):
+        rs = self.sm['radarState']
+        lead = getattr(rs, 'leadOne', None)
+        if lead and getattr(lead, 'status', False):
+          d_rel = float(getattr(lead, 'dRel', 0))
+          v_rel = float(getattr(lead, 'vRel', 0))
+          if d_rel > 0 and v_rel < 0:
+            ttc_sec = d_rel / (-v_rel)
+          else:
+            ttc_sec = 60.0
+      ttc_sec = float(np.clip(ttc_sec, 0.2, 120.0))
+
       # BluePilot longitudinal: lead-time-based brake ramp (same metric as actuators.accel), TTC kept for safety. No hysteresis.
       if not self.disable_BP_long_UI:
 
@@ -834,20 +848,6 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
             if d_rel > 0:
               lead_time_sec = d_rel / v_ego
         lead_time_sec = float(np.clip(lead_time_sec, 0.0, 999.0))
-
-        # TTC (s): keep for possible safety override (e.g. force full model when TTC very low).
-        ttc_sec = 120.0
-        if self.sm.valid.get('radarState', False):
-          rs = self.sm['radarState']
-          lead = getattr(rs, 'leadOne', None)
-          if lead and getattr(lead, 'status', False):
-            d_rel = float(getattr(lead, 'dRel', 0))
-            v_rel = float(getattr(lead, 'vRel', 0))
-            if d_rel > 0 and v_rel < 0:
-              ttc_sec = d_rel / (-v_rel)
-            else:
-              ttc_sec = 60.0
-        ttc_sec = float(np.clip(ttc_sec, 0.2, 120.0))
 
         # T_FOLLOW from driving personality (matches long_mpc.get_T_FOLLOW).
         personality = getattr(self.sm['selfdriveState'], 'personality', log.LongitudinalPersonality.standard) if self.sm.valid.get('selfdriveState', False) else log.LongitudinalPersonality.standard
@@ -910,7 +910,7 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
       # Only use BP values when BP long is enabled and we're above 45 mph (highway). Otherwise always send stock.
       gasPressed = CS.out.gasPressed
       brakePressed = CS.out.brakePressed
-      bp_long_available = (self.disable_BP_long_UI == False) and (v_ego_mph > self.MAX_URBAN_SPEED_MPH) and (gasPressed == False) and (brakePressed == False)
+      bp_long_available = (self.disable_BP_long_UI == False) and (v_ego_mph > self.MAX_URBAN_SPEED_MPH) and (gasPressed == False) and (brakePressed == False) and (ttc_sec > self.target_ttc_low)
       if bp_long_available:
         accel = bp_accel
         gas = bp_gas
