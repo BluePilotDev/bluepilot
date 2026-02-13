@@ -897,7 +897,7 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
           bp_gas = CarControllerParams.INACTIVE_GAS
         elif bp_accel < 0:
           # Ford expects AccPrpl_A_Rq slightly positive when coasting (not braking). Avoid negative gas.
-          bp_gas = max(bp_gas, 0.2)
+          bp_gas = max(bp_gas, 0.0)
 
         stopping = CC.actuators.longControlState == LongCtrlState.stopping
         target_speed = float(np.clip(actuators.speed * self.target_speed_multiplier, 0, V_CRUISE_MAX))
