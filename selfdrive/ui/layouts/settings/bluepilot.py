@@ -127,20 +127,10 @@ class BluePilotLayout(Widget):
       icon="warning.png"
     )
 
-    # Ford long: Min Coasting TTC; Target TTC Low/High for brake ramp; Brake Target TTC-L
-    self._min_coasting_ttc = float_control_item(
-      lambda: tr("Min Coasting TTC (s)"),
-      lambda: tr("Below this TTC (s) we use full model. Above it we use highway coast/accel logic."),
-      param="MIN_COASTING_TTC",
-      min_value=5.0,
-      max_value=30.0,
-      step=1.0,
-      suffix="s",
-      icon="speed_limit.png"
-    )
+    # Ford long: Target TTC Low/High for brake ramp
     self._target_ttc_low = float_control_item(
       lambda: tr("Target TTC Low (s)"),
-      lambda: tr("Below this TTC we use full model. Between Low and High we smooth-brake (interp)."),
+      lambda: tr("Below this TTC we use full model. Ramp goes from precharge at High to model at Low (no jump)."),
       param="FordTargetHighwayTTC",
       min_value=5.0,
       max_value=60.0,
@@ -156,15 +146,6 @@ class BluePilotLayout(Widget):
       max_value=60.0,
       step=1.0,
       suffix="s",
-      icon="speed_limit.png"
-    )
-    self._brake_target_ttc_l = float_control_item(
-      lambda: tr("Brake Target TTC-L (m/s²)"),
-      lambda: tr("Accel at Target TTC Low (full brake end of ramp). E.g. -0.25. High end is fixed at brake activate."),
-      param="FordBrakeTargetTTCL",
-      min_value=-1.0,
-      max_value=0.0,
-      step=0.05,
       icon="speed_limit.png"
     )
 
@@ -304,10 +285,8 @@ class BluePilotLayout(Widget):
       self._show_ford_radar_overlay,
       self._show_hybrid_battery_status,
       self._show_hybrid_power_flow,
-      self._min_coasting_ttc,
       self._target_ttc_low,
       self._target_ttc_high,
-      self._brake_target_ttc_l,
       self._enable_human_turn_detection,
       self._lane_change_factor_high,
       self._enable_lane_positioning,
