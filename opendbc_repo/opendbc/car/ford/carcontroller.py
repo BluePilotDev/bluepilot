@@ -420,6 +420,8 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
         self.precision_type = 1
         steeringPressed = CS.out.steeringPressed
         steeringAngleDeg_PV = CS.out.steeringAngleDeg
+        gasPressed = CS.out.gasPressed
+        brakePressed = CS.out.brakePressed
 
         # determine tuning profile
         if self.custom_profile == 1: # custom tuning profile
@@ -880,7 +882,8 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
         self.accel_pred = -5.0
 
       # Only use BP values when BP long is enabled and we're above 45 mph (highway). Otherwise always send stock.
-      if not self.disable_BP_long_UI and v_ego_mph > self.MAX_URBAN_SPEED_MPH:
+      bp_long_available = (self.disable_BP_long_UI == False) and (v_ego_mph > self.MAX_URBAN_SPEED_MPH) and (gasPressed == False) and (brakePressed == False)
+      if bp_long_available:
         accel = bp_accel
         gas = bp_gas
         brake_actuate = bp_brake_actuate
