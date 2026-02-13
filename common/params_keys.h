@@ -285,6 +285,8 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"vbatt_pause_charging", {PERSISTENT | BACKUP, FLOAT, "11.8"}},
     {"MIN_COASTING_TTC", {PERSISTENT | BACKUP, FLOAT, "10.0"}},
     {"FordTargetHighwayTTC", {PERSISTENT | BACKUP, FLOAT, "15.0"}},
+    {"FordTargetHighwayTTCHigh", {PERSISTENT | BACKUP, FLOAT, "25.0"}},
+    {"FordBrakeTargetTTCL", {PERSISTENT | BACKUP, FLOAT, "-0.25"}},
     {"show_lead_speed", {PERSISTENT | BACKUP, BOOL, "1"}},
     {"FordPrefShowRadarLeadOverlay", {PERSISTENT | BACKUP, BOOL, "1"}},
     {"FordPrefRadarOverlayDisplayMode", {PERSISTENT | BACKUP, INT, "1"}},

@@ -262,16 +262,26 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
     self.enable_lanefull_mode = self.params.get_bool("enable_lane_full_mode")
     self.custom_profile = int(self.params.get("custom_profile", return_default=True))
     self.LC_PID_gain_UI = float(self.params.get("LC_PID_gain_UI", return_default=True))
-    # Ford long: min_TTC from menu (Min Coasting TTC), target highway TTC from menu
+    # Ford long: Min Coasting TTC; Target TTC Low/High for brake ramp; Brake_Target_TTC-L (H is BRAKE_ACTIVATE)
     try:
       self.min_coasting_ttc = float(self.params.get("MIN_COASTING_TTC", return_default=True))
     except (TypeError, ValueError):
       self.min_coasting_ttc = 10.0
     try:
-      self.target_highway_ttc = float(self.params.get("FordTargetHighwayTTC", return_default=True))
+      self.target_ttc_low = float(self.params.get("FordTargetHighwayTTC", return_default=True))
     except (TypeError, ValueError):
-      self.target_highway_ttc = 15.0
-    self.target_highway_ttc = float(np.clip(self.target_highway_ttc, 5.0, 60.0))
+      self.target_ttc_low = 15.0
+    self.target_ttc_low = float(np.clip(self.target_ttc_low, 5.0, 60.0))
+    try:
+      self.target_ttc_high = float(self.params.get("FordTargetHighwayTTCHigh", return_default=True))
+    except (TypeError, ValueError):
+      self.target_ttc_high = 25.0
+    self.target_ttc_high = float(np.clip(self.target_ttc_high, 10.0, 60.0))
+    try:
+      self.brake_target_ttc_l = float(self.params.get("FordBrakeTargetTTCL", return_default=True))
+    except (TypeError, ValueError):
+      self.brake_target_ttc_l = -0.25
+    self.brake_target_ttc_l = float(np.clip(self.brake_target_ttc_l, -1.0, 0.0))
     self.disable_BP_long_UI = self.params.get_bool("disable_BP_long_UI")
 
   def handle_post_lane_change_transition(self, path_angle, path_offset, desired_curvature_rate):
@@ -779,13 +789,14 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
               ttc_sec = 60.0
         ttc_sec = float(np.clip(ttc_sec, 0.2, 120.0))
 
-        # min_TTC from menu (Min Coasting TTC); below it we pass through actuators.accel. target_highway_ttc from menu.
-        min_TTC = self.min_coasting_ttc
-        target_TTC = self.target_highway_ttc
-        BRAKE_ACTIVATE = -0.14
+        # Target TTC Low/High: below Low we pass through; above High no brake (coast/accel); between = smooth brake ramp.
+        target_TTC_low = self.target_ttc_low
+        target_TTC_high = self.target_ttc_high
+        BRAKE_ACTIVATE = -0.14   # Brake_Target_TTC-H (fixed)
+        Brake_Target_TTC_H = BRAKE_ACTIVATE
+        Brake_Target_TTC_L = self.brake_target_ttc_l
         PRECHARGE_ACTIVATE = -0.08
-        MIN_HIGHWAY_ACCEL = -0.1   # when above target_TTC but model wants brake: coast above brake threshold with precharge active.
-        COAST_ACCEL_ABOVE_BRAKE = -0.13  # when between target_TTC and min_TTC: slight decel, no brake
+        MIN_HIGHWAY_ACCEL = -0.1   # when above target_TTC_high but model wants brake: coast
 
         # Stock accel (works well for urban)
         accel_stock = actuators.accel
@@ -800,17 +811,20 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
         v_ego_mph = CS.out.vEgo * 2.23694  # m/s to mph
         blend = float(np.clip((v_ego_mph - MAX_URBAN_SPEED_MPH) / (MIN_HIGHWAY_SPEED_MPH - MAX_URBAN_SPEED_MPH), 0.0, 1.0))
 
-        # Highway accel: above min_TTC we send accel above BRAKE_ACTIVATE; below min_TTC pass through actuators.accel
-        if ttc_sec <= min_TTC:
+        # Highway accel: above TTC High = no brake (coast or accel). Between Low and High = brake ramp (interp) only when model wants brake. Below Low = full model.
+        if ttc_sec <= target_TTC_low:
           highway_accel = accel_stock
-        elif ttc_sec > target_TTC:
+        elif ttc_sec > target_TTC_high:
           if accel_stock > 0:
             highway_accel = accel_stock
           else:
             highway_accel = MIN_HIGHWAY_ACCEL
         else:
-          # between target_TTC and min_TTC
-          highway_accel = COAST_ACCEL_ABOVE_BRAKE
+          # target_TTC_low < ttc_sec <= target_TTC_high: smooth brake ramp; only apply when model wants brake (accel_stock < 0)
+          if accel_stock < 0:
+            highway_accel = float(np.interp(ttc_sec, [target_TTC_low, target_TTC_high], [Brake_Target_TTC_L, Brake_Target_TTC_H]))
+          else:
+            highway_accel = accel_stock
         highway_accel = float(np.clip(highway_accel, CarControllerParams.ACCEL_MIN, CarControllerParams.ACCEL_MAX))
 
         accel = (1.0 - blend) * accel_stock + blend * highway_accel

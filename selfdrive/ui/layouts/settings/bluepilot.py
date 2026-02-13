@@ -127,7 +127,7 @@ class BluePilotLayout(Widget):
       icon="warning.png"
     )
 
-    # Ford long: min_TTC (below this we pass through model); target highway TTC (above this we coast or pass positive accel)
+    # Ford long: Min Coasting TTC; Target TTC Low/High for brake ramp; Brake Target TTC-L
     self._min_coasting_ttc = float_control_item(
       lambda: tr("Min Coasting TTC (s)"),
       lambda: tr("Below this TTC (s) we use full model. Above it we use highway coast/accel logic."),
@@ -138,14 +138,33 @@ class BluePilotLayout(Widget):
       suffix="s",
       icon="speed_limit.png"
     )
-    self._target_highway_ttc = float_control_item(
-      lambda: tr("Target Highway TTC (s)"),
-      lambda: tr("Above this TTC we pass positive accel or coast. Between this and Min Coasting TTC we send slight decel (no brake)."),
+    self._target_ttc_low = float_control_item(
+      lambda: tr("Target TTC Low (s)"),
+      lambda: tr("Below this TTC we use full model. Between Low and High we smooth-brake (interp)."),
       param="FordTargetHighwayTTC",
       min_value=5.0,
       max_value=60.0,
       step=1.0,
       suffix="s",
+      icon="speed_limit.png"
+    )
+    self._target_ttc_high = float_control_item(
+      lambda: tr("Target TTC High (s)"),
+      lambda: tr("Above this TTC we do not brake (coast or accel only). Brake ramp is between Low and High."),
+      param="FordTargetHighwayTTCHigh",
+      min_value=10.0,
+      max_value=60.0,
+      step=1.0,
+      suffix="s",
+      icon="speed_limit.png"
+    )
+    self._brake_target_ttc_l = float_control_item(
+      lambda: tr("Brake Target TTC-L (m/s²)"),
+      lambda: tr("Accel at Target TTC Low (full brake end of ramp). E.g. -0.25. High end is fixed at brake activate."),
+      param="FordBrakeTargetTTCL",
+      min_value=-1.0,
+      max_value=0.0,
+      step=0.05,
       icon="speed_limit.png"
     )
 
@@ -286,7 +305,9 @@ class BluePilotLayout(Widget):
       self._show_hybrid_battery_status,
       self._show_hybrid_power_flow,
       self._min_coasting_ttc,
-      self._target_highway_ttc,
+      self._target_ttc_low,
+      self._target_ttc_high,
+      self._brake_target_ttc_l,
       self._enable_human_turn_detection,
       self._lane_change_factor_high,
       self._enable_lane_positioning,
