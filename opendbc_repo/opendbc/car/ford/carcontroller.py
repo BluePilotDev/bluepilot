@@ -829,15 +829,31 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
         lead_time_sec = 999.0  # no lead: treat as far
         lead = None
         v_rel = 0.0
+        v_lead = 0.0
         if self.sm.valid.get('radarState', False):
           rs = self.sm['radarState']
           lead = getattr(rs, 'leadOne', None)
           if lead and getattr(lead, 'status', False):
             d_rel = float(getattr(lead, 'dRel', 0))
             v_rel = float(getattr(lead, 'vRel', 0))
+            v_lead = float(getattr(lead, 'vLead', 0))  # m/s; schema is vLead (camelCase)
             if d_rel > 0:
               lead_time_sec = d_rel / v_ego
         lead_time_sec = float(np.clip(lead_time_sec, 0.0, 999.0))
+        v_lead_mph = v_lead * 2.23694  # for apply_bp_long: only optimize when lead > 40 mph (don't coast into traffic jam)
+
+        ttc_sec = 120.0
+        if self.sm.valid.get('radarState', False):
+          rs = self.sm['radarState']
+          lead = getattr(rs, 'leadOne', None)
+          if lead and getattr(lead, 'status', False):
+            d_rel = float(getattr(lead, 'dRel', 0))
+            v_rel = float(getattr(lead, 'vRel', 0))
+            if d_rel > 0 and v_rel < 0:
+              ttc_sec = d_rel / (-v_rel)
+            else:
+              ttc_sec = 60.0
+        ttc_sec = float(np.clip(ttc_sec, 0.2, 120.0))
 
         # Defaults: pass through op_* when no lead or no mode; brake/precharge off until thresholds
         gaining = False
@@ -890,8 +906,10 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
         bp_accel = clip(op_accel, min_follow_accel, max_follow_accel)
 
         # now let's apply some rate limits, to keep the places where we choose op_accel or op_gas from moving too fast
-        bp_gas = clip(bp_gas, self.bp_gas_last - self.following_gas_ROC, self.bp_gas_last + self.following_gas_ROC)
-        bp_accel = clip(bp_accel, self.bp_accel_last - self.following_accel_ROC, self.bp_accel_last + self.following_accel_ROC)
+        # but only apply the limits if there is no imminent chance of a collision
+        if ttc_sec > 8.0 and lead_time_sec > 0.5:
+          bp_gas = clip(bp_gas, self.bp_gas_last - self.following_gas_ROC/10, self.bp_gas_last + self.following_gas_ROC/10)
+          bp_accel = clip(bp_accel, self.bp_accel_last - self.following_accel_ROC/10, self.bp_accel_last + self.following_accel_ROC/10)
 
         # Set brake_actuate and precharge_actuate flags (initialized False above)
         if bp_accel < self.brake_actuate_target:
@@ -906,7 +924,8 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
         # Determine if we will use bp smoothing
         gasPressed = CS.out.gasPressed
         brakePressed = CS.out.brakePressed
-        apply_bp_long = (self.disable_BP_long_UI == False) and (v_ego_mph > self.MAX_URBAN_SPEED_MPH) and (gasPressed == False) and (brakePressed == False)
+        # When we have a lead, require lead speed > 40 mph so we don't coast into a traffic jam; when no lead, allow BP long
+        apply_bp_long = (self.disable_BP_long_UI == False) and (v_ego_mph > self.MAX_URBAN_SPEED_MPH) and (gasPressed == False) and (brakePressed == False) and (lead is None or v_lead_mph > 40.0)
 
         if apply_bp_long:
           accel = bp_accel
