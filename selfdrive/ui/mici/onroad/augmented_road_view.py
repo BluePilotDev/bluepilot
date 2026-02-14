@@ -264,7 +264,13 @@ class AugmentedRoadView(CameraView):
 
     # Custom UI extension point - add custom overlays here
     # Use self._content_rect for positioning within camera bounds
-    self._confidence_ball.render(self.rect)
+    conf_ball_rect = rl.Rectangle(
+      self._content_rect.x + self._content_rect.width,
+      self._content_rect.y,
+      SIDE_PANEL_WIDTH,
+      self.rect.height
+    )
+    self._confidence_ball.render(conf_ball_rect)
 
     self._bookmark_icon.render(self.rect)
 

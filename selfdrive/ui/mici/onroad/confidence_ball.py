@@ -33,16 +33,39 @@ class ConfidenceBall(Widget, ConfidenceBallSP):
       self._confidence_filter.update((1 - max(ui_state.sm['modelV2'].meta.disengagePredictions.brakeDisengageProbs or [1])) *
                                                         (1 - max(ui_state.sm['modelV2'].meta.disengagePredictions.steerOverrideProbs or [1])))
 
+  def draw_mads_beam(self, x: int, y: int, width: int, height: int, color: rl.Color):
+      transparent = rl.Color(color.r, color.g, color.b, 0)
+      segments = 3
+      seg_width = width // segments
+
+      # Center segment: solid color
+      rl.draw_rectangle(
+          x + seg_width, y, seg_width, height,
+          color
+      )
+
+      # Left segment: fade from transparent -> solid
+      rl.draw_rectangle_gradient_h(
+          x, y, seg_width, height,
+          transparent,  # bottom-left
+          color         # top-right
+      )
+
+      # Right segment: fade from solid -> transparent
+      rl.draw_rectangle_gradient_h(
+          x + seg_width * (segments-1), y, width - seg_width, height,
+          color,        # bottom-left
+          transparent   # top-right
+      )
+
   def _render(self, _):
-    # Use rect width directly (works for both MICI and TICI)
-    # For MICI: rect.width matches SIDE_PANEL_WIDTH
-    # For TICI: rect.width is CONFIDENCE_BALL_R (thinner bar)
-    bar_width = self.rect.width
-    content_rect = rl.Rectangle(
-      self.rect.x,
-      self.rect.y,
-      bar_width,
-      self.rect.height,
+    content_rect = self.rect
+
+    rl.begin_scissor_mode(
+      int(content_rect.x),
+      int(content_rect.y),
+      int(content_rect.width),
+      int(content_rect.height)
     )
 
     bottom_position = content_rect.height
@@ -65,7 +88,7 @@ class ConfidenceBall(Widget, ConfidenceBallSP):
     dot_height = content_rect.y + dot_height  # Use content_rect.y, not self._rect.y
 
     # confidence zones
-    if ui_state.status == UIStatus.ENGAGED or self._demo:
+    if ui_state.status in (UIStatus.LAT_ONLY, UIStatus.LONG_ONLY, UIStatus.ENGAGED) or self._demo:
       if self._confidence_filter.x > 0.5:
         top_dot_color = rl.Color(0, 255, 204, 255)
         bottom_dot_color = rl.Color(0, 255, 38, 255)
@@ -76,8 +99,8 @@ class ConfidenceBall(Widget, ConfidenceBallSP):
         top_dot_color = rl.Color(255, 0, 21, 255)
         bottom_dot_color = rl.Color(255, 0, 89, 255)
 
-    elif ui_state.status in (UIStatus.LAT_ONLY, UIStatus.LONG_ONLY):
-      top_dot_color = bottom_dot_color = self.get_lat_long_dot_color()
+    # elif ui_state.status in (UIStatus.LAT_ONLY, UIStatus.LONG_ONLY):
+    #   top_dot_color = bottom_dot_color = self.get_lat_long_dot_color()
 
     elif ui_state.status == UIStatus.OVERRIDE:
       top_dot_color = rl.Color(255, 255, 255, 255)
@@ -87,8 +110,6 @@ class ConfidenceBall(Widget, ConfidenceBallSP):
       top_dot_color = rl.Color(50, 50, 50, 255)
       bottom_dot_color = rl.Color(13, 13, 13, 255)
 
-    # Use bottom color for ring to match the ball (darker edge looks more natural)
-    ring_color = bottom_dot_color
     # Position ball so it fits within the bar without going off the left edge
     # If bar is narrower than 2*radius, position ball so left edge aligns with bar left edge
     # Otherwise, position ball centered or aligned to right edge
@@ -99,5 +120,17 @@ class ConfidenceBall(Widget, ConfidenceBallSP):
       # Bar is wide enough - position ball aligned to right edge of bar (original behavior)
       ball_center_x = content_rect.x + content_rect.width - self._status_dot_radius
 
+    if ui_state.status in (UIStatus.LAT_ONLY, UIStatus.LONG_ONLY):
+      color = self.get_lat_long_dot_color()
+      color = rl.Color(color.r, color.g, color.b, 150)  # Set alpha for faded background
+      self.draw_mads_beam(int(self.rect.x),
+                              int(self.rect.y),
+                              int(self.rect.width),
+                              int(self.rect.height),
+                              color)
+
     draw_circle_gradient(self.rect, ball_center_x, dot_height, self._status_dot_radius,
                          top_dot_color, bottom_dot_color)
+
+    # End clipping region
+    rl.end_scissor_mode()
