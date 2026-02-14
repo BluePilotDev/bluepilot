@@ -8,10 +8,11 @@ from openpilot.system.ui.widgets import Widget
 from openpilot.common.filter_simple import FirstOrderFilter
 
 class Blindspot(Widget):
-  def __init__(self):
+  def __init__(self, width: float = 150):
     super().__init__()
     self.params = Params()
     self._enabled = False
+    self._width = width
 
     # Blindspot screen edge indicators (MICI style)
     self._blindspot_left_alpha_filter = FirstOrderFilter(0.0, 0.15, 1 / gui_app.target_fps)
@@ -37,9 +38,6 @@ class Blindspot(Widget):
     # Update alpha filters for smooth fade in/out
     self._blindspot_left_alpha_filter.update(1.0 if left_blindspot else 0.0)
     self._blindspot_right_alpha_filter.update(1.0 if right_blindspot else 0.0)
-
-    # Screen edge width - MICI screen is ~1920x720, so use narrower edge than TICI
-    BLIND_SPOT_W = 125  # Width of red edge indicator in pixels (half width for MICI's smaller screen)
 
     # Pulse animation: creates a brightness pulse effect
     PULSE_DURATION = 3.0  # seconds for one complete pulse cycle (twice as slow)
@@ -68,7 +66,7 @@ class Blindspot(Widget):
       rl.draw_rectangle_gradient_h(
         x,
         y,
-        BLIND_SPOT_W,
+        self._width,
         h,
         edge_color,
         inside_color)
@@ -81,9 +79,9 @@ class Blindspot(Widget):
       edge_color = rl.Color(255, 0, 0, edge_alpha)
       inside_color = rl.Color(255, 0, 0, inside_alpha)
       rl.draw_rectangle_gradient_h(
-        x + int(rect.width) - BLIND_SPOT_W,
+        x + int(rect.width) - self._width,
         y,
-        BLIND_SPOT_W,
+        self._width,
         h,
         inside_color,
         edge_color)

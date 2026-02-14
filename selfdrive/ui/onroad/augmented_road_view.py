@@ -64,7 +64,7 @@ class AugmentedRoadView(CameraView):
     self.driver_state_renderer = DriverStateRenderer()
     self._confidence_ball = ConfidenceBall(radius=CONFIDENCE_BALL_R)  # Doubled from 10 to 20 for better visibility
     self._battery_gauge = HybridBatteryGauge()
-    self._blindspot = Blindspot()
+    self._blindspot = Blindspot(250)  # Width of red edge indicator in pixels (wider for TICI to start gradient sooner)
 
     # Blindspot screen edge indicators (MICI style)
     self._params = Params()
