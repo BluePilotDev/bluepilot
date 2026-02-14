@@ -261,7 +261,7 @@ class AugmentedRoadView(CameraView):
 
     # Draw blindspot screen edge indicators (MICI style) - draw early so it's behind other UI elements
     # Must be after scissor mode to show on screen edges, but before other overlays to be on back layer
-    self._draw_blindspot_screen_edges(self.rect)
+    self._draw_blindspot_screen_edges(self._content_rect)
 
     # Custom UI extension point - add custom overlays here
     # Use self._content_rect for positioning within camera bounds
@@ -298,16 +298,16 @@ class AugmentedRoadView(CameraView):
 
     # Screen edge width - MICI screen is ~1920x720, so use narrower edge than TICI
     BLIND_SPOT_W = 125  # Width of red edge indicator in pixels (half width for MICI's smaller screen)
-    
+
     # Pulse animation: creates a brightness pulse effect
     PULSE_DURATION = 3.0  # seconds for one complete pulse cycle (twice as slow)
     current_time = time.monotonic()
     pulse_phase = ((current_time - self._blindspot_pulse_start_time) % PULSE_DURATION) / PULSE_DURATION
-    
+
     # Gradient opacity: starts at 75% and fades to 0% (fully transparent)
     EDGE_ALPHA_START = 0.75  # 75% opacity at the edge
     EDGE_ALPHA_END = 0.0     # 0% opacity at the inside edge (fully transparent)
-    
+
     x = int(rect.x)
     y = int(rect.y)
     h = int(rect.height)
