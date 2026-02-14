@@ -12,6 +12,7 @@ from openpilot.selfdrive.ui.mici.onroad.hud_renderer import HudRenderer
 from openpilot.selfdrive.ui.mici.onroad.model_renderer import ModelRenderer
 from openpilot.selfdrive.ui.mici.onroad.confidence_ball import ConfidenceBall
 from openpilot.selfdrive.ui.mici.onroad.cameraview import CameraView
+from openpilot.selfdrive.ui.widgets.blindspot import Blindspot
 from openpilot.system.ui.lib.application import FontWeight, gui_app, MousePos, MouseEvent
 from openpilot.system.ui.widgets.label import UnifiedLabel
 from openpilot.system.ui.widgets import Widget
@@ -157,6 +158,7 @@ class AugmentedRoadView(CameraView):
     self._driver_state_renderer = DriverStateRenderer()
     self._confidence_ball = ConfidenceBall()
     self._complication = MiciComplication()
+    self._blindspot = Blindspot()
     self._offroad_label = UnifiedLabel("start the car to\nuse sunnypilot", 54, FontWeight.DISPLAY,
                                        text_color=rl.Color(255, 255, 255, int(255 * 0.9)),
                                        alignment=rl.GuiTextAlignment.TEXT_ALIGN_CENTER,
@@ -168,10 +170,7 @@ class AugmentedRoadView(CameraView):
 
     self.params = Params()
 
-    # Blindspot screen edge indicators (MICI style)
-    self._blindspot_left_alpha_filter = FirstOrderFilter(0.0, 0.15, 1 / gui_app.target_fps)
-    self._blindspot_right_alpha_filter = FirstOrderFilter(0.0, 0.15, 1 / gui_app.target_fps)
-    self._blindspot_pulse_start_time = time.monotonic()
+
 
     # debug
     self._pm = messaging.PubMaster(['uiDebug'])
@@ -261,7 +260,7 @@ class AugmentedRoadView(CameraView):
 
     # Draw blindspot screen edge indicators (MICI style) - draw early so it's behind other UI elements
     # Must be after scissor mode to show on screen edges, but before other overlays to be on back layer
-    self._draw_blindspot_screen_edges(self._content_rect)
+    self._blindspot.render(self._content_rect)
 
     # Custom UI extension point - add custom overlays here
     # Use self._content_rect for positioning within camera bounds
@@ -278,75 +277,6 @@ class AugmentedRoadView(CameraView):
     msg = messaging.new_message('uiDebug')
     msg.uiDebug.drawTimeMillis = (time.monotonic() - start_draw) * 1000
     self._pm.send('uiDebug', msg)
-
-  def _draw_blindspot_screen_edges(self, rect: rl.Rectangle):
-    """Draw blindspot screen edge indicators (MICI style) - red gradient edge of screen when blindspot detected with pulsing animation"""
-    if not self.params.get_bool("BlindSpot"):
-      return
-
-    sm = ui_state.sm
-    if not sm.valid['carState']:
-      return
-
-    car_state = sm['carState']
-    left_blindspot = car_state.leftBlindspot
-    right_blindspot = car_state.rightBlindspot
-
-    # Update alpha filters for smooth fade in/out
-    self._blindspot_left_alpha_filter.update(1.0 if left_blindspot else 0.0)
-    self._blindspot_right_alpha_filter.update(1.0 if right_blindspot else 0.0)
-
-    # Screen edge width - MICI screen is ~1920x720, so use narrower edge than TICI
-    BLIND_SPOT_W = 125  # Width of red edge indicator in pixels (half width for MICI's smaller screen)
-
-    # Pulse animation: creates a brightness pulse effect
-    PULSE_DURATION = 3.0  # seconds for one complete pulse cycle (twice as slow)
-    current_time = time.monotonic()
-    pulse_phase = ((current_time - self._blindspot_pulse_start_time) % PULSE_DURATION) / PULSE_DURATION
-
-    # Gradient opacity: starts at 75% and fades to 0% (fully transparent)
-    EDGE_ALPHA_START = 0.75  # 75% opacity at the edge
-    EDGE_ALPHA_END = 0.0     # 0% opacity at the inside edge (fully transparent)
-
-    x = int(rect.x)
-    y = int(rect.y)
-    h = int(rect.height)
-
-    # Calculate brightness pulse: smooth sine wave from 0.3 (dim) to 1.0 (bright)
-    # pulse_phase goes from 0.0 to 1.0, so we use sine to create smooth pulsing
-    brightness_pulse = 0.3 + 0.7 * (0.5 + 0.5 * np.sin(pulse_phase * 2 * np.pi))  # Range: 0.3 to 1.0
-
-    # Draw left edge red gradient indicator with brightness pulse
-    if self._blindspot_left_alpha_filter.x > 0.01:
-      filter_alpha = self._blindspot_left_alpha_filter.x
-      edge_alpha = int(255 * EDGE_ALPHA_START * filter_alpha * brightness_pulse)  # Apply brightness pulse
-      inside_alpha = int(255 * EDGE_ALPHA_END * filter_alpha * brightness_pulse)  # Apply brightness pulse
-      edge_color = rl.Color(255, 0, 0, edge_alpha)
-      inside_color = rl.Color(255, 0, 0, inside_alpha)
-      rl.draw_rectangle_gradient_h(
-        x,
-        y,
-        BLIND_SPOT_W,
-        h,
-        edge_color,
-        inside_color
-      )
-
-    # Draw right edge red gradient indicator with brightness pulse
-    if self._blindspot_right_alpha_filter.x > 0.01:
-      filter_alpha = self._blindspot_right_alpha_filter.x
-      edge_alpha = int(255 * EDGE_ALPHA_START * filter_alpha * brightness_pulse)  # Apply brightness pulse
-      inside_alpha = int(255 * EDGE_ALPHA_END * filter_alpha * brightness_pulse)  # Apply brightness pulse
-      edge_color = rl.Color(255, 0, 0, edge_alpha)
-      inside_color = rl.Color(255, 0, 0, inside_alpha)
-      rl.draw_rectangle_gradient_h(
-        x + int(rect.width) - BLIND_SPOT_W,
-        y,
-        BLIND_SPOT_W,
-        h,
-        inside_color,
-        edge_color
-      )
 
   def _switch_stream_if_needed(self, sm):
     if sm['selfdriveState'].experimentalMode and WIDE_CAM in self.available_streams:
