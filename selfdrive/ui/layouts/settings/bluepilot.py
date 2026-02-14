@@ -127,40 +127,6 @@ class BluePilotLayout(Widget):
       icon="warning.png"
     )
 
-    # Ford long coasting TTC (time-to-collision) – no coast below min, full coast above max
-    self._min_coasting_ttc = float_control_item(
-      lambda: tr("Min Coasting TTC (s)"),
-      lambda: tr("No coasting below this TTC (seconds). Brake when closer."),
-      param="MIN_COASTING_TTC",
-      min_value=5.0,
-      max_value=30.0,
-      step=1.0,
-      suffix="s",
-      icon="speed_limit.png"
-    )
-    self._max_coasting_ttc = float_control_item(
-      lambda: tr("Max Coasting TTC (s)"),
-      lambda: tr("Full coasting above this TTC (seconds). Blend between min and max."),
-      param="MAX_COASTING_TTC",
-      min_value=8.0,
-      max_value=60.0,
-      step=1.0,
-      suffix="s",
-      icon="speed_limit.png"
-    )
-
-    # Ford long brake/gas cooldown: wait this long (s) after releasing brake or gas before re-applying (reduces tapping at coasting limit).
-    self._long_brake_gas_cooldown = float_control_item(
-      lambda: tr("Brake/Gas Cooldown (s)"),
-      lambda: tr("Seconds to wait after releasing brake or gas before re-applying (1–10 s). Reduces tapping at coasting limit."),
-      param="FordLongBrakeGasCooldown",
-      min_value=1.0,
-      max_value=10.0,
-      step=0.1,
-      suffix="s",
-      icon="speed_limit.png"
-    )
-
     # Human turn detection toggle
     self._enable_human_turn_detection = toggle_item(
       lambda: tr("Enable Human Turn Detection"),
@@ -297,9 +263,6 @@ class BluePilotLayout(Widget):
       self._show_ford_radar_overlay,
       self._show_hybrid_battery_status,
       self._show_hybrid_power_flow,
-      self._min_coasting_ttc,
-      self._max_coasting_ttc,
-      self._long_brake_gas_cooldown,
       self._enable_human_turn_detection,
       self._lane_change_factor_high,
       self._enable_lane_positioning,

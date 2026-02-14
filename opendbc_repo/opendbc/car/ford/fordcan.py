@@ -133,7 +133,7 @@ def create_lat_ctl2_msg(packer, CAN: CanBus, mode: int, ramp_type: int, precisio
   return packer.make_can_msg("LateralMotionControl2", CAN.main, values)
 
 
-def create_acc_msg(packer, CAN: CanBus, long_active: bool, gas: float, accel: float, stopping: bool,
+def create_acc_msg(packer, CAN: CanBus, long_active: bool, gas: float, accel: float, accel_pred: float, stopping: bool,
                   brake_actuate, precharge_actuate, v_ego_kph: float):
   """
   Creates a CAN message for the Ford ACC Command.
@@ -148,9 +148,7 @@ def create_acc_msg(packer, CAN: CanBus, long_active: bool, gas: float, accel: fl
     "AccBrkTot_A_Rq": accel,                          # Brake total accel request: [-20|11.9449] m/s^2
     "Cmbb_B_Enbl": 1 if long_active else 0,           # Enabled: 0=No, 1=Yes
     "AccPrpl_A_Rq": gas,                              # Acceleration request: [-5|5.23] m/s^2
-    # No observed acceleration seen from this signal alone. During stock system operation, it appears to
-    # be the raw acceleration request (AccPrpl_A_Rq when positive, AccBrkTot_A_Rq when negative)
-    "AccPrpl_A_Pred": -5.0,                           # Acceleration request: [-5|5.23] m/s^2
+    "AccPrpl_A_Pred": accel_pred,                     # From carcontroller (Ford stock: gas when not braking, else AccBrkTot)
     "AccResumEnbl_B_Rq": 1 if long_active else 0,
     # No observed acceleration seen from this signal alone
     "AccVeh_V_Trg": v_ego_kph,                        # Target speed: [0|255] km/h

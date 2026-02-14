@@ -45,12 +45,10 @@ class ConfidenceBall(Widget, ConfidenceBallSP):
       self.rect.height,
     )
 
-    # Ball range: bottom at 25% up from bottom (75% from top), top at 75% up from bottom (25% from top)
-    # Calculate positions relative to content_rect height
-    bottom_position = content_rect.height * 0.75  # 25% up from bottom = 75% of height
-    top_position = content_rect.height * 0.25      # 75% up from bottom = 25% of height
+    bottom_position = content_rect.height
+    top_position = 0.0
     range_height = bottom_position - top_position
-    
+
     # Map confidence filter to new range
     # Original: (1 - self._confidence_filter.x) maps -0.5->1.5 (top) and 1.0->0.0 (bottom)
     # We want to preserve this mapping but constrain to new range
@@ -59,7 +57,7 @@ class ConfidenceBall(Widget, ConfidenceBallSP):
     filter_max = 1.0
     normalized = (self._confidence_filter.x - filter_min) / (filter_max - filter_min)
     normalized = max(0.0, min(1.0, normalized))  # Clamp to [0, 1]
-    
+
     # Map normalized [0, 1] to [bottom_position, top_position]
     # When normalized=0 (low confidence), ball at bottom_position
     # When normalized=1 (high confidence), ball at top_position
@@ -100,7 +98,6 @@ class ConfidenceBall(Widget, ConfidenceBallSP):
     else:
       # Bar is wide enough - position ball aligned to right edge of bar (original behavior)
       ball_center_x = content_rect.x + content_rect.width - self._status_dot_radius
-
 
     draw_circle_gradient(self.rect, ball_center_x, dot_height, self._status_dot_radius,
                          top_dot_color, bottom_dot_color)

@@ -356,7 +356,7 @@ def draw_circle_gradient(rect: rl.Rectangle, center_x: float, center_y: float, r
   state = ShaderState.get_instance()
   state.initialize()
 
-  state.circle_center[0:2] = [center_x, center_y]
+  state.circle_center[0:2] = [center_x, rect.height - center_y]
   state.circle_radius[0] = radius
   state.circle_top_color[0:4] = [top_color.r / 255.0, top_color.g / 255.0, top_color.b / 255.0, top_color.a / 255.0]
   state.circle_bottom_color[0:4] = [bottom_color.r / 255.0, bottom_color.g / 255.0, bottom_color.b / 255.0, bottom_color.a / 255.0]

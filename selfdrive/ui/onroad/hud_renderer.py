@@ -2,6 +2,7 @@ import pyray as rl
 from dataclasses import dataclass
 from openpilot.common.constants import CV
 from openpilot.common.params import Params
+from openpilot.system.hardware import PC
 from openpilot.selfdrive.ui.onroad.exp_button import ExpButton
 from openpilot.selfdrive.ui.ui_state import ui_state, UIStatus
 from openpilot.system.ui.lib.application import gui_app, FontWeight
@@ -21,6 +22,7 @@ CRUISE_DISABLED_CHAR = '–'
 @dataclass(frozen=True)
 class UIConfig:
   header_height: int = 300
+  header_align_center_y: int = 180  # Vertical center for header row alignment (max speed, current speed, exp button, road name, alerts)
   border_size: int = 30
   button_size: int = 192
   set_speed_width_metric: int = 200
@@ -35,7 +37,7 @@ class FontSizes:
   speed_unit: int = 66
   max_speed: int = 40
   set_speed: int = 90
-  road_name: int = 36
+  road_name: int = 48
 
 
 @dataclass(frozen=True)
@@ -155,7 +157,8 @@ class HudRenderer(Widget):
     self._draw_current_speed(rect)
 
     button_x = rect.x + rect.width - UI_CONFIG.border_size - UI_CONFIG.button_size
-    button_y = rect.y + UI_CONFIG.border_size
+    # Vertical center aligns with current speed (header_align_center_y)
+    button_y = rect.y + UI_CONFIG.header_align_center_y - UI_CONFIG.button_size / 2
     self._exp_button.render(rl.Rectangle(button_x, button_y, UI_CONFIG.button_size, UI_CONFIG.button_size))
 
   def user_interacting(self) -> bool:
@@ -165,7 +168,8 @@ class HudRenderer(Widget):
     """Draw the MAX speed indicator box."""
     set_speed_width = UI_CONFIG.set_speed_width_metric if ui_state.is_metric else UI_CONFIG.set_speed_width_imperial
     x = rect.x + 60 + self._left_offset + (UI_CONFIG.set_speed_width_imperial - set_speed_width) // 2
-    y = rect.y + 45
+    # Vertical center aligns with current speed (header_align_center_y)
+    y = rect.y + UI_CONFIG.header_align_center_y - UI_CONFIG.set_speed_height / 2
 
     set_speed_rect = rl.Rectangle(x, y, set_speed_width, UI_CONFIG.set_speed_height)
     rl.draw_rectangle_rounded(set_speed_rect, 0.35, 10, COLORS.BLACK_TRANSLUCENT)
@@ -222,50 +226,88 @@ class HudRenderer(Widget):
         pass
     if not road_name:
       road_name = (self._params.get("RoadName") or "").strip()
+    if not road_name and PC:
+      # Simulator has no GPS - use hardcoded name for UI testing (font size, placement, etc.)
+      road_name = "west grand parkway south"
     if not road_name:
       return
 
-    # Truncate long road names
-    max_chars = 25
-    if len(road_name) > max_chars:
-      road_name = road_name[: max_chars - 1] + "…"
+    # Wrap long road names at spaces (max 22 chars per line)
+    MAX_CHARS_PER_LINE = 22
+    line_spacing = 4
 
-    # Layout: pill between set speed (left) and current speed (center)
-    set_speed_width = UI_CONFIG.set_speed_width_metric if ui_state.is_metric else UI_CONFIG.set_speed_width_imperial
-    set_speed_x = rect.x + 60 + self._left_offset + (UI_CONFIG.set_speed_width_imperial - set_speed_width) // 2
-    pill_left = set_speed_x + set_speed_width + 24  # Gap after set speed box
-    # Right edge: leave space before current speed (center - ~200px)
-    pill_max_width = int(rect.x + rect.width / 2 - 220 - pill_left)
-    if pill_max_width < 60:
+    def _wrap_at_spaces(text: str, max_len: int) -> list[str]:
+      if len(text) <= max_len:
+        return [text] if text else []
+      lines = []
+      remaining = text.strip()
+      while remaining:
+        if len(remaining) <= max_len:
+          lines.append(remaining)
+          break
+        chunk = remaining[: max_len + 1]  # Look at first max_len+1 chars for a space
+        last_space = chunk.rfind(' ')
+        if last_space > 0:
+          lines.append(remaining[:last_space])
+          remaining = remaining[last_space + 1 :].lstrip()
+        else:
+          # No space found - break at max_len (fallback for very long words)
+          lines.append(remaining[:max_len])
+          remaining = remaining[max_len:].lstrip()
+      return lines
+
+    road_name_lines = _wrap_at_spaces(road_name, MAX_CHARS_PER_LINE)
+    if not road_name_lines:
       return
 
-    text_size = measure_text_cached(self._font_semi_bold, road_name, FONT_SIZES.road_name)
-    pill_padding_h = 20
-    pill_height = 56
-    pill_width = min(int(text_size.x) + 2 * pill_padding_h, pill_max_width)
-    pill_x = pill_left
-    pill_y = rect.y + 100  # Vertically between set speed area and current speed
+    # Layout: pill centered on fixed spot between set speed (left) and current speed (center)
+    set_speed_width = UI_CONFIG.set_speed_width_metric if ui_state.is_metric else UI_CONFIG.set_speed_width_imperial
+    set_speed_x = rect.x + 60 + self._left_offset + (UI_CONFIG.set_speed_width_imperial - set_speed_width) // 2
+    gap_left = set_speed_x + set_speed_width + 24  # Start of gap after set speed box
+    gap_right = rect.x + rect.width / 2 - 80  # End of gap before current speed (wider to allow padding)
+    center_x = (gap_left + gap_right) / 2 - 25  # Center of available space, shifted 25px left (15 + 10)
+
+    # Measure all lines to get pill dimensions (use _font_bold to match alert pills)
+    line_sizes = [measure_text_cached(self._font_bold, line, FONT_SIZES.road_name) for line in road_name_lines]
+    max_line_width = max(s.x for s in line_sizes)
+    single_line_height = line_sizes[0].y
+    total_text_height = single_line_height * len(road_name_lines) + line_spacing * (len(road_name_lines) - 1)
+
+    pill_padding_h = 48  # Horizontal padding around text
+    pill_padding_v = 12  # Vertical padding around text
+    pill_height = int(total_text_height) + 2 * pill_padding_v
+    pill_width = min(int(max_line_width) + 2 * pill_padding_h, int(gap_right - gap_left))
+    if pill_width < 60:
+      return
+
+    # Position by center: pill left edge = center - half width
+    pill_x = center_x - pill_width / 2
+    # Vertical center aligns with current speed (header_align_center_y)
+    pill_y = rect.y + UI_CONFIG.header_align_center_y - pill_height / 2
 
     pill_rect = rl.Rectangle(pill_x, pill_y, pill_width, pill_height)
     rl.draw_rectangle_rounded(pill_rect, 0.75, 10, COLORS.ROAD_NAME_PILL_BG)
 
-    # Center text in pill
-    text_x = pill_x + (pill_width - text_size.x) / 2
-    text_y = pill_y + (pill_height - text_size.y) / 2
-    rl.draw_text_ex(
-      self._font_semi_bold,
-      road_name,
-      rl.Vector2(text_x, text_y),
-      FONT_SIZES.road_name,
-      0,
-      COLORS.WHITE_TRANSLUCENT,
-    )
+    # Draw each line centered in pill
+    text_y = pill_y + pill_padding_v
+    for i, (line, line_size) in enumerate(zip(road_name_lines, line_sizes)):
+      text_x = pill_x + (pill_width - line_size.x) / 2
+      rl.draw_text_ex(
+        self._font_bold,
+        line,
+        rl.Vector2(text_x, text_y),
+        FONT_SIZES.road_name,
+        0,
+        rl.WHITE,
+      )
+      text_y += single_line_height + line_spacing
 
   def _draw_current_speed(self, rect: rl.Rectangle) -> None:
     """Draw the current vehicle speed and unit."""
     speed_text = str(round(self.speed))
     speed_text_size = measure_text_cached(self._font_bold, speed_text, FONT_SIZES.current_speed)
-    speed_pos = rl.Vector2(rect.x + rect.width / 2 - speed_text_size.x / 2, 180 - speed_text_size.y / 2)
+    # Vertical center aligns with header_align_center_y
+    speed_pos = rl.Vector2(rect.x + rect.width / 2 - speed_text_size.x / 2, rect.y + UI_CONFIG.header_align_center_y - speed_text_size.y / 2)
     self.speed_right = speed_pos.x + speed_text_size.x
 
     # Show red when braking if brake status is enabled
@@ -274,5 +316,5 @@ class HudRenderer(Widget):
 
     unit_text = tr("km/h") if ui_state.is_metric else tr("mph")
     unit_text_size = measure_text_cached(self._font_medium, unit_text, FONT_SIZES.speed_unit)
-    unit_pos = rl.Vector2(rect.x + rect.width / 2 - unit_text_size.x / 2, 290 - unit_text_size.y / 2)
+    unit_pos = rl.Vector2(rect.x + rect.width / 2 - unit_text_size.x / 2, rect.y + 290 - unit_text_size.y / 2)
     rl.draw_text_ex(self._font_medium, unit_text, unit_pos, FONT_SIZES.speed_unit, 0, COLORS.WHITE_TRANSLUCENT)

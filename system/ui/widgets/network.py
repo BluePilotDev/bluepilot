@@ -186,10 +186,12 @@ class AdvancedNetworkSettings(Widget):
     self._tethering_password_action.set_enabled(True)
 
     # Update saved networks list for preferred network selector
+    # Note: This only includes networks currently in scan results, not all saved networks
     self._saved_networks = [n for n in networks if n.is_saved]
     self._preferred_network_action.set_enabled(len(self._saved_networks) > 0)
     
-    # Update preferred network button text if current favorite is no longer saved
+    # Check if preferred network is still saved in NetworkManager (not just in scan results)
+    # This ensures we don't clear the preferred network when it's just out of range
     if Params is not None:
       try:
         favorite_value = self._params.get("WifiFavoriteSSID")
@@ -199,11 +201,16 @@ class AdvancedNetworkSettings(Widget):
             current_favorite = favorite_value.decode('utf-8', errors='replace').strip('\x00')
           else:
             current_favorite = str(favorite_value).strip('\x00')
-        if current_favorite and not any(n.ssid == current_favorite for n in self._saved_networks):
-          # Favorite network is no longer saved, clear it
-          self._params.put("WifiFavoriteSSID", "")
-          cloudlog.info(f"Cleared preferred network '{current_favorite}' - network no longer saved")
-      except Exception:
+        if current_favorite:
+          # Check NetworkManager's saved connections directly, not scan results
+          # This way we only clear if the network was actually forgotten, not just out of range
+          saved_connections = self._wifi_manager._get_connections()
+          if current_favorite not in saved_connections:
+            # Network is no longer saved in NetworkManager (user forgot it), clear preferred setting
+            self._params.put("WifiFavoriteSSID", "")
+            cloudlog.info(f"Cleared preferred network '{current_favorite}' - network no longer saved in NetworkManager")
+      except Exception as e:
+        cloudlog.debug(f"Error checking preferred network: {e}")
         pass
 
     if self._wifi_manager.is_tethering_active() or self._wifi_manager.ipv4_address == "":

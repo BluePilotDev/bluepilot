@@ -251,9 +251,10 @@ class AlertRenderer(Widget):
     pill_width = min(text_width + 2 * PILL_PADDING_H, available_width)
 
     # Position: right-aligned, between center and wheel
-    # Move 7% further to the right (toward center) by increasing spacing from wheel
-    pill_x = center_x + (wheel_x - center_x) / 2 - pill_width / 2
-    pill_y = rect.y + PILL_TOP_MARGIN
+    # Move 7% further to the right (toward center) by increasing spacing from wheel, plus 10px right
+    pill_x = center_x + (wheel_x - center_x) / 2 - pill_width / 2 + 10
+    # Vertical center aligns with current speed (header row)
+    pill_y = rect.y + UI_CONFIG.header_align_center_y - pill_height / 2
 
     return rl.Rectangle(pill_x, pill_y, pill_width, pill_height)
 

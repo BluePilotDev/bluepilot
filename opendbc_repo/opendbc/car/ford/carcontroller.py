@@ -1,5 +1,6 @@
 import math
 import cereal.messaging as messaging
+from cereal import log
 import numpy as np
 from numpy import clip, interp
 from collections import deque
@@ -13,12 +14,23 @@ from opendbc.car.ford.values import CarControllerParams, FordFlags, CAR
 from opendbc.car.interfaces import CarControllerBase, V_CRUISE_MAX
 from selfdrive.modeld.constants import ModelConstants  # for calculations
 from common.pid import PIDController # PID control of lateral
-from opendbc.car.ford.helpers import compute_dm_msg_values, actuators_calc
+from opendbc.car.ford.helpers import compute_dm_msg_values
 from openpilot.common.params import Params
 #from opendbc.sunnypilot.car.ford.icbm import IntelligentCruiseButtonManagementInterface
 
 LongCtrlState = structs.CarControl.Actuators.LongControlState
 VisualAlert = structs.CarControl.HUDControl.VisualAlert
+
+
+def _get_T_FOLLOW(personality):
+  """Match long_mpc.get_T_FOLLOW: follow time (s) from driving personality (relaxed/standard/aggressive)."""
+  if personality == log.LongitudinalPersonality.relaxed:
+    return 1.75
+  if personality == log.LongitudinalPersonality.standard:
+    return 1.45
+  if personality == log.LongitudinalPersonality.aggressive:
+    return 1.25
+  return 1.45  # default standard if unknown
 
 def index_function(idx, max_val=192, max_idx=32):
   return (max_val) * ((idx/max_idx)**2)
@@ -101,6 +113,7 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
     self.apply_curvature_last = 0
     self.accel = 0.0
     self.gas = 0.0
+    self.accel_pred = -5.0  # AccPrpl_A_Pred: safe inactive until we send; avoids cruise fault on crank
     self.brake_request = False
     self.main_on_last = False
     self.lkas_enabled_last = False
@@ -116,25 +129,16 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
     self.last_button_frame = 0  # Track last ICBM button press frame
     self.lateralUncertainty = 0.0
 
-    # Longitudinal: hysteresis for brake/precharge to avoid binary feel and gas+brake at once
-    self.brake_actuate_last = 0
-    self.precharge_actuate_last = 0
-    self.precharge_actuate_ts = 0
-    self.brake_actuator_activate = -0.14   # accel threshold to activate brake
-    self.brake_actuator_release_delta = 0.08  # hysteresis gap to release brake
-    self.precharge_actuator_target_delta = 0.02  # precharge engages slightly before brake
     self.target_speed_multiplier = 1.0
-    # Brake/gas cooldown: don't re-apply brake or gas within this many seconds after releasing (only when TTC >= MIN_TTC_FOR_SMOOTHING)
-    self._long_brake_sent_last = False
-    self._long_gas_sent_last = False
-    self._long_brake_release_ts = 0.0
-    self._long_gas_release_ts = 0.0
 
     ################################## lateral control parameters ##############################################
 
     # Toggles
     self.enable_human_turn_detection = True
     self.enable_lane_positioning = True
+    self.bp_BRAKE_ACTIVATE = -0.14
+    self.bp_PRECHARGE_ACTIVATE = -0.08
+    self.bp_MIN_HIGHWAY_ACCEL = -0.1   # when above target_TTC_high but model wants brake: coast
 
     # Variables to initialize (these get updated every scan as part of the control code)
     self.precision_type = 1  # precise or comfort
@@ -151,8 +155,20 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
     self.disable_BP_lat_UI = False   # updated from UI: disable BP lateral control
     self.disable_BP_long_UI = False  # updated from UI: bypass BP longitudinal (use stock logic)
     self.anti_overshoot_curvature_last = 0.0 # initialize anti_overshoot_curvature_last
+    self._bp_long_active_last = False  # True if we sent BP long values last frame (for clean transition off BP long)
+    self.bp_gas_last = 0.0
+    self.bp_accel_last = 0.0
 
-    # Curvature variables
+    # Long Control Variables
+    self.MAX_URBAN_SPEED_MPH = 45.0
+    self.following_gas_ROC = 0.05 # amount that gas can change per scan when in following mode
+    self.following_accel_ROC = 0.025  # amount that accel can change per scan when in following mode
+    self.brake_actuate_target = -0.12 # at what accel limit do we engage brakes
+    self.brake_actuate_release = -0.04 # at what accel limit do we release brakes
+    self.precharge_actuate_target = -0.08 # at what accel limit do we engage precharge
+    self.precharge_actuate_release = -0.04 # at what accel limit do we release precharge
+
+    # # Curvature variables
     self.curvature_lookup_time = 0.42 #from lagd
     self.lane_change_factor_bp = [4.4, 40.23] # what speed to adjust lane_change_factor
     self.lane_change_factor_low = 0.95 # lane_change_factor at 4.4 m/s
@@ -273,21 +289,17 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
     self.enable_lanefull_mode = self.params.get_bool("enable_lane_full_mode")
     self.custom_profile = int(self.params.get("custom_profile", return_default=True))
     self.LC_PID_gain_UI = float(self.params.get("LC_PID_gain_UI", return_default=True))
-    # Ford long coasting by TTC (seconds): no coast below min, full coast above max (UI: Bluepilot menu)
+    # Ford long: rate-of-change limits when following a lead (gas and accel per scan)
     try:
-      self.min_coasting_ttc = float(self.params.get("MIN_COASTING_TTC", return_default=True))
+      self.following_gas_ROC = float(self.params.get("FordFollowingGasROC", return_default=True))
     except (TypeError, ValueError):
-      self.min_coasting_ttc = 10.0
+      self.following_gas_ROC = 0.05
+    self.following_gas_ROC = float(np.clip(self.following_gas_ROC, 0.01, 0.5))
     try:
-      self.max_coasting_ttc = float(self.params.get("MAX_COASTING_TTC", return_default=True))
+      self.following_accel_ROC = float(self.params.get("FordFollowingAccelROC", return_default=True))
     except (TypeError, ValueError):
-      self.max_coasting_ttc = 20.0
-    # Brake/gas cooldown (s): wait this long after releasing before re-applying (1–10 s, TICI UI)
-    try:
-      self.long_brake_gas_cooldown_sec = float(self.params.get("FordLongBrakeGasCooldown", return_default=True))
-    except (TypeError, ValueError):
-      self.long_brake_gas_cooldown_sec = 3.0
-    self.long_brake_gas_cooldown_sec = float(np.clip(self.long_brake_gas_cooldown_sec, 1.0, 10.0))
+      self.following_accel_ROC = 0.025
+    self.following_accel_ROC = float(np.clip(self.following_accel_ROC, 0.005, 0.2))
     self.disable_BP_long_UI = self.params.get_bool("disable_BP_long_UI")
 
   def handle_post_lane_change_transition(self, path_angle, path_offset, desired_curvature_rate):
@@ -374,6 +386,8 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
     actuators = CC.actuators
     hud_control = CC.hudControl
     main_on = CS.out.cruiseState.available
+    gasPressed = CS.out.gasPressed
+    brakePressed = CS.out.brakePressed
     # if self.fordVariables is None:
       # act = actuators.as_builder()
       # self.fordVariables = act.fordVariables
@@ -772,130 +786,183 @@ class CarController(CarControllerBase): #, IntelligentCruiseButtonManagementInte
 
     ### longitudinal control ###
     # send acc msg at 50Hz
+    v_ego_mph = CS.out.vEgo * 2.23694  # m/s to mph
+
     if self.CP.openpilotLongitudinalControl and (self.frame % CarControllerParams.ACC_CONTROL_STEP) == 0:
+      # First calcualte the stock logic's accel, gas, and brake request
+      op_accel = actuators.accel
+      if CC.longActive:
+        op_accel = apply_creep_compensation(op_accel, CS.out.vEgo)
+        op_accel = max(op_accel, self.accel - (3.5 * CarControllerParams.ACC_CONTROL_STEP * DT_CTRL))
+      op_accel = float(np.clip(op_accel, CarControllerParams.ACCEL_MIN, CarControllerParams.ACCEL_MAX))
+
+      op_gas = op_accel
+      if not CC.longActive or op_gas < CarControllerParams.MIN_GAS:
+        op_gas = CarControllerParams.INACTIVE_GAS
+
+      # Pitch-compensated brake request (stock style)
+      accel_due_to_pitch = 0.0
+      orientation_ned = getattr(CC, "orientationNED", None)
+      if orientation_ned is not None and len(orientation_ned) == 3:
+        accel_due_to_pitch = math.sin(orientation_ned[1]) * ACCELERATION_DUE_TO_GRAVITY
+      accel_pitch_compensated = op_accel + accel_due_to_pitch
+      if accel_pitch_compensated > 0.3 or not CC.longActive:
+        op_brake_actuate = False
+      elif accel_pitch_compensated < 0.0:
+        op_brake_actuate = True
+      else:
+        op_brake_actuate = False
+
+      stopping = CC.actuators.longControlState == LongCtrlState.stopping
+      target_speed = float(np.clip(actuators.speed * self.target_speed_multiplier, 0, V_CRUISE_MAX))
+      if not CC.longActive and getattr(hud_control, "setSpeed", None) is not None:
+        target_speed = hud_control.setSpeed
+
+      # TODO return to this signal later, it might help with highway control, but sending values ford doesn't like causes ACC to cancel.
+      self.accel_pred = -5.0  # same as BluePilot branch until safe logic is confirmed
+
+      # BluePilot longitudinal: gas limits when following + rate-limited accel/brake to avoid stomping.
       if not self.disable_BP_long_UI:
-        # BluePilot longitudinal: TTC-based coasting, actuators_calc hysteresis, brake/gas cooldown
-        # Time-to-collision (TTC): only brake when there is collision risk. When not closing, coast until speed matches lead.
-        # TTC = dRel / (-vRel) when vRel < 0 (closing). No precomputed TTC in radar msg; we compute it.
-        ttc_sec = 10.0   # set the default to min coasting and applying brake
+
+        # Lead time (s) and lead state
+        v_ego = max(CS.out.vEgo, 0.5)
+        lead_time_sec = 999.0  # no lead: treat as far
+        lead = None
+        v_rel = 0.0
+        v_lead = 0.0
         if self.sm.valid.get('radarState', False):
           rs = self.sm['radarState']
           lead = getattr(rs, 'leadOne', None)
           if lead and getattr(lead, 'status', False):
             d_rel = float(getattr(lead, 'dRel', 0))
             v_rel = float(getattr(lead, 'vRel', 0))
-            if d_rel > 0 and v_rel < -0.5:   # closing (we're faster than lead)
+            v_lead = float(getattr(lead, 'vLead', 0))  # m/s; schema is vLead (camelCase)
+            if d_rel > 0:
+              lead_time_sec = d_rel / v_ego
+        lead_time_sec = float(np.clip(lead_time_sec, 0.0, 999.0))
+        v_lead_mph = v_lead * 2.23694  # for apply_bp_long: only optimize when lead > 40 mph (don't coast into traffic jam)
+
+        ttc_sec = 120.0
+        if self.sm.valid.get('radarState', False):
+          rs = self.sm['radarState']
+          lead = getattr(rs, 'leadOne', None)
+          if lead and getattr(lead, 'status', False):
+            d_rel = float(getattr(lead, 'dRel', 0))
+            v_rel = float(getattr(lead, 'vRel', 0))
+            if d_rel > 0 and v_rel < 0:
               ttc_sec = d_rel / (-v_rel)
-            # else: not closing (v_rel >= 0) or too close -> keep ttc_sec large so we coast
-        ttc_sec = float(np.clip(ttc_sec, 0.2, 60.0))
+            else:
+              ttc_sec = 60.0
+        ttc_sec = float(np.clip(ttc_sec, 0.2, 120.0))
 
-        # Below this TTC we never modify braking: always obey model (no coasting band, no brake/gas cooldown).
-        MIN_TTC_FOR_SMOOTHING = 8.0
-        use_smoothing = ttc_sec >= MIN_TTC_FOR_SMOOTHING
+        # Defaults: pass through op_* when no lead or no mode; brake/precharge off until thresholds
+        gaining = False
+        pacing = False
+        trailing = False
+        max_follow_gas = op_gas
+        min_follow_gas = op_gas
+        max_follow_accel = op_accel
+        min_follow_accel = op_accel
+        bp_brake_actuate = False
+        bp_precharge_actuate = False
 
-        # Dynamic coasting by TTC (only when use_smoothing). Below MIN_TTC_FOR_SMOOTHING use MIN_GAS (no coasting band).
-        min_ttc = min(self.min_coasting_ttc, self.max_coasting_ttc)
-        max_ttc = max(self.min_coasting_ttc, self.max_coasting_ttc)
-        min_gas_close = CarControllerParams.MIN_GAS
-        min_gas_far = 0.0   # cap at 0 so positive accel always gets gas (no pulsing to maintain speed)
-        if use_smoothing:
-          dynamic_min_gas = float(np.interp(ttc_sec, [min_ttc, max_ttc], [min_gas_close, min_gas_far]))
+        # Gaining on lead, pacing, or trailing away
+        if lead:
+          if v_rel < -0.1:
+            gaining = True
+          elif v_rel > 0.1:
+            trailing = True
+          else:
+            pacing = True
+
+        # limits when gaining
+        if gaining:
+          if lead_time_sec < 2.5:
+              max_follow_gas = 0.0 # if we are within 2.5 seconds and gaining, why press the gas?
+              min_follow_gas = 0.0
+          else:
+             max_follow_gas = op_gas
+             min_follow_gas = op_gas
+          max_follow_accel = op_accel
+          min_follow_accel = op_accel # following braking for our primary target
+
+
+        # limits when pacing
+        if pacing:
+          max_follow_gas = 0.2 + accel_due_to_pitch # don't get too happy with the gas when pacing.
+          min_follow_gas = 0.0
+          max_follow_accel = op_accel
+          min_follow_accel = op_accel # we will always target op_accel for braking
+
+        # limits when trailing
+        if trailing:
+          max_follow_gas = op_gas
+          min_follow_gas = op_gas
+          max_follow_accel = op_accel
+          min_follow_accel = op_accel
+
+        # apply our bp gas and accel targets
+        bp_gas = clip(op_gas, min_follow_gas, max_follow_gas)
+        bp_accel = clip(op_accel, min_follow_accel, max_follow_accel)
+
+        # now let's apply some rate limits, to keep the places where we choose op_accel or op_gas from moving too fast
+        # but only apply the limits if there is no imminent chance of a collision
+        UI_ROC_MODIFIER = 500 # to keep UI variables a reasonable number, divide them in carcontroller
+        if ttc_sec > 8.0 and lead_time_sec > 0.5:
+          bp_gas = clip(bp_gas, self.bp_gas_last - self.following_gas_ROC/UI_ROC_MODIFIER, self.bp_gas_last + self.following_gas_ROC/UI_ROC_MODIFIER)
+          bp_accel = clip(bp_accel, self.bp_accel_last - self.following_accel_ROC/UI_ROC_MODIFIER, self.bp_accel_last + self.following_accel_ROC/UI_ROC_MODIFIER)
+
+        # Set brake_actuate and precharge_actuate flags (initialized False above)
+        if bp_accel < self.brake_actuate_target:
+          bp_brake_actuate = True
+        if bp_accel > self.brake_actuate_release:
+          bp_brake_actuate = False
+        if bp_accel < self.precharge_actuate_target:
+          bp_precharge_actuate = True
+        if bp_accel > self.precharge_actuate_release:
+          bp_precharge_actuate = False
+
+        # Determine if we will use bp smoothing
+        gasPressed = CS.out.gasPressed
+        brakePressed = CS.out.brakePressed
+        # When we have a lead, require lead speed > 40 mph so we don't coast into a traffic jam; when no lead, allow BP long
+        apply_bp_long = (self.disable_BP_long_UI == False) and (v_ego_mph > self.MAX_URBAN_SPEED_MPH) and (gasPressed == False) and (brakePressed == False) and (lead is None or v_lead_mph > 40.0)
+
+        if apply_bp_long:
+          accel = bp_accel
+          gas = bp_gas
+          brake_actuate = bp_brake_actuate
+          precharge_actuate = bp_precharge_actuate
         else:
-          dynamic_min_gas = min_gas_close  # no coasting band; obey model
+          accel = op_accel
+          gas = op_gas
+          brake_actuate = op_brake_actuate
+          precharge_actuate = op_brake_actuate
 
-        # Single accel path (like old logic): one clipped value for both gas and brake
-        accel = actuators.accel
-        if CC.longActive:
-          accel = apply_creep_compensation(accel, CS.out.vEgo)
-          # Rate limit brake request to reduce jerk
-          accel = max(accel, self.accel - (3.5 * CarControllerParams.ACC_CONTROL_STEP * DT_CTRL))
-        accel = float(np.clip(accel, CarControllerParams.ACCEL_MIN, CarControllerParams.ACCEL_MAX))
-
-        gas = accel
-        if not CC.longActive or gas < dynamic_min_gas:
-          gas = CarControllerParams.INACTIVE_GAS
-
-        # Hysteresis for precharge/brake so we don't chatter and we get smooth coast -> brake
-        precharge_actuate, brake_actuate = actuators_calc(self, accel)
-
-        # Never apply gas and brake at the same time: when braking, send no gas
-        if brake_actuate:
-          gas = CarControllerParams.INACTIVE_GAS
-
-        # When TTC >= 8s: cooldown hysteresis – don't re-apply brake or gas within cooldown_sec after releasing.
-        # Long press of either is OK; only the re-application after release is delayed.
-        if use_smoothing:
-          ts = self.frame * DT_CTRL
-          cooldown = self.long_brake_gas_cooldown_sec
-          want_brake = brake_actuate
-          want_gas = gas > CarControllerParams.INACTIVE_GAS
-          can_brake = want_brake and (self._long_brake_sent_last or (ts - self._long_brake_release_ts >= cooldown))
-          can_gas = want_gas and (self._long_gas_sent_last or (ts - self._long_gas_release_ts >= cooldown))
-          if want_brake and not can_brake:
-            accel = 0.0
-            gas = CarControllerParams.INACTIVE_GAS
-            brake_actuate = 0
-            precharge_actuate = 0
-          if want_gas and not can_gas:
-            gas = CarControllerParams.INACTIVE_GAS
-          # Update release timestamps when we transition from on to off
-          if self._long_brake_sent_last and not brake_actuate:
-            self._long_brake_release_ts = ts
-          if self._long_gas_sent_last and (gas <= CarControllerParams.INACTIVE_GAS):
-            self._long_gas_release_ts = ts
-          self._long_brake_sent_last = bool(brake_actuate)
-          self._long_gas_sent_last = (gas > CarControllerParams.INACTIVE_GAS)
-        else:
-          self._long_brake_sent_last = bool(brake_actuate)
-          self._long_gas_sent_last = (gas > CarControllerParams.INACTIVE_GAS)
-
-        stopping = CC.actuators.longControlState == LongCtrlState.stopping
-        target_speed = float(np.clip(actuators.speed * self.target_speed_multiplier, 0, V_CRUISE_MAX))
-        if not CC.longActive and getattr(hud_control, "setSpeed", None) is not None:
-          target_speed = hud_control.setSpeed
-
-        can_sends.append(fordcan.create_acc_msg(
-          self.packer, self.CAN, CC.longActive, gas, accel, stopping,
-          brake_actuate, precharge_actuate, v_ego_kph=target_speed
-        ))
+        self.bp_gas_last = bp_gas
+        self.bp_accel_last = bp_accel
+        bp_long_used = apply_bp_long
       else:
-        # Stock / bypass BP long: simple logic, no TTC, no actuators_calc, no cooldown (like upstream)
-        accel = actuators.accel
-        if CC.longActive:
-          accel = apply_creep_compensation(accel, CS.out.vEgo)
-          accel = max(accel, self.accel - (3.5 * CarControllerParams.ACC_CONTROL_STEP * DT_CTRL))
-        accel = float(np.clip(accel, CarControllerParams.ACCEL_MIN, CarControllerParams.ACCEL_MAX))
+        accel = op_accel
+        gas = op_gas
+        brake_actuate = op_brake_actuate
+        precharge_actuate = op_brake_actuate
+        bp_long_used = False
 
-        gas = accel
-        if not CC.longActive or gas < CarControllerParams.MIN_GAS:
-          gas = CarControllerParams.INACTIVE_GAS
+      # Clip to ford.h ACCDATA safety limits
+      accel = float(clip(accel, CarControllerParams.ACCEL_MIN, CarControllerParams.ACCEL_MAX))
+      if gas != CarControllerParams.INACTIVE_GAS:
+        gas = float(clip(gas, CarControllerParams.MIN_GAS, CarControllerParams.ACCEL_MAX))
+      accel_pred_send = CarControllerParams.INACTIVE_GAS
 
-        # Pitch-compensated brake request (stock style)
-        accel_due_to_pitch = 0.0
-        orientation_ned = getattr(CC, "orientationNED", None)
-        if orientation_ned is not None and len(orientation_ned) == 3:
-          accel_due_to_pitch = math.sin(orientation_ned[1]) * ACCELERATION_DUE_TO_GRAVITY
-        accel_pitch_compensated = accel + accel_due_to_pitch
-        if accel_pitch_compensated > 0.3 or not CC.longActive:
-          brake_request = False
-        elif accel_pitch_compensated < 0.0:
-          brake_request = True
-        else:
-          brake_request = False
-
-        stopping = CC.actuators.longControlState == LongCtrlState.stopping
-        target_speed = float(np.clip(actuators.speed * self.target_speed_multiplier, 0, V_CRUISE_MAX))
-        if not CC.longActive and getattr(hud_control, "setSpeed", None) is not None:
-          target_speed = hud_control.setSpeed
-
-        # Stock uses single brake_request for both precharge and brake bits
-        can_sends.append(fordcan.create_acc_msg(
-          self.packer, self.CAN, CC.longActive, gas, accel, stopping,
-          brake_request, brake_request, v_ego_kph=target_speed
-        ))
+      can_sends.append(fordcan.create_acc_msg(
+        self.packer, self.CAN, CC.longActive, gas, accel, accel_pred_send, stopping,
+        brake_actuate, precharge_actuate, v_ego_kph=target_speed
+      ))
 
       self.accel = accel
       self.gas = gas
+      self._bp_long_active_last = bp_long_used
 
     ### ui ###
     send_ui = (self.main_on_last != main_on) or (self.lkas_enabled_last != CC.latActive) or (self.steer_alert_last != steer_alert)

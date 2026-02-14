@@ -141,15 +141,9 @@ class ChevronMetrics:
       unit = "km/h" if ui_state.is_metric else "mph"
       text_lines.append(f"{val:.0f} {unit}")
       
-      # Time to collision (TTC); when not closing show "---". Temporary: was lead time (d_rel/v_ego) for tuning.
-      # Lead time (comment out TTC block below and uncomment this to restore):
-      # val = (d_rel / v_ego) if (d_rel > 0 and v_ego > 0) else 0.0
-      # ttc_text = f"{val:.1f} s" if (0 < val < 200) else "---"
-      if d_rel > 0 and v_rel < -0.5:
-        val = d_rel / (-v_rel)
-        ttc_text = f"{val:.1f} s" if (0 < val < 200) else "---"
-      else:
-        ttc_text = "---"
+      # Lead time (s): d_rel / v_ego, matches MPC / Ford long tuning
+      val = (d_rel / v_ego) if (d_rel > 0 and v_ego > 0) else 0.0
+      ttc_text = f"{val:.1f} s" if (0 < val < 200) else "---"
       text_lines.append(ttc_text)
     else:
       # When Ford overlay is disabled, respect the chevron_metrics setting
@@ -172,16 +166,10 @@ class ChevronMetrics:
         unit = "km/h" if ui_state.is_metric else "mph"
         text_lines.append(f"{val:.0f} {unit}")
 
-      # Time to collision (TTC); when not closing show "---". Temporary: was lead time (d_rel/v_ego) for tuning.
+      # Lead time (s): d_rel / v_ego, matches MPC / Ford long tuning
       if show_ttc:
-        # Lead time (comment out TTC block below and uncomment this to restore):
-        # val = (d_rel / v_ego) if (d_rel > 0 and v_ego > 0) else 0.0
-        # ttc_text = f"{val:.1f} s" if (0 < val < 200) else "---"
-        if d_rel > 0 and v_rel < -0.5:
-          val = d_rel / (-v_rel)
-          ttc_text = f"{val:.1f} s" if (0 < val < 200) else "---"
-        else:
-          ttc_text = "---"
+        val = (d_rel / v_ego) if (d_rel > 0 and v_ego > 0) else 0.0
+        ttc_text = f"{val:.1f} s" if (0 < val < 200) else "---"
         text_lines.append(ttc_text)
 
     return text_lines
