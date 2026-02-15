@@ -16,7 +16,7 @@ from selfdrive.modeld.constants import ModelConstants  # for calculations
 from common.pid import PIDController # PID control of lateral
 from opendbc.car.ford.helpers import compute_dm_msg_values
 from openpilot.common.params import Params
-from opendbc.sunnypilot.car.ford.icbm import IntelligentCruiseButtonManagementInterface
+# from opendbc.sunnypilot.car.ford.icbm import IntelligentCruiseButtonManagementInterface
 
 LongCtrlState = structs.CarControl.Actuators.LongControlState
 VisualAlert = structs.CarControl.HUDControl.VisualAlert
@@ -99,10 +99,11 @@ def apply_creep_compensation(accel: float, v_ego: float) -> float:
   return float(accel)
 
 
-class CarController(CarControllerBase, IntelligentCruiseButtonManagementInterface):
+# class CarController(CarControllerBase, IntelligentCruiseButtonManagementInterface):
+class CarController(CarControllerBase):
   def __init__(self, dbc_names, CP, CP_SP):
     CarControllerBase.__init__(self, dbc_names, CP, CP_SP)
-    IntelligentCruiseButtonManagementInterface.__init__(self, CP, CP_SP)
+    # IntelligentCruiseButtonManagementInterface.__init__(self, CP, CP_SP)
 
     self.params = Params()
 
@@ -411,10 +412,10 @@ class CarController(CarControllerBase, IntelligentCruiseButtonManagementInterfac
       can_sends.append(fordcan.create_button_msg(self.packer, self.CAN.camera, CS.buttons_stock_values, tja_toggle=True))
 
     # Intelligent Cruise Button Management (ICBM)
-    icbm_can_sends, self.last_button_frame = IntelligentCruiseButtonManagementInterface.update(
-      self, CC_SP, CS, self.packer, self.CAN, self.frame, self.last_button_frame
-    )
-    can_sends.extend(icbm_can_sends)
+    # icbm_can_sends, self.last_button_frame = IntelligentCruiseButtonManagementInterface.update(
+      # self, CC_SP, CS, self.packer, self.CAN, self.frame, self.last_button_frame
+    # )
+    # can_sends.extend(icbm_can_sends)
 
     ### lateral control ###
 
