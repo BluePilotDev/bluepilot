@@ -158,7 +158,7 @@ class AugmentedRoadView(CameraView):
     self._driver_state_renderer = DriverStateRenderer()
     self._confidence_ball = ConfidenceBall()
     self._complication = MiciComplication()
-    self._blindspot = Blindspot(125)  # Width of red edge indicator in pixels (half width for MICI's smaller screen)
+    self._blindspot = Blindspot(100)  # Width of red edge indicator in pixels (half width for MICI's smaller screen)
     self._offroad_label = UnifiedLabel("start the car to\nuse sunnypilot", 54, FontWeight.DISPLAY,
                                        text_color=rl.Color(255, 255, 255, int(255 * 0.9)),
                                        alignment=rl.GuiTextAlignment.TEXT_ALIGN_CENTER,
