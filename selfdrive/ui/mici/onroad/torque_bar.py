@@ -163,7 +163,7 @@ class TorqueBar(Widget):
 
     # torque line
     if ui_state.sm['controlsState'].lateralControlState.which() == 'angleState':
-      if ui_state.sm.updated["controllerStateBP"]:
+      if ui_state.sm.valid["controllerStateBP"]:
         ctrlr_state = ui_state.sm['controllerStateBP']
         self._torque_filter.update(min(max(ctrlr_state.lateralUncertainty, -1.2), 1.2))
       else:
