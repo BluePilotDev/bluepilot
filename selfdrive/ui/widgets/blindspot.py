@@ -44,8 +44,8 @@ class Blindspot(Widget):
     current_time = time.monotonic()
     pulse_phase = ((current_time - self._blindspot_pulse_start_time) % PULSE_DURATION) / PULSE_DURATION
 
-    # Gradient opacity: starts at 75% and fades to 0% (fully transparent)
-    EDGE_ALPHA_START = 1,0   # 100% opacity at the edge
+    # Gradient opacity: starts at 100% and fades to 0% (fully transparent)
+    EDGE_ALPHA_START = 1.0   # 100% opacity at the edge
     EDGE_ALPHA_END = 0.0     # 0% opacity at the inside edge (fully transparent)
 
     x = int(rect.x)
