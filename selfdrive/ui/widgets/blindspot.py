@@ -44,9 +44,9 @@ class Blindspot(Widget):
     current_time = time.monotonic()
     pulse_phase = ((current_time - self._blindspot_pulse_start_time) % PULSE_DURATION) / PULSE_DURATION
 
-    # Gradient opacity: starts at 100% and fades to 0% (fully transparent)
+    # Gradient opacity: starts at 100% and fades to 30%
     EDGE_ALPHA_START = 1.0   # 100% opacity at the edge
-    EDGE_ALPHA_END = 0.0     # 0% opacity at the inside edge (fully transparent)
+    EDGE_ALPHA_END = 0.0     # 30% opacity at the inside edge (fully transparent)
 
     x = int(rect.x)
     y = int(rect.y)
@@ -59,8 +59,8 @@ class Blindspot(Widget):
     # Draw left edge red gradient indicator with brightness pulse
     if self._blindspot_left_alpha_filter.x > 0.01:
       filter_alpha = self._blindspot_left_alpha_filter.x
-      edge_alpha = int(255 * EDGE_ALPHA_START * filter_alpha * brightness_pulse)  # Apply brightness pulse
-      inside_alpha = int(255 * EDGE_ALPHA_END * filter_alpha * brightness_pulse)  # Apply brightness pulse
+      edge_alpha = min(255, int(255 * EDGE_ALPHA_START * filter_alpha * brightness_pulse)) # Apply brightness pulse
+      inside_alpha = min(255,int(255 * EDGE_ALPHA_END * filter_alpha * brightness_pulse))  # Apply brightness pulse
       edge_color = rl.Color(255, 0, 0, edge_alpha)
       inside_color = rl.Color(255, 0, 0, inside_alpha)
       rl.draw_rectangle_gradient_h(
