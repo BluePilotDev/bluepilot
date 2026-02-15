@@ -18,11 +18,12 @@ GearShifter = structs.CarState.GearShifter
 TransmissionType = structs.CarParams.TransmissionType
 
 
-class CarState(CarStateBase, MadsCarState, CarStateExt):
+# class CarState(CarStateBase, MadsCarState, CarStateExt):
+class CarState(CarStateBase, MadsCarState):
   def __init__(self, CP, CP_SP):
     CarStateBase.__init__(self, CP, CP_SP)
     MadsCarState.__init__(self, CP, CP_SP)
-    CarStateExt.__init__(self, CP, CP_SP)
+    # CarStateExt.__init__(self, CP, CP_SP)
     can_define = CANDefine(DBC[CP.carFingerprint][Bus.pt])
     self.params = Params()
     # self.ford_can_parser = FordCanParser(CP)
@@ -174,7 +175,7 @@ class CarState(CarStateBase, MadsCarState, CarStateExt):
     self.lkas_status_stock_values = cp_cam.vl["IPMA_Data"]
 
     MadsCarState.update_mads(self, ret, can_parsers)
-    CarStateExt.update(self, ret, ret_sp, can_parsers)
+    # CarStateExt.update(self, ret, ret_sp, can_parsers)
 
     ret.buttonEvents = [
       *create_button_events(self.distance_button, prev_distance_button, {1: ButtonType.gapAdjustCruise}),
