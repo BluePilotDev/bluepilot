@@ -147,7 +147,7 @@ class HudRenderer(Widget):
     # Render powerflow gauge above torque bar
     self._powerflow_gauge.render(rect)
 
-    if ui_state.sm['controlsState'].lateralControlState.which() != 'angleState' or ui_state.sm.updated["controllerStateBP"]:
+    if ui_state.sm['controlsState'].lateralControlState.which() != 'angleState' or ui_state.sm.valid["controllerStateBP"]:
       self._torque_bar.render(rect)
 
     if self.is_cruise_available:
