@@ -1,7 +1,7 @@
 import pyray as rl
 from openpilot.common.params import Params
 from openpilot.selfdrive.ui.mici.onroad.hud_renderer import HudRenderer
-from openpilot.selfdrive.ui.ui_state import ui_state
+from openpilot.selfdrive.ui.ui_state import ui_state, UIStatus
 
 
 class MiciHudRendererBP(HudRenderer):
