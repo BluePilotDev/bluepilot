@@ -2,16 +2,19 @@ import pyray as rl
 from collections.abc import Callable
 
 from openpilot.common.time_helpers import system_time_valid
+from openpilot.common.swaglog import cloudlog
 from openpilot.system.ui.widgets.scroller import Scroller
 from openpilot.selfdrive.ui.mici.widgets.button import BigButton, BigParamControl, BigMultiParamToggle, BigMultiToggle
 from openpilot.system.ui.widgets.label import gui_label, MiciLabel, UnifiedLabel
 from openpilot.selfdrive.ui.bp.mici.widgets.floatbutton import BigParamFloatControl
-from openpilot.selfdrive.ui.mici.widgets.dialog import BigDialogBase
+from openpilot.selfdrive.ui.mici.widgets.dialog import BigDialogBase, BigMultiOptionDialog
 from openpilot.system.ui.lib.application import gui_app, MousePos
+from openpilot.system.ui.lib.wifi_manager import WifiManager, Network
 from openpilot.system.ui.widgets import NavWidget, DialogResult
 from openpilot.selfdrive.ui.layouts.settings.common import restart_needed_callback
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.common.params import Params
+from openpilot.selfdrive.ui.bp.lib.favorite_wifi_manager import FavoriteWifiManager
 from openpilot.selfdrive.ui.bp.mici.widgets.web_server_qr_dialog import WebServerQRDialog
 
 class BluePilotLayoutMici(NavWidget):
@@ -44,6 +47,15 @@ class BluePilotLayoutMici(NavWidget):
     self.disable_BP_lat = BigParamControl("disable BP lateral control", "disable_BP_lat_UI")
     self.disable_BP_long = BigParamControl("bypass BP longitudinal control", "disable_BP_long_UI")
     self.vbatt_pause_charging = BigParamFloatControl("12V battery limit", "vbatt_pause_charging", min=11.0, max=14.0, step=0.1)
+
+    # Preferred WiFi network
+    self._wifi_manager = WifiManager()
+    self._wifi_manager.set_active(False)
+    self._saved_networks: list[Network] = []
+    self._wifi_manager.add_callbacks(networks_updated=self._on_network_updated)
+    self._favorite_wifi_manager = FavoriteWifiManager(self._wifi_manager)
+    self._preferred_network_btn = BigButton("preferred wifi", self._get_preferred_network_display())
+    self._preferred_network_btn.set_click_callback(self._select_preferred_network)
 
     def power_flow_callback(value: str):
       match value:
@@ -85,6 +97,7 @@ class BluePilotLayoutMici(NavWidget):
       self.vbatt_pause_charging,
       self.disable_BP_lat,
       self.disable_BP_long,
+      self._preferred_network_btn,
     ], snap_items=False)
 
     # Toggle lists
@@ -116,8 +129,14 @@ class BluePilotLayoutMici(NavWidget):
     self._scroller.show_event()
     self._update_toggles()
     self._update_buttons()
+    self._wifi_manager.set_active(True)
+
+  def hide_event(self):
+    super().hide_event()
+    self._wifi_manager.set_active(False)
 
   def _render(self, rect: rl.Rectangle):
+    self._wifi_manager.process_callbacks()
     self._scroller.render(rect)
 
   def _show_qr_dialog(self):
@@ -155,6 +174,60 @@ class BluePilotLayoutMici(NavWidget):
 
     # Also update button state
     self._update_buttons()
+
+  # ---- preferred WiFi network ------------------------------------
+
+  def _get_preferred_network_display(self) -> str:
+    try:
+      value = self._params.get("WifiFavoriteSSID")
+      if value:
+        ssid = value.decode("utf-8", errors="replace").strip("\x00") if isinstance(value, bytes) else str(value).strip("\x00")
+        if ssid:
+          return ssid[:17] + "..." if len(ssid) > 20 else ssid
+    except Exception:
+      pass
+    return "none"
+
+  def _on_network_updated(self, networks: list[Network]):
+    self._saved_networks = [n for n in networks if n.is_saved]
+    self._preferred_network_btn.set_enabled(len(self._saved_networks) > 0)
+    self._preferred_network_btn.set_value(self._get_preferred_network_display())
+
+    # Clear preferred network if it was forgotten from NetworkManager
+    try:
+      value = self._params.get("WifiFavoriteSSID")
+      current = ""
+      if value:
+        current = value.decode("utf-8", errors="replace").strip("\x00") if isinstance(value, bytes) else str(value).strip("\x00")
+      if current:
+        saved = self._wifi_manager._get_connections()
+        if current not in saved:
+          self._params.put("WifiFavoriteSSID", "")
+          cloudlog.info(f"Cleared preferred network '{current}' - no longer saved in NetworkManager")
+          self._preferred_network_btn.set_value(self._get_preferred_network_display())
+    except Exception as e:
+      cloudlog.debug(f"Error checking preferred network: {e}")
+
+  def _select_preferred_network(self):
+    if not self._saved_networks:
+      return
+
+    current_favorite = self._get_preferred_network_display()
+    options = ["none"] + [n.ssid for n in self._saved_networks]
+    default = current_favorite if current_favorite in options else "none"
+
+    def on_confirm():
+      selection = dlg.get_selected_option()
+      ssid = "" if selection == "none" else selection
+      self._params.put("WifiFavoriteSSID", ssid)
+      self._preferred_network_btn.set_value(self._get_preferred_network_display())
+      if ssid:
+        cloudlog.info(f"Set preferred network: {ssid}")
+      else:
+        cloudlog.info("Cleared preferred network")
+
+    dlg = BigMultiOptionDialog(options, default, right_btn="check", right_btn_callback=on_confirm)
+    gui_app.set_modal_overlay(dlg)
 
 # class BigChargingDialog(BigDialogBase):
 #   def __init__(self):

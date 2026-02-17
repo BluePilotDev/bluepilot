@@ -11,6 +11,7 @@ from openpilot.system.ui.lib.application import gui_app
 from openpilot.system.ui.lib.multilang import tr, tr_noop
 from openpilot.system.ui.lib.wifi_manager import WifiManager, Network
 from openpilot.selfdrive.ui.ui_state import ui_state
+from openpilot.selfdrive.ui.bp.lib.favorite_wifi_manager import FavoriteWifiManager
 from openpilot.selfdrive.ui.bp.widgets.web_server_qr_dialog_tici import WebServerQRDialogTici
 from openpilot.selfdrive.ui.bp.widgets.float_control_item import float_control_item
 
@@ -27,7 +28,10 @@ class BluePilotLayout(Widget):
     self._wifi_manager.set_active(False)  # Don't scan unless needed
     self._saved_networks: list[Network] = []
     self._preferred_network_dialog: MultiOptionDialog | None = None
-    
+
+    # Start standalone favorite-network auto-connect thread (runs in background)
+    self._favorite_wifi_manager = FavoriteWifiManager(self._wifi_manager)
+
     # Register callback to update saved networks list
     self._wifi_manager.add_callbacks(networks_updated=self._on_network_updated)
 
