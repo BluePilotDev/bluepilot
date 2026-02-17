@@ -94,7 +94,7 @@ class FavoriteWifiManager:
       cloudlog.debug(f"Favorite network '{favorite_ssid}' is already connected")
       return
 
-    # Connected to something else — try to switch
+    # Connected to something else — only switch if preferred network is in range
     if current_ssid and current_ssid != favorite_ssid:
       favorite_in_scan = False
       with self._wm._lock:
@@ -103,9 +103,15 @@ class FavoriteWifiManager:
             favorite_in_scan = True
             break
 
+      if not favorite_in_scan:
+        # Preferred network not available; stay on current network
+        cloudlog.debug(
+          f"Favorite '{favorite_ssid}' not in range; staying on '{current_ssid}'"
+        )
+        return
+
       cloudlog.info(
-        f"Connected to '{current_ssid}', switching to favorite "
-        f"'{favorite_ssid}' (in scan: {favorite_in_scan})..."
+        f"Connected to '{current_ssid}', switching to favorite '{favorite_ssid}'..."
       )
       try:
         self._wm._deactivate_connection(current_ssid)
