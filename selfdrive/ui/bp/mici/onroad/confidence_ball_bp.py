@@ -1,3 +1,4 @@
+import math
 import pyray as rl
 from openpilot.selfdrive.ui.mici.onroad.confidence_ball import ConfidenceBall
 from openpilot.selfdrive.ui.ui_state import ui_state, UIStatus
@@ -35,12 +36,18 @@ class ConfidenceBallBP(ConfidenceBall):
           transparent   # top-right
       )
 
-  def get_animate_status_probs(self):
-    if ui_state.status == UIStatus.LAT_ONLY:
-      return [p * p for p in ui_state.sm['modelV2'].meta.disengagePredictions.steerOverrideProbs]
+  def _update_state(self):
+    if self._demo:
+      return
 
-    # UIStatus.LONG_ONLY
-    return [p * p for p in ui_state.sm['modelV2'].meta.disengagePredictions.brakeDisengageProbs]
+    # animate status dot in from bottom
+    if ui_state.status == UIStatus.DISENGAGED:
+      self._confidence_filter.update(-0.5)
+    elif ui_state.status in (UIStatus.LAT_ONLY, UIStatus.LONG_ONLY):
+      self._confidence_filter.update(math.pow(1 - max(self.get_animate_status_probs() or [1]),2))
+    else:
+      self._confidence_filter.update((1 - max(ui_state.sm['modelV2'].meta.disengagePredictions.brakeDisengageProbs or [1])) *
+                                                        (1 - max(ui_state.sm['modelV2'].meta.disengagePredictions.steerOverrideProbs or [1])))
 
   def _render(self, _):
     bar_width = self._width
