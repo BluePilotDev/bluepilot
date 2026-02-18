@@ -171,7 +171,6 @@ class WifiManager:
     self._lock = threading.Lock()
     self._scan_thread = threading.Thread(target=self._network_scanner, daemon=True)
     self._state_thread = threading.Thread(target=self._monitor_state, daemon=True)
-    self._favorite_check_thread = threading.Thread(target=self._check_favorite_network, daemon=True)
     self._initialize()
     atexit.register(self.stop)
 
@@ -181,7 +180,6 @@ class WifiManager:
 
       self._scan_thread.start()
       self._state_thread.start()
-      self._favorite_check_thread.start()
 
       if Params is not None and self._tethering_ssid not in self._get_connections():
         self._add_tethering_connection()
@@ -633,7 +631,7 @@ class WifiManager:
       known_connections = self._get_connections()
       networks = [Network.from_dbus(ssid, ap_list, ssid in known_connections) for ssid, ap_list in aps.items()]
       # sort with quantized strength to reduce jumping
-      networks.sort(key=lambda n: (-n.is_connected, -round(n.strength / 100 * 4), n.ssid.lower()))
+      networks.sort(key=lambda n: (-n.is_connected, -round(n.strength / 100 * 2), n.ssid.lower()))
       self._networks = networks
 
       self._update_ipv4_address()
@@ -662,111 +660,6 @@ class WifiManager:
             if 'address' in entry:
               self._ipv4_address = entry['address'][1]
               return
-
-  def _check_favorite_network(self):
-    """Background thread that checks every 30 seconds for favorite network and auto-connects"""
-    FAVORITE_CHECK_INTERVAL = 30.0  # Check every 30 seconds
-    INITIAL_CHECK_DELAY = 5.0  # Wait 5 seconds after startup for networks to be scanned
-    last_check_time = 0.0
-    startup_time = time.monotonic()
-    initial_check_done = False
-    
-    while not self._exit:
-      if not self._active:
-        time.sleep(1)
-        continue
-      
-      current_time = time.monotonic()
-      
-      # Do an initial check after a short delay on startup
-      if not initial_check_done:
-        if current_time - startup_time < INITIAL_CHECK_DELAY:
-          time.sleep(1)
-          continue
-        initial_check_done = True
-        # Force immediate check on startup
-        last_check_time = 0.0
-        # Don't trigger scan here - let scanner thread handle it naturally
-      
-      # Regular interval checks after initial check
-      if initial_check_done and current_time - last_check_time < FAVORITE_CHECK_INTERVAL:
-        time.sleep(1)
-        continue
-      
-      last_check_time = current_time
-      
-      try:
-        if Params is None:
-          continue
-        
-        params = Params()
-        favorite_value = params.get("WifiFavoriteSSID")
-        favorite_ssid = ""
-        if favorite_value:
-          if isinstance(favorite_value, bytes):
-            favorite_ssid = favorite_value.decode('utf-8', errors='replace').strip('\x00')
-          else:
-            favorite_ssid = str(favorite_value).strip('\x00')
-        
-        if not favorite_ssid:
-          # No favorite set, skip
-          continue
-        
-        # Verify favorite network is saved in NetworkManager
-        saved_connections = self._get_connections()
-        if favorite_ssid not in saved_connections:
-          cloudlog.warning(f"Favorite network '{favorite_ssid}' is not saved in NetworkManager, cannot auto-connect")
-          continue
-        
-        # Check NetworkManager's active connections directly (more reliable than scan results)
-        # This works even when scanning is paused
-        active_connections = self._get_active_connections()
-        current_connected_ssid = None
-        for conn_path in active_connections:
-          try:
-            conn_addr = DBusAddress(conn_path, bus_name=NM, interface=NM_ACTIVE_CONNECTION_IFACE)
-            conn_type = self._router_main.send_and_get_reply(Properties(conn_addr).get('Type')).body[0][1]
-            if conn_type == '802-11-wireless':
-              specific_obj_path = self._router_main.send_and_get_reply(Properties(conn_addr).get('SpecificObject')).body[0][1]
-              if specific_obj_path != "/":
-                ap_addr = DBusAddress(specific_obj_path, bus_name=NM, interface=NM_ACCESS_POINT_IFACE)
-                ap_ssid_bytes = self._router_main.send_and_get_reply(Properties(ap_addr).get('Ssid')).body[0][1]
-                current_connected_ssid = bytes(ap_ssid_bytes).decode("utf-8", "replace")
-                break
-          except Exception:
-            continue
-        
-        # If favorite is already connected, nothing to do
-        if current_connected_ssid == favorite_ssid:
-          cloudlog.debug(f"Favorite network '{favorite_ssid}' is already connected")
-          continue
-        
-        # If we're connected to something other than the favorite, try to switch
-        if current_connected_ssid and current_connected_ssid != favorite_ssid:
-          # Check if favorite is in scan results (optional - helps but not required)
-          favorite_in_scan = False
-          with self._lock:
-            for network in self._networks:
-              if network.ssid == favorite_ssid:
-                favorite_in_scan = True
-                break
-          
-          # Try to activate favorite network (NetworkManager will handle if it's in range)
-          # We know it's saved, so NetworkManager can attempt to connect
-          cloudlog.info(f"Connected to '{current_connected_ssid}', switching to favorite '{favorite_ssid}' (in scan: {favorite_in_scan})...")
-          try:
-            # Disconnect from current network first
-            self._deactivate_connection(current_connected_ssid)
-            time.sleep(2)
-            # Try to activate favorite network
-            self.activate_connection(favorite_ssid, block=False)
-          except Exception as e:
-            cloudlog.warning(f"Failed to switch to favorite network '{favorite_ssid}': {e}")
-      
-      except Exception as e:
-        cloudlog.exception(f"Error checking favorite network: {e}")
-      
-      time.sleep(1)  # Small sleep to prevent tight loop
 
   def __del__(self):
     self.stop()
