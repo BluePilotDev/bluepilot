@@ -130,10 +130,10 @@ void main()
     }
 
     // Gradient factor
-    float t = clamp(dist / radius, 0.0, 1.0);
+    float t = clamp((uv.y - center.y + radius) / (2.0 * radius), 0.0, 1.0);
 
     // Radial gradient
-    finalColor = mix(topColor, bottomColor, t);
+    finalColor = mix(bottomColor, topColor, t);
 }
 """
 

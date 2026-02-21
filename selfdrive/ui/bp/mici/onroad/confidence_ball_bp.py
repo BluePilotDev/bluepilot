@@ -40,6 +40,10 @@ class ConfidenceBallBP(ConfidenceBall):
     if self._demo:
       return
 
+    #******
+    ui_state.status = UIStatus.LAT_ONLY
+    #******
+
     # animate status dot in from bottom
     if ui_state.status == UIStatus.DISENGAGED:
       self._confidence_filter.update(-0.5)
