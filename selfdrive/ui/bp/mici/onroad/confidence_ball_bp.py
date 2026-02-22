@@ -36,20 +36,10 @@ class ConfidenceBallBP(ConfidenceBall):
           transparent   # top-right
       )
 
-  def _update_state(self):
-    if self._demo:
-      return
-
-    # animate status dot in from bottom
-    if ui_state.status == UIStatus.DISENGAGED:
-      self._confidence_filter.update(-0.5)
-    elif ui_state.status in (UIStatus.LAT_ONLY, UIStatus.LONG_ONLY):
-      self._confidence_filter.update(math.pow(1 - max(self.get_animate_status_probs() or [1]),2))
-    else:
-      self._confidence_filter.update((1 - max(ui_state.sm['modelV2'].meta.disengagePredictions.brakeDisengageProbs or [1])) *
-                                                        (1 - max(ui_state.sm['modelV2'].meta.disengagePredictions.steerOverrideProbs or [1])))
-
   def _render(self, _):
+    print(f"Lat: {ui_state.sm['modelV2'].meta.disengagePredictions.steerOverrideProbs}")
+    print(f"Lng: {ui_state.sm['modelV2'].meta.disengagePredictions.brakeDisengageProbs}")
+
     bar_width = self._width
     x = self.rect.x if not self._align_right else self.rect.x + self.rect.width - bar_width
     content_rect = rl.Rectangle(
