@@ -3,6 +3,8 @@ from openpilot.common.constants import CV
 from openpilot.common.realtime import DT_MDL
 from openpilot.sunnypilot.selfdrive.controls.lib.auto_lane_change import AutoLaneChangeController, AutoLaneChangeMode
 from openpilot.sunnypilot.selfdrive.controls.lib.lane_turn_desire import LaneTurnController
+from openpilot.sunnypilot.selfdrive.controls.lib.blinker_pause_lateral import BlinkerPauseLateral
+from openpilot.common.params import Params
 
 LaneChangeState = log.LaneChangeState
 LaneChangeDirection = log.LaneChangeDirection
@@ -51,6 +53,8 @@ class DesireHelper:
     self.alc = AutoLaneChangeController(self)
     self.lane_turn_controller = LaneTurnController(self)
     self.lane_turn_direction = TurnDirection.none
+    self.blinker_pause_lateral = BlinkerPauseLateral()
+    self.params = Params()
 
   @staticmethod
   def get_lane_change_direction(CS):
@@ -68,7 +72,12 @@ class DesireHelper:
                                                left_blinker=carstate.leftBlinker, right_blinker=carstate.rightBlinker, v_ego=v_ego)
     self.lane_turn_direction = self.lane_turn_controller.get_turn_direction()
 
-    if not lateral_active or self.lane_change_timer > LANE_CHANGE_TIME_MAX or self.alc.lane_change_set_timer == AutoLaneChangeMode.OFF:
+    #BluePilot
+    self.blinker_pause_lateral.enabled = self.params.get_bool("BlinkerPauseLaneChange")
+
+    if (not lateral_active or self.lane_change_timer > LANE_CHANGE_TIME_MAX or
+       self.alc.lane_change_set_timer == AutoLaneChangeMode.OFF or
+       self.blinker_pause_lateral.update(carstate)):
       self.lane_change_state = LaneChangeState.off
       self.lane_change_direction = LaneChangeDirection.none
     else:

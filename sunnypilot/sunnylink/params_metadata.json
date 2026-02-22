@@ -1521,5 +1521,9 @@
     "title": "BluePilot: Preferred WiFi Network",
     "description": "Automatically connect to this WiFi network when available. Select from saved networks, or leave empty to disable auto-connect. The device will check every 30 seconds and connect to this network even if currently connected to another network.",
     "optionsEndpoint": "getSavedWifiNetworks"
+  },
+  "BlinkerPauseLaneChange": {
+    "title": "BluePilot: Disable lane change under certain speed",
+    "description": "Use 'Blinker Min Lateral Control Speed' to specify speed"
   }
 }
