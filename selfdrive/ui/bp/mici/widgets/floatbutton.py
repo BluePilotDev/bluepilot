@@ -1,7 +1,7 @@
 
 import pyray as rl
 from openpilot.selfdrive.ui.bp.mici.widgets.button_bp import BigButtonBP
-from openpilot.selfdrive.ui.mici.widgets.dialog import BigInputDialog
+from openpilot.selfdrive.ui.bp.mici.widgets.big_input_dialog_bp import BigInputDialogBP
 from openpilot.common.params import Params
 from openpilot.system.ui.lib.application import gui_app, MousePos
 
@@ -33,7 +33,7 @@ class BigParamFloatControl(BigButtonBP):
     else:
       message = "enter a numberic value..."
 
-    dlg = BigInputDialog(message, str(self.get_param()),
+    dlg = BigInputDialogBP(message, str(self.get_param()),
                          confirm_callback=self._callback, show_special_keys=True, minimum_length=0)
     gui_app.set_modal_overlay(dlg)
 
