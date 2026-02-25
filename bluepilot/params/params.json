@@ -102,6 +102,14 @@
       "enabled": true
     },
     {
+      "name": "FordPrefHybridGaugeStyle",
+      "default": "flat",
+      "type": "string",
+      "flags": ["PERSISTENT", "BACKUP"],
+      "create_default": true,
+      "enabled": true
+    },
+    {
       "name": "FordPrefHybridBatteryOverlay",
       "default": false,
       "type": "bool",
@@ -297,6 +305,14 @@
       "type": "bool",
       "flags": ["PERSISTENT", "BACKUP"],
       "create_default": false,
+      "enabled": true
+    },
+    {
+      "name": "ShowBlindspotOverlay",
+      "default": true,
+      "type": "bool",
+      "flags": ["PERSISTENT", "BACKUP"],
+      "create_default": true,
       "enabled": true
     },
     {

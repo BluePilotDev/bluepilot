@@ -221,6 +221,7 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
 
     {"DynamicExperimentalControl", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"BlindSpot", {PERSISTENT | BACKUP, BOOL, "0"}},
+    {"ShowBlindspotOverlay", {PERSISTENT | BACKUP, BOOL, "1"}},
 
     // sunnypilot model params
     {"CameraOffset", {PERSISTENT | BACKUP, FLOAT, "0.0"}},
@@ -297,6 +298,7 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"FordPrefHybridBatteryStatus", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"FordPrefHybridPowerFlow", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"FordPrefHybridDriveGaugeSize", {PERSISTENT | BACKUP, INT, "1"}},
+    {"FordPrefHybridGaugeStyle", {PERSISTENT | BACKUP, STRING, "flat"}},
     {"FordPrefHevDataAvailable", {CLEAR_ON_MANAGER_START, BOOL, "0"}},
     {"FordPrefHevBattDataAvailable", {CLEAR_ON_MANAGER_START, BOOL, "0"}},
     {"mici_complication", {PERSISTENT | BACKUP, INT, "1"}},

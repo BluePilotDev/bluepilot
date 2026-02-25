@@ -34,6 +34,11 @@ STRIP_DIVIDER_COLOR = rl.Color(100, 100, 100, 80) # 1px separator below strip
 STRIP_CENTER_TICK_COLOR = rl.Color(200, 200, 200, 140)
 STRIP_CORNER_SEGMENTS = 10
 
+# Arched strip (same data as flat strip, drawn on top of arched powerflow meter)
+STRIP_ARCH_THICKNESS = 12
+STRIP_ARCH_GAP = 2  # Gap above powerflow outer edge
+STRIP_ARCH_TRACK_COLOR = rl.Color(52, 73, 94, 180)
+
 
 def _quantized_lru_cache(maxsize=128):
   def decorator(func):
@@ -366,3 +371,57 @@ class TorqueBarRendererBP:
       1.0, rl.Color(STRIP_DIVIDER_COLOR.r, STRIP_DIVIDER_COLOR.g,
                      STRIP_DIVIDER_COLOR.b, int(STRIP_DIVIDER_COLOR.a * alpha)),
     )
+
+  def render_strip_arched(self, rect: rl.Rectangle, cx: float, cy: float,
+                         top_angle: float, start_angle: float, end_angle: float,
+                         powerflow_outer_radius: float,
+                         fill_center_angle: float = None,
+                         scale: float = 1.0) -> None:
+    """Render the same steering/torque strip as an arc above the arched powerflow meter.
+
+    Uses the same torque/alpha state as the flat strip (updated by update() each frame).
+    fill_center_angle: center of positive/negative fill (default top_angle). Use when combo
+    strip spans battery+powerflow to shift center left by one tick (e.g. top_angle - 1.5°).
+    scale: 0.75 for small arched gauge, 1.0 for large.
+    """
+    if not ui_state.torque_bar:
+      return
+    torque = self._torque_filter.x
+    alpha = self._alpha_filter.x
+    if alpha < 0.01:
+      return
+    center = fill_center_angle if fill_center_angle is not None else top_angle
+    strip_thickness = STRIP_ARCH_THICKNESS * scale
+    strip_mid_r = powerflow_outer_radius + STRIP_ARCH_GAP * scale + strip_thickness / 2
+    track_color = rl.Color(
+      STRIP_ARCH_TRACK_COLOR.r, STRIP_ARCH_TRACK_COLOR.g,
+      STRIP_ARCH_TRACK_COLOR.b, int(STRIP_ARCH_TRACK_COLOR.a * max(alpha, 0.4)),
+    )
+    track_pts = _arc_bar_pts(
+      cx, cy, strip_mid_r, strip_thickness,
+      start_angle, end_angle,
+    )
+    draw_polygon(rect, track_pts, color=track_color)
+    abs_torque = abs(torque)
+    if abs_torque > 0.005:
+      is_active = ui_state.status in (UIStatus.ENGAGED, UIStatus.LAT_ONLY)
+      if is_active:
+        high_blend = max(0.0, abs_torque - 0.75) * 4
+        fill_color = blend_colors(
+          rl.Color(255, 255, 255, int(255 * 0.9 * alpha)),
+          rl.Color(255, 200, 0, int(255 * alpha)),
+          high_blend,
+        )
+      else:
+        fill_color = rl.Color(255, 255, 255, int(255 * 0.35 * alpha))
+      if torque < 0:
+        bar_start_angle = center + (start_angle - center) * abs_torque
+        bar_end_angle = center
+      else:
+        bar_start_angle = center
+        bar_end_angle = center + (end_angle - center) * torque
+      fill_pts = _arc_bar_pts(
+        cx, cy, strip_mid_r, strip_thickness,
+        bar_start_angle, bar_end_angle,
+      )
+      draw_polygon(rect, fill_pts, color=fill_color)

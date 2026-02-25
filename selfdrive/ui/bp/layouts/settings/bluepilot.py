@@ -36,7 +36,7 @@ class BluePilotLayout(Widget):
     # Toggle refresh list
     self._refresh_toggles = (
       ("send_hands_free_cluster_msg", self._show_hands_free_ui),
-      ("BlindSpot", self._show_blindspot),
+      ("ShowBlindspotOverlay", self._show_blindspot),
       ("ShowBrakeStatus", self._show_brake_status),
       ("BPHideOnroadBorder", self._hide_onroad_border),
       ("BPShowConfidenceBall", self._show_confidence_ball),
@@ -67,12 +67,12 @@ class BluePilotLayout(Widget):
       icon="monitoring.png"
     )
 
-    # Blindspot overlay toggle
+    # Blindspot overlay toggle (BluePilot red edge overlay; SunnyPilot BSM is controlled by Visuals → BlindSpot)
     self._show_blindspot = toggle_item(
       lambda: tr("Show Blindspot Overlay"),
       lambda: tr("Display red overlay when vehicle is detected in blindspot."),
-      initial_state=self._params.get_bool("BlindSpot"),
-      callback=lambda state: self._toggle_callback(state, "BlindSpot"),
+      initial_state=self._params.get_bool("ShowBlindspotOverlay"),
+      callback=lambda state: self._toggle_callback(state, "ShowBlindspotOverlay"),
       icon="warning.png"
     )
 
@@ -175,6 +175,23 @@ class BluePilotLayout(Widget):
       button_width=225,
       callback=self._set_hybrid_gauge_size,
       selected_index=gauge_size_idx - 1,
+      icon="warning.png"
+    )
+
+    # Hybrid gauge style: Flat (horizontal bar + container) vs Arched (arch above torque bar)
+    gauge_style_raw = self._params.get("FordPrefHybridGaugeStyle") or b"flat"
+    gauge_style_str = (gauge_style_raw.decode("utf-8", errors="replace").strip("\x00").lower()
+                       if isinstance(gauge_style_raw, bytes) else str(gauge_style_raw).strip().lower())
+    gauge_style_idx = 1 if gauge_style_str == "arched" else 0
+    if gauge_style_str not in ("flat", "arched"):
+      self._params.put("FordPrefHybridGaugeStyle", "flat")
+    self._hybrid_gauge_style_btn = multiple_button_item(
+      lambda: tr("Hybrid Gauge Style"),
+      lambda: tr("Flat: horizontal bar in shared container. Arched: arch above torque bar (older style)."),
+      buttons=[lambda: tr("Flat"), lambda: tr("Arched")],
+      button_width=225,
+      callback=self._set_hybrid_gauge_style,
+      selected_index=gauge_style_idx,
       icon="warning.png"
     )
 
@@ -335,6 +352,7 @@ class BluePilotLayout(Widget):
       self._show_hybrid_battery_status,
       self._show_hybrid_power_flow,
       self._hybrid_gauge_size_btn,
+      self._hybrid_gauge_style_btn,
       self._enable_human_turn_detection,
       self._lane_change_factor_high,
       self._enable_lane_positioning,
@@ -388,6 +406,12 @@ class BluePilotLayout(Widget):
       gauge_size = 1
     gauge_size = min(gauge_size, 2)  # Clamp old 3-tier values
     self._hybrid_gauge_size_btn.action_item.set_selected_button(gauge_size - 1)
+    self._hybrid_gauge_style_btn.action_item.set_enabled(gauge_either_on)
+    raw_style = ui_state.params.get("FordPrefHybridGaugeStyle") or b"flat"
+    style_str = (raw_style.decode("utf-8", errors="replace").strip("\x00").lower()
+                 if isinstance(raw_style, bytes) else str(raw_style).strip().lower())
+    style_idx = 1 if style_str == "arched" else 0
+    self._hybrid_gauge_style_btn.action_item.set_selected_button(style_idx)
     self._custom_path_offset.action_item.set_enabled(ui_state.params.get_bool("enable_lane_positioning"))
     self._enable_lane_full_mode.action_item.set_enabled(ui_state.params.get_bool("enable_lane_positioning"))
     self._pc_blend_ratio_high_C.action_item.set_enabled(ui_state.params.get_bool("custom_profile"))
@@ -505,6 +529,10 @@ class BluePilotLayout(Widget):
   def _set_hybrid_gauge_size(self, button_index: int):
     """Handle hybrid gauge size button selection. Buttons are 0/1/2, param stores 1/2/3."""
     self._params.put("FordPrefHybridDriveGaugeSize", button_index + 1)
+
+  def _set_hybrid_gauge_style(self, button_index: int):
+    """Handle hybrid gauge style: 0 = Flat, 1 = Arched."""
+    self._params.put("FordPrefHybridGaugeStyle", "arched" if button_index == 1 else "flat")
 
   def _render(self, rect):
     # Process WiFi manager callbacks

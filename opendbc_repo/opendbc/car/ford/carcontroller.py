@@ -92,10 +92,9 @@ def apply_ford_curvature_limits(apply_curvature, apply_curvature_last, current_c
 
 
 def apply_creep_compensation(accel: float, v_ego: float) -> float:
-  # Only compensate when decelerating; avoids fighting creep during coast and prevents binary feel
-  creep_accel = np.interp(v_ego, [2., 3.], [0.3, 0.])
-  if accel < 0.0:
-    accel -= creep_accel
+  creep_accel = np.interp(v_ego, [1., 3.], [0.6, 0.])
+  creep_accel = np.interp(accel, [0., 0.2], [creep_accel, 0.])
+  accel -= creep_accel
   return float(accel)
 
 
@@ -782,31 +781,44 @@ class CarController(CarControllerBase, IntelligentCruiseButtonManagementInterfac
     if self.CP.openpilotLongitudinalControl and (self.frame % CarControllerParams.ACC_CONTROL_STEP) == 0:
       # First calcualte the stock logic's accel, gas, and brake request
       op_accel = actuators.accel
-      if CC.longActive:
-        op_accel = apply_creep_compensation(op_accel, CS.out.vEgo)
-        op_accel = max(op_accel, self.accel - (3.5 * CarControllerParams.ACC_CONTROL_STEP * DT_CTRL))
-      op_accel = float(np.clip(op_accel, CarControllerParams.ACCEL_MIN, CarControllerParams.ACCEL_MAX))
-
       op_gas = op_accel
+
+      if CC.longActive:
+        # Compensate for engine creep at low speed.
+        # Either the ABS does not account for engine creep, or the correction is very slow
+        # TODO: verify this applies to EV/hybrid
+        op_accel = apply_creep_compensation(op_accel, CS.out.vEgo)
+
+        # The stock system has been seen rate limiting the brake accel to 5 m/s^3,
+        # however even 3.5 m/s^3 causes some overshoot with a step response.
+        op_accel = max(op_accel, self.accel - (3.5 * CarControllerParams.ACC_CONTROL_STEP * DT_CTRL))
+
+      op_accel = float(np.clip(op_accel, CarControllerParams.ACCEL_MIN, CarControllerParams.ACCEL_MAX))
+      op_gas = float(np.clip(op_gas, CarControllerParams.ACCEL_MIN, CarControllerParams.ACCEL_MAX))
+
+      # Both gas and accel are in m/s^2, accel is used solely for braking
       if not CC.longActive or op_gas < CarControllerParams.MIN_GAS:
         op_gas = CarControllerParams.INACTIVE_GAS
 
-      # Pitch-compensated brake request (stock style)
+      # PCM applies pitch compensation to gas/accel, but we need to compensate for the brake/pre-charge bits
       accel_due_to_pitch = 0.0
-      orientation_ned = getattr(CC, "orientationNED", None)
-      if orientation_ned is not None and len(orientation_ned) == 3:
-        accel_due_to_pitch = math.sin(orientation_ned[1]) * ACCELERATION_DUE_TO_GRAVITY
+      if len(CC.orientationNED) == 3:
+        accel_due_to_pitch = math.sin(CC.orientationNED[1]) * ACCELERATION_DUE_TO_GRAVITY
+
       accel_pitch_compensated = op_accel + accel_due_to_pitch
       op_brake_actuate = self.op_brake_actuate_last
-      if accel_pitch_compensated > self.precharge_actuate_release or not CC.longActive:
+      if accel_pitch_compensated > 0.3 or not CC.longActive:
         op_brake_actuate = False
-      elif accel_pitch_compensated < self.precharge_actuate_target:
+      elif accel_pitch_compensated < 0.0:
         op_brake_actuate = True
+      # else: keep op_brake_actuate (hysteresis between 0 and 0.3)
 
       stopping = CC.actuators.longControlState == LongCtrlState.stopping
-      target_speed = float(np.clip(actuators.speed * self.target_speed_multiplier, 0, V_CRUISE_MAX))
-      if not CC.longActive and getattr(hud_control, "setSpeed", None) is not None:
-        target_speed = hud_control.setSpeed
+      # target_speed = float(np.clip(actuators.speed * self.target_speed_multiplier, 0, V_CRUISE_MAX))
+
+      # if not CC.longActive and getattr(hud_control, "setSpeed", None) is not None:
+        # target_speed = hud_control.setSpeed
+      target_speed = V_CRUISE_MAX
 
       # TODO return to this signal later, it might help with highway control, but sending values ford doesn't like causes ACC to cancel.
       self.accel_pred = -5.0  # same as BluePilot branch until safe logic is confirmed
@@ -964,7 +976,7 @@ class CarController(CarControllerBase, IntelligentCruiseButtonManagementInterfac
       self.accel = accel
       self.gas = gas
       self._bp_long_active_last = bp_long_used
-      self.op_brake_actaute_last = op_brake_actuate
+      self.op_brake_actuate_last = op_brake_actuate
 
     ### ui ###
     send_ui = (self.main_on_last != main_on) or (self.lkas_enabled_last != CC.latActive) or (self.steer_alert_last != steer_alert)

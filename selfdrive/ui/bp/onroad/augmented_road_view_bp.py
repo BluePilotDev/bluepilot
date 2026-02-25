@@ -10,7 +10,9 @@ from openpilot.selfdrive.ui.bp.onroad.hud_renderer_bp import HudRendererBP
 from openpilot.selfdrive.ui.bp.onroad.alert_renderer_bp import AlertRendererBP
 from openpilot.selfdrive.ui.bp.onroad.model_renderer_bp import ModelRendererBP
 from openpilot.selfdrive.ui.bp.onroad.hybrid_battery_gauge import HybridBatteryGauge
+from openpilot.selfdrive.ui.bp.onroad.hybrid_battery_gauge_arched import HybridBatteryGaugeArched, BATTERY_START_ANGLE
 from openpilot.selfdrive.ui.bp.onroad.power_flow_gauge import PowerFlowGauge
+from openpilot.selfdrive.ui.bp.onroad.powerflow_gauge_arched import PowerflowGaugeArched, POWERFLOW_ANGLE_SPAN
 from openpilot.selfdrive.ui.bp.onroad.torque_bar_renderer_bp import TorqueBarRendererBP
 from openpilot.selfdrive.ui.bp.mici.onroad.confidence_ball_bp import ConfidenceBallTiciBP
 from openpilot.selfdrive.ui.onroad.driver_state import BTN_SIZE
@@ -53,14 +55,21 @@ class AugmentedRoadViewBP(AugmentedRoadView, BlindspotRendererMixin):
     self.alert_renderer = AlertRendererBP()
     self._battery_gauge_bp = HybridBatteryGauge()
     self._power_flow_gauge = PowerFlowGauge()
-
+    self._battery_gauge_arched = HybridBatteryGaugeArched()
+    self._power_flow_gauge_arched = PowerflowGaugeArched()
     # BluePilot: Torque bar renderer (renders as crown strip inside gauge container)
     self._torque_bar = TorqueBarRendererBP(scale=3.0)
+    self._power_flow_gauge_arched.set_torque_bar(self._torque_bar)
 
     # BluePilot: Add confidence ball on left side (MADS beam + enhanced coloring)
     self._confidence_ball = ConfidenceBallTiciBP()
     self._show_confidence_ball = self._bp_params.get_bool("BPShowConfidenceBall")
     self._param_counter = 0
+    raw_style = self._bp_params.get("FordPrefHybridGaugeStyle") or b"flat"
+    self._hybrid_gauge_style = (raw_style.decode("utf-8", errors="replace").strip("\x00").lower()
+                                if isinstance(raw_style, bytes) else str(raw_style).strip().lower())
+    if self._hybrid_gauge_style not in ("flat", "arched"):
+      self._hybrid_gauge_style = "flat"
 
   def update_fade_out_bottom_overlay(self, _content_rect):
     """BluePilot: Skip MICI fade overlay on TICI — causes unwanted black gradient at bottom."""
@@ -78,6 +87,11 @@ class AugmentedRoadViewBP(AugmentedRoadView, BlindspotRendererMixin):
     if self._param_counter >= 60:
       self._param_counter = 0
       self._show_confidence_ball = self._bp_params.get_bool("BPShowConfidenceBall")
+      raw_style = self._bp_params.get("FordPrefHybridGaugeStyle") or b"flat"
+      self._hybrid_gauge_style = (raw_style.decode("utf-8", errors="replace").strip("\x00").lower()
+                                  if isinstance(raw_style, bytes) else str(raw_style).strip().lower())
+      if self._hybrid_gauge_style not in ("flat", "arched"):
+        self._hybrid_gauge_style = "flat"
 
     self._switch_stream_if_needed(ui_state.sm)
     self._update_calibration()
@@ -208,11 +222,28 @@ class AugmentedRoadViewBP(AugmentedRoadView, BlindspotRendererMixin):
     When no hybrid gauge is active, the strip is not rendered — the stock arc torque bar
     is used instead (handled by the caller).
 
+    When FordPrefHybridGaugeStyle is "arched" and powerflow is ON: use arched powerflow + arched battery.
+    When powerflow is OFF: always use flat battery (no arched battery solo).
+    When style is "flat": use flat battery and/or flat powerflow.
+
     Returns:
         (gauge_height_offset, hybrid_active): gauge_height_offset is pixels from bottom of
             content_rect to top of gauge area (0 if nothing visible). hybrid_active is True
             when at least one hybrid gauge was rendered (strip was used for torque).
     """
+    # Arched style + powerflow on: use arched layout. Powerflow off → flat battery only.
+    if getattr(self, "_hybrid_gauge_style", "flat") == "arched":
+      self._power_flow_gauge_arched._update_state()
+      if self._power_flow_gauge_arched._should_render():
+        try:
+          gauge_size = int(self._bp_params.get("FordPrefHybridDriveGaugeSize", return_default=True))
+        except (TypeError, ValueError):
+          gauge_size = 2
+        gauge_size = min(max(gauge_size, 1), 2)  # 1 = small, 2 = large
+        arched_scale = 0.75 if gauge_size == 1 else 1.0
+        return self._render_gauges_arched(content_rect, ball_offset, scale=arched_scale)
+      # Powerflow off: fall through to flat path (flat battery)
+
     left_offset = content_rect.x + ball_offset
     sidebar_visible = content_rect.width < (FULL_CONTENT_WIDTH * 0.9)
     content_bottom = content_rect.y + content_rect.height
@@ -359,6 +390,52 @@ class AugmentedRoadViewBP(AugmentedRoadView, BlindspotRendererMixin):
 
     # Return offset and whether hybrid gauges were active
     return max(0.0, content_bottom - gauge_top), hybrid_active
+
+  # Arched gauge layout height (approx. arch + text + battery area) for torque bar offset
+  _ARCHED_GAUGE_HEIGHT_OFFSET = 220.0
+
+  def _render_gauges_arched(self, content_rect: rl.Rectangle, ball_offset: float, scale: float = 1.0) -> tuple[float, bool]:
+    """Render arched-style powerflow and battery gauges (FordPrefHybridGaugeStyle = arched).
+    scale: 0.75 for small (gauge size 1), 1.0 for large (gauge size 2).
+    When both are visible, the steering strip spans battery + powerflow with center at screen middle.
+    """
+    left_offset = int(content_rect.x + ball_offset)
+    self._battery_gauge_arched.set_scale(scale)
+    self._power_flow_gauge_arched.set_scale(scale)
+    self._battery_gauge_arched._update_state()
+    self._power_flow_gauge_arched._update_state()
+    battery_visible = self._battery_gauge_arched._should_render()
+    pf_visible = self._power_flow_gauge_arched._should_render()
+    hybrid_active = battery_visible or pf_visible
+
+    strip_drawn_by_view = False
+    if battery_visible and pf_visible and ui_state.torque_bar and self._power_flow_gauge_arched._torque_bar is not None:
+      geo = self._power_flow_gauge_arched.get_arch_geometry(content_rect)
+      # Center fill one powerflow tick left so zero aligns with visual center of battery+powerflow
+      fill_center = geo["top_angle"] - POWERFLOW_ANGLE_SPAN * 0.10
+      self._torque_bar.render_strip_arched(
+        content_rect,
+        geo["cx"], geo["cy"], geo["top_angle"],
+        BATTERY_START_ANGLE,
+        geo["powerflow_end_angle"],
+        geo["outer_radius"],
+        fill_center_angle=fill_center,
+        scale=scale,
+      )
+      strip_drawn_by_view = True
+
+    if battery_visible:
+      self._battery_gauge_arched.set_powerflow_visible(pf_visible)
+      self._battery_gauge_arched.render(content_rect, left_offset=left_offset)
+    if pf_visible:
+      self._power_flow_gauge_arched.render(
+        content_rect,
+        strip_drawn_by_view=strip_drawn_by_view,
+        battery_visible=battery_visible,
+      )
+
+    offset = self._ARCHED_GAUGE_HEIGHT_OFFSET * scale if hybrid_active else 0.0
+    return offset, hybrid_active
 
   def _draw_shared_background(self, rect: rl.Rectangle):
     """Draw shared background container (glow + fill). Border drawn separately."""

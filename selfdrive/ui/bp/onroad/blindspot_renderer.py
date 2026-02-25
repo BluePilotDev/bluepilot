@@ -24,8 +24,8 @@ class BlindspotRendererMixin:
 
   def _draw_blindspot_screen_edges(self, rect: rl.Rectangle, blind_spot_width: int = 250):
     """Draw blindspot screen edge indicators - red gradient edge with pulsing animation."""
-    # Check both param spellings: TICI uses "BlindSpot", MICI previously used "Blindspot"
-    if not (self._blindspot_params.get_bool("BlindSpot") or self._blindspot_params.get_bool("Blindspot")):
+    # BluePilot-only toggle: ShowBlindspotOverlay controls this overlay (decoupled from SunnyPilot BlindSpot).
+    if not self._blindspot_params.get_bool("ShowBlindspotOverlay"):
       return
 
     bp_ui_log.state("Blindspot", "param_enabled", True)
