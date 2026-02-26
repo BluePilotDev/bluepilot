@@ -72,7 +72,8 @@ class DesireHelper:
                                                left_blinker=carstate.leftBlinker, right_blinker=carstate.rightBlinker, v_ego=v_ego)
     self.lane_turn_direction = self.lane_turn_controller.get_turn_direction()
 
-    #BluePilot
+    #BluePilot ([ab]use the BlinkerPauseLateral class to disable lane change with the same logic)
+    self.blinker_pause_lateral.get_params()
     self.blinker_pause_lateral.enabled = self.params.get_bool("BlinkerPauseLaneChange")
 
     if (not lateral_active or self.lane_change_timer > LANE_CHANGE_TIME_MAX or
