@@ -11,17 +11,22 @@ from openpilot.common.params import Params
 
 
 class BlinkerPauseLateral:
-  def __init__(self):
+  def __init__(self, en_param: str = "BlinkerPauseLateralControl"):
     self.params = Params()
 
-    self.enabled = self.params.get_bool("BlinkerPauseLateralControl")
+    #BluePilot - Allow using a different enable
+    self.en_param = en_param
+    self.enabled = self.params.get_bool(self.en_param)
+    #BluePilot
     self.is_metric = self.params.get_bool("IsMetric")
     self.min_speed = 0
     self.reengage_delay = 0
     self.blinker_off_timer = 0.0
 
   def get_params(self) -> None:
-    self.enabled = self.params.get_bool("BlinkerPauseLateralControl")
+    #BluePilot - Allow using a different enable
+    self.enabled = self.params.get_bool(self.en_param)
+    #BluePilot
     self.is_metric = self.params.get_bool("IsMetric")
     self.min_speed = self.params.get("BlinkerMinLateralControlSpeed", return_default=True)
     self.reengage_delay = self.params.get("BlinkerLateralReengageDelay", return_default=True)

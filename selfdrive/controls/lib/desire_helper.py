@@ -53,8 +53,10 @@ class DesireHelper:
     self.alc = AutoLaneChangeController(self)
     self.lane_turn_controller = LaneTurnController(self)
     self.lane_turn_direction = TurnDirection.none
-    self.blinker_pause_lateral = BlinkerPauseLateral()
+    #BluePilot
+    self.blinker_pause_lateral = BlinkerPauseLateral(en_param = "BlinkerPauseLaneChange")
     self.params = Params()
+    #BluePilot
 
   @staticmethod
   def get_lane_change_direction(CS):
@@ -72,13 +74,14 @@ class DesireHelper:
                                                left_blinker=carstate.leftBlinker, right_blinker=carstate.rightBlinker, v_ego=v_ego)
     self.lane_turn_direction = self.lane_turn_controller.get_turn_direction()
 
-    #BluePilot ([ab]use the BlinkerPauseLateral class to disable lane change with the same logic)
+    #BluePilot (use the BlinkerPauseLateral class to disable lane change with the same logic)
     self.blinker_pause_lateral.get_params()
-    self.blinker_pause_lateral.enabled = self.params.get_bool("BlinkerPauseLaneChange")
+    bp_pause_blinker = self.blinker_pause_lateral.update(carstate)
+    #BluePilot
 
     if (not lateral_active or self.lane_change_timer > LANE_CHANGE_TIME_MAX or
        self.alc.lane_change_set_timer == AutoLaneChangeMode.OFF or
-       self.blinker_pause_lateral.update(carstate)):
+       bp_pause_blinker):
       self.lane_change_state = LaneChangeState.off
       self.lane_change_direction = LaneChangeDirection.none
     else:
