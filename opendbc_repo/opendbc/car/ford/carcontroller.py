@@ -21,17 +21,6 @@ from opendbc.sunnypilot.car.ford.icbm import IntelligentCruiseButtonManagementIn
 LongCtrlState = structs.CarControl.Actuators.LongControlState
 VisualAlert = structs.CarControl.HUDControl.VisualAlert
 
-
-def _get_T_FOLLOW(personality):
-  """Match long_mpc.get_T_FOLLOW: follow time (s) from driving personality (relaxed/standard/aggressive)."""
-  if personality == log.LongitudinalPersonality.relaxed:
-    return 1.75
-  if personality == log.LongitudinalPersonality.standard:
-    return 1.45
-  if personality == log.LongitudinalPersonality.aggressive:
-    return 1.25
-  return 1.45  # default standard if unknown
-
 def index_function(idx, max_val=192, max_idx=32):
   return (max_val) * ((idx/max_idx)**2)
 
@@ -157,6 +146,13 @@ class CarController(CarControllerBase, IntelligentCruiseButtonManagementInterfac
     self.bp_accel_last = 0.0
     self.bpSpeedAllow = False # initialize to false
 
+    # Long-control debug for controllerStateBP (which path BP vs stock and why)
+    self.bp_long_debug_disable_bp_long_ui = False
+    self.bp_long_debug_lead_present = False
+    self.bp_long_debug_v_lead_mph = 0.0
+    self.bp_long_debug_bp_speed_allow = False
+    self.bp_long_debug_apply_bp_long = False
+
     # Long Control Variables
     self.MAX_URBAN_SPEED_MPH = 45.0
     self.following_gas_ROC = 0.05 # amount that gas can change per scan when in following mode
@@ -167,6 +163,7 @@ class CarController(CarControllerBase, IntelligentCruiseButtonManagementInterfac
     self.precharge_actuate_target = -0.12 # at what accel limit do we engage precharge
     self.precharge_actuate_release = -0.06 # at what accel limit do we release precharge
     self.op_brake_actuate_last = False # init the value for our hysteresis
+    self.disable_downhill_comp_UI = True #flag to disable downhill pitch compensation
 
     # # Curvature variables
     self.curvature_lookup_time = 0.42 #from lagd
@@ -291,6 +288,7 @@ class CarController(CarControllerBase, IntelligentCruiseButtonManagementInterfac
     self.LC_PID_gain_UI = float(self.params.get("LC_PID_gain_UI", return_default=True))
     # Ford long: bypass BP longitudinal toggle (gas/accel ROC use __init__ defaults only)
     self.disable_BP_long_UI = self.params.get_bool("disable_BP_long_UI")
+    self.disable_downhill_comp_UI = self.params.get_bool("disable_downhill_comp_UI")
 
   def handle_post_lane_change_transition(self, path_angle, path_offset, desired_curvature_rate):
     """
@@ -805,11 +803,16 @@ class CarController(CarControllerBase, IntelligentCruiseButtonManagementInterfac
       if len(CC.orientationNED) == 3:
         accel_due_to_pitch = math.sin(CC.orientationNED[1]) * ACCELERATION_DUE_TO_GRAVITY
 
+      # some ford vehicles have downhill compensation built in, adding in accel_due_to_pitch is double dipping, creating harsh braking downhill
+      if self.disable_downhill_comp_UI:
+          if accel_due_to_pitch < 0:
+              accel_due_to_pitch = 0
+
       accel_pitch_compensated = op_accel + accel_due_to_pitch
       op_brake_actuate = self.op_brake_actuate_last
-      if accel_pitch_compensated > 0.3 or not CC.longActive:
+      if accel_pitch_compensated > self.brake_actuate_release or not CC.longActive:
         op_brake_actuate = False
-      elif accel_pitch_compensated < 0.0:
+      elif accel_pitch_compensated < self.brake_actuate_target:
         op_brake_actuate = True
       # else: keep op_brake_actuate (hysteresis between 0 and 0.3)
 
@@ -831,10 +834,34 @@ class CarController(CarControllerBase, IntelligentCruiseButtonManagementInterfac
       if bpSpeedTooSlow:
         self.bpSpeedAllow = False
 
+      # Long-control debug for controllerStateBP (log which path and why)
+      # RadarState.leadOne.status: 0 = no lead, 1 = lead
+      lead_debug = None
+      has_lead = False
+      v_lead_mph_debug = 0.0
+      if self.sm.valid.get('radarState', False):
+        rs = self.sm['radarState']
+        lead_debug = getattr(rs, 'leadOne', None)
+        if lead_debug is not None and getattr(lead_debug, 'status', 0) == 1:
+          has_lead = True
+          v_lead_mph_debug = float(getattr(lead_debug, 'vLead', 0)) * 2.23694
+      gasPressed_debug = CS.out.gasPressed
+      brakePressed_debug = CS.out.brakePressed
+      apply_bp_long_debug = (
+        self.disable_BP_long_UI == False and self.bpSpeedAllow
+        and not gasPressed_debug and not brakePressed_debug
+        and (not has_lead or v_lead_mph_debug > 40.0)
+      )
+      self.bp_long_debug_disable_bp_long_ui = self.disable_BP_long_UI
+      self.bp_long_debug_lead_present = has_lead
+      self.bp_long_debug_v_lead_mph = v_lead_mph_debug
+      self.bp_long_debug_bp_speed_allow = self.bpSpeedAllow
+      self.bp_long_debug_apply_bp_long = apply_bp_long_debug
+
       # BluePilot longitudinal: gas limits when following + rate-limited accel/brake to avoid stomping.
       if not self.disable_BP_long_UI:
 
-        # Lead time (s) and lead state
+        # Lead time (s) and lead state. leadOne.status: 0 = no lead, 1 = lead.
         v_ego = max(CS.out.vEgo, 0.5)
         lead_time_sec = 999.0  # no lead: treat as far
         lead = None
@@ -843,7 +870,9 @@ class CarController(CarControllerBase, IntelligentCruiseButtonManagementInterfac
         if self.sm.valid.get('radarState', False):
           rs = self.sm['radarState']
           lead = getattr(rs, 'leadOne', None)
-          if lead and getattr(lead, 'status', False):
+          if lead is not None and getattr(lead, 'status', 0) != 1:
+            lead = None
+          if lead:
             d_rel = float(getattr(lead, 'dRel', 0))
             v_rel = float(getattr(lead, 'vRel', 0))
             v_lead = float(getattr(lead, 'vLead', 0))  # m/s; schema is vLead (camelCase)
@@ -856,7 +885,9 @@ class CarController(CarControllerBase, IntelligentCruiseButtonManagementInterfac
         if self.sm.valid.get('radarState', False):
           rs = self.sm['radarState']
           lead = getattr(rs, 'leadOne', None)
-          if lead and getattr(lead, 'status', False):
+          if lead is not None and getattr(lead, 'status', 0) != 1:
+            lead = None
+          if lead:
             d_rel = float(getattr(lead, 'dRel', 0))
             v_rel = float(getattr(lead, 'vRel', 0))
             if d_rel > 0 and v_rel < 0:
@@ -910,6 +941,14 @@ class CarController(CarControllerBase, IntelligentCruiseButtonManagementInterfac
           min_follow_gas = op_gas
           max_follow_accel = op_accel
           min_follow_accel = op_accel
+
+        # limits with no lead
+        if lead == 0:
+          max_follow_gas = op_gas
+          min_follow_gas = op_gas
+          max_follow_accel = 0
+          min_follow_accel = 0
+
 
         # apply our bp gas and accel targets
         bp_gas = clip(op_gas, min_follow_gas, max_follow_gas)

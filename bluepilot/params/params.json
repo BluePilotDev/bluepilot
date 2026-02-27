@@ -27,6 +27,15 @@
       "enabled": true
     },
     {
+      "name": "FordPrefDisableDownhillCompUI",
+      "default": false,
+      "type": "bool",
+      "flags": ["PERSISTENT", "BACKUP"],
+      "ccProp": "disable_downhill_comp_UI",
+      "create_default": true,
+      "enabled": true
+    },
+    {
       "name": "FordPrefHumanTurnDetectionEnable",
       "default": true,
       "type": "bool",

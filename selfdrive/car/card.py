@@ -294,6 +294,11 @@ class Car:
     if hasattr(self.CI.CC, "lateralUncertainty"):
       cs_bp = structs.ControllerStateBP()
       cs_bp.lateralUncertainty = self.CI.CC.lateralUncertainty
+      cs_bp.disableBpLongUI = getattr(self.CI.CC, "bp_long_debug_disable_bp_long_ui", False)
+      cs_bp.leadPresent = getattr(self.CI.CC, "bp_long_debug_lead_present", False)
+      cs_bp.vLeadMph = getattr(self.CI.CC, "bp_long_debug_v_lead_mph", 0.0)
+      cs_bp.bpSpeedAllow = getattr(self.CI.CC, "bp_long_debug_bp_speed_allow", False)
+      cs_bp.applyBpLong = getattr(self.CI.CC, "bp_long_debug_apply_bp_long", False)
       cs_bp_capnp = convert_to_capnp(cs_bp)
       cs_bp_send = messaging.new_message('controllerStateBP')
       cs_bp_send.valid = True

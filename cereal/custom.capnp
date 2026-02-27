@@ -466,6 +466,12 @@ struct CustomReserved12 @0x9ccdc8676701b412 {
 
 struct ControllerStateBP @0xcd96dafb67a082d0 {
     lateralUncertainty @0 :Float32; #BluePilot
+    # Long-control debug: which path (BP vs stock) and why
+    disableBpLongUI @1 :Bool;
+    leadPresent @2 :Bool;
+    vLeadMph @3 :Float32;
+    bpSpeedAllow @4 :Bool;
+    applyBpLong @5 :Bool;
 }
 
 struct CarStateBP @0xb057204d7deadf3f {

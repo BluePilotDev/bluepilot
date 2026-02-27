@@ -50,6 +50,7 @@ class BluePilotLayout(Widget):
       ("custom_profile", self._custom_profile),
       ("disable_BP_lat_UI", self._disable_BP_lat),
       ("disable_BP_long_UI", self._disable_BP_long),
+      ("disable_downhill_comp_UI", self._disable_dowhill_comp),
       ("BPUIDebugLog", self._ui_debug_log),
     )
 
@@ -330,6 +331,15 @@ class BluePilotLayout(Widget):
       icon="chffr_wheel.png"
     )
 
+    # Disable downhill compensation toggle
+    self._disable_dowhill_comp = toggle_item(
+      lambda: tr("Disable Downhill Compensation"),
+      lambda: tr("Disable pitch-based brake/gas compensation when going downhill."),
+      initial_state=self._params.get_bool("disable_downhill_comp_UI"),
+      callback=lambda state: self._toggle_callback(state, "disable_downhill_comp_UI"),
+      icon="chffr_wheel.png"
+    )
+
     # Preferred WiFi Network selector
     self._preferred_network_action = ButtonAction(lambda: tr("SELECT"))
     self._preferred_network_action.set_value(lambda: self._get_preferred_network_display())
@@ -365,6 +375,7 @@ class BluePilotLayout(Widget):
       self._vbatt_pause_charging,
       self._disable_BP_lat,
       self._disable_BP_long,
+      self._disable_dowhill_comp,
       self._preferred_network_btn,
       self._ui_debug_log,
     ]
