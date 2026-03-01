@@ -16,9 +16,10 @@ POWERFLOW_UPPER_THRESHOLD_M = 150.0 * 0.3048  # 150 feet = 45.72 meters
 POWERFLOW_LOWER_THRESHOLD_M = 100.0 * 0.3048  # 100 feet = 30.48 meters
 
 # BluePilot: Border colors for radar vs vision leads
+LEAD_RADAR_GLOW = rl.Color(0, 134, 233, 255)
 RADAR_BORDER_COLOR_BASE = rl.Color(0, 100, 200, 255)   # Blue for radar
+LEAD_VISION_GLOW = rl.Color(218, 202, 37, 255)
 VISION_BORDER_COLOR_BASE = rl.Color(201, 34, 49, 255)   # Red for vision
-
 
 class ChevronMetricsBP(ChevronMetrics):
   """BluePilot ChevronMetrics with horizontal boxed layout and radar/vision colored borders."""
@@ -50,51 +51,14 @@ class ChevronMetricsBP(ChevronMetrics):
     if not lead_vehicle.chevron or len(lead_vehicle.chevron) < 3:
       return
 
-    # BluePilot: Deadband logic for close-proximity positioning
-    powerflow_enabled = self._bp_params.get_bool("FordPrefHybridPowerFlow")
-
-    if powerflow_enabled:
-      if d_rel < POWERFLOW_UPPER_THRESHOLD_M:
-        self._close_mode = True
-      elif d_rel > POWERFLOW_LOWER_THRESHOLD_M:
-        self._close_mode = False
-    else:
-      if d_rel < CLOSE_MODE_THRESHOLD_M:
-        self._close_mode = True
-      elif d_rel > NORMAL_MODE_THRESHOLD_M:
-        self._close_mode = False
-
-    # Extract chevron geometry
-    chevron_point_0 = lead_vehicle.chevron[0]
-    chevron_point_1 = lead_vehicle.chevron[1]
-    chevron_point_2 = lead_vehicle.chevron[2]
-
-    chevron_x = chevron_point_1[0]
-
-    all_y_coords = [chevron_point_0[1], chevron_point_1[1], chevron_point_2[1]]
-    chevron_top_y = min(all_y_coords)
-    chevron_bottom_y = max(all_y_coords)
-
     sz = np.clip((25 * 30) / (d_rel / 3 + 30), 15.0, 30.0) * 2.35 * self.overlay_scale
 
     text_lines = self._build_text_lines_bp(d_rel, v_rel, v_ego)
     if not text_lines:
       return
 
-    # Position text: below chevron normally, above chevron when in close mode
-    spacing_offset = max(70 * self.overlay_scale, sz * 0.6)
-
-    if self._close_mode:
-      if powerflow_enabled:
-        chevron_text_y = chevron_top_y - (spacing_offset * 0.85)
-      else:
-        upward_offset = sz * 3.0
-        chevron_text_y = chevron_top_y - spacing_offset - upward_offset
-    else:
-      chevron_text_y = chevron_bottom_y + spacing_offset
-
     is_radar = self.lead_is_radar[lead_index] if lead_index < len(self.lead_is_radar) else False
-    self._render_text_lines_bp(text_lines, chevron_x, chevron_text_y, sz, rect, is_radar)
+    self._render_text_lines_bp(text_lines, lead_vehicle, sz, rect, is_radar)
 
   def _build_text_lines_bp(self, d_rel: float, v_rel: float, v_ego: float) -> list[str]:
     """Build text lines - Ford overlay forces all 3, otherwise respects setting."""
@@ -124,9 +88,12 @@ class ChevronMetricsBP(ChevronMetrics):
     else:
       return ChevronMetrics._build_text_lines(d_rel, v_rel, v_ego)
 
-  def _render_text_lines_bp(self, text_lines: list[str], chevron_x: float, chevron_y: float,
-                            sz: float, rect: rl.Rectangle, is_radar: bool = False):
+  def _render_text_lines_bp(self, text_lines: list[str], lead_vehicle,
+                            sz: float, rect: rl.Rectangle, is_radar: bool):
     """Render text lines with horizontal boxed layout when Ford overlay is active."""
+
+    CHEVRON_H = 40
+
     margin = 20
     alpha = int(255 * self._lead_status_alpha)
     text_color = rl.Color(255, 255, 255, alpha)
@@ -139,6 +106,9 @@ class ChevronMetricsBP(ChevronMetrics):
       padding = int(12 * scale)
       box_spacing = int(15 * scale)
       box_color = rl.Color(40, 40, 40, int(220 * self._lead_status_alpha))
+
+      chevron_x = lead_vehicle.chevron[1][0]
+      chevron_y = lead_vehicle.chevron[1][1]
 
       # Measure all text sizes
       text_sizes = []
@@ -156,12 +126,6 @@ class ChevronMetricsBP(ChevronMetrics):
       text_height = text_sizes[0].y if text_sizes else font_size
       box_height = text_height + (padding * 2)
 
-      # Position based on close mode
-      if self._close_mode:
-        y = int(chevron_y - box_height)
-      else:
-        y = int(chevron_y)
-
       # Clamp to screen bounds
       if start_x < margin:
         start_x = margin
@@ -172,19 +136,24 @@ class ChevronMetricsBP(ChevronMetrics):
 
       # Border color: blue for radar, red for vision
       if is_radar:
+        glow_color = LEAD_RADAR_GLOW
         border_color = rl.Color(RADAR_BORDER_COLOR_BASE.r, RADAR_BORDER_COLOR_BASE.g,
                                 RADAR_BORDER_COLOR_BASE.b, alpha)
       else:
+        glow_color = LEAD_VISION_GLOW
         border_color = rl.Color(VISION_BORDER_COLOR_BASE.r, VISION_BORDER_COLOR_BASE.g,
                                 VISION_BORDER_COLOR_BASE.b, alpha)
 
       border_thickness = max(2, int(6 * scale))
+      y = chevron_y + CHEVRON_H
 
+      box_rects = []
       for line, text_size in zip(text_lines, text_sizes):
         box_width = text_size.x + (padding * 2)
 
         # Dark grey box
         box_rect = rl.Rectangle(int(current_x), int(y), box_width, box_height)
+        box_rects.append(box_rect)
         rl.draw_rectangle_rounded(box_rect, 0.2, 10, box_color)
 
         # Colored border (drawn on same rect so there's no gap)
@@ -198,6 +167,31 @@ class ChevronMetricsBP(ChevronMetrics):
         rl.draw_text_ex(self._font, line, rl.Vector2(text_x, text_y_pos), font_size, 0, text_color)
 
         current_x += box_width + box_spacing
+
+      box = None
+      if len(box_rects) == 1:
+        box = box_rects[0]
+      elif len(box_rects) == 3:
+        box = box_rects[1]
+
+      if box != None:
+        center_x = box.x + box.width / 2
+        chevron = [rl.Vector2(center_x, y - CHEVRON_H),
+                   rl.Vector2(box.x, y),
+                   rl.Vector2(box.x + box.width, y)]
+      else:
+        chevron = lead_vehicle.glow
+
+      #draw modified chevron
+      rl.draw_triangle_fan(chevron, len(chevron), border_color)
+      rl.draw_line_ex(chevron[0], chevron[1], border_thickness, glow_color)
+      rl.draw_line_ex(chevron[1], chevron[2], border_thickness, glow_color)
+      rl.draw_line_ex(chevron[2], chevron[0], border_thickness, glow_color)
+      r = border_thickness / 2
+      rl.draw_circle_v(chevron[0], r, glow_color)
+      rl.draw_circle_v(chevron[1], r, glow_color)
+      rl.draw_circle_v(chevron[2], r, glow_color)
+
     else:
       # Fall back to base vertical stack rendering
       self._render_text_lines(text_lines, chevron_x, chevron_y, sz, rect)

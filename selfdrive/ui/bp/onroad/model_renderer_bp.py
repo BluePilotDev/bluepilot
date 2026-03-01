@@ -96,8 +96,8 @@ class ModelRendererBP(ModelRenderer):
     lead_one = radar_state.leadOne if radar_state else None
 
     # BluePilot: Ford radar overlay feature - show leads even without longitudinal control
-    ford_overlay_enabled = self._bp_params.get_bool("FordPrefShowRadarLeadOverlay")
-    render_lead_indicator = (self._longitudinal_control or ford_overlay_enabled) and radar_state is not None
+    self.ford_overlay_enabled = self._bp_params.get_bool("FordPrefShowRadarLeadOverlay")
+    render_lead_indicator = (self._longitudinal_control or self.ford_overlay_enabled) and radar_state is not None
     bp_ui_log.state("ModelRenderer", "render_lead", render_lead_indicator)
 
     model_updated = sm.updated['modelV2']
@@ -123,7 +123,7 @@ class ModelRendererBP(ModelRenderer):
     if render_lead_indicator and radar_state:
       self._draw_lead_indicator()
       # BluePilot: Pass radar/overlay state to BP chevron metrics for boxed layout
-      self.chevron_metrics.ford_overlay_enabled = ford_overlay_enabled
+      self.chevron_metrics.ford_overlay_enabled = self.ford_overlay_enabled
       self.chevron_metrics.lead_is_radar = self._lead_is_radar
       self.chevron_metrics.overlay_scale = self._overlay_scale
       self.chevron_metrics.draw_lead_status(sm, radar_state, self._rect, self._lead_vehicles)
@@ -436,6 +436,10 @@ class ModelRendererBP(ModelRenderer):
 
   def _draw_lead_indicator(self):
     """Draw lead vehicles with dynamic colors based on detection source (radar vs vision)."""
+    if self.ford_overlay_enabled:
+      #Chevron is handled by the Metric renderer.
+      return
+
     for i, lead in enumerate(self._lead_vehicles):
       if not lead.glow or not lead.chevron:
         continue
