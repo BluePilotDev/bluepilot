@@ -17,8 +17,9 @@ from openpilot.selfdrive.ui.bp.onroad.torque_bar_renderer_bp import TorqueBarRen
 from openpilot.selfdrive.ui.bp.mici.onroad.confidence_ball_bp import ConfidenceBallTiciBP
 from openpilot.selfdrive.ui.onroad.driver_state import BTN_SIZE
 from openpilot.selfdrive.ui.sunnypilot.onroad.developer_ui import DeveloperUiRenderer
-from openpilot.selfdrive.ui.ui_state import ui_state
+from openpilot.selfdrive.ui.ui_state import ui_state, UIStatus
 from openpilot.selfdrive.ui.bp.lib.ui_debug_logger import bp_ui_log
+from openpilot.selfdrive.ui.onroad.augmented_road_view import BORDER_COLORS
 
 # BluePilot: Margin to keep confidence ball inside the colored border
 BALL_BORDER_MARGIN = UI_BORDER_SIZE // 2  # 15px
@@ -196,9 +197,7 @@ class AugmentedRoadViewBP(AugmentedRoadView, BlindspotRendererMixin):
     bp_ui_log.scissor("AugRoadView", "end")
     rl.end_scissor_mode()
 
-    # BluePilot: Conditionally draw border
-    if not self._bp_params.get_bool("BPHideOnroadBorder"):
-      self._draw_border(rect)
+    self._draw_border(rect)
 
     # Publish uiDebug
     msg = messaging.new_message('uiDebug')
@@ -449,3 +448,16 @@ class AugmentedRoadViewBP(AugmentedRoadView, BlindspotRendererMixin):
       rl.Color(20, 20, 20, int(SHARED_BG_COLOR.a * 0.3)),
     )
     rl.draw_rectangle_rounded(rect, SHARED_BG_ROUNDNESS, 10, SHARED_BG_COLOR)
+
+  def _draw_border(self, rect: rl.Rectangle):
+    rl.draw_rectangle_lines_ex(rect, UI_BORDER_SIZE, rl.BLACK)
+    border_roundness = 0.12
+
+    if self._bp_params.get_bool("BPHideOnroadBorder"):
+      border_color = rl.BLACK
+    else:
+      border_color = BORDER_COLORS.get(ui_state.status, BORDER_COLORS[UIStatus.DISENGAGED])
+
+    border_rect = rl.Rectangle(rect.x + UI_BORDER_SIZE, rect.y + UI_BORDER_SIZE,
+                               rect.width - 2 * UI_BORDER_SIZE, rect.height - 2 * UI_BORDER_SIZE)
+    rl.draw_rectangle_rounded_lines_ex(border_rect, border_roundness, 10, UI_BORDER_SIZE, border_color)
