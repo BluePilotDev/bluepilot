@@ -124,8 +124,6 @@ class ChevronMetrics:
       # Draw text
       rl.draw_text_ex(self._font, line, rl.Vector2(x, y), font_size, 0, text_color)
 
-
-
   def draw_lead_status(self, sm, radar_state, rect, lead_vehicles):
     lead_one = radar_state.leadOne
     lead_two = radar_state.leadTwo
