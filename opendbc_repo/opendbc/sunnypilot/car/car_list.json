@@ -2070,6 +2070,16 @@
     ],
     "package": "Smart Cruise Control (SCC)"
   },
+  "Kia K7 2017": {
+    "platform": "KIA_K7_2017",
+    "make": "Kia",
+    "brand": "hyundai",
+    "model": "K7",
+    "year": [
+      "2017"
+    ],
+    "package": "Smart Cruise Control (SCC)"
+  },
   "Kia K8 Hybrid (with HDA II) 2023": {
     "platform": "KIA_K8_HEV_1ST_GEN",
     "make": "Kia",

@@ -13,6 +13,7 @@ class ToyotaFlagsSP(IntFlag):
   RADAR_CAN_FILTER = 2
   ZSS = 4
   STOCK_LONGITUDINAL = 8
+  STOP_AND_GO_HACK = 16
 
 
 class ToyotaSafetyFlagsSP:

@@ -40,7 +40,7 @@ class CarInterface(CarInterfaceBase):
   @staticmethod
   def _get_params_sp(stock_cp: structs.CarParams, ret: structs.CarParamsSP, candidate, fingerprint: dict[int, dict[int, int]],
                      car_fw: list[structs.CarParams.CarFw], alpha_long: bool, is_release_sp: bool, docs: bool) -> structs.CarParamsSP:
-    if 0x31a in fingerprint[5]:
+    if 0x131a in fingerprint[1]:
       ret.flags |= RivianFlagsSP.LONGITUDINAL_HARNESS_UPGRADE.value
       stock_cp.radarUnavailable = False
       stock_cp.enableBsm = True

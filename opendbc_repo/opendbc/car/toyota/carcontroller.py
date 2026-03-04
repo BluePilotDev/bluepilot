@@ -14,6 +14,7 @@ from opendbc.car.toyota.values import CAR, NO_STOP_TIMER_CAR, TSS2_CAR, \
 from opendbc.can import CANPacker
 
 from opendbc.sunnypilot.car.toyota.gas_interceptor import GasInterceptorCarController
+from opendbc.sunnypilot.car.toyota.values import ToyotaFlagsSP
 
 Ecu = structs.CarParams.Ecu
 LongCtrlState = structs.CarControl.Actuators.LongControlState
@@ -175,7 +176,7 @@ class CarController(CarControllerBase, GasInterceptorCarController):
 
     # on entering standstill, send standstill request for older TSS-P cars that aren't designed to stay engaged at a stop
     if self.CP.carFingerprint not in NO_STOP_TIMER_CAR or self.CP_SP.enableGasInterceptor:
-      if CS.out.standstill and not self.last_standstill:
+      if CS.out.standstill and not self.last_standstill and not self.CP_SP.flags & ToyotaFlagsSP.STOP_AND_GO_HACK:
         self.standstill_req = True
       if CS.pcm_acc_status != 8:
         # pcm entered standstill or it's disabled

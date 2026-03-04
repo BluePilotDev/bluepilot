@@ -42,15 +42,15 @@ class CarStateExt:
 
     if self.CP.openpilotLongitudinalControl:
       # distance scroll wheel
-      right_scroll = cp_park.vl["WheelButtons"]["RightButton_Scroll"]
+      right_scroll = cp_park.vl["WheelButtons_Fwd"]["RightButton_Scroll"]
       if right_scroll != 255:
         if self.distance_button != right_scroll:
           ret.buttonEvents = [structs.CarState.ButtonEvent(pressed=False, type=ButtonType.gapAdjustCruise)]
         self.distance_button = right_scroll
 
       # button logic for set-speed
-      self.increase_button = cp_park.vl["WheelButtons"]["RightButton_RightClick"] == 2
-      self.decrease_button = cp_park.vl["WheelButtons"]["RightButton_LeftClick"] == 2
+      self.increase_button = cp_park.vl["WheelButtons_Fwd"]["RightButton_RightClick"] == 2
+      self.decrease_button = cp_park.vl["WheelButtons_Fwd"]["RightButton_LeftClick"] == 2
 
       self.increase_counter = self.increase_counter + 1 if self.increase_button else 0
       self.decrease_counter = self.decrease_counter + 1 if self.decrease_button else 0
@@ -86,8 +86,8 @@ class CarStateExt:
       ret.cruiseState.speed = self.set_speed
 
     if self.CP.enableBsm:
-      ret.leftBlindspot = cp_park.vl["BSM_BlindSpotIndicator"]["BSM_BlindSpotIndicator_Left"] != 0
-      ret.rightBlindspot = cp_park.vl["BSM_BlindSpotIndicator"]["BSM_BlindSpotIndicator_Right"] != 0
+      ret.leftBlindspot = cp_park.vl["BSM_BlindSpotIndicator_Fwd"]["BSM_BlindSpotIndicator_Left"] != 0
+      ret.rightBlindspot = cp_park.vl["BSM_BlindSpotIndicator_Fwd"]["BSM_BlindSpotIndicator_Right"] != 0
 
   def update(self, ret: structs.CarState, can_parsers: dict[StrEnum, CANParser]) -> None:
     if self.CP_SP.flags & RivianFlagsSP.LONGITUDINAL_HARNESS_UPGRADE:
@@ -98,6 +98,6 @@ class CarStateExt:
     messages = {}
 
     if CP_SP.flags & RivianFlagsSP.LONGITUDINAL_HARNESS_UPGRADE:
-      messages[Bus.alt] = CANParser(DBC[CP.carFingerprint][Bus.alt], [], 5)
+      messages[Bus.alt] = CANParser(DBC[CP.carFingerprint][Bus.alt], [], 1)
 
     return messages

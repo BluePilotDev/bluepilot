@@ -170,12 +170,3 @@ class CarControlSP:
 @auto_dataclass
 class CarStateSP:
   speedLimit: float = auto_field()
-
-@auto_dataclass
-class ControllerStateBP:
-  lateralUncertainty: float = auto_field()
-  disableBpLongUI: bool = auto_field()
-  leadPresent: bool = auto_field()
-  vLeadMph: float = auto_field()
-  bpSpeedAllow: bool = auto_field()
-  applyBpLong: bool = auto_field()
