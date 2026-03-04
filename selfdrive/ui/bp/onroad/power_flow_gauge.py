@@ -10,7 +10,7 @@ import pyray as rl
 from openpilot.common.filter_simple import FirstOrderFilter, BounceFilter
 from openpilot.common.params import Params
 from openpilot.common.swaglog import cloudlog
-from openpilot.selfdrive.ui.sunnypilot.onroad.developer_ui import DeveloperUiRenderer
+from openpilot.selfdrive.ui.sunnypilot.onroad.developer_ui import DeveloperUiState
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.system.ui.lib.application import FontWeight, gui_app
 from openpilot.system.ui.lib.text_measure import measure_text_cached
@@ -172,11 +172,11 @@ class PowerFlowGauge(Widget):
 
     # Developer UI adjustments
     dev_ui = ui_state.developer_ui
-    if dev_ui in (DeveloperUiRenderer.DEV_UI_RIGHT, DeveloperUiRenderer.DEV_UI_BOTH):
+    if dev_ui in (DeveloperUiState.RIGHT, DeveloperUiState.BOTH):
       gauge_width *= 0.85
 
     bottom_margin = 30
-    if dev_ui in (DeveloperUiRenderer.DEV_UI_BOTTOM, DeveloperUiRenderer.DEV_UI_BOTH):
+    if dev_ui in (DeveloperUiState.BOTTOM, DeveloperUiState.BOTH):
       bottom_margin += 70
 
     # Confidence ball adjustment

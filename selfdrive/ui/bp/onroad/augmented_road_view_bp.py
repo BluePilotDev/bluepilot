@@ -16,7 +16,7 @@ from openpilot.selfdrive.ui.bp.onroad.powerflow_gauge_arched import PowerflowGau
 from openpilot.selfdrive.ui.bp.onroad.torque_bar_renderer_bp import TorqueBarRendererBP
 from openpilot.selfdrive.ui.bp.mici.onroad.confidence_ball_bp import ConfidenceBallTiciBP
 from openpilot.selfdrive.ui.onroad.driver_state import BTN_SIZE
-from openpilot.selfdrive.ui.sunnypilot.onroad.developer_ui import DeveloperUiRenderer
+from openpilot.selfdrive.ui.sunnypilot.onroad.developer_ui import DeveloperUiState, get_bottom_dev_ui_offset
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.selfdrive.ui.bp.lib.ui_debug_logger import bp_ui_log
 
@@ -185,8 +185,8 @@ class AugmentedRoadViewBP(AugmentedRoadView, BlindspotRendererMixin):
     # BluePilot: When no hybrid gauge is active, fall back to the stock arc torque bar
     if not hybrid_active:
       torque_rect = ui_rect
-      if ui_state.developer_ui in (DeveloperUiRenderer.DEV_UI_BOTTOM, DeveloperUiRenderer.DEV_UI_BOTH):
-        torque_rect = rl.Rectangle(ui_rect.x, ui_rect.y, ui_rect.width, ui_rect.height - DeveloperUiRenderer.BOTTOM_BAR_HEIGHT)
+      if ui_state.developer_ui in (DeveloperUiState.BOTTOM, DeveloperUiState.BOTH):
+        torque_rect = rl.Rectangle(ui_rect.x, ui_rect.y, ui_rect.width, ui_rect.height - get_bottom_dev_ui_offset())
       self._torque_bar.render(torque_rect, gauge_height_offset=gauge_height_offset)
 
     # Alerts last so they are never covered by gauges or other overlays
@@ -210,7 +210,7 @@ class AugmentedRoadViewBP(AugmentedRoadView, BlindspotRendererMixin):
     This matches the positioning in DriverStateRendererSP._pre_calculate_drawing_elements():
       position_y = rect.y + height - (UI_BORDER_SIZE + BTN_SIZE // 2) - dev_ui_offset
     """
-    dev_ui_offset = DeveloperUiRenderer.get_bottom_dev_ui_offset()
+    dev_ui_offset = get_bottom_dev_ui_offset()
     return content_rect.y + content_rect.height - (UI_BORDER_SIZE + BTN_SIZE // 2) - dev_ui_offset
 
   def _render_gauges(self, content_rect: rl.Rectangle, ball_offset: float) -> tuple[float, bool]:

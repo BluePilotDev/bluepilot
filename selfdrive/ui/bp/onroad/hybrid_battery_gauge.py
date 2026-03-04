@@ -10,7 +10,7 @@ Displays a horizontal battery gauge with:
 import traceback
 import pyray as rl
 from openpilot.common.filter_simple import FirstOrderFilter
-from openpilot.selfdrive.ui.sunnypilot.onroad.developer_ui import DeveloperUiRenderer
+from openpilot.selfdrive.ui.sunnypilot.onroad.developer_ui import DeveloperUiState, get_bottom_dev_ui_offset
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.system.ui.lib.application import gui_app, FontWeight
 from openpilot.system.ui.lib.text_measure import measure_text_cached
@@ -153,8 +153,7 @@ class HybridBatteryGauge(Widget):
   def _compute_bottom_margin(self, s: float) -> float:
     """Compute bottom margin accounting for developer UI bottom bar."""
     margin = BATTERY_Y_MARGIN * s
-    if ui_state.developer_ui in (DeveloperUiRenderer.DEV_UI_BOTTOM, DeveloperUiRenderer.DEV_UI_BOTH):
-      margin += DeveloperUiRenderer.BOTTOM_BAR_HEIGHT
+    margin += get_bottom_dev_ui_offset()
     return margin
 
   def _compute_scale(self, rect_width: float) -> float:
