@@ -4,25 +4,21 @@ Copyright (c) 2021-, Haibin Wen, sunnypilot, and a number of other contributors.
 This file is part of sunnypilot and is licensed under the MIT License.
 See the LICENSE.md file in the root directory for more details.
 """
-import pyray as rl
-from enum import IntEnum
-
 from openpilot.selfdrive.ui.mici.layouts.settings import settings as OP
 from openpilot.selfdrive.ui.bp.mici.widgets.button_bp import BigButtonBP as BigButton
 from openpilot.selfdrive.ui.sunnypilot.mici.layouts.sunnylink import SunnylinkLayoutMici
 from openpilot.selfdrive.ui.sunnypilot.mici.layouts.models import ModelsLayoutMici
+from openpilot.system.ui.lib.application import gui_app
 # BluePilot: START - BP settings tab import
 from openpilot.selfdrive.ui.bp.mici.layouts.settings.bluepilot import BluePilotLayoutMici
 # BluePilot: END - BP settings tab import
 
 ICON_SIZE = 70
 
-OP.PanelType = IntEnum(
+OP.PanelType = IntEnum(  # type: ignore
   "PanelType",
   [es.name for es in OP.PanelType] + [
     "SUNNYLINK",
-    "MODELS",
-    "BLUEPILOT",  # BluePilot: START/END - BP settings panel type
   ],
   start=0,
 )
@@ -32,24 +28,19 @@ class SettingsLayoutSP(OP.SettingsLayout):
   def __init__(self):
     OP.SettingsLayout.__init__(self)
 
+    sunnylink_panel = SunnylinkLayoutMici(back_callback=gui_app.pop_widget)
     sunnylink_btn = BigButton("sunnylink", "", "icons_mici/settings/developer/ssh.png")
-    sunnylink_btn.set_click_callback(lambda: self._set_current_panel(OP.PanelType.SUNNYLINK))
+    sunnylink_btn.set_click_callback(lambda: gui_app.push_widget(sunnylink_panel))
 
+    models_panel = ModelsLayoutMici(back_callback=gui_app.pop_widget)
     models_btn = BigButton("models", "", "../../sunnypilot/selfdrive/assets/offroad/icon_models.png")
-    models_btn.set_click_callback(lambda: self._set_current_panel(OP.PanelType.MODELS))
+    models_btn.set_click_callback(lambda: gui_app.push_widget(models_panel))
 
     # BluePilot: START - BP settings button and panel
+    bp_panel = BluePilotLayoutMici(back_callback=gui_app.pop_widget)
     bluepilot_btn = BigButton("bluepilot", "", "icons_mici/settings/car_icon.png", tint=rl.BLUE)
-    bluepilot_btn.set_click_callback(lambda: self._set_current_panel(OP.PanelType.BLUEPILOT))
+    bluepilot_btn.set_click_callback(lambda: gui_app.push_widget(bp_panel))
     # BluePilot: END - BP settings button and panel
-
-    self._panels.update({
-      OP.PanelType.SUNNYLINK: OP.PanelInfo("sunnylink", SunnylinkLayoutMici(back_callback=lambda: self._set_current_panel(None))),
-      OP.PanelType.MODELS: OP.PanelInfo("models", ModelsLayoutMici(back_callback=lambda: self._set_current_panel(None))),
-      # BluePilot: START - BP settings panel entry
-      OP.PanelType.BLUEPILOT: OP.PanelInfo("BluePilot", BluePilotLayoutMici(back_callback=lambda: self._set_current_panel(None))),
-      # BluePilot: END - BP settings panel entry
-    })
 
     items = self._scroller._items.copy()
 
