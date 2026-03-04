@@ -5,7 +5,7 @@ from openpilot.system.ui.widgets.scroller import Scroller
 from openpilot.selfdrive.ui.bp.mici.widgets.button_bp import BigButtonBP, BigParamControlBP, BigMultiToggleBP, BigMultiParamToggleBP, BigMultiParamToggleBoolBP
 from openpilot.selfdrive.ui.bp.mici.widgets.floatbutton import BigParamFloatControl, BigParamIntControl
 from openpilot.system.ui.lib.application import gui_app
-from openpilot.system.ui.widgets import NavWidget
+from openpilot.system.ui.widgets.nav_widget import NavWidget
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.common.params import Params
 from openpilot.selfdrive.ui.bp.mici.widgets.web_server_qr_dialog import WebServerQRDialog
@@ -65,7 +65,8 @@ class BluePilotLayoutMici(NavWidget):
     #self.charging_btn = BigButton("charging", "", "icons_mici/settings/charge_icon.png")
     #self.charging_btn.set_click_callback(lambda: self._show_charging_view())
 
-    self._scroller = Scroller([
+    self._scroller = Scroller(snap_items=False)
+    self._scroller._scroller.add_widgets([
       self.enable_web_routes,
       self.show_web_routes_qr,
       self.show_hands_free_ui,
@@ -94,7 +95,7 @@ class BluePilotLayoutMici(NavWidget):
       self.disable_BP_long,
       self.disable_dowhill_comp,
       self.ui_debug_log,
-    ], snap_items=False)
+    ])
 
     # Toggle lists
     self._refresh_toggles = (
@@ -136,15 +137,21 @@ class BluePilotLayoutMici(NavWidget):
   def _show_qr_dialog(self):
     """Show QR code dialog for webserver access."""
     # Only show if server is enabled
-    if self._params.get_bool("EnableWebRoutesServer"):
+    if not self._params.get_bool("EnableWebRoutesServer"):
+      return
+    try:
       qr_dialog = WebServerQRDialog(back_callback=lambda: gui_app.set_modal_overlay(None))
       gui_app.set_modal_overlay(qr_dialog)
-    # If disabled, could show a message dialog, but for now just do nothing
+    except Exception as e:
+      from openpilot.common.swaglog import cloudlog
+      cloudlog.warning(f"Failed to show QR dialog: {e}")
 
   def _update_state(self):
     super()._update_state()
     self.show_lead_vehicle._load_value()
     self.hybrid_power_flow_style._load_value()
+    # Refresh dependent control enabled state (e.g. after toggling enable_lane_positioning)
+    self._update_buttons()
 
   def _update_buttons(self):
     """Update button enabled state based on server status and parameter dependencies (see MICI_MENU.csv)."""

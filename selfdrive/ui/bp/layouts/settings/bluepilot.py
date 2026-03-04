@@ -420,15 +420,17 @@ class BluePilotLayout(Widget):
       self._params.put_bool(param, state)
     except UnknownKeyName:
       pass  # Param not available in dev environment
-    self._update_toggles()
+    self._update_toggles(just_toggled={param: state})
 
-  def _update_toggles(self):
-    """Update toggle states from params."""
+  def _update_toggles(self, just_toggled: dict | None = None):
+    """Update toggle states from params. just_toggled: {param: value} for params we just wrote (avoids refresh race)."""
     ui_state.update_params()
+    fresh = just_toggled or {}
 
-    # Refresh toggles from params to mirror external changes
+    # Refresh toggles from params to mirror external changes (use fresh for params we just wrote)
     for key, item in self._refresh_toggles:
-      item.action_item.set_state(self._safe_get_bool(ui_state.params, key))
+      state = fresh[key] if key in fresh else self._safe_get_bool(ui_state.params, key)
+      item.action_item.set_state(state)
 
     # Update button enabled states
     self._radar_overlay_size_btn.action_item.set_enabled(self._safe_get_bool(ui_state.params, "FordPrefShowRadarLeadOverlay"))
@@ -437,24 +439,24 @@ class BluePilotLayout(Widget):
     except (TypeError, ValueError):
       overlay_idx = 1
     self._radar_overlay_size_btn.action_item.set_selected_button(overlay_idx)
-    # Hybrid gauge size: enable if either battery or power flow is enabled
-    gauge_either_on = (self._safe_get_bool(ui_state.params, "FordPrefHybridBatteryStatus")
-                       or self._safe_get_bool(ui_state.params, "FordPrefHybridPowerFlow"))
-    self._hybrid_gauge_size_btn.action_item.set_enabled(gauge_either_on)
+    # Hybrid gauge size and style: enable only when power flow gauge is enabled
+    power_flow_on = self._safe_get_bool(ui_state.params, "FordPrefHybridPowerFlow")
+    self._hybrid_gauge_size_btn.action_item.set_enabled(power_flow_on)
     try:
       gauge_size = int(self._safe_get(ui_state.params, "FordPrefHybridDriveGaugeSize") or 1)
     except (TypeError, ValueError):
       gauge_size = 1
     gauge_size = min(gauge_size, 2)  # Clamp old 3-tier values
     self._hybrid_gauge_size_btn.action_item.set_selected_button(gauge_size - 1)
-    self._hybrid_gauge_style_btn.action_item.set_enabled(gauge_either_on)
+    self._hybrid_gauge_style_btn.action_item.set_enabled(power_flow_on)
     raw_style = self._safe_get(ui_state.params, "FordPrefHybridGaugeStyle") or b"flat"
     style_str = (raw_style.decode("utf-8", errors="replace").strip("\x00").lower()
                  if isinstance(raw_style, bytes) else str(raw_style).strip().lower())
     style_idx = 1 if style_str == "arched" else 0
     self._hybrid_gauge_style_btn.action_item.set_selected_button(style_idx)
-    lane_pos = self._safe_get_bool(ui_state.params, "enable_lane_positioning")
-    custom_prof = self._safe_get_bool(ui_state.params, "custom_profile")
+    # Use just_toggled for params we just wrote to avoid update_params refresh race
+    lane_pos = fresh.get("enable_lane_positioning") if "enable_lane_positioning" in fresh else self._safe_get_bool(ui_state.params, "enable_lane_positioning")
+    custom_prof = fresh.get("custom_profile") if "custom_profile" in fresh else self._safe_get_bool(ui_state.params, "custom_profile")
     self._custom_path_offset.action_item.set_enabled(lane_pos)
     self._enable_lane_full_mode.action_item.set_enabled(lane_pos)
     self._pc_blend_ratio_high_C.action_item.set_enabled(custom_prof)

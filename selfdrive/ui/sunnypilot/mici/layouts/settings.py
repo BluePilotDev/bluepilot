@@ -4,6 +4,8 @@ Copyright (c) 2021-, Haibin Wen, sunnypilot, and a number of other contributors.
 This file is part of sunnypilot and is licensed under the MIT License.
 See the LICENSE.md file in the root directory for more details.
 """
+import pyray as rl
+
 from openpilot.selfdrive.ui.mici.layouts.settings import settings as OP
 from openpilot.selfdrive.ui.bp.mici.widgets.button_bp import BigButtonBP as BigButton
 from openpilot.selfdrive.ui.sunnypilot.mici.layouts.sunnylink import SunnylinkLayoutMici
@@ -14,14 +16,6 @@ from openpilot.selfdrive.ui.bp.mici.layouts.settings.bluepilot import BluePilotL
 # BluePilot: END - BP settings tab import
 
 ICON_SIZE = 70
-
-OP.PanelType = IntEnum(  # type: ignore
-  "PanelType",
-  [es.name for es in OP.PanelType] + [
-    "SUNNYLINK",
-  ],
-  start=0,
-)
 
 
 class SettingsLayoutSP(OP.SettingsLayout):

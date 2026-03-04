@@ -34,31 +34,36 @@ class WebServerQRDialogTici(Widget):
 
   def _get_wifi_ip(self) -> str:
     """Get WiFi interface IP address."""
-    try:
-      # Try using ip command (works on Linux/AGNOS)
-      result = subprocess.run(['ip', 'addr', 'show', 'wlan0'],
-                              capture_output=True, text=True, timeout=2)
-      for line in result.stdout.split('\n'):
-        if 'inet ' in line:
+    def _parse_ip(line: str) -> str | None:
+      try:
+        if 'inet ' in line and len(line.strip().split()) >= 2:
           ip = line.strip().split()[1].split('/')[0]
           if ip and not ip.startswith('127.'):
             return ip
+      except (IndexError, AttributeError):
+        pass
+      return None
+
+    try:
+      result = subprocess.run(['ip', 'addr', 'show', 'wlan0'],
+                              capture_output=True, text=True, timeout=2)
+      for line in (result.stdout or '').split('\n'):
+        ip = _parse_ip(line)
+        if ip:
+          return ip
     except Exception as e:
       cloudlog.warning(f"Failed to get WiFi IP: {e}")
-    
-    # Fallback: try other wlan interfaces
+
     try:
       for iface in ['wlan1', 'wlan2']:
         result = subprocess.run(['ip', 'addr', 'show', iface],
                                 capture_output=True, text=True, timeout=2)
-        for line in result.stdout.split('\n'):
-          if 'inet ' in line:
-            ip = line.strip().split()[1].split('/')[0]
-            if ip and not ip.startswith('127.'):
-              return ip
-    except:
+        for line in (result.stdout or '').split('\n'):
+          ip = _parse_ip(line)
+          if ip:
+            return ip
+    except Exception:
       pass
-    
     return ""
 
   def _get_server_url(self) -> str:
@@ -66,8 +71,12 @@ class WebServerQRDialogTici(Widget):
     wifi_ip = self._get_wifi_ip()
     if not wifi_ip:
       return ""
-    
-    port = self._params.get("BPPortalPort") or "8088"
+
+    try:
+      port_raw = self._params.get("BPPortalPort") or "8088"
+      port = port_raw.decode("utf-8") if isinstance(port_raw, bytes) else str(port_raw)
+    except Exception:
+      port = "8088"
     return f"http://{wifi_ip}:{port}"
 
   def _generate_qr_code(self) -> None:
@@ -115,9 +124,14 @@ class WebServerQRDialogTici(Widget):
 
   def _render(self, rect: rl.Rectangle) -> int:
     rl.clear_background(rl.Color(224, 224, 224, 255))
-    
-    self._generate_qr_code()
-    
+
+    try:
+      self._generate_qr_code()
+      url = self._get_server_url()
+    except Exception as e:
+      cloudlog.warning(f"QR dialog state error: {e}")
+      url = ""
+
     margin = 70
     content_rect = rl.Rectangle(rect.x + margin, rect.y + margin, rect.width - 2 * margin, rect.height - 2 * margin)
     y = content_rect.y
@@ -143,13 +157,12 @@ class WebServerQRDialogTici(Widget):
     right_width = content_rect.width // 2 - 20
 
     # QR code on right
-    qr_size = min(right_width, remaining_height) - 40
+    qr_size = max(80, min(right_width, remaining_height) - 40)
     qr_x = content_rect.x + left_width + 40 + (right_width - qr_size) // 2
     qr_y = y
-    self._render_qr_code(rl.Rectangle(qr_x, qr_y, qr_size, qr_size))
-    
+    self._render_qr_code(rl.Rectangle(qr_x, qr_y, qr_size, qr_size), has_url=bool(url))
+
     # URL below QR code
-    url = self._get_server_url()
     if url:
       url_y = qr_y + qr_size + 20
       gui_label(
@@ -185,18 +198,21 @@ class WebServerQRDialogTici(Widget):
 
     return -1
 
-  def _render_qr_code(self, rect: rl.Rectangle) -> None:
-    """Render QR code texture."""
+  def _render_qr_code(self, rect: rl.Rectangle, has_url: bool = True) -> None:
+    """Render QR code texture or error message when no IP."""
     if not self._qr_texture:
-      rl.draw_rectangle_rounded(rect, 0.1, 20, rl.Color(240, 240, 240, 255))
-      error_font = gui_app.font(FontWeight.BOLD)
-      rl.draw_text_ex(
-        error_font, "QR Code Error", 
-        rl.Vector2(rect.x + 20, rect.y + rect.height // 2 - 15), 
-        30, 0.0, rl.RED
-      )
+      msg = "No WiFi connection" if not has_url else "QR Code Error"
+      try:
+        rl.draw_rectangle_rounded(rect, 0.1, 20, rl.Color(240, 240, 240, 255))
+        error_font = gui_app.font(FontWeight.BOLD)
+        msg_y = rect.y + max(0, rect.height // 2 - 15)
+        rl.draw_text_ex(error_font, msg, rl.Vector2(rect.x + 20, msg_y), 28, 0.0, rl.RED)
+      except Exception as e:
+        cloudlog.warning(f"QR dialog draw error: {e}")
       return
 
+    if rect.height <= 0 or rect.width <= 0 or self._qr_texture.height <= 0:
+      return
     source = rl.Rectangle(0, 0, self._qr_texture.width, self._qr_texture.height)
     rl.draw_texture_pro(self._qr_texture, source, rect, rl.Vector2(0, 0), 0, rl.WHITE)
 

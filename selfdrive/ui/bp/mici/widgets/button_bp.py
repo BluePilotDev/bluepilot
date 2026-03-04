@@ -37,7 +37,7 @@ class BigButtonBP(BigButton):
     if not self.enabled:
       txt_bg = self._txt_disabled_bg
     elif self.is_pressed:
-      txt_bg = self._txt_hover_bg
+      txt_bg = self._txt_pressed_bg
 
     scale = self._scale_filter.update(PRESSED_SCALE if self.is_pressed else 1.0)
     btn_x = self._rect.x + (self._rect.width * (1 - scale)) / 2

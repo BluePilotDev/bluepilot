@@ -6,7 +6,7 @@ from typing import Callable
 
 from openpilot.common.swaglog import cloudlog
 from openpilot.common.params import Params
-from openpilot.system.ui.widgets import NavWidget
+from openpilot.system.ui.widgets.nav_widget import NavWidget
 from openpilot.system.ui.lib.application import FontWeight, gui_app
 from openpilot.system.ui.widgets.label import MiciLabel
 from openpilot.selfdrive.ui.mici.widgets.button import BigParamControl
@@ -39,31 +39,39 @@ class WebServerQRDialog(NavWidget):
 
   def _get_wifi_ip(self) -> str:
     """Get WiFi interface IP address."""
+    def _parse_ip_from_line(line: str) -> str | None:
+      try:
+        if 'inet ' in line:
+          parts = line.strip().split()
+          if len(parts) >= 2:
+            ip = parts[1].split('/')[0]
+            if ip and not ip.startswith('127.'):
+              return ip
+      except (IndexError, AttributeError):
+        pass
+      return None
+
     try:
-      # Try using ip command (works on Linux/AGNOS)
       result = subprocess.run(['ip', 'addr', 'show', 'wlan0'],
                               capture_output=True, text=True, timeout=2)
-      for line in result.stdout.split('\n'):
-        if 'inet ' in line:
-          ip = line.strip().split()[1].split('/')[0]
-          if ip and not ip.startswith('127.'):
-            return ip
+      for line in (result.stdout or '').split('\n'):
+        ip = _parse_ip_from_line(line)
+        if ip:
+          return ip
     except Exception as e:
       cloudlog.warning(f"Failed to get WiFi IP: {e}")
-    
-    # Fallback: try other wlan interfaces
+
     try:
       for iface in ['wlan1', 'wlan2']:
         result = subprocess.run(['ip', 'addr', 'show', iface],
                                 capture_output=True, text=True, timeout=2)
-        for line in result.stdout.split('\n'):
-          if 'inet ' in line:
-            ip = line.strip().split()[1].split('/')[0]
-            if ip and not ip.startswith('127.'):
-              return ip
-    except:
+        for line in (result.stdout or '').split('\n'):
+          ip = _parse_ip_from_line(line)
+          if ip:
+            return ip
+    except Exception:
       pass
-    
+
     return ""
 
   def _get_server_url(self) -> str:
@@ -71,8 +79,12 @@ class WebServerQRDialog(NavWidget):
     wifi_ip = self._get_wifi_ip()
     if not wifi_ip:
       return ""
-    
-    port = self._params.get("BPPortalPort") or "8088"
+
+    try:
+      port_raw = self._params.get("BPPortalPort") or "8088"
+      port = port_raw.decode("utf-8") if isinstance(port_raw, bytes) else str(port_raw)
+    except Exception:
+      port = "8088"
     return f"http://{wifi_ip}:{port}"
 
   def _generate_qr_code(self) -> None:
@@ -119,22 +131,26 @@ class WebServerQRDialog(NavWidget):
         self._back_callback()
 
   def _render(self, rect: rl.Rectangle) -> int:
-    self._generate_qr_code()
-    
+    try:
+      self._generate_qr_code()
+      url = self._get_server_url()
+    except Exception as e:
+      cloudlog.warning(f"QR dialog state error: {e}")
+      url = ""
+
     # Layout: QR code on left, controls on right
     padding = 24
-    qr_size = min(self._rect.height - (padding * 2), (self._rect.width - padding * 3) // 2)
+    qr_size = max(80, min(self._rect.height - (padding * 2), (self._rect.width - padding * 3) // 2))
     qr_x = self._rect.x + padding
     qr_y = self._rect.y + padding
-    
+
     right_x = qr_x + qr_size + padding
-    right_width = self._rect.width - right_x - padding
-    
-    # Render QR code on left
-    self._render_qr_code(rl.Rectangle(qr_x, qr_y, qr_size, qr_size))
-    
+    right_width = max(100, self._rect.width - right_x - padding)
+
+    # Render QR code on left (or error message when no IP)
+    self._render_qr_code(rl.Rectangle(qr_x, qr_y, qr_size, qr_size), has_url=bool(url))
+
     # Render URL label below QR code
-    url = self._get_server_url()
     if url:
       self._url_label.set_text(url)
       self._url_label.set_width(int(qr_size))
@@ -146,13 +162,8 @@ class WebServerQRDialog(NavWidget):
       self._scan_label.set_position(qr_x, qr_y + qr_size + 16 + 40)
       self._scan_label.render()
     else:
-      # Show error if no IP
-      error_font = gui_app.font(FontWeight.MEDIUM)
-      rl.draw_text_ex(
-        error_font, "No WiFi connection", 
-        rl.Vector2(qr_x + 20, qr_y + qr_size // 2 - 15), 
-        32, 0.0, rl.RED
-      )
+      # No IP - message shown in _render_qr_code
+      pass
     
     # Render title and toggle on right
     title_y = self._rect.y + padding
@@ -168,17 +179,20 @@ class WebServerQRDialog(NavWidget):
     
     return -1
 
-  def _render_qr_code(self, rect: rl.Rectangle) -> None:
-    """Render QR code texture."""
+  def _render_qr_code(self, rect: rl.Rectangle, has_url: bool = True) -> None:
+    """Render QR code texture or error message when no IP/generation failed."""
     if not self._qr_texture:
-      error_font = gui_app.font(FontWeight.BOLD)
-      rl.draw_text_ex(
-        error_font, "QR Code Error", 
-        rl.Vector2(rect.x + 20, rect.y + rect.height // 2 - 15), 
-        30, 0.0, rl.RED
-      )
+      msg = "No WiFi connection" if not has_url else "QR Code Error"
+      try:
+        error_font = gui_app.font(FontWeight.BOLD)
+        msg_y = rect.y + max(0, rect.height // 2 - 15)
+        rl.draw_text_ex(error_font, msg, rl.Vector2(rect.x + 20, msg_y), 28, 0.0, rl.RED)
+      except Exception as e:
+        cloudlog.warning(f"QR dialog draw error: {e}")
       return
 
+    if rect.height <= 0 or self._qr_texture.height <= 0:
+      return
     scale = rect.height / self._qr_texture.height
     pos = rl.Vector2(rect.x, rect.y)
     rl.draw_texture_ex(self._qr_texture, pos, 0.0, scale, rl.WHITE)
