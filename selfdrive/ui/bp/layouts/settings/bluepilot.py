@@ -439,16 +439,19 @@ class BluePilotLayout(Widget):
     except (TypeError, ValueError):
       overlay_idx = 1
     self._radar_overlay_size_btn.action_item.set_selected_button(overlay_idx)
-    # Hybrid gauge size and style: enable only when power flow gauge is enabled
-    power_flow_on = self._safe_get_bool(ui_state.params, "FordPrefHybridPowerFlow")
-    self._hybrid_gauge_size_btn.action_item.set_enabled(power_flow_on)
+    # Hybrid gauge size and style: enable only when power flow gauge is enabled (NOT battery status)
+    self._hybrid_gauge_size_btn.action_item.set_enabled(
+      lambda: self._safe_get_bool(ui_state.params, "FordPrefHybridPowerFlow")
+    )
+    self._hybrid_gauge_style_btn.action_item.set_enabled(
+      lambda: self._safe_get_bool(ui_state.params, "FordPrefHybridPowerFlow")
+    )
     try:
       gauge_size = int(self._safe_get(ui_state.params, "FordPrefHybridDriveGaugeSize") or 1)
     except (TypeError, ValueError):
       gauge_size = 1
     gauge_size = min(gauge_size, 2)  # Clamp old 3-tier values
     self._hybrid_gauge_size_btn.action_item.set_selected_button(gauge_size - 1)
-    self._hybrid_gauge_style_btn.action_item.set_enabled(power_flow_on)
     raw_style = self._safe_get(ui_state.params, "FordPrefHybridGaugeStyle") or b"flat"
     style_str = (raw_style.decode("utf-8", errors="replace").strip("\x00").lower()
                  if isinstance(raw_style, bytes) else str(raw_style).strip().lower())
