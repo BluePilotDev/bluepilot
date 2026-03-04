@@ -135,13 +135,12 @@ class BluePilotLayoutMici(NavWidget):
     self._scroller.render(rect)
 
   def _show_qr_dialog(self):
-    """Show QR code dialog for webserver access."""
-    # Only show if server is enabled
+    """Show QR code dialog for webserver access. MICI uses push_widget/pop_widget (no set_modal_overlay)."""
     if not self._params.get_bool("EnableWebRoutesServer"):
       return
     try:
-      qr_dialog = WebServerQRDialog(back_callback=lambda: gui_app.set_modal_overlay(None))
-      gui_app.set_modal_overlay(qr_dialog)
+      qr_dialog = WebServerQRDialog(back_callback=gui_app.pop_widget)
+      gui_app.push_widget(qr_dialog)
     except Exception as e:
       from openpilot.common.swaglog import cloudlog
       cloudlog.warning(f"Failed to show QR dialog: {e}")
