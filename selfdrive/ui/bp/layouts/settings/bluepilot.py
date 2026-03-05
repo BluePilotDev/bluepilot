@@ -490,7 +490,7 @@ class BluePilotLayout(Widget):
 
   def _on_network_updated(self, networks: list[Network]):
     """Update saved networks list when WiFi networks are updated"""
-    self._saved_networks = [n for n in networks if n.is_saved]
+    self._saved_networks = [n for n in networks if self._wifi_manager.is_connection_saved(n.ssid)]
     self._preferred_network_action.set_enabled(len(self._saved_networks) > 0)
 
     # Check if preferred network is still saved in NetworkManager
