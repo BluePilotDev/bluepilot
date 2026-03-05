@@ -378,11 +378,11 @@ class BluePilotLayout(Widget):
       callback=self._select_preferred_network
     )
 
-    # Clear model cache (ModelRunnerTypeCache + ModelManager_ActiveBundle) and reboot
+    # Clear model runner cache (ModelRunnerTypeCache + ModelManager_ActiveBundle) and reboot
     self._clear_model_cache_btn = button_item(
-      lambda: tr("Clear Model Cache"),
+      lambda: tr("Clear Crashed Model"),
       lambda: tr("CLEAR"),
-      lambda: tr("Clear model runner cache and reboot. Fixes 'Communication Issue' if modeld fails to start."),
+      lambda: tr("Clear crashed model runner cache and reboot. Fixes 'Communication Issue' if modeld fails to start."),
       callback=self._clear_model_cache
     )
 
@@ -597,7 +597,7 @@ class BluePilotLayout(Widget):
         cloudlog.info("BluePilot: Cleared model cache (ModelRunnerTypeCache, ModelManager_ActiveBundle), triggered reboot")
 
     dialog = ConfirmDialog(
-      tr("Clear model runner cache and reboot? This fixes 'Communication Issue' when modeld fails to start."),
+      tr("Clear crashed model runner cache and reboot? This fixes 'Communication Issue' when modeld fails to start."),
       tr("Clear & Reboot"),
       callback=handle_confirm
     )
