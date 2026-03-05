@@ -304,8 +304,6 @@ BluePilot implements intelligent speed and braking control for Ford vehicles.
 
 #### Tuning Parameters (exposed in UI)
 - `disable_BP_long_UI` - Enable/disable BP longitudinal control
-- `FordFollowingGasROC` - Gas rate-of-change limit
-- `FordFollowingAccelROC` - Acceleration rate-of-change limit
 
 ### Implementation Location
 
@@ -407,8 +405,6 @@ BluePilot uses a comprehensive parameter system for configuration and feature to
 #### Ford Preferences (`FordPref*`)
 - `FordPrefHybridVehicle` - Enable hybrid vehicle features
 - `FordPrefEnableDebugLogs` - Enable debug logging
-- `FordFollowingGasROC` - Gas rate-of-change limit
-- `FordFollowingAccelROC` - Acceleration rate-of-change limit
 
 #### BluePilot Portal (`BPPortal*`)
 - `BPPortalEnabled` - Enable portal server

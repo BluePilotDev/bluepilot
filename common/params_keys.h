@@ -290,8 +290,6 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"disable_BP_lat_UI", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"disable_BP_long_UI", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"disable_downhill_comp_UI", {PERSISTENT | BACKUP, BOOL, "0"}},
-    {"FordFollowingGasROC", {PERSISTENT | BACKUP, FLOAT, "0.05"}},
-    {"FordFollowingAccelROC", {PERSISTENT | BACKUP, FLOAT, "0.025"}},
     {"vbatt_pause_charging", {PERSISTENT | BACKUP, FLOAT, "11.8"}},
     {"show_lead_speed", {PERSISTENT | BACKUP, BOOL, "1"}},
     {"FordPrefShowRadarLeadOverlay", {PERSISTENT | BACKUP, BOOL, "1"}},
