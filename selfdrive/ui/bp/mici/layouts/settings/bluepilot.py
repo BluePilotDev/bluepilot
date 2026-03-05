@@ -8,6 +8,10 @@ from openpilot.system.ui.lib.application import gui_app
 from openpilot.system.ui.widgets.nav_widget import NavWidget
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.common.params import Params
+from openpilot.common.swaglog import cloudlog
+from openpilot.system.ui.lib.multilang import tr
+from openpilot.system.ui.widgets import DialogResult
+from openpilot.system.ui.widgets.confirm_dialog import ConfirmDialog
 from openpilot.selfdrive.ui.bp.mici.widgets.web_server_qr_dialog import WebServerQRDialog
 
 class BluePilotLayoutMici(NavWidget):
@@ -50,6 +54,8 @@ class BluePilotLayoutMici(NavWidget):
     self.disable_BP_lat = BigParamControlBP("disable BP lateral control", "disable_BP_lat_UI")
     self.disable_BP_long = BigParamControlBP("bypass BP longitudinal control", "disable_BP_long_UI")
     self.disable_dowhill_comp = BigParamControlBP("disable downhill compensation", "disable_downhill_comp_UI")
+    self.clear_model_cache = BigButtonBP("clear model cache", "", "icons_mici/settings/device/reboot.png")
+    self.clear_model_cache.set_click_callback(self._clear_model_cache)
     self.ui_debug_log = BigParamControlBP("ui debug logging", "BPUIDebugLog")
     self.vbatt_pause_charging = BigParamFloatControl("12V battery limit", "vbatt_pause_charging", min=11.0, max=14.0, step=0.1)
 
@@ -94,6 +100,7 @@ class BluePilotLayoutMici(NavWidget):
       self.disable_BP_lat,
       self.disable_BP_long,
       self.disable_dowhill_comp,
+      self.clear_model_cache,
       self.ui_debug_log,
     ])
 
@@ -133,6 +140,29 @@ class BluePilotLayoutMici(NavWidget):
 
   def _render(self, rect: rl.Rectangle):
     self._scroller.render(rect)
+
+  def _clear_model_cache(self):
+    """Clear ModelRunnerTypeCache and ModelManager_ActiveBundle, then reboot."""
+
+    def handle_confirm(result: DialogResult):
+      if result == DialogResult.CONFIRM:
+        try:
+          self._params.remove("ModelRunnerTypeCache")
+        except Exception:
+          pass
+        try:
+          self._params.remove("ModelManager_ActiveBundle")
+        except Exception:
+          pass
+        self._params.put_bool_nonblocking("DoReboot", True)
+        cloudlog.info("BluePilot: Cleared model cache (ModelRunnerTypeCache, ModelManager_ActiveBundle), triggered reboot")
+
+    dialog = ConfirmDialog(
+      tr("Clear model runner cache and reboot? This fixes 'Communication Issue' when modeld fails to start."),
+      tr("Clear & Reboot"),
+      callback=handle_confirm
+    )
+    gui_app.push_widget(dialog)
 
   def _show_qr_dialog(self):
     """Show QR code dialog for webserver access. MICI uses push_widget/pop_widget (no set_modal_overlay)."""

@@ -4,7 +4,8 @@ from openpilot.common.params import Params
 from openpilot.common.params_pyx import UnknownKeyName
 from openpilot.common.swaglog import cloudlog
 from openpilot.system.ui.widgets import Widget, DialogResult
-from openpilot.system.ui.widgets.list_view import toggle_item, multiple_button_item, ButtonAction, ListItem
+from openpilot.system.ui.widgets.confirm_dialog import ConfirmDialog
+from openpilot.system.ui.widgets.list_view import toggle_item, multiple_button_item, button_item, ButtonAction, ListItem
 from openpilot.system.ui.widgets.scroller_tici import Scroller
 from openpilot.system.ui.widgets.option_dialog import MultiOptionDialog
 from openpilot.system.ui.lib.application import gui_app
@@ -377,6 +378,14 @@ class BluePilotLayout(Widget):
       callback=self._select_preferred_network
     )
 
+    # Clear model cache (ModelRunnerTypeCache + ModelManager_ActiveBundle) and reboot
+    self._clear_model_cache_btn = button_item(
+      lambda: tr("Clear Model Cache"),
+      lambda: tr("CLEAR"),
+      lambda: tr("Clear model runner cache and reboot. Fixes 'Communication Issue' if modeld fails to start."),
+      callback=self._clear_model_cache
+    )
+
     return [
       self._show_hands_free_ui,
       self._show_blindspot,
@@ -404,6 +413,7 @@ class BluePilotLayout(Widget):
       self._disable_BP_long,
       self._disable_dowhill_comp,
       self._preferred_network_btn,
+      self._clear_model_cache_btn,
       self._ui_debug_log,
     ]
 
@@ -569,6 +579,29 @@ class BluePilotLayout(Widget):
       self._preferred_network_dialog = None
 
     gui_app.set_modal_overlay(self._preferred_network_dialog, callback=handle_selection)
+
+  def _clear_model_cache(self):
+    """Clear ModelRunnerTypeCache and ModelManager_ActiveBundle, then reboot."""
+
+    def handle_confirm(result: DialogResult):
+      if result == DialogResult.CONFIRM:
+        try:
+          self._params.remove("ModelRunnerTypeCache")
+        except Exception:
+          pass
+        try:
+          self._params.remove("ModelManager_ActiveBundle")
+        except Exception:
+          pass
+        self._params.put_bool_nonblocking("DoReboot", True)
+        cloudlog.info("BluePilot: Cleared model cache (ModelRunnerTypeCache, ModelManager_ActiveBundle), triggered reboot")
+
+    dialog = ConfirmDialog(
+      tr("Clear model runner cache and reboot? This fixes 'Communication Issue' when modeld fails to start."),
+      tr("Clear & Reboot"),
+      callback=handle_confirm
+    )
+    gui_app.push_widget(dialog)
 
   def _set_overlay_size(self, button_index: int):
     """Handle overlay size button selection."""
