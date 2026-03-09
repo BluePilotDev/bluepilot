@@ -20,6 +20,7 @@ from opendbc.sunnypilot.car.ford.icbm import IntelligentCruiseButtonManagementIn
 
 LongCtrlState = structs.CarControl.Actuators.LongControlState
 VisualAlert = structs.CarControl.HUDControl.VisualAlert
+MADSState = structs.ModularAssistiveDrivingSystem.ModularAssistiveDrivingSystemState
 
 def index_function(idx, max_val=192, max_idx=32):
   return (max_val) * ((idx/max_idx)**2)
@@ -379,6 +380,11 @@ class CarController(CarControllerBase, IntelligentCruiseButtonManagementInterfac
     main_on = CS.out.cruiseState.available
     gasPressed = CS.out.gasPressed
     brakePressed = CS.out.brakePressed
+    # BluePilot: tighten hands-free cluster UI gating to true lateral control ownership
+    mads_available = bool(CC_SP.mads.available)
+    mads_strict_in_control = CC.latActive and (not mads_available or CC_SP.mads.state == MADSState.enabled)
+    show_hands_free_cluster_msg = self.send_hands_free_cluster_msg and mads_strict_in_control
+    # End BluePilot
     # if self.fordVariables is None:
       # act = actuators.as_builder()
       # self.fordVariables = act.fordVariables
@@ -392,7 +398,9 @@ class CarController(CarControllerBase, IntelligentCruiseButtonManagementInterfac
       # print(f'HudControl: {hud_control}')
       # print(f'tja_msg: {self.tja_msg} | tja_warn: {self.tja_warn}')
       if (self.frame % CarControllerParams.ACC_UI_STEP) == 0:
-        self.tja_msg, self.tja_warn, self.hands = compute_dm_msg_values(self.ss, hud_control, self.send_hands_free_cluster_msg, main_on, CS.out.cruiseState.standstill)
+        self.tja_msg, self.tja_warn, self.hands = compute_dm_msg_values(
+          self.ss, hud_control, show_hands_free_cluster_msg, main_on, CS.out.cruiseState.standstill
+        )
     else:
       steer_alert = hud_control.visualAlert in (VisualAlert.steerRequired, VisualAlert.ldw)
       if steer_alert:
@@ -1055,7 +1063,7 @@ class CarController(CarControllerBase, IntelligentCruiseButtonManagementInterfac
           CS.out.cruiseState.standstill,
           hud_control,
           CS.acc_tja_status_stock_values,
-          self.send_hands_free_cluster_msg,
+          show_hands_free_cluster_msg,
           send_ui,
           send_bars,
           self.tja_warn,
