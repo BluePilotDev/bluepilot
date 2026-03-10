@@ -80,10 +80,10 @@ class BluePilotLayout(Widget):
   def _initialize_items(self):
     """Initialize all BluePilot menu items."""
 
-    # Hands-free UI toggle
+    # BlueCruise icon on dash toggle
     self._show_hands_free_ui = toggle_item(
-      lambda: tr("Show Hands-Free UI"),
-      lambda: tr("Display hands-free UI elements."),
+      lambda: tr("Show BlueCruise Icon on Dash"),
+      lambda: tr("Display BlueCruise icon in the gauge cluster for supported vehicles."),
       initial_state=self._safe_get_bool(self._params, "send_hands_free_cluster_msg"),
       callback=lambda state: self._toggle_callback(state, "send_hands_free_cluster_msg"),
       icon="monitoring.png"
