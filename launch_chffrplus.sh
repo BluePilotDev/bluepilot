@@ -83,6 +83,12 @@ function launch {
   # start manager
   cd system/manager
   if [ ! -f $DIR/prebuilt ]; then
+    # BluePilot - Remove stale scons lock if it exists
+    if [ -f /data/scons_cache/config.lock ]; then
+      rm -f /data/scons_cache/config.lock
+    fi
+    # BluePilot - Remove stale scons lock if it exists
+
     ./build.py
   fi
   ./manager.py
