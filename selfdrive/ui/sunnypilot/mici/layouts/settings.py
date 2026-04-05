@@ -8,6 +8,7 @@ from openpilot.selfdrive.ui.mici.layouts.settings import settings as OP
 from openpilot.selfdrive.ui.mici.widgets.button import BigButton
 from openpilot.selfdrive.ui.sunnypilot.mici.layouts.sunnylink import SunnylinkLayoutMici
 from openpilot.selfdrive.ui.sunnypilot.mici.layouts.models import ModelsLayoutMici
+import pyray as rl
 from openpilot.system.ui.lib.application import gui_app
 # BluePilot: vehicle selector, BP settings panel, and BigButtonBP override
 from openpilot.common.bluepilot import is_bluepilot
@@ -43,7 +44,7 @@ class SettingsLayoutSP(OP.SettingsLayout):
       vehicle_btn.set_click_callback(lambda: gui_app.push_widget(vehicle_panel))
 
       bp_panel = BluePilotLayoutMici(back_callback=gui_app.pop_widget)
-      bluepilot_btn = BigButton("bluepilot", "", gui_app.texture("icons_mici/settings/car_icon.png", ICON_SIZE, ICON_SIZE, tint=rl.BLUE))
+      bluepilot_btn = BigButton("bluepilot", "", gui_app.texture("icons_mici/settings/car_icon.png", ICON_SIZE, ICON_SIZE))
       bluepilot_btn.set_click_callback(lambda: gui_app.push_widget(bp_panel))
 
       items.insert(3, vehicle_btn)

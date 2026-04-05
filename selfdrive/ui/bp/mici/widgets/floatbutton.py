@@ -22,7 +22,7 @@ class BigParamFloatControl(BigButtonBP):
     self.max = max
     self.step = step
 
-    self._sub_label.font_size = 22
+    self._sub_label.set_font_size(22)
 
     self.margin = self._rect.width * 0.1
     self.rect_size = LINE_L + 2 * CONTENT_MARGIN
@@ -133,7 +133,7 @@ class BigParamIntControl(BigButtonBP):
     self.max = max
     self.step = step
 
-    self._sub_label.font_size = 22
+    self._sub_label.set_font_size(22)
 
     self.margin = self._rect.width * 0.1
     self.rect_size = LINE_L + 2 * CONTENT_MARGIN

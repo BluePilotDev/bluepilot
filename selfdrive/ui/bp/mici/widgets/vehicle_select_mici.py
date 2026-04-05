@@ -14,7 +14,7 @@ from collections.abc import Callable
 from openpilot.common.basedir import BASEDIR
 from openpilot.common.swaglog import cloudlog
 from openpilot.selfdrive.ui.bp.mici.widgets.button_bp import BigButtonBP
-from openpilot.selfdrive.ui.mici.widgets.dialog import BigConfirmationDialogV2
+from openpilot.selfdrive.ui.mici.widgets.dialog import BigConfirmationDialog
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.system.ui.lib.application import gui_app
 from openpilot.system.ui.lib.multilang import tr
@@ -113,7 +113,7 @@ class VehicleModelSelectMici(NavScroller):
       self._scroller.add_widget(btn)
 
   def _ask_confirm(self, platform_name: str):
-    # MICI: use swipe slider (BigConfirmationDialogV2), not TICI ConfirmDialog (200px side margins).
+    # MICI: use swipe slider (BigConfirmationDialog), not TICI ConfirmDialog (200px side margins).
     def on_confirmed():
       self._apply_vehicle(platform_name)
 
@@ -122,7 +122,7 @@ class VehicleModelSelectMici(NavScroller):
       if ui_state.is_offroad
       else tr("slide to\napply when offroad")
     )
-    dlg = BigConfirmationDialogV2(
+    dlg = BigConfirmationDialog(
       title,
       "icons_mici/settings/car_icon.png",
       red=False,
