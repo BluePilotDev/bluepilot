@@ -139,7 +139,7 @@ class DriveStatsWidget(Widget):
     dist_unit = "KM" if is_metric else "Miles"
 
     number_font = gui_app.font(FontWeight.BOLD)
-    unit_font = gui_app.font(FontWeight.LIGHT)
+    unit_font = gui_app.font(FontWeight.DISPLAY_REGULAR)
 
     col_width = container_rect.width / 3
 
