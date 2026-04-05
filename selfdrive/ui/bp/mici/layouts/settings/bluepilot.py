@@ -253,7 +253,7 @@ class BluePilotLayoutMici(NavWidget):
         else:
           current_favorite = str(favorite_value).strip("\x00")
       if current_favorite:
-        saved_connections = self._wifi_manager._get_connections()
+        saved_connections = self._wifi_manager._connections
         if current_favorite not in saved_connections:
           self._params.put("WifiFavoriteSSID", "")
           cloudlog.info(f"Cleared preferred network '{current_favorite}' - network no longer saved in NetworkManager")

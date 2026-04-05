@@ -522,7 +522,7 @@ class BluePilotLayout(Widget):
           current_favorite = str(favorite_value).strip('\x00')
       if current_favorite:
         # Check NetworkManager's saved connections directly
-        saved_connections = self._wifi_manager._get_connections()
+        saved_connections = self._wifi_manager._connections
         if current_favorite not in saved_connections:
           # Network is no longer saved, clear preferred setting
           self._params.put("WifiFavoriteSSID", "")

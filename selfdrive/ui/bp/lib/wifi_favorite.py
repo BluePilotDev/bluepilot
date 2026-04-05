@@ -86,7 +86,7 @@ class WifiFavoriteManager:
           continue
         
         # Verify favorite network is saved in NetworkManager
-        saved_connections = self._wifi_manager._get_connections()
+        saved_connections = self._wifi_manager._connections
         if favorite_ssid not in saved_connections:
           cloudlog.debug(f"BluePilot: Favorite network '{favorite_ssid}' is not saved in NetworkManager")
           continue
