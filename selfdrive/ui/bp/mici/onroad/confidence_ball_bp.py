@@ -2,7 +2,8 @@ import math
 import pyray as rl
 from openpilot.selfdrive.ui.mici.onroad.confidence_ball import ConfidenceBall, draw_circle_gradient
 from openpilot.selfdrive.ui.ui_state import ui_state, UIStatus
-from openpilot.system.ui.lib.shader_polygon import draw_shader_circle_gradient
+# BluePilot: GPU circle shader moved to BP module after upstream removal
+from openpilot.bluepilot.ui.lib.bp_shaders import draw_shader_circle_gradient
 from openpilot.selfdrive.ui.bp.lib.ui_debug_logger import bp_ui_log
 
 class ConfidenceBallBP(ConfidenceBall):

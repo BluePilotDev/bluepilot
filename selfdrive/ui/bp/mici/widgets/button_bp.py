@@ -14,10 +14,15 @@ COMPLICATION_GREY    = rl.Color(0xAA, 0xAA, 0xAA, 255)
 PRESSED_SCALE = 1.15 if DO_ZOOM else 1.07
 
 class BigButtonBP(BigButton):
-  def __init__(self, text: str, value: str = "", icon: Union[str, rl.Texture] = "", icon_size: tuple[int, int] = (64, 64),
+  def __init__(self, text: str, value: str = "", icon: Union[str, rl.Texture, None] = None,
                scroll: bool = False, tint: rl.Color = rl.WHITE, is_active: Callable[[], bool] = None,
                value_size: int = COMPLICATION_SIZE):
-    BigButton.__init__(self, text, value, icon, icon_size, scroll)
+    # BluePilot: Convert string icon paths to pre-loaded textures (upstream removed string support)
+    if isinstance(icon, str) and icon:
+      icon = gui_app.texture(icon)
+    elif isinstance(icon, str):
+      icon = None
+    BigButton.__init__(self, text, value, icon, scroll)
     self.tint = tint
     self.get_is_active = is_active
 
@@ -61,8 +66,8 @@ class BigButtonBP(BigButton):
 
 class BigToggleBP(BigButtonBP, BigToggle):
   def __init__(self, text: str, value: str = "", initial_state: bool = False, toggle_callback: Callable = None,
-               tint: rl.Color = rl.WHITE,is_active: Callable[[], bool] = None):
-    BigButtonBP.__init__(self, text, value, "", tint=tint, is_active=is_active)
+               tint: rl.Color = rl.WHITE, is_active: Callable[[], bool] = None):
+    BigButtonBP.__init__(self, text, value, None, tint=tint, is_active=is_active)
     BigToggle.__init__(self, text, value, initial_state=initial_state, toggle_callback=toggle_callback)
 
   def _load_images(self):

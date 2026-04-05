@@ -8,7 +8,7 @@ from openpilot.common.swaglog import cloudlog
 from openpilot.common.params import Params
 from openpilot.system.ui.widgets.nav_widget import NavWidget
 from openpilot.system.ui.lib.application import FontWeight, gui_app
-from openpilot.system.ui.widgets.label import MiciLabel
+from openpilot.system.ui.widgets.label import UnifiedLabel
 from openpilot.selfdrive.ui.mici.widgets.button import BigParamControl
 
 
@@ -29,13 +29,13 @@ class WebServerQRDialog(NavWidget):
     # Ensure toggle reflects current state
     self._disable_toggle.refresh()
     
-    # Labels
-    self._title_label = MiciLabel("web routes server", 56, font_weight=FontWeight.BOLD,
-                                  color=rl.Color(255, 255, 255, int(255 * 0.9)), line_height=50)
-    self._url_label = MiciLabel("", 36, font_weight=FontWeight.MEDIUM,
-                                color=rl.Color(200, 200, 200, int(255 * 0.8)), line_height=35)
-    self._scan_label = MiciLabel("scan to connect", 32, font_weight=FontWeight.MEDIUM,
-                                 color=rl.Color(150, 150, 150, int(255 * 0.7)), line_height=30)
+    # Labels (BluePilot: migrated from MiciLabel to UnifiedLabel after upstream removal)
+    self._title_label = UnifiedLabel("web routes server", font_size=56, font_weight=FontWeight.BOLD,
+                                     text_color=rl.Color(255, 255, 255, int(255 * 0.9)))
+    self._url_label = UnifiedLabel("", font_size=36, font_weight=FontWeight.MEDIUM,
+                                   text_color=rl.Color(200, 200, 200, int(255 * 0.8)))
+    self._scan_label = UnifiedLabel("scan to connect", font_size=32, font_weight=FontWeight.MEDIUM,
+                                    text_color=rl.Color(150, 150, 150, int(255 * 0.7)))
 
   def _get_wifi_ip(self) -> str:
     """Get WiFi interface IP address."""
@@ -153,12 +153,12 @@ class WebServerQRDialog(NavWidget):
     # Render URL label below QR code
     if url:
       self._url_label.set_text(url)
-      self._url_label.set_width(int(qr_size))
+      self._url_label.set_max_width(int(qr_size))
       self._url_label.set_position(qr_x, qr_y + qr_size + 16)
       self._url_label.render()
       
       # Scan label
-      self._scan_label.set_width(int(qr_size))
+      self._scan_label.set_max_width(int(qr_size))
       self._scan_label.set_position(qr_x, qr_y + qr_size + 16 + 40)
       self._scan_label.render()
     else:
@@ -167,7 +167,7 @@ class WebServerQRDialog(NavWidget):
     
     # Render title and toggle on right
     title_y = self._rect.y + padding
-    self._title_label.set_width(int(right_width))
+    self._title_label.set_max_width(int(right_width))
     self._title_label.set_position(right_x, title_y)
     self._title_label.render()
     

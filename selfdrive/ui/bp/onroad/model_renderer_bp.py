@@ -7,6 +7,8 @@ from openpilot.selfdrive.ui.bp.onroad.chevron_metrics_bp import ChevronMetricsBP
 from openpilot.selfdrive.ui.ui_state import ui_state, UIStatus
 from openpilot.system.ui.lib.application import gui_app
 from openpilot.system.ui.lib.shader_polygon import draw_polygon
+# BluePilot: Rainbow shader moved to BP module after upstream removal
+from openpilot.bluepilot.ui.lib.bp_shaders import draw_rainbow_polygon
 from openpilot.selfdrive.ui.bp.lib.ui_debug_logger import bp_ui_log
 
 # BluePilot: Lane line colors by status (upstream removed LANE_LINE_COLORS dict)
@@ -390,7 +392,7 @@ class ModelRendererBP(ModelRenderer):
     """Draw path with status-colored edges."""
 
     if ui_state.rainbow_path:
-      draw_polygon(self._rect, self._path.projected_points, rainbow=True, rainbow_v=self._rainbow_v)
+      draw_rainbow_polygon(self._rect, self._path.projected_points, rainbow_v=self._rainbow_v)
     else:
       super()._draw_path(sm)
 
