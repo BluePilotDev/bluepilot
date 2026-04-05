@@ -82,8 +82,8 @@ class BluePilotLayout(Widget):
 
     # BlueCruise icon on dash toggle
     self._show_hands_free_ui = toggle_item(
-      lambda: tr("Show BlueCruise Icon on Dash"),
-      lambda: tr("Display BlueCruise icon in the gauge cluster for supported vehicles."),
+      lambda: tr("Show BlueCruise UI on Cluster"),
+      lambda: tr("Display BlueCruise UI on the cluster for supported vehicles."),
       initial_state=self._safe_get_bool(self._params, "send_hands_free_cluster_msg"),
       callback=lambda state: self._toggle_callback(state, "send_hands_free_cluster_msg"),
       icon="monitoring.png"
