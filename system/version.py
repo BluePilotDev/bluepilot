@@ -42,14 +42,8 @@ def get_version(path: str = BASEDIR) -> str:
 
 
 def get_release_notes(path: str = BASEDIR) -> str:
-  # BluePilot: tolerate missing CHANGELOG.md (e.g. stripped device images)
-  try:
-    with open(os.path.join(path, "CHANGELOG.md")) as f:
-      return f.read().split('\n\n', 1)[0]
-  except FileNotFoundError:
-    cloudlog.warning("CHANGELOG.md missing: %s", os.path.join(path, "CHANGELOG.md"))
-    return ""
-  # End BluePilot
+  with open(os.path.join(path, "CHANGELOG.md")) as f:
+    return f.read().split('\n\n', 1)[0]
 
 
 @cache

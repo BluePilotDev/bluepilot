@@ -1,3 +1,4 @@
+import unittest
 from enum import IntFlag
 
 from opendbc.sunnypilot.car.hyundai.lead_data_ext import LeadDataCarController, CanLeadData, CanFdLeadData
@@ -20,41 +21,41 @@ def make_carcontrolsp(leadDistance=10.0, leadRelSpeed=0.0, leadVisible=True):
   return c
 
 
-class TestLeadDataCarController:
+class TestLeadDataCarController(unittest.TestCase):
   def test_update_object_gap(self):
     ctrl = LeadDataCarController(make_carparams())
     # Initial value should be 0
-    assert ctrl.object_gap == 0
+    self.assertEqual(ctrl.object_gap, 0)
 
     # Set to 15 (should become 2 after hysteresis)
     for _ in range(ctrl.LEAD_HYSTERESIS_FRAMES):
       ctrl._update_object_gap(15)
-    assert ctrl.object_gap == 2
+    self.assertEqual(ctrl.object_gap, 2)
 
     # Set to 22 (should become 3 after hysteresis)
     for _ in range(ctrl.LEAD_HYSTERESIS_FRAMES):
       ctrl._update_object_gap(22)
-    assert ctrl.object_gap == 3
+    self.assertEqual(ctrl.object_gap, 3)
 
     # Set to 0 (should become 0 after hysteresis)
     for _ in range(ctrl.LEAD_HYSTERESIS_FRAMES):
       ctrl._update_object_gap(0)
-    assert ctrl.object_gap == 0
+    self.assertEqual(ctrl.object_gap, 0)
 
   def test_update_lead_visible_hysteresis(self):
     ctrl = LeadDataCarController(make_carparams())
     ctrl._update_lead_visible_hysteresis(True)
-    assert isinstance(ctrl.lead_visible, bool)
+    self.assertIsInstance(ctrl.lead_visible, bool)
     ctrl._update_lead_visible_hysteresis(False)
-    assert isinstance(ctrl.lead_visible, bool)
+    self.assertIsInstance(ctrl.lead_visible, bool)
 
   def test_update(self):
     ctrl = LeadDataCarController(make_carparams())
     sp = make_carcontrolsp(leadDistance=25, leadRelSpeed=-0.5, leadVisible=True)
     ctrl.update(sp)
-    assert ctrl.lead_distance == 25
-    assert ctrl.lead_rel_speed == -0.5
-    assert isinstance(ctrl.lead_visible, bool)
+    self.assertEqual(ctrl.lead_distance, 25)
+    self.assertEqual(ctrl.lead_rel_speed, -0.5)
+    self.assertIsInstance(ctrl.lead_visible, bool)
 
   def test_lead_data_can(self):
     ctrl = LeadDataCarController(make_carparams())
@@ -63,8 +64,8 @@ class TestLeadDataCarController:
     ctrl.lead_rel_speed = -0.3
     ctrl.lead_visible = True
     ld = ctrl.lead_data
-    assert isinstance(ld, CanLeadData)
-    assert ld.object_rel_gap == 2
+    self.assertIsInstance(ld, CanLeadData)
+    self.assertEqual(ld.object_rel_gap, 2)
 
   def test_lead_data_canfd(self):
     ctrl = LeadDataCarController(make_carparams(HyundaiFlags.CANFD))
@@ -73,5 +74,5 @@ class TestLeadDataCarController:
     ctrl.lead_rel_speed = 1.0
     ctrl.lead_visible = True
     ld = ctrl.lead_data
-    assert isinstance(ld, CanFdLeadData)
-    assert ld.object_rel_gap == 1
+    self.assertIsInstance(ld, CanFdLeadData)
+    self.assertEqual(ld.object_rel_gap, 1)

@@ -1,9 +1,10 @@
 import json
+import unittest
 
 from opendbc.sunnypilot.car.platform_list import get_car_list, CAR_LIST_JSON_OUT
 
 
-class TestCarList:
+class TestCarList(unittest.TestCase):
   def test_generator(self):
     generated_car_list = json.dumps(get_car_list(), indent=2, ensure_ascii=False)
     with open(CAR_LIST_JSON_OUT) as f:

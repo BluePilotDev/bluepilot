@@ -84,4 +84,3 @@ class ConfidenceBall(Widget, ConfidenceBallSP):
     draw_circle_gradient(content_rect.x + content_rect.width - status_dot_radius,
                          dot_height, status_dot_radius,
                          top_dot_color, bottom_dot_color)
-

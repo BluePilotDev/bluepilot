@@ -10,6 +10,7 @@ source "$DIR/launch_env.sh"
 function agnos_init {
   # TODO: move this to agnos
   sudo rm -f /data/etc/NetworkManager/system-connections/*.nmmeta
+  rm -f /data/scons_cache/config.lock
 
   # set success flag for current boot slot
   sudo abctl --set_success
@@ -83,12 +84,6 @@ function launch {
   # start manager
   cd system/manager
   if [ ! -f $DIR/prebuilt ]; then
-    # BluePilot - Remove stale scons lock if it exists
-    if [ -f /data/scons_cache/config.lock ]; then
-      rm -f /data/scons_cache/config.lock
-    fi
-    # BluePilot - Remove stale scons lock if it exists
-
     ./build.py
   fi
   ./manager.py

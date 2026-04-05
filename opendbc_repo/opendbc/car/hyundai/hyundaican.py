@@ -1,10 +1,10 @@
-import crcmod
+from opendbc.car.crc import CRC8J1850, mk_crc8_fun
 from opendbc.car.hyundai.values import CAR, HyundaiFlags
 
 from opendbc.sunnypilot.car.hyundai.escc import EnhancedSmartCruiseControl
 from opendbc.sunnypilot.car.hyundai.lead_data_ext import CanLeadData
 
-hyundai_checksum = crcmod.mkCrcFun(0x11D, initCrc=0xFD, rev=False, xorOut=0xdf)
+hyundai_checksum = mk_crc8_fun(CRC8J1850, init_crc=0xFD, xor_out=0xDF)
 
 
 def create_lkas11(packer, frame, CP, apply_torque, steer_req,
@@ -79,7 +79,7 @@ def create_lkas11(packer, frame, CP, apply_torque, steer_req,
     values["CF_Lkas_LdwsActivemode"] = 0
     values["CF_Lkas_FcwOpt_USM"] = 0
 
-  elif CP.carFingerprint == CAR.HYUNDAI_GENESIS:
+  elif CP.carFingerprint in (CAR.HYUNDAI_GENESIS, CAR.KIA_OPTIMA_H):
     # This field is actually LdwsActivemode
     # Genesis and Optima fault when forwarding while engaged
     values["CF_Lkas_LdwsActivemode"] = 2

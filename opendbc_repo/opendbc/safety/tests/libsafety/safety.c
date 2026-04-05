@@ -298,4 +298,10 @@ void init_tests(void){
 
   // assumes autopark on safety mode init to avoid a fault. get rid of that for testing
   tesla_autopark = false;
+
+  // reset MADS state to prevent leaking between tests
+  mads_set_system_state(false, false, false);
+  mads_button_press = MADS_BUTTON_UNAVAILABLE;
+  heartbeat_engaged_mads = false;
+  heartbeat_engaged_mads_mismatches = 0U;
 }

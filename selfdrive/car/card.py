@@ -71,7 +71,7 @@ class Car:
   def __init__(self, CI=None, RI=None) -> None:
     self.can_sock = messaging.sub_sock('can', timeout=20)
     self.sm = messaging.SubMaster(['pandaStates', 'carControl', 'onroadEvents'] + ['carControlSP', 'longitudinalPlanSP'])
-    self.pm = messaging.PubMaster(['sendcan', 'carState', 'carParams', 'carOutput', 'liveTracks'] + ['carParamsSP', 'carStateSP', 'controllerStateBP', 'carStateBP'])
+    self.pm = messaging.PubMaster(['sendcan', 'carState', 'carParams', 'carOutput', 'liveTracks'] + ['carParamsSP', 'carStateSP'])
 
     self.can_rcv_cum_timeout_counter = 0
 
@@ -98,7 +98,6 @@ class Car:
           break
 
       alpha_long_allowed = self.params.get_bool("AlphaLongitudinalEnabled")
-      num_pandas = len(messaging.recv_one_retry(self.sm.sock['pandaStates']).pandaStates)
 
       cached_params = None
       cached_params_raw = self.params.get("CarParamsCache")
@@ -109,7 +108,7 @@ class Car:
       fixed_fingerprint = (self.params.get("CarPlatformBundle") or {}).get("platform", None)
       init_params_list_sp = sunnypilot_interfaces.initialize_params(self.params)
 
-      self.CI = get_car(*self.can_callbacks, obd_callback(self.params), alpha_long_allowed, is_release, num_pandas, cached_params,
+      self.CI = get_car(*self.can_callbacks, obd_callback(self.params), alpha_long_allowed, is_release, cached_params,
                         fixed_fingerprint, init_params_list_sp, is_release_sp)
       sunnypilot_interfaces.setup_interfaces(self.CI, self.params)
       self.RI = interfaces[self.CI.CP.carFingerprint].RadarInterface(self.CI.CP, self.CI.CP_SP)
@@ -267,12 +266,6 @@ class Car:
     cs_sp_send.carStateSP = CS_SP
     self.pm.send('carStateSP', cs_sp_send)
 
-    # carStateBP - hybrid drive gauge data
-    if hasattr(self.CI.CS, 'car_state_bp_msg') and self.CI.CS.car_state_bp_msg is not None:
-      cs_bp_send = self.CI.CS.car_state_bp_msg
-      cs_bp_send.valid = CS.canValid
-      self.pm.send('carStateBP', cs_bp_send)
-
   def controls_update(self, CS: car.CarState, CC: car.CarControl, CC_SP: custom.CarControlSP):
     """control update loop, driven by carControl"""
 
@@ -290,16 +283,6 @@ class Car:
       self.pm.send('sendcan', can_list_to_can_capnp(can_sends, msgtype='sendcan', valid=CS.canValid))
 
       self.CC_prev = CC
-
-    if hasattr(self.CI.CC, "lateralUncertainty"):
-      cs_bp = structs.ControllerStateBP()
-      cs_bp.lateralUncertainty = self.CI.CC.lateralUncertainty
-      cs_bp_capnp = convert_to_capnp(cs_bp)
-      cs_bp_send = messaging.new_message('controllerStateBP')
-      cs_bp_send.valid = True
-      cs_bp_send.controllerStateBP = cs_bp_capnp
-      self.pm.send('controllerStateBP', cs_bp_send)
-
 
   def step(self):
     CS, CS_SP, RD = self.state_update()

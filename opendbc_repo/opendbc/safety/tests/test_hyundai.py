@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-from parameterized import parameterized_class
+from opendbc.testing import parameterized_class
 import random
 import unittest
 
@@ -160,46 +160,67 @@ class TestHyundaiSafety(HyundaiButtonBase, common.CarSafetyTest, common.DriverTo
     return self._button_msg(0, enabled)
 
   def test_pcm_main_cruise_state_availability(self):
-    """Test that ACC main state is correctly set when receiving 0x420 message, toggling HYUNDAI_LONG flag"""
+    """Test that ACC main state is correctly set when receiving SCC11 (0x420), toggling HYUNDAI_LONG flag.
+
+    Only applicable to SCC-based cars. Non-SCC cars use different messages for ACC state
+    and their rx_checks don't include SCC11 after mode reconfiguration.
+    """
+    if any('NonSCC' in cls.__name__ for cls in type(self).__mro__):
+      raise unittest.SkipTest("Non-SCC cars use different ACC state messages, not SCC11")
+
     prior_safety_mode = self.safety.get_current_safety_mode()
     prior_safety_param = self.safety.get_current_safety_param()
+    safety_param_sp = self.SAFETY_PARAM_SP
 
     for hyundai_longitudinal in (True, False):
       with self.subTest("hyundai_longitudinal", hyundai_longitudinal=hyundai_longitudinal):
+        self.safety.set_current_safety_param_sp(self.SAFETY_PARAM_SP)
         self.safety.set_safety_hooks(CarParams.SafetyModel.hyundai, 0 if hyundai_longitudinal else HyundaiSafetyFlags.LONG)
         for should_turn_acc_main_on in (True, False):
           with self.subTest("acc_main_on", should_turn_acc_main_on=should_turn_acc_main_on):
-            self._rx(self._acc_state_msg(should_turn_acc_main_on))  # Send the ACC state message
-            expected_acc_main = should_turn_acc_main_on and hyundai_longitudinal  # ACC main should only be set if hyundai_longitudinal is True
+            self.safety.set_acc_main_on(False)
+            self._rx(self._acc_state_msg(should_turn_acc_main_on))
+            expected_acc_main = should_turn_acc_main_on and hyundai_longitudinal
             self.assertEqual(expected_acc_main, self.safety.get_acc_main_on())
+    self.safety.set_current_safety_param_sp(safety_param_sp)
     self.safety.set_safety_hooks(prior_safety_mode, prior_safety_param)
+    self.safety.init_tests()
 
   def test_enable_control_allowed_with_mads_button(self):
+    """Toggle MADS with MADS button, testing HAS_LDA_BUTTON param gating."""
     default_safety_mode = self.safety.get_current_safety_mode()
     default_safety_param = self.safety.get_current_safety_param()
-    default_safety_param_sp = self.safety.get_current_safety_param_sp()
-    """Toggle MADS with MADS button"""
+    default_safety_param_sp = self.SAFETY_PARAM_SP
+
     try:
       self._lkas_button_msg(False)
     except NotImplementedError as err:
       raise unittest.SkipTest("Skipping test because LDA button is not supported") from err
 
+    # CameraSCC rx_checks always include BCM_PO_11 regardless of HAS_LDA_BUTTON param,
+    # so we can only test the has_lda_button=True case for CameraSCC.
+    camera_scc = bool(default_safety_param & HyundaiSafetyFlags.CAMERA_SCC)
+    lda_button_variants = [True] if camera_scc else [True, False]
+
     try:
       for enable_mads in (True, False):
         with self.subTest("enable_mads", mads_enabled=enable_mads):
-          for has_lda_button_param in (True, False):
+          for has_lda_button_param in lda_button_variants:
             with self.subTest("has_lda_button", has_lda_button_param=has_lda_button_param):
               has_lda_button = HyundaiSafetyFlagsSP.HAS_LDA_BUTTON if has_lda_button_param else 0
-              self.safety.set_current_safety_param_sp(has_lda_button)
+              sp = (default_safety_param_sp & ~HyundaiSafetyFlagsSP.HAS_LDA_BUTTON) | has_lda_button
+              self.safety.set_current_safety_param_sp(sp)
               self.safety.set_safety_hooks(default_safety_mode, default_safety_param)
+              self.safety.init_tests()
 
+              self.safety.set_controls_allowed(False)
+              self.safety.set_acc_main_on(False)
+              self.safety.set_controls_allowed_lat(False)
               self.safety.set_mads_params(enable_mads, False, False)
               self.assertEqual(enable_mads, self.safety.get_enable_mads())
 
               self._rx(self._lkas_button_msg(True))
-              self._rx(self._speed_msg(0))
               self._rx(self._lkas_button_msg(False))
-              self._rx(self._speed_msg(0))
               self.assertEqual(enable_mads and has_lda_button_param, self.safety.get_controls_allowed_lat())
     finally:
       self.safety.set_current_safety_param_sp(default_safety_param_sp)

@@ -23,6 +23,7 @@ class ExpButton(Widget):
     self._txt_wheel: rl.Texture = gui_app.texture('icons/chffr_wheel.png', icon_size, icon_size)
     self._txt_exp: rl.Texture = gui_app.texture('icons/experimental.png', icon_size, icon_size)
     self._rect = rl.Rectangle(0, 0, button_size, button_size)
+    # Bluepilot - Animated Wheel icon
     self._animate_wheel = self._params.get_bool("BPAnimateSteeringWheel")
     self._param_counter = 0
 
@@ -34,6 +35,7 @@ class ExpButton(Widget):
     self._experimental_mode = selfdrive_state.experimentalMode
     self._engageable = selfdrive_state.engageable or selfdrive_state.enabled
 
+    # Bluepilot - Animated Wheel icon
     self._param_counter += 1
     if self._param_counter >= 60:
       self._param_counter = 0
@@ -55,12 +57,14 @@ class ExpButton(Widget):
 
     self._white_color.a = 180 if self.is_pressed or not self._engageable else 255
 
+    # Bluepilot - Animated Wheel icon
     is_exp = self._held_or_actual_mode()
     texture = self._txt_exp if is_exp else self._txt_wheel
     rl.draw_circle(center_x, center_y, self._rect.width / 2, self._black_bg)
 
+    # Bluepilot - Animated Wheel icon
     if is_exp or not self._animate_wheel:
-      rl.draw_texture(texture, center_x - texture.width // 2, center_y - texture.height // 2, self._white_color)
+      rl.draw_texture_ex(texture, rl.Vector2(center_x - texture.width / 2, center_y - texture.height / 2), 0.0, 1.0, self._white_color)
     else:
       # Rotate wheel icon to match steering angle
       rotation = -ui_state.sm['carState'].steeringAngleDeg

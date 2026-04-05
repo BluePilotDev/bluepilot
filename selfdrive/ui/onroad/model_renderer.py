@@ -18,6 +18,12 @@ MIN_DRAW_DISTANCE = 10.0
 MAX_DRAW_DISTANCE = 100.0
 
 THROTTLE_COLORS = [
+  # Stock upstream code
+  # rl.Color(13, 248, 122, 102),   # HSLF(148/360, 0.94, 0.51, 0.4)
+  # rl.Color(114, 255, 92, 89),    # HSLF(112/360, 1.0, 0.68, 0.35)
+  # rl.Color(114, 255, 92, 0),     # HSLF(112/360, 1.0, 0.68, 0.0)
+
+  # Bluepilot color overrides
   rl.Color(0, 255, 80, 140),     # Bright green (bottom, high opacity)
   rl.Color(0, 255, 100, 110),    # Bright green (mid, medium opacity)
   rl.Color(0, 255, 100, 0),      # Bright green (top, transparent)

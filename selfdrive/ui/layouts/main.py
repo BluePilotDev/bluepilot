@@ -5,7 +5,7 @@ from openpilot.system.ui.lib.application import gui_app
 from openpilot.selfdrive.ui.layouts.sidebar import Sidebar, SIDEBAR_WIDTH  # noqa: F401
 from openpilot.selfdrive.ui.layouts.home import HomeLayout
 from openpilot.selfdrive.ui.layouts.settings import settings as _settings_mod
-from openpilot.selfdrive.ui.layouts.settings.settings import SettingsLayout
+from openpilot.selfdrive.ui.layouts.settings.settings import SettingsLayout, PanelType
 from openpilot.selfdrive.ui.onroad.augmented_road_view import AugmentedRoadView  # noqa: F401
 
 # BluePilot: START - BP sidebar, home layout, and onroad overlays
@@ -69,13 +69,13 @@ class MainLayout(Widget):
     self._sidebar.set_callbacks(on_settings=self._on_settings_clicked,
                                 on_flag=self._on_bookmark_clicked,
                                 on_debug=self._on_debug_clicked,
-                                on_network=lambda: self.open_settings(_settings_mod.PanelType.NETWORK),
-                                open_settings=lambda: self.open_settings(_settings_mod.PanelType.TOGGLES))
-    self._layouts[MainState.HOME]._setup_widget.set_open_settings_callback(lambda: self.open_settings(_settings_mod.PanelType.FIREHOSE))
-    self._layouts[MainState.HOME].set_settings_callback(lambda: self.open_settings(_settings_mod.PanelType.TOGGLES))
+                                on_network=lambda: self.open_settings(PanelType.NETWORK),
+                                open_settings=lambda: self.open_settings(PanelType.TOGGLES))
+    self._layouts[MainState.HOME]._setup_widget.set_open_settings_callback(lambda: self.open_settings(PanelType.FIREHOSE))
+    self._layouts[MainState.HOME].set_settings_callback(lambda: self.open_settings(PanelType.TOGGLES))
     # BluePilot: model info click -> Models settings panel
     if hasattr(self._layouts[MainState.HOME], 'set_model_settings_callback'):
-      self._layouts[MainState.HOME].set_model_settings_callback(lambda: self.open_settings(_settings_mod.PanelType.MODELS))
+      self._layouts[MainState.HOME].set_model_settings_callback(lambda: self.open_settings(PanelType.MODELS))
     self._layouts[MainState.SETTINGS].set_callbacks(on_close=self._set_mode_for_state)
     self._layouts[MainState.ONROAD].set_click_callback(self._on_onroad_clicked)
     device.add_interactive_timeout_callback(self._set_mode_for_state)
@@ -108,13 +108,13 @@ class MainLayout(Widget):
       self._current_mode = layout
       self._layouts[self._current_mode].show_event()
 
-  def open_settings(self, panel_type: _settings_mod.PanelType):
+  def open_settings(self, panel_type: PanelType):
     self._layouts[MainState.SETTINGS].set_current_panel(panel_type)
     self._set_current_layout(MainState.SETTINGS)
     self._sidebar.set_visible(False)
 
   def _on_settings_clicked(self):
-    self.open_settings(_settings_mod.PanelType.DEVICE)
+    self.open_settings(PanelType.DEVICE)
 
   def _on_bookmark_clicked(self):
     user_bookmark = messaging.new_message('bookmarkButton')

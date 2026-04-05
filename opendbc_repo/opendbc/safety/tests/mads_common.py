@@ -1,4 +1,4 @@
-from parameterized import parameterized
+from opendbc.testing import parameterized
 import abc
 import unittest
 
@@ -16,8 +16,9 @@ class MadsSafetyTestBase(unittest.TestCase):
   def _acc_state_msg(self, enabled):
     raise NotImplementedError
 
-  def teardown_method(self, method):
-    self.safety = libsafety_py.libsafety
+  def setUp(self):
+    super().setUp()
+    self.safety.set_controls_allowed(False)
     self.safety.set_mads_button_press(-1)
     self.safety.set_controls_allowed_lat(False)
     self.safety.set_controls_requested_lat(False)
@@ -92,6 +93,7 @@ class MadsSafetyTestBase(unittest.TestCase):
       with self.subTest("enable_mads", mads_enabled=enable_mads):
         for acc_main_on in (True, False):
           with self.subTest("initial_acc_main", initial_acc_main=acc_main_on):
+            self.safety.set_controls_allowed(False)
             self.safety.set_mads_params(enable_mads, False, False)
 
             # Set initial state
@@ -160,7 +162,7 @@ class MadsSafetyTestBase(unittest.TestCase):
     self._rx(self._user_brake_msg(True))
     self.assertTrue(self.safety.get_controls_allowed_lat())
 
-  @parameterized.expand(["mads_button", "acc_main_on"])
+  @parameterized("engage_method", ["mads_button", "acc_main_on"])
   def test_engage_with_brake_pressed(self, engage_method):
     if engage_method == "mads_button":
       try:
@@ -365,5 +367,77 @@ class MadsSafetyTestBase(unittest.TestCase):
 
       self._rx(self._user_brake_msg(False))
       self.assertEqual(not disengage_on_brake, self.safety.get_controls_allowed_lat())
+
+  def test_heartbeat_engaged_mads_exact_threshold(self):
+    """Test that exactly 3 heartbeat mismatches triggers disengage (not 2 or 4)"""
+    self.safety.set_mads_params(True, False, False)
+    self.safety.set_controls_allowed_lat(True)
+    self.safety.set_heartbeat_engaged_mads(False)
+
+    # After 2 mismatches: still engaged
+    for _ in range(2):
+      self.safety.mads_heartbeat_engaged_check()
+    self.assertTrue(self.safety.get_controls_allowed_lat(),
+                    "Should still be engaged after 2 mismatches")
+
+    # 3rd mismatch: disengaged
+    self.safety.mads_heartbeat_engaged_check()
+    self.assertFalse(self.safety.get_controls_allowed_lat(),
+                     "Should disengage after exactly 3 mismatches")
+
+  def test_heartbeat_engaged_mads_reset_on_match(self):
+    """Test that mismatch counter resets when heartbeat matches"""
+    self.safety.set_mads_params(True, False, False)
+    self.safety.set_controls_allowed_lat(True)
+    self.safety.set_heartbeat_engaged_mads(False)
+
+    # 2 mismatches
+    for _ in range(2):
+      self.safety.mads_heartbeat_engaged_check()
+    self.assertTrue(self.safety.get_controls_allowed_lat())
+
+    # Match resets counter
+    self.safety.set_heartbeat_engaged_mads(True)
+    self.safety.mads_heartbeat_engaged_check()
+    self.assertTrue(self.safety.get_controls_allowed_lat())
+
+    # Need 3 more mismatches from scratch to disengage
+    self.safety.set_heartbeat_engaged_mads(False)
+    for _ in range(2):
+      self.safety.mads_heartbeat_engaged_check()
+    self.assertTrue(self.safety.get_controls_allowed_lat(),
+                    "Counter should have reset; 2 mismatches after reset should not disengage")
+
+  def test_mads_button_not_engaged_without_press(self):
+    """Test that MADS button in idle state does not engage lateral control"""
+    try:
+      self._lkas_button_msg(False)
+    except NotImplementedError as err:
+      raise unittest.SkipTest("MADS button not supported") from err
+
+    self.safety.set_mads_params(True, False, False)
+
+    # Only send idle/release — should NOT engage
+    self._rx(self._lkas_button_msg(False))
+    self._rx(self._speed_msg(0))
+    self.assertFalse(self.safety.get_controls_allowed_lat(),
+                     "Button idle/release alone should not engage lateral control")
+
+  def test_mads_params_individual_flags(self):
+    """Test that each MADS param flag is independently wired correctly.
+
+    Kills mutation mutants for ALT_EXP boundary values (1024/2048/4096).
+    """
+    for enable, disengage, pause in [
+      (False, False, False),
+      (True, False, False),
+      (True, True, False),
+      (True, False, True),
+    ]:
+      with self.subTest(enable=enable, disengage=disengage, pause=pause):
+        self.safety.set_mads_params(enable, disengage, pause)
+        self.assertEqual(enable, self.safety.get_enable_mads())
+        self.assertEqual(enable and disengage, self.safety.get_disengage_lateral_on_brake())
+        self.assertEqual(enable and pause, self.safety.get_pause_lateral_on_brake())
 
   # TODO-SP: controls_allowed and controls_allowed_lat check for steering safety tests

@@ -167,24 +167,21 @@ class CarInterface(CarInterfaceBase):
     # reuse logic from _get_params
     # if the smartDSU is detected, openpilot can send ACC_CONTROL and the smartDSU will block it from the DSU or radar.
     # since we don't yet parse radar on TSS2/TSS-P radar-based ACC cars, gate longitudinal behind experimental toggle
-    if candidate in (RADAR_ACC_CAR | NO_DSU_CAR):
-      stock_cp.alphaLongitudinalAvailable = use_sdsu or candidate in RADAR_ACC_CAR
+    stock_cp.alphaLongitudinalAvailable = use_sdsu or candidate in RADAR_ACC_CAR
 
-      if not use_sdsu:
-        # Disabling radar is only supported on TSS2 radar-ACC cars
-        if alpha_long and candidate in RADAR_ACC_CAR:
-          stock_cp.flags |= ToyotaFlags.DISABLE_RADAR.value
-      else:
-        use_sdsu = use_sdsu and alpha_long
-        stock_cp.flags &= ~ToyotaFlags.DISABLE_RADAR.value
+    if use_sdsu:
+      use_sdsu = use_sdsu and alpha_long
+      stock_cp.flags &= ~ToyotaFlags.DISABLE_RADAR.value
+    elif candidate in (RADAR_ACC_CAR | NO_DSU_CAR):
+      # Disabling radar is only supported on TSS2 radar-ACC cars
+      if alpha_long and candidate in RADAR_ACC_CAR:
+        stock_cp.flags |= ToyotaFlags.DISABLE_RADAR.value
 
     # openpilot longitudinal enabled by default:
-    #  - non-(TSS2 radar ACC cars) w/ smartDSU installed
     #  - TSS2 cars with camera sending ACC_CONTROL where we can block it
     # openpilot longitudinal behind experimental long toggle:
-    #  - TSS2 radar ACC cars w/ smartDSU installed
+    #  - cars w/ smartDSU or CAN filter installed
     #  - TSS2 radar ACC cars w/o smartDSU installed (disables radar)
-    #  - TSS-P DSU-less cars w/ CAN filter installed (no radar parser yet)
     stock_cp.openpilotLongitudinalControl = use_sdsu or \
       candidate in (TSS2_CAR - RADAR_ACC_CAR) or \
       bool(stock_cp.flags & ToyotaFlags.DISABLE_RADAR)

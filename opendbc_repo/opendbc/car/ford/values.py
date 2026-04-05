@@ -8,8 +8,7 @@ from enum import Enum, IntFlag
 from opendbc.car import Bus, CarSpecs, DbcDict, PlatformConfig, Platforms, uds
 from opendbc.car.lateral import AngleSteeringLimits
 from opendbc.car.structs import CarParams
-from opendbc.car.docs_definitions import CarFootnote, CarHarness, CarDocs, CarParts, Column, \
-                                                     Device
+from opendbc.car.docs_definitions import CarFootnote, CarHarness, CarDocs, CarParts, Column, Device
 from opendbc.car.fw_query_definitions import FwQueryConfig, LiveFwVersions, OfflineFwVersions, Request, StdQueries, p16
 
 Ecu = CarParams.Ecu
@@ -223,58 +222,23 @@ class CAR(Platforms):
 # 3 = Part number
 # 4 = Software version
 FW_ALPHABET = b'A-HJ-NP-VX-Z'
-# Full firmware version pattern
-FW_PATTERN_FULL = re.compile(
-    b'^(?P<model_year_hint>[' + FW_ALPHABET + b'])' +
-    b'(?P<platform_hint>[0-9' + FW_ALPHABET + b']{3})-' +
-    b'(?P<part_number>[0-9' + FW_ALPHABET + b']{5,6})-' +
-    b'(?P<software_revision>[' + FW_ALPHABET + b']{2,})\x00*$'
-)
+FW_PATTERN = re.compile(b'^(?P<model_year_hint>[' + FW_ALPHABET + b'])' +
+                        b'(?P<platform_hint>[0-9' + FW_ALPHABET + b']{3})-' +
+                        b'(?P<part_number>[0-9' + FW_ALPHABET + b']{5,6})-' +
+                        b'(?P<software_revision>[' + FW_ALPHABET + b']{2,})\x00*$')
 
-# Partial firmware version pattern (excluding software_revision)
-FW_PATTERN_PARTIAL = re.compile(
-    b'^(?P<model_year_hint>[' + FW_ALPHABET + b'])' +
-    b'(?P<platform_hint>[0-9' + FW_ALPHABET + b']{3})-' +
-    b'(?P<part_number>[0-9' + FW_ALPHABET + b']{5,6})\x00*$'
-)
 
 def get_platform_codes(fw_versions: list[bytes] | set[bytes]) -> set[tuple[bytes, bytes]]:
   codes = set()
   for fw in fw_versions:
-    # Try full match first
-    full_match = FW_PATTERN_FULL.match(fw)
-    if full_match is not None:
-      codes.add((full_match.group('platform_hint'), full_match.group('model_year_hint')))
-    else:
-      # If full match fails, try partial match
-      partial_match = FW_PATTERN_PARTIAL.match(fw)
-      if partial_match is not None:
-        codes.add((partial_match.group('platform_hint'), partial_match.group('model_year_hint')))
+    match = FW_PATTERN.match(fw)
+    if match is not None:
+      codes.add((match.group('platform_hint'), match.group('model_year_hint')))
 
   return codes
 
 
-collected_fw_data = {
-  "candidates": [],
-  "vin": None,
-}
-
-
-# Save the collected_fw_data to a json file
-def save_fw_data():
-  try:
-    # Create the directory path if it doesn't exist
-    os.makedirs('/data/exports/fw_data', exist_ok=True)
-
-    with open('/data/exports/fw_data/collected_fw_data.json', 'w') as f:
-      json.dump(collected_fw_data, f, indent=2, default=str)
-  except Exception as e:
-    print(f"Error saving collected_fw_data: {e}")
-
-
 def match_fw_to_car_fuzzy(live_fw_versions: LiveFwVersions, vin: str, offline_fw_versions: OfflineFwVersions) -> set[str]:
-  # Store data for this pass
-  collected_fw_data["vin"] = vin
   candidates: set[str] = set()
 
   for candidate, fws in offline_fw_versions.items():
@@ -303,7 +267,8 @@ def match_fw_to_car_fuzzy(live_fw_versions: LiveFwVersions, vin: str, offline_fw
 
       # Check any model year hint within range in the database. Note that some models have more than one
       # platform code per ECU which we don't consider as separate ranges
-      if not any(min(expected_model_year_hints) <= found_model_year_hint <= max(expected_model_year_hints) for found_model_year_hint in found_model_year_hints):
+      if not any(min(expected_model_year_hints) <= found_model_year_hint <= max(expected_model_year_hints) for
+                 found_model_year_hint in found_model_year_hints):
         break
 
       valid_found_ecus.add(addr)
@@ -311,9 +276,6 @@ def match_fw_to_car_fuzzy(live_fw_versions: LiveFwVersions, vin: str, offline_fw
     # If all live ECUs pass all checks for candidate, add it as a match
     if valid_expected_ecus.issubset(valid_found_ecus):
       candidates.add(candidate)
-
-  # Push the candidates to the collected_fw_data["candidates"]
-  collected_fw_data["candidates"].append(candidates)
 
   return candidates
 
@@ -355,7 +317,7 @@ FW_QUERY_CONFIG = FwQueryConfig(
     Request(
       [StdQueries.TESTER_PRESENT_REQUEST, StdQueries.MANUFACTURER_SOFTWARE_VERSION_REQUEST],
       [StdQueries.TESTER_PRESENT_RESPONSE, StdQueries.MANUFACTURER_SOFTWARE_VERSION_RESPONSE],
-      whitelist_ecus=[Ecu.abs, Ecu.debug, Ecu.engine, Ecu.eps, Ecu.fwdCamera, Ecu.fwdRadar, Ecu.shiftByWire, Ecu.hud],
+      whitelist_ecus=[Ecu.abs, Ecu.debug, Ecu.engine, Ecu.eps, Ecu.fwdCamera, Ecu.fwdRadar, Ecu.shiftByWire],
       logging=True,
     ),
     Request(
@@ -363,18 +325,14 @@ FW_QUERY_CONFIG = FwQueryConfig(
       [StdQueries.TESTER_PRESENT_RESPONSE, StdQueries.MANUFACTURER_SOFTWARE_VERSION_RESPONSE],
       whitelist_ecus=[Ecu.abs, Ecu.debug, Ecu.engine, Ecu.eps, Ecu.fwdCamera, Ecu.fwdRadar, Ecu.shiftByWire, Ecu.hud],
       bus=0,
-      auxiliary=True,
     ),
-    *[
-      Request(
-        [StdQueries.TESTER_PRESENT_REQUEST, ford_asbuilt_block_request(block_id)],
-        [StdQueries.TESTER_PRESENT_RESPONSE, ford_asbuilt_block_response(block_id)],
-        whitelist_ecus=ecus,
-        bus=0,
-        logging=True,
-      )
-      for block_id, ecus in ASBUILT_BLOCKS
-    ],
+    *[Request(
+      [StdQueries.TESTER_PRESENT_REQUEST, ford_asbuilt_block_request(block_id)],
+      [StdQueries.TESTER_PRESENT_RESPONSE, ford_asbuilt_block_response(block_id)],
+      whitelist_ecus=ecus,
+      bus=0,
+      logging=True,
+    ) for block_id, ecus in ASBUILT_BLOCKS],
   ],
   extra_ecus=[
     (Ecu.engine, 0x7e0, None),        # Powertrain Control Module
@@ -384,8 +342,6 @@ FW_QUERY_CONFIG = FwQueryConfig(
     (Ecu.hud, 0x720, None),           # Instrument Cluster Module
   ],
   # Custom fuzzy fingerprinting function using platform and model year hints
-  # Save the raw fingerprint data to a param name "FingerprintData"
-  # param.put("FingerprintData", f'{vin}: {match_fw_to_car_fuzzy}')
   match_fw_to_car_fuzzy=match_fw_to_car_fuzzy,
 )
 

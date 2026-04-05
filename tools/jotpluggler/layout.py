@@ -1,477 +1,704 @@
-import dearpygui.dearpygui as dpg
-from openpilot.tools.jotpluggler.data import DataManager
-from openpilot.tools.jotpluggler.views import TimeSeriesPanel
+#include "tools/jotpluggler/internal.h"
+#include "system/hardware/hw.h"
 
-GRIP_SIZE = 4
-MIN_PANE_SIZE = 60
+#include <unistd.h>
 
-class LayoutManager:
-  def __init__(self, data_manager, playback_manager, worker_manager, scale: float = 1.0):
-    self.data_manager = data_manager
-    self.playback_manager = playback_manager
-    self.worker_manager = worker_manager
-    self.scale = scale
-    self.container_tag = "plot_layout_container"
-    self.tab_bar_tag = "tab_bar_container"
-    self.tab_content_tag = "tab_content_area"
+namespace fs = std::filesystem;
 
-    self.active_tab = 0
-    initial_panel_layout = PanelLayoutManager(data_manager, playback_manager, worker_manager, scale)
-    self.tabs: dict = {0: {"name": "Tab 1", "panel_layout": initial_panel_layout}}
-    self._next_tab_id = self.active_tab + 1
+namespace {
 
-  def to_dict(self) -> dict:
-    return {
-      "tabs": {
-        str(tab_id): {
-          "name": tab_data["name"],
-          "panel_layout": tab_data["panel_layout"].to_dict()
+enum class ModalAction {
+  None,
+  Primary,
+  Secondary,
+};
+
+struct FindSignalMatch {
+  const std::string *path = nullptr;
+  int score = 0;
+};
+
+struct DbcEditorSource {
+  fs::path path;
+  DbcEditorState::SourceKind kind = DbcEditorState::SourceKind::None;
+};
+
+StreamSourceConfig stream_source_config_from_ui(const UiState &state) {
+  StreamSourceConfig source;
+  source.kind = state.stream_source_kind;
+  source.address = util::strip(state.stream_address_buffer);
+  if (source.kind == StreamSourceKind::CerealLocal) {
+    source.address = "127.0.0.1";
+  } else {
+    source.address = normalize_stream_address(std::move(source.address));
+  }
+  return source;
+}
+
+void open_queued_popup(bool &flag, const char *name) {
+  if (flag) {
+    ImGui::OpenPopup(name);
+    flag = false;
+  }
+}
+
+ModalAction draw_modal_action_row(const char *primary_label,
+                                  const char *secondary_label = "Cancel",
+                                  float width = 120.0f) {
+  if (ImGui::Button(primary_label, ImVec2(width, 0.0f))) {
+    return ModalAction::Primary;
+  }
+  ImGui::SameLine();
+  if (ImGui::Button(secondary_label, ImVec2(width, 0.0f))) {
+    return ModalAction::Secondary;
+  }
+  return ModalAction::None;
+}
+
+std::vector<FindSignalMatch> find_signal_matches(const AppSession &session, std::string_view query) {
+  std::vector<FindSignalMatch> matches;
+  if (query.empty()) {
+    return matches;
+  }
+  const std::string needle = lowercase_copy(query);
+  for (const std::string &path : session.route_data.paths) {
+    const std::string hay = lowercase_copy(path);
+    const size_t pos = hay.find(needle);
+    if (pos == std::string::npos) {
+      continue;
+    }
+    const size_t slash = path.find_last_of('/');
+    const std::string_view label = slash == std::string::npos ? std::string_view(path) : std::string_view(path).substr(slash + 1);
+    int score = static_cast<int>(pos * 8 + path.size());
+    if (lowercase_copy(label) == needle) score -= 60;
+    if (util::starts_with(hay, needle)) score -= 30;
+    matches.push_back({.path = &path, .score = score});
+  }
+  std::sort(matches.begin(), matches.end(), [](const FindSignalMatch &a, const FindSignalMatch &b) {
+    return std::tie(a.score, *a.path) < std::tie(b.score, *b.path);
+  });
+  if (matches.size() > 200) {
+    matches.resize(200);
+  }
+  return matches;
+}
+
+bool open_find_signal_result(UiState *state, const std::string &path) {
+  state->selected_browser_paths = {path};
+  state->selected_browser_path = path;
+  state->browser_selection_anchor = path;
+  state->status_text = "Selected signal " + path;
+  return true;
+}
+
+void draw_open_route_popup(AppSession *session, UiState *state) {
+  if (!ImGui::BeginPopupModal("Open Route", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+    return;
+  }
+  ImGui::TextUnformatted("Load a route into the current layout.");
+  ImGui::Separator();
+  input_text_string("Route", &state->route_buffer);
+  input_text_string("Data Dir", &state->data_dir_buffer);
+  ImGui::Spacing();
+  switch (draw_modal_action_row("Load")) {
+    case ModalAction::Primary:
+      reload_session(session, state, state->route_buffer, state->data_dir_buffer);
+      ImGui::CloseCurrentPopup();
+      break;
+    case ModalAction::Secondary:
+      sync_route_buffers(state, *session);
+      ImGui::CloseCurrentPopup();
+      break;
+    case ModalAction::None:
+      break;
+  }
+  ImGui::EndPopup();
+}
+
+void draw_stream_popup(AppSession *session, UiState *state) {
+  if (!ImGui::BeginPopupModal("Live Stream", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+    return;
+  }
+
+  ImGui::TextUnformatted("Connect to a live source.");
+  ImGui::Separator();
+  if (ImGui::RadioButton("Local (MSGQ)", state->stream_source_kind == StreamSourceKind::CerealLocal)) {
+    state->stream_source_kind = StreamSourceKind::CerealLocal;
+  }
+  if (ImGui::RadioButton("Remote (ZMQ)", state->stream_source_kind == StreamSourceKind::CerealRemote)) {
+    state->stream_source_kind = StreamSourceKind::CerealRemote;
+  }
+
+  if (state->stream_source_kind == StreamSourceKind::CerealRemote) {
+    input_text_string("Address", &state->stream_address_buffer);
+  }
+  ImGui::InputDouble("Buffer (seconds)", &state->stream_buffer_seconds, 0.0, 0.0, "%.0f");
+  ImGui::Spacing();
+  switch (draw_modal_action_row("Connect")) {
+    case ModalAction::Primary: {
+      const StreamSourceConfig source = stream_source_config_from_ui(*state);
+      if (start_stream_session(session, state, source, state->stream_buffer_seconds, false)) {
+        ImGui::CloseCurrentPopup();
+      }
+      break;
+    }
+    case ModalAction::Secondary:
+      sync_stream_buffers(state, *session);
+      ImGui::CloseCurrentPopup();
+      break;
+    case ModalAction::None:
+      break;
+  }
+  ImGui::EndPopup();
+}
+
+void draw_load_layout_popup(AppSession *session, UiState *state) {
+  if (!ImGui::BeginPopupModal("Load Layout", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+    return;
+  }
+  ImGui::TextUnformatted("Load a JotPlugger JSON layout.");
+  ImGui::Separator();
+  input_text_string("Layout", &state->load_layout_buffer);
+  ImGui::Spacing();
+  switch (draw_modal_action_row("Load")) {
+    case ModalAction::Primary:
+      if (reload_layout(session, state, state->load_layout_buffer)) {
+        ImGui::CloseCurrentPopup();
+      }
+      break;
+    case ModalAction::Secondary:
+      sync_layout_buffers(state, *session);
+      ImGui::CloseCurrentPopup();
+      break;
+    case ModalAction::None:
+      break;
+  }
+  ImGui::EndPopup();
+}
+
+void draw_save_layout_popup(AppSession *session, UiState *state) {
+  if (!ImGui::BeginPopupModal("Save Layout", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+    return;
+  }
+  ImGui::TextUnformatted("Save the current workspace as a JotPlugger JSON layout.");
+  ImGui::Separator();
+  input_text_string("Layout", &state->save_layout_buffer);
+  ImGui::Spacing();
+  switch (draw_modal_action_row("Save")) {
+    case ModalAction::Primary:
+      if (save_layout(session, state, state->save_layout_buffer)) {
+        ImGui::CloseCurrentPopup();
+      }
+      break;
+    case ModalAction::Secondary:
+      sync_layout_buffers(state, *session);
+      ImGui::CloseCurrentPopup();
+      break;
+    case ModalAction::None:
+      break;
+  }
+  ImGui::EndPopup();
+}
+
+void draw_preferences_popup(AppSession *session, UiState *state) {
+  if (!ImGui::BeginPopupModal("Preferences", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+    return;
+  }
+  if (session->map_data) {
+    const MapCacheStats map_cache = session->map_data->cacheStats();
+    const MapCacheStats download_cache = directory_cache_stats(Path::download_cache_root());
+    ImGui::TextUnformatted("Map");
+    ImGui::Separator();
+    ImGui::Text("Map cache: %s in %zu file%s",
+                format_cache_bytes(map_cache.bytes).c_str(),
+                map_cache.files,
+                map_cache.files == 1 ? "" : "s");
+    if (ImGui::Button("Clear Map Cache", ImVec2(120.0f, 0.0f))) {
+      session->map_data->clearCache();
+      state->status_text = "Cleared map cache";
+    }
+    ImGui::Spacing();
+    ImGui::TextUnformatted("comma Download Cache");
+    ImGui::Separator();
+    ImGui::Text("Download cache: %s in %zu file%s",
+                format_cache_bytes(download_cache.bytes).c_str(),
+                download_cache.files,
+                download_cache.files == 1 ? "" : "s");
+    ImGui::TextDisabled("%s", Path::download_cache_root().c_str());
+    ImGui::Spacing();
+  }
+  if (ImGui::Button("Close", ImVec2(120.0f, 0.0f))) {
+    ImGui::CloseCurrentPopup();
+  }
+  ImGui::EndPopup();
+}
+
+void draw_find_signal_popup(AppSession *session, UiState *state) {
+  if (!ImGui::BeginPopupModal("Find Signal", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+    return;
+  }
+  ImGui::TextUnformatted("Search decoded signals across the loaded route.");
+  ImGui::Separator();
+  ImGui::SetNextItemWidth(560.0f);
+  input_text_with_hint_string("##find_signal_query", "Search signal path or name...", &state->find_signal_buffer);
+  if (ImGui::IsWindowAppearing()) {
+    ImGui::SetKeyboardFocusHere(-1);
+  }
+  const std::vector<FindSignalMatch> matches = find_signal_matches(*session, state->find_signal_buffer);
+  ImGui::Spacing();
+  ImGui::TextDisabled("%zu match%s", matches.size(), matches.size() == 1 ? "" : "es");
+  if (ImGui::BeginChild("##find_signal_results", ImVec2(760.0f, 360.0f), true)) {
+    for (const FindSignalMatch &match : matches) {
+      const std::string &path = *match.path;
+      const size_t slash = path.find_last_of('/');
+      const std::string_view label = slash == std::string::npos ? std::string_view(path) : std::string_view(path).substr(slash + 1);
+      if (ImGui::Selectable((std::string(label) + "##" + path).c_str(), false, ImGuiSelectableFlags_SpanAllColumns)) {
+        if (open_find_signal_result(state, path)) {
+          ImGui::CloseCurrentPopup();
         }
-        for tab_id, tab_data in self.tabs.items()
+      }
+      ImGui::SameLine(280.0f);
+      ImGui::TextDisabled("%s", path.c_str());
+    }
+  }
+  ImGui::EndChild();
+  ImGui::Spacing();
+  if (ImGui::Button("Close", ImVec2(120.0f, 0.0f))) {
+    ImGui::CloseCurrentPopup();
+  }
+  ImGui::EndPopup();
+}
+
+std::string default_dbc_template() {
+  return "VERSION \"\"\n\nNS_ :\nBS_:\nBU_: XXX\n";
+}
+
+DbcEditorSource resolve_dbc_editor_source(const std::string &dbc_name) {
+  const fs::path generated_dbc_dir = repo_root() / "tools" / "jotpluggler" / "generated_dbcs";
+  const std::array<DbcEditorSource, 2> candidates = {{
+    {.path = repo_root() / "opendbc" / "dbc" / (dbc_name + ".dbc"), .kind = DbcEditorState::SourceKind::Opendbc},
+    {.path = generated_dbc_dir / (dbc_name + ".dbc"), .kind = DbcEditorState::SourceKind::Generated},
+  }};
+  for (const DbcEditorSource &candidate : candidates) {
+    if (fs::exists(candidate.path)) {
+      return candidate;
+    }
+  }
+  return {};
+}
+
+void load_dbc_editor_state(const AppSession &session, UiState *state) {
+  DbcEditorState &editor = state->dbc_editor;
+  const std::string dbc_name = !session.dbc_override.empty() ? session.dbc_override : session.route_data.dbc_name;
+  editor.source_name = dbc_name.empty() ? "untitled" : dbc_name;
+  editor.source_path.clear();
+  editor.source_kind = DbcEditorState::SourceKind::None;
+  if (dbc_name.empty()) {
+    editor.save_name = "custom_can";
+    editor.text = default_dbc_template();
+  } else {
+    const DbcEditorSource source = resolve_dbc_editor_source(dbc_name);
+    editor.source_kind = source.kind;
+    editor.source_path = source.path;
+    editor.text = source.path.empty() ? default_dbc_template() : read_file_or_throw(source.path);
+    editor.save_name = source.kind == DbcEditorState::SourceKind::Generated ? dbc_name : dbc_name + "_edited";
+  }
+  editor.loaded = true;
+}
+
+bool ensure_dbc_editor_loaded(const AppSession &session, UiState *state) {
+  if (!state->dbc_editor.loaded) {
+    try {
+      load_dbc_editor_state(session, state);
+    } catch (const std::exception &err) {
+      state->error_text = err.what();
+      state->open_error_popup = true;
+      return false;
+    }
+  }
+  return true;
+}
+
+bool save_dbc_editor_contents(AppSession *session, UiState *state) {
+  DbcEditorState &editor = state->dbc_editor;
+  editor.save_name = util::strip(editor.save_name);
+  if (editor.save_name.empty()) {
+    state->error_text = "DBC name cannot be empty";
+    state->open_error_popup = true;
+    return false;
+  }
+  if (editor.source_kind == DbcEditorState::SourceKind::Opendbc && editor.save_name == editor.source_name) {
+    state->error_text = "Save edited opendbc files under a new name";
+    state->open_error_popup = true;
+    return false;
+  }
+  try {
+    dbc::Database::fromContent(editor.text, editor.save_name + ".dbc");
+    const fs::path generated_dbc_dir = repo_root() / "tools" / "jotpluggler" / "generated_dbcs";
+    fs::create_directories(generated_dbc_dir);
+    const fs::path output = generated_dbc_dir / (editor.save_name + ".dbc");
+    write_file_or_throw(output, editor.text);
+    apply_dbc_override_change(session, state, editor.save_name);
+    editor.source_name = editor.save_name;
+    editor.source_path = output;
+    editor.source_kind = DbcEditorState::SourceKind::Generated;
+    editor.loaded = false;
+    state->status_text = "Saved DBC " + editor.save_name;
+    return true;
+  } catch (const std::exception &err) {
+    state->error_text = err.what();
+    state->open_error_popup = true;
+    return false;
+  }
+}
+
+void draw_dbc_editor_popup(AppSession *session, UiState *state) {
+  if (!ImGui::BeginPopupModal("DBC Editor", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+    return;
+  }
+  DbcEditorState &editor = state->dbc_editor;
+  if (!ensure_dbc_editor_loaded(*session, state)) {
+    ImGui::CloseCurrentPopup();
+    ImGui::EndPopup();
+    return;
+  }
+  ImGui::TextUnformatted("Edit DBC text and save it into generated_dbcs.");
+  ImGui::Separator();
+  ImGui::SetNextItemWidth(260.0f);
+  input_text_string("DBC Name", &editor.save_name, ImGuiInputTextFlags_AutoSelectAll);
+  if (!editor.source_path.empty()) {
+    ImGui::TextDisabled("%s", editor.source_path.string().c_str());
+  } else {
+    ImGui::TextDisabled("New in-memory DBC");
+  }
+  ImGui::Spacing();
+  input_text_multiline_string("##dbc_editor_text", &editor.text, ImVec2(920.0f, 520.0f), ImGuiInputTextFlags_AllowTabInput);
+  ImGui::Spacing();
+  if (ImGui::Button("Apply + Save", ImVec2(140.0f, 0.0f))) {
+    if (save_dbc_editor_contents(session, state)) {
+      ImGui::CloseCurrentPopup();
+    }
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("Reload Source", ImVec2(140.0f, 0.0f))) {
+    editor.loaded = false;
+  }
+  ImGui::SameLine();
+  if (ImGui::Button("Close", ImVec2(120.0f, 0.0f))) {
+    editor.loaded = false;
+    ImGui::CloseCurrentPopup();
+  }
+  ImGui::EndPopup();
+}
+
+void draw_axis_limits_popup(AppSession *session, UiState *state) {
+  if (!ImGui::BeginPopupModal("Edit Axis Limits", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+    return;
+  }
+  const WorkspaceTab *tab = app_active_tab(session->layout, *state);
+  const bool valid_pane = tab != nullptr
+    && state->axis_limits.pane_index >= 0
+    && state->axis_limits.pane_index < static_cast<int>(tab->panes.size());
+  if (!valid_pane) {
+    ImGui::TextWrapped("The selected pane is no longer available.");
+    ImGui::Spacing();
+    if (ImGui::Button("Close", ImVec2(120.0f, 0.0f))) {
+      state->axis_limits.pane_index = -1;
+      ImGui::CloseCurrentPopup();
+    }
+    ImGui::EndPopup();
+    return;
+  }
+
+  ImGui::TextUnformatted("X range applies to the active tab. Y limits apply to the selected pane.");
+  ImGui::Separator();
+  ImGui::TextUnformatted("Horizontal");
+  ImGui::SetNextItemWidth(180.0f);
+  ImGui::InputDouble("X Min", &state->axis_limits.x_min, 0.0, 0.0, "%.3f");
+  ImGui::SetNextItemWidth(180.0f);
+  ImGui::InputDouble("X Max", &state->axis_limits.x_max, 0.0, 0.0, "%.3f");
+  ImGui::Spacing();
+  ImGui::TextUnformatted("Vertical");
+  ImGui::Checkbox("Use Y Min", &state->axis_limits.y_min_enabled);
+  ImGui::BeginDisabled(!state->axis_limits.y_min_enabled);
+  ImGui::SetNextItemWidth(180.0f);
+  ImGui::InputDouble("Y Min", &state->axis_limits.y_min, 0.0, 0.0, "%.6g");
+  ImGui::EndDisabled();
+  ImGui::Checkbox("Use Y Max", &state->axis_limits.y_max_enabled);
+  ImGui::BeginDisabled(!state->axis_limits.y_max_enabled);
+  ImGui::SetNextItemWidth(180.0f);
+  ImGui::InputDouble("Y Max", &state->axis_limits.y_max, 0.0, 0.0, "%.6g");
+  ImGui::EndDisabled();
+  ImGui::Spacing();
+  switch (draw_modal_action_row("Apply")) {
+    case ModalAction::Primary:
+      if (apply_axis_limits_editor(session, state)) {
+        state->axis_limits.pane_index = -1;
+        ImGui::CloseCurrentPopup();
+      }
+      break;
+    case ModalAction::Secondary:
+      state->axis_limits.pane_index = -1;
+      ImGui::CloseCurrentPopup();
+      break;
+    case ModalAction::None:
+      break;
+  }
+  ImGui::EndPopup();
+}
+
+void draw_error_popup(UiState *state) {
+  if (state->open_error_popup) {
+    ImGui::OpenPopup("Error");
+    state->open_error_popup = false;
+  }
+  if (!ImGui::BeginPopupModal("Error", nullptr, ImGuiWindowFlags_AlwaysAutoResize)) {
+    return;
+  }
+  ImGui::TextWrapped("%s", state->error_text.c_str());
+  ImGui::Spacing();
+  if (ImGui::Button("Close", ImVec2(120.0f, 0.0f))) {
+    ImGui::CloseCurrentPopup();
+  }
+  ImGui::EndPopup();
+}
+
+}  // namespace
+
+bool reset_layout(AppSession *session, UiState *state) {
+  try {
+    if (session->layout_path.empty()) {
+      start_new_layout(session, state, "Reset layout");
+      return true;
+    }
+    clear_layout_autosave(*session);
+    session->layout = load_sketch_layout(session->layout_path);
+    state->layout_dirty = false;
+    session->autosave_path = autosave_path_for_layout(session->layout_path);
+    state->undo.reset(session->layout);
+    refresh_replaced_layout_ui(session, state, false);
+    reset_shared_range(state, *session);
+    state->status_text = "Reset layout";
+    return true;
+  } catch (const std::exception &err) {
+    state->error_text = err.what();
+    state->open_error_popup = true;
+    state->status_text = "Failed to reset layout";
+    return false;
+  }
+}
+
+bool reload_layout(AppSession *session, UiState *state, const std::string &layout_arg) {
+  try {
+    const bool preserve_shared_range = session->route_data.has_time_range && state->has_shared_range;
+    const double preserved_x_min = state->x_view_min;
+    const double preserved_x_max = state->x_view_max;
+    const fs::path layout_path = resolve_layout_path(layout_arg);
+    session->autosave_path = autosave_path_for_layout(layout_path);
+    const bool load_draft = fs::exists(session->autosave_path);
+    session->layout = load_sketch_layout(load_draft ? session->autosave_path : layout_path);
+    session->layout_path = layout_path;
+    state->layout_dirty = load_draft;
+    state->undo.reset(session->layout);
+    refresh_replaced_layout_ui(session, state, true);
+    if (preserve_shared_range) {
+      state->has_shared_range = true;
+      state->x_view_min = preserved_x_min;
+      state->x_view_max = preserved_x_max;
+      clamp_shared_range(state, *session);
+    } else {
+      reset_shared_range(state, *session);
+    }
+    state->status_text = std::string(load_draft ? "Loaded layout draft " : "Loaded layout ")
+      + layout_path.filename().string();
+    return true;
+  } catch (const std::exception &err) {
+    state->error_text = err.what();
+    state->open_error_popup = true;
+    state->status_text = "Failed to load layout";
+    return false;
+  }
+}
+
+bool save_layout(AppSession *session, UiState *state, const std::string &layout_path) {
+  try {
+    if (layout_path.empty()) throw std::runtime_error("Layout path is empty");
+    session->layout.current_tab_index = state->active_tab_index;
+    const fs::path previous_autosave = session->autosave_path;
+    const fs::path output = fs::absolute(fs::path(layout_path));
+    save_layout_json(session->layout, output);
+    session->layout_path = output;
+    session->autosave_path = autosave_path_for_layout(output);
+    if (!previous_autosave.empty() && previous_autosave != session->autosave_path && fs::exists(previous_autosave)) {
+      fs::remove(previous_autosave);
+    }
+    clear_layout_autosave(*session);
+    state->layout_dirty = false;
+    sync_layout_buffers(state, *session);
+    state->status_text = "Saved layout " + output.filename().string();
+    return true;
+  } catch (const std::exception &err) {
+    state->error_text = err.what();
+    state->open_error_popup = true;
+    state->status_text = "Failed to save layout";
+    return false;
+  }
+}
+
+void rebuild_session_route_data(AppSession *session, UiState *state,
+                                const RouteLoadProgressCallback &progress) {
+  apply_route_data(session, state, load_route_data(session->route_name, session->data_dir, session->dbc_override, progress));
+}
+
+void stop_stream_session(AppSession *session, UiState *state, bool preserve_data) {
+  if (preserve_data && session->stream_poller && session->data_mode == SessionDataMode::Stream) {
+    session->stream_poller->setPaused(true);
+  } else if (session->stream_poller) {
+    session->stream_poller->stop();
+  }
+  session->stream_paused = preserve_data && session->data_mode == SessionDataMode::Stream;
+  if (!preserve_data) {
+    session->stream_time_offset.reset();
+    apply_route_data(session, state, RouteData{});
+  }
+  sync_stream_buffers(state, *session);
+}
+
+bool start_stream_session(AppSession *session,
+                          UiState *state,
+                          const StreamSourceConfig &source,
+                          double buffer_seconds,
+                          bool preserve_existing_data) {
+  try {
+    if (session->route_loader) {
+      session->route_loader.reset();
+    }
+    session->data_mode = SessionDataMode::Stream;
+    session->route_id = {};
+    session->route_name.clear();
+    session->data_dir.clear();
+    session->stream_source = source;
+    if (session->stream_source.kind == StreamSourceKind::CerealLocal) {
+      session->stream_source.address = "127.0.0.1";
+    }
+    session->stream_buffer_seconds = std::max(1.0, buffer_seconds);
+    session->next_stream_custom_refresh_time = 0.0;
+    session->stream_paused = false;
+    if (preserve_existing_data && session->stream_poller) {
+      StreamPollSnapshot snapshot = session->stream_poller->snapshot();
+      if (snapshot.active) {
+        session->stream_poller->setPaused(false);
+        sync_route_buffers(state, *session);
+        sync_stream_buffers(state, *session);
+        state->follow_latest = true;
+        state->playback_playing = false;
+        state->status_text = "Resumed stream " + stream_source_target_label(session->stream_source);
+        return true;
       }
     }
+    if (!preserve_existing_data) {
+      session->stream_time_offset.reset();
+      apply_route_data(session, state, RouteData{});
+    }
+    if (!session->stream_poller) {
+      session->stream_poller = std::make_unique<StreamPoller>();
+    }
+    session->stream_poller->start(session->stream_source,
+                                  session->stream_buffer_seconds,
+                                  session->dbc_override,
+                                  session->stream_time_offset);
+    sync_route_buffers(state, *session);
+    sync_stream_buffers(state, *session);
+    state->follow_latest = true;
+    state->playback_playing = false;
+    state->status_text = preserve_existing_data ? "Resumed stream " + stream_source_target_label(session->stream_source)
+                                                : "Streaming from " + stream_source_target_label(session->stream_source);
+    return true;
+  } catch (const std::exception &err) {
+    state->error_text = err.what();
+    state->open_error_popup = true;
+    state->status_text = "Failed to start stream";
+    return false;
+  }
+}
 
-  def clear_and_load_from_dict(self, data: dict):
-    tab_ids_to_close = list(self.tabs.keys())
-    for tab_id in tab_ids_to_close:
-      self.close_tab(tab_id, force=True)
+void start_async_route_load(AppSession *session, UiState *state) {
+  if (!session->route_loader) {
+    return;
+  }
+  apply_route_data(session, state, RouteData{});
+  session->route_loader->start(session->route_name, session->data_dir, session->dbc_override);
+  state->status_text = session->route_name.empty() ? "Ready" : "Loading route " + session->route_name;
+}
 
-    for tab_id_str, tab_data in data["tabs"].items():
-      tab_id = int(tab_id_str)
-      panel_layout = PanelLayoutManager.load_from_dict(
-        tab_data["panel_layout"], self.data_manager, self.playback_manager,
-        self.worker_manager, self.scale
-      )
-      self.tabs[tab_id] = {
-        "name": tab_data["name"],
-        "panel_layout": panel_layout
+void poll_async_route_load(AppSession *session, UiState *state) {
+  if (!session->route_loader) {
+    return;
+  }
+  RouteData loaded_route;
+  std::string error_text;
+  if (!session->route_loader->consume(&loaded_route, &error_text)) {
+    return;
+  }
+  if (!error_text.empty()) {
+    state->error_text = error_text;
+    state->open_error_popup = true;
+    state->status_text = "Failed to load route";
+    return;
+  }
+  apply_route_data(session, state, std::move(loaded_route));
+  state->status_text = session->route_name.empty() ? "Ready" : "Loaded route " + session->route_name;
+}
+
+bool reload_session(AppSession *session, UiState *state, const std::string &route_name, const std::string &data_dir) {
+  try {
+    stop_stream_session(session, state, false);
+    session->data_mode = SessionDataMode::Route;
+    session->route_name = route_name;
+    session->route_id = parse_route_identifier(route_name);
+    session->data_dir = data_dir;
+    if (session->async_route_loading) {
+      if (!session->route_loader) {
+        session->route_loader = std::make_unique<AsyncRouteLoader>(::isatty(STDERR_FILENO) != 0);
       }
-
-    self.active_tab = min(self.tabs.keys()) if self.tabs else 0
-    self._next_tab_id = max(self.tabs.keys()) + 1 if self.tabs else 1
-
-  def create_ui(self, parent_tag: str):
-    if dpg.does_item_exist(self.container_tag):
-      dpg.delete_item(self.container_tag)
-
-    with dpg.child_window(tag=self.container_tag, parent=parent_tag, border=False, width=-1, height=-1, no_scrollbar=True, no_scroll_with_mouse=True):
-      self._create_tab_bar()
-      self._create_tab_content()
-    dpg.bind_item_theme(self.tab_bar_tag, "tab_bar_theme")
-
-  def _create_tab_bar(self):
-    text_size = int(13 * self.scale)
-    with dpg.child_window(tag=self.tab_bar_tag, parent=self.container_tag, height=(text_size + 8), border=False, horizontal_scrollbar=True):
-      with dpg.group(horizontal=True, tag="tab_bar_group"):
-        for tab_id, tab_data in self.tabs.items():
-          self._create_tab_ui(tab_id, tab_data["name"])
-        dpg.add_image_button(texture_tag="plus_texture", callback=self.add_tab, width=text_size, height=text_size, tag="add_tab_button")
-    dpg.bind_item_theme("add_tab_button", "inactive_tab_theme")
-
-  def _create_tab_ui(self, tab_id: int, tab_name: str):
-    text_size = int(13 * self.scale)
-    tab_width = int(140 * self.scale)
-    with dpg.child_window(width=tab_width, height=-1, border=False, no_scrollbar=True, tag=f"tab_window_{tab_id}", parent="tab_bar_group"):
-      with dpg.group(horizontal=True, tag=f"tab_group_{tab_id}"):
-        dpg.add_input_text(
-          default_value=tab_name, width=tab_width - text_size - 16, callback=lambda s, v, u: self.rename_tab(u, v), user_data=tab_id, tag=f"tab_input_{tab_id}"
-        )
-        dpg.add_image_button(
-          texture_tag="x_texture", callback=lambda s, a, u: self.close_tab(u), user_data=tab_id, width=text_size, height=text_size, tag=f"tab_close_{tab_id}"
-        )
-      with dpg.item_handler_registry(tag=f"tab_handler_{tab_id}"):
-        dpg.add_item_clicked_handler(callback=lambda s, a, u: self.switch_tab(u), user_data=tab_id)
-      dpg.bind_item_handler_registry(f"tab_group_{tab_id}", f"tab_handler_{tab_id}")
-
-    theme_tag = "active_tab_theme" if tab_id == self.active_tab else "inactive_tab_theme"
-    dpg.bind_item_theme(f"tab_window_{tab_id}", theme_tag)
-
-  def _create_tab_content(self):
-    with dpg.child_window(tag=self.tab_content_tag, parent=self.container_tag, border=False, width=-1, height=-1, no_scrollbar=True, no_scroll_with_mouse=True):
-      if self.active_tab in self.tabs:
-        active_panel_layout = self.tabs[self.active_tab]["panel_layout"]
-        active_panel_layout.create_ui()
-
-  def add_tab(self):
-    new_panel_layout = PanelLayoutManager(self.data_manager, self.playback_manager, self.worker_manager, self.scale)
-    new_tab = {"name": f"Tab {self._next_tab_id + 1}", "panel_layout": new_panel_layout}
-    self.tabs[self._next_tab_id] = new_tab
-    self._create_tab_ui(self._next_tab_id, new_tab["name"])
-    dpg.move_item("add_tab_button", parent="tab_bar_group")  # move plus button to end
-    self.switch_tab(self._next_tab_id)
-    self._next_tab_id += 1
-
-  def close_tab(self, tab_id: int, force = False):
-    if len(self.tabs) <= 1 and not force:
-      return  # don't allow closing the last tab
-
-    tab_to_close = self.tabs[tab_id]
-    tab_to_close["panel_layout"].destroy_ui()
-    for suffix in ["window", "group", "input", "close", "handler"]:
-      tag = f"tab_{suffix}_{tab_id}"
-      if dpg.does_item_exist(tag):
-        dpg.delete_item(tag)
-    del self.tabs[tab_id]
-
-    if self.active_tab == tab_id and self.tabs: # switch to another tab if we closed the active one
-      self.active_tab = next(iter(self.tabs.keys()))
-      self._switch_tab_content()
-      dpg.bind_item_theme(f"tab_window_{self.active_tab}", "active_tab_theme")
-
-  def switch_tab(self, tab_id: int):
-    if tab_id == self.active_tab or tab_id not in self.tabs:
-      return
-
-    current_panel_layout = self.tabs[self.active_tab]["panel_layout"]
-    current_panel_layout.destroy_ui()
-    dpg.bind_item_theme(f"tab_window_{self.active_tab}", "inactive_tab_theme")  # deactivate old tab
-    self.active_tab = tab_id
-    dpg.bind_item_theme(f"tab_window_{tab_id}", "active_tab_theme")  # activate new tab
-    self._switch_tab_content()
-
-  def _switch_tab_content(self):
-    dpg.delete_item(self.tab_content_tag, children_only=True)
-    active_panel_layout = self.tabs[self.active_tab]["panel_layout"]
-    active_panel_layout.create_ui()
-    active_panel_layout.update_all_panels()
-
-  def rename_tab(self, tab_id: int, new_name: str):
-    if tab_id in self.tabs:
-      self.tabs[tab_id]["name"] = new_name
-
-  def update_all_panels(self):
-    self.tabs[self.active_tab]["panel_layout"].update_all_panels()
-
-  def on_viewport_resize(self):
-    self.tabs[self.active_tab]["panel_layout"].on_viewport_resize()
-
-class PanelLayoutManager:
-  def __init__(self, data_manager: DataManager, playback_manager, worker_manager, scale: float = 1.0):
-    self.data_manager = data_manager
-    self.playback_manager = playback_manager
-    self.worker_manager = worker_manager
-    self.scale = scale
-    self.active_panels: list = []
-    self.parent_tag = "tab_content_area"
-    self._queue_resize = False
-    self._created_handler_tags: set[str] = set()
-
-    self.grip_size = int(GRIP_SIZE * self.scale)
-    self.min_pane_size = int(MIN_PANE_SIZE * self.scale)
-
-    initial_panel = TimeSeriesPanel(data_manager, playback_manager, worker_manager)
-    self.layout: dict = {"type": "panel", "panel": initial_panel}
-
-  def to_dict(self) -> dict:
-    return self._layout_to_dict(self.layout)
-
-  def _layout_to_dict(self, layout: dict) -> dict:
-    if layout["type"] == "panel":
-      return {
-        "type": "panel",
-        "panel": layout["panel"].to_dict()
-      }
-    else:  # split
-      return {
-        "type": "split",
-        "orientation": layout["orientation"],
-        "proportions": layout["proportions"],
-        "children": [self._layout_to_dict(child) for child in layout["children"]]
-      }
-
-  @classmethod
-  def load_from_dict(cls, data: dict, data_manager, playback_manager, worker_manager, scale: float = 1.0):
-    manager = cls(data_manager, playback_manager, worker_manager, scale)
-    manager.layout = manager._dict_to_layout(data)
-    return manager
-
-  def _dict_to_layout(self, data: dict) -> dict:
-    if data["type"] == "panel":
-      panel_data = data["panel"]
-      if panel_data["type"] == "timeseries":
-        panel = TimeSeriesPanel.load_from_dict(
-          panel_data, self.data_manager, self.playback_manager, self.worker_manager
-        )
-        return {"type": "panel", "panel": panel}
-      else:
-        # Handle future panel types here or make a general mapping
-        raise ValueError(f"Unknown panel type: {panel_data['type']}")
-    else:  # split
-      return {
-        "type": "split",
-        "orientation": data["orientation"],
-        "proportions": data["proportions"],
-        "children": [self._dict_to_layout(child) for child in data["children"]]
-      }
-
-  def create_ui(self):
-    self.active_panels.clear()
-    if dpg.does_item_exist(self.parent_tag):
-      dpg.delete_item(self.parent_tag, children_only=True)
-    self._cleanup_all_handlers()
-
-    container_width, container_height = dpg.get_item_rect_size(self.parent_tag)
-    if container_width == 0 and container_height == 0:
-      self._queue_resize = True
-    self._create_ui_recursive(self.layout, self.parent_tag, [], container_width, container_height)
-
-  def destroy_ui(self):
-    self._cleanup_ui_recursive(self.layout, [])
-    self._cleanup_all_handlers()
-    self.active_panels.clear()
-
-  def _cleanup_all_handlers(self):
-    for handler_tag in list(self._created_handler_tags):
-      if dpg.does_item_exist(handler_tag):
-        dpg.delete_item(handler_tag)
-    self._created_handler_tags.clear()
-
-  def _create_ui_recursive(self, layout: dict, parent_tag: str, path: list[int], width: int, height: int):
-    if layout["type"] == "panel":
-      self._create_panel_ui(layout, parent_tag, path, width, height)
-    else:
-      self._create_split_ui(layout, parent_tag, path, width, height)
-
-  def _create_panel_ui(self, layout: dict, parent_tag: str, path: list[int], width: int, height: int):
-    panel_tag = self._path_to_tag(path, "panel")
-    panel = layout["panel"]
-    self.active_panels.append(panel)
-    text_size = int(13 * self.scale)
-    bar_height = (text_size + 24) if width < int(329 * self.scale + 64) else (text_size + 8)  # adjust height to allow for scrollbar
-
-    with dpg.child_window(parent=parent_tag, border=False, width=-1, height=-1, no_scrollbar=True):
-      with dpg.group(horizontal=True):
-        with dpg.child_window(tag=panel_tag, width=-(text_size + 16), height=bar_height, horizontal_scrollbar=True, no_scroll_with_mouse=True, border=False):
-          with dpg.group(horizontal=True):
-            # if you change the widths make sure to change the sum of widths (currently 329 * scale)
-            dpg.add_input_text(default_value=panel.title, width=int(150 * self.scale), callback=lambda s, v: setattr(panel, "title", v))
-            dpg.add_combo(items=["Time Series"], default_value="Time Series", width=int(100 * self.scale))
-            dpg.add_button(label="Clear", callback=lambda: self.clear_panel(panel), width=int(40 * self.scale))
-            dpg.add_image_button(texture_tag="split_h_texture", callback=lambda: self.split_panel(path, 0), width=text_size, height=text_size)
-            dpg.add_image_button(texture_tag="split_v_texture", callback=lambda: self.split_panel(path, 1), width=text_size, height=text_size)
-        dpg.add_image_button(texture_tag="x_texture", callback=lambda: self.delete_panel(path), width=text_size, height=text_size)
-
-      dpg.add_separator()
-
-      content_tag = self._path_to_tag(path, "content")
-      with dpg.child_window(tag=content_tag, border=False, height=-1, width=-1, no_scrollbar=True):
-        panel.create_ui(content_tag)
-
-  def _create_split_ui(self, layout: dict, parent_tag: str, path: list[int], width: int, height: int):
-    split_tag = self._path_to_tag(path, "split")
-    orientation, _, pane_sizes = self._get_split_geometry(layout, (width, height))
-
-    with dpg.group(tag=split_tag, parent=parent_tag, horizontal=orientation == 0):
-      for i, child_layout in enumerate(layout["children"]):
-        child_path = path + [i]
-        container_tag = self._path_to_tag(child_path, "container")
-        pane_width, pane_height = [(pane_sizes[i], -1), (-1, pane_sizes[i])][orientation]  # fill 2nd dim up to the border
-        with dpg.child_window(tag=container_tag, width=pane_width, height=pane_height, border=False, no_scrollbar=True):
-          child_width, child_height = [(pane_sizes[i], height), (width, pane_sizes[i])][orientation]
-          self._create_ui_recursive(child_layout, container_tag, child_path, child_width, child_height)
-        if i < len(layout["children"]) - 1:
-          self._create_grip(split_tag, path, i, orientation)
-
-  def clear_panel(self, panel):
-    panel.clear()
-
-  def delete_panel(self, panel_path: list[int]):
-    if not panel_path:  # Root deletion
-      old_panel = self.layout["panel"]
-      old_panel.destroy_ui()
-      self.active_panels.remove(old_panel)
-      new_panel = TimeSeriesPanel(self.data_manager, self.playback_manager, self.worker_manager)
-      self.layout = {"type": "panel", "panel": new_panel}
-      self._rebuild_ui_at_path([])
-      return
-
-    parent, child_index = self._get_parent_and_index(panel_path)
-    layout_to_delete = parent["children"][child_index]
-    self._cleanup_ui_recursive(layout_to_delete, panel_path)
-
-    parent["children"].pop(child_index)
-    parent["proportions"].pop(child_index)
-
-    if len(parent["children"]) == 1:  # remove parent and collapse
-      remaining_child = parent["children"][0]
-      if len(panel_path) == 1:  # parent is at root level - promote remaining child to root
-        self.layout = remaining_child
-        self._rebuild_ui_at_path([])
-      else:  # replace parent with remaining child in grandparent
-        grandparent_path = panel_path[:-2]
-        parent_index = panel_path[-2]
-        self._replace_layout_at_path(grandparent_path + [parent_index], remaining_child)
-        self._rebuild_ui_at_path(grandparent_path + [parent_index])
-    else:  # redistribute proportions
-      equal_prop = 1.0 / len(parent["children"])
-      parent["proportions"] = [equal_prop] * len(parent["children"])
-      self._rebuild_ui_at_path(panel_path[:-1])
-
-  def split_panel(self, panel_path: list[int], orientation: int):
-    current_layout = self._get_layout_at_path(panel_path)
-    existing_panel = current_layout["panel"]
-    new_panel = TimeSeriesPanel(self.data_manager, self.playback_manager, self.worker_manager)
-    parent, child_index = self._get_parent_and_index(panel_path)
-
-    if parent is None:  # Root split
-      self.layout = {
-        "type": "split",
-        "orientation": orientation,
-        "children": [{"type": "panel", "panel": existing_panel}, {"type": "panel", "panel": new_panel}],
-        "proportions": [0.5, 0.5],
-      }
-      self._rebuild_ui_at_path([])
-    elif parent["type"] == "split" and parent["orientation"] == orientation:  # Same orientation - insert into existing split
-      parent["children"].insert(child_index + 1, {"type": "panel", "panel": new_panel})
-      parent["proportions"] = [1.0 / len(parent["children"])] * len(parent["children"])
-      self._rebuild_ui_at_path(panel_path[:-1])
-    else:  # Different orientation - create new split level
-      new_split = {"type": "split", "orientation": orientation, "children": [current_layout, {"type": "panel", "panel": new_panel}], "proportions": [0.5, 0.5]}
-      self._replace_layout_at_path(panel_path, new_split)
-      self._rebuild_ui_at_path(panel_path)
-
-  def _rebuild_ui_at_path(self, path: list[int]):
-    layout = self._get_layout_at_path(path)
-    if path:
-      container_tag = self._path_to_tag(path, "container")
-    else:  # Root update
-      container_tag = self.parent_tag
-
-    self._cleanup_ui_recursive(layout, path)
-    dpg.delete_item(container_tag, children_only=True)
-    width, height = dpg.get_item_rect_size(container_tag)
-    self._create_ui_recursive(layout, container_tag, path, width, height)
-
-  def _cleanup_ui_recursive(self, layout: dict, path: list[int]):
-    if layout["type"] == "panel":
-      panel = layout["panel"]
-      panel.destroy_ui()
-      if panel in self.active_panels:
-        self.active_panels.remove(panel)
-    else:
-      for i in range(len(layout["children"]) - 1):
-        handler_tag = f"{self._path_to_tag(path, f'grip_{i}')}_handler"
-        if dpg.does_item_exist(handler_tag):
-          dpg.delete_item(handler_tag)
-        self._created_handler_tags.discard(handler_tag)
-
-      for i, child in enumerate(layout["children"]):
-        self._cleanup_ui_recursive(child, path + [i])
-
-  def update_all_panels(self):
-    if self._queue_resize:
-      if (size := dpg.get_item_rect_size(self.parent_tag)) != [0, 0]:
-        self._queue_resize = False
-        self._resize_splits_recursive(self.layout, [], *size)
-    for panel in self.active_panels:
-      panel.update()
-
-  def on_viewport_resize(self):
-    self._resize_splits_recursive(self.layout, [])
-
-  def _resize_splits_recursive(self, layout: dict, path: list[int], width: int | None = None, height: int | None = None):
-    if layout["type"] == "split":
-      split_tag = self._path_to_tag(path, "split")
-      if dpg.does_item_exist(split_tag):
-        available_sizes = (width, height) if width and height else dpg.get_item_rect_size(dpg.get_item_parent(split_tag))
-        orientation, _, pane_sizes = self._get_split_geometry(layout, available_sizes)
-        size_properties = ("width", "height")
-
-        for i, child_layout in enumerate(layout["children"]):
-          child_path = path + [i]
-          container_tag = self._path_to_tag(child_path, "container")
-          if dpg.does_item_exist(container_tag):
-            dpg.configure_item(container_tag, **{size_properties[orientation]: pane_sizes[i]})
-            child_width, child_height = [(pane_sizes[i], available_sizes[1]), (available_sizes[0], pane_sizes[i])][orientation]
-            self._resize_splits_recursive(child_layout, child_path, child_width, child_height)
-    else:  # leaf node/panel - adjust bar height to allow for scrollbar
-      panel_tag = self._path_to_tag(path, "panel")
-      if width is not None and width < int(329 * self.scale + 64):  # scaled widths of the elements in top bar + fixed 8 padding on left and right of each item
-        dpg.configure_item(panel_tag, height=(int(13 * self.scale) + 24))
-      else:
-        dpg.configure_item(panel_tag, height=(int(13 * self.scale) + 8))
-
-  def _get_split_geometry(self, layout: dict, available_size: tuple[int, int]) -> tuple[int, int, list[int]]:
-    orientation = layout["orientation"]
-    num_grips = len(layout["children"]) - 1
-    usable_size = max(self.min_pane_size, available_size[orientation] - (num_grips * (self.grip_size + 8 * (2 - orientation))))  # approximate, scaling is weird
-    pane_sizes = [max(self.min_pane_size, int(usable_size * prop)) for prop in layout["proportions"]]
-    return orientation, usable_size, pane_sizes
-
-  def _get_layout_at_path(self, path: list[int]) -> dict:
-    current = self.layout
-    for index in path:
-      current = current["children"][index]
-    return current
-
-  def _get_parent_and_index(self, path: list[int]) -> tuple:
-    return (None, -1) if not path else (self._get_layout_at_path(path[:-1]), path[-1])
-
-  def _replace_layout_at_path(self, path: list[int], new_layout: dict):
-    if not path:
-      self.layout = new_layout
-    else:
-      parent, index = self._get_parent_and_index(path)
-      parent["children"][index] = new_layout
-
-  def _path_to_tag(self, path: list[int], prefix: str = "") -> str:
-    path_str = "_".join(map(str, path)) if path else "root"
-    return f"{prefix}_{path_str}" if prefix else path_str
-
-  def _create_grip(self, parent_tag: str, path: list[int], grip_index: int, orientation: int):
-    grip_tag = self._path_to_tag(path, f"grip_{grip_index}")
-    handler_tag = f"{grip_tag}_handler"
-    width, height = [(self.grip_size, -1), (-1, self.grip_size)][orientation]
-
-    with dpg.child_window(tag=grip_tag, parent=parent_tag, width=width, height=height, no_scrollbar=True, border=False):
-      button_tag = dpg.add_button(label="", width=-1, height=-1)
-
-    with dpg.item_handler_registry(tag=handler_tag):
-      user_data = (path, grip_index, orientation)
-      dpg.add_item_active_handler(callback=self._on_grip_drag, user_data=user_data)
-      dpg.add_item_deactivated_handler(callback=self._on_grip_end, user_data=user_data)
-    dpg.bind_item_handler_registry(button_tag, handler_tag)
-    self._created_handler_tags.add(handler_tag)
-
-  def _on_grip_drag(self, sender, app_data, user_data):
-    path, grip_index, orientation = user_data
-    layout = self._get_layout_at_path(path)
-
-    if "_drag_data" not in layout:
-      layout["_drag_data"] = {"initial_proportions": layout["proportions"][:], "start_mouse": dpg.get_mouse_pos(local=False)[orientation]}
-      return
-
-    drag_data = layout["_drag_data"]
-    split_tag = self._path_to_tag(path, "split")
-    if not dpg.does_item_exist(split_tag):
-      return
-
-    _, usable_size, _ = self._get_split_geometry(layout, dpg.get_item_rect_size(split_tag))
-    current_coord = dpg.get_mouse_pos(local=False)[orientation]
-    delta = current_coord - drag_data["start_mouse"]
-    delta_prop = delta / usable_size
-
-    left_idx = grip_index
-    right_idx = left_idx + 1
-    initial = drag_data["initial_proportions"]
-    min_prop = self.min_pane_size / usable_size
-
-    new_left = max(min_prop, initial[left_idx] + delta_prop)
-    new_right = max(min_prop, initial[right_idx] - delta_prop)
-
-    total_available = initial[left_idx] + initial[right_idx]
-    if new_left + new_right > total_available:
-      if new_left > new_right:
-        new_left = total_available - new_right
-      else:
-        new_right = total_available - new_left
-
-    layout["proportions"] = initial[:]
-    layout["proportions"][left_idx] = new_left
-    layout["proportions"][right_idx] = new_right
-
-    self._resize_splits_recursive(layout, path)
-
-  def _on_grip_end(self, sender, app_data, user_data):
-    path, _, _ = user_data
-    self._get_layout_at_path(path).pop("_drag_data", None)
+      start_async_route_load(session, state);
+    } else {
+      rebuild_session_route_data(session, state);
+      state->status_text = "Loaded route " + route_name;
+    }
+    sync_route_buffers(state, *session);
+    return true;
+  } catch (const std::exception &err) {
+    state->error_text = err.what();
+    state->open_error_popup = true;
+    state->status_text = "Failed to load route";
+    return false;
+  }
+}
+
+void draw_popups(AppSession *session, UiState *state) {
+  open_queued_popup(state->open_open_route, "Open Route");
+  if (state->open_stream) {
+    sync_stream_buffers(state, *session);
+  }
+  open_queued_popup(state->open_stream, "Live Stream");
+  if (state->open_load_layout || state->open_save_layout) {
+    sync_layout_buffers(state, *session);
+  }
+  open_queued_popup(state->open_load_layout, "Load Layout");
+  open_queued_popup(state->open_save_layout, "Save Layout");
+  open_queued_popup(state->open_preferences, "Preferences");
+  open_queued_popup(state->dbc_editor.open, "DBC Editor");
+  open_queued_popup(state->open_find_signal, "Find Signal");
+  open_queued_popup(state->axis_limits.open, "Edit Axis Limits");
+
+  draw_open_route_popup(session, state);
+  draw_stream_popup(session, state);
+  draw_load_layout_popup(session, state);
+  draw_save_layout_popup(session, state);
+  draw_preferences_popup(session, state);
+  draw_dbc_editor_popup(session, state);
+  draw_find_signal_popup(session, state);
+  draw_axis_limits_popup(session, state);
+  draw_error_popup(state);
+}

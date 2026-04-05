@@ -4,21 +4,12 @@ import pyray as rl
 from collections.abc import Callable
 
 from openpilot.common.swaglog import cloudlog
-from openpilot.selfdrive.ui.mici.widgets.dialog import BigInputDialog, BigConfirmationDialogV2
+from openpilot.selfdrive.ui.mici.widgets.dialog import BigInputDialog, BigConfirmationDialog
 from openpilot.selfdrive.ui.mici.widgets.button import BigButton, LABEL_COLOR
 from openpilot.system.ui.lib.application import gui_app, MousePos, FontWeight
 from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.scroller import NavScroller
 from openpilot.system.ui.lib.wifi_manager import WifiManager, Network, SecurityType, normalize_ssid
-
-
-def _display_ssid(ssid: str) -> str:
-  """Normalize and sanitize SSID for display; fallback for empty/hidden networks."""
-  s = normalize_ssid(ssid or "")
-  if not s:
-    return "Hidden Network"
-  # Filter non-printable chars that can cause blank rendering
-  return "".join(c for c in s if c.isprintable() or c in " \t") or "Hidden Network"
 
 
 class LoadingAnimation(Widget):
@@ -95,7 +86,7 @@ class WifiButton(BigButton):
   SUB_LABEL_WIDTH = 402 - BigButton.LABEL_HORIZONTAL_PADDING * 2
 
   def __init__(self, network: Network, wifi_manager: WifiManager):
-    super().__init__(_display_ssid(network.ssid), scroll=True)
+    super().__init__(normalize_ssid(network.ssid), scroll=True)
 
     self._network = network
     self._wifi_manager = wifi_manager
@@ -118,7 +109,6 @@ class WifiButton(BigButton):
     self._wifi_icon.set_network_missing(False)
     if self._is_connected or self._is_connecting:
       self._wrong_password = False
-    self.set_text(_display_ssid(network.ssid))
 
   @property
   def network_forgetting(self) -> bool:
@@ -161,27 +151,11 @@ class WifiButton(BigButton):
   def _get_label_font_size(self):
     return 48
 
-  def _render(self, rect):
-    super()._render(rect)
-    # BluePilot: draw SSID directly with raylib - UnifiedLabel may not render on C4
-    txt = _display_ssid(self._network.ssid)
-    if txt:
-      font = gui_app.font(FontWeight.BOLD)
-      x = int(self._rect.x + self.LABEL_PADDING)
-      y = int(self._rect.y + self.LABEL_VERTICAL_PADDING)
-      # Use _orig_draw_text_ex to bypass wrapper; apply FONT_SCALE manually
-      from openpilot.system.ui.lib.application import FONT_SCALE
-      draw_fn = getattr(rl, "_orig_draw_text_ex", rl.draw_text_ex)
-      draw_fn(font, txt, rl.Vector2(x, y), int(48 * FONT_SCALE), 0, LABEL_COLOR)
-
   def _draw_content(self, btn_y: float):
-    # BluePilot: draw SSID directly - UnifiedLabel does not render on C4/MICI
-    x = int(self._rect.x + self.LABEL_PADDING)
-    y = int(btn_y + self.LABEL_VERTICAL_PADDING)
-    txt = _display_ssid(self._network.ssid)
-    if txt:
-      font = gui_app.font(FontWeight.BOLD)
-      rl.draw_text_ex(font, txt, rl.Vector2(x, y), 48, 0, LABEL_COLOR)
+    self._label.set_color(LABEL_COLOR)
+    label_rect = rl.Rectangle(self._rect.x + self.LABEL_PADDING, btn_y + self.LABEL_VERTICAL_PADDING,
+                              self.LABEL_WIDTH, self._rect.height - self.LABEL_VERTICAL_PADDING * 2)
+    self._label.render(label_rect)
 
     if self.value:
       sub_label_x = self._rect.x + self.LABEL_HORIZONTAL_PADDING
@@ -191,7 +165,7 @@ class WifiButton(BigButton):
 
       if self._is_connected and not self._network_forgetting:
         check_y = int(label_y - sub_label_height + (sub_label_height - self._check_txt.height) / 2)
-        rl.draw_texture(self._check_txt, int(sub_label_x), check_y, rl.Color(255, 255, 255, int(255 * 0.9 * 0.65)))
+        rl.draw_texture_ex(self._check_txt, rl.Vector2(sub_label_x, check_y), 0.0, 1.0, rl.Color(255, 255, 255, int(255 * 0.9 * 0.65)))
         sub_label_x += self._check_txt.width + 14
 
       sub_label_rect = rl.Rectangle(sub_label_x, label_y - sub_label_height, sub_label_w, sub_label_height)
@@ -272,8 +246,7 @@ class ForgetButton(Widget):
 
   def _handle_mouse_release(self, mouse_pos: MousePos):
     super()._handle_mouse_release(mouse_pos)
-    dlg = BigConfirmationDialogV2("slide to forget", "icons_mici/settings/network/new/trash.png", red=True,
-                                  confirm_callback=self._forget_network)
+    dlg = BigConfirmationDialog("slide to forget", gui_app.texture("icons_mici/settings/network/new/trash.png", 54, 64), self._forget_network, red=True)
     gui_app.push_widget(dlg)
 
   def _render(self, _):
@@ -318,10 +291,11 @@ class WifiUIMici(NavScroller):
 
   @property
   def any_network_forgetting(self) -> bool:
+    # TODO: deactivate before forget and add DISCONNECTING state
     return any(btn.network_forgetting for btn in self._scroller.items if isinstance(btn, WifiButton))
 
   def show_event(self):
-    # Re-sort scroller items and update from latest scan results (upstream: do NOT clear)
+    # Re-sort scroller items and update from latest scan results
     super().show_event()
     self._wifi_manager.set_active(True)
     self._networks = {n.ssid: n for n in self._wifi_manager.networks}
