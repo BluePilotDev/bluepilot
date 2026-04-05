@@ -24,21 +24,7 @@ FW_VERSIONS = {
       b'M1PT-14F397-AD\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00',
     ],
   },
-  CAR.FORD_EDGE_MK2: {
-    (Ecu.eps, 0x730, None): [
-      b'M2GC-14D003-AA\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00',
-    ],
-    (Ecu.abs, 0x760, None): [
-      b'M2GC-2D053-CB\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00',
-      b'M2GC-2D053-EA\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00',
-    ],
-    (Ecu.fwdRadar, 0x764, None): [
-      b'JX7T-14D049-AD\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00',
-    ],
-    (Ecu.fwdCamera, 0x706, None): [
-      b'KT4T-14F397-AF\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00',
-    ],
-  },
+  # BluePilot: FORD_EDGE_MK2 FW_VERSIONS moved to sunnypilot/car/ford/fingerprints_ext.py
   CAR.FORD_ESCAPE_MK4: {
     (Ecu.eps, 0x730, None): [
       b'LX6C-14D003-AF\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00',
@@ -241,3 +227,8 @@ FW_VERSIONS = {
     ],
   },
 }
+
+# BluePilot: merge BP-only platform FW_VERSIONS (Ford Edge MK2)
+from opendbc.sunnypilot.car.fingerprints_ext import merge_fw_versions
+from opendbc.sunnypilot.car.ford.fingerprints_ext import FW_VERSIONS_EXT
+FW_VERSIONS = merge_fw_versions(FW_VERSIONS, FW_VERSIONS_EXT)

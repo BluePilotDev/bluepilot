@@ -33,36 +33,20 @@ def calculate_lat_ctl2_checksum(mode: int, counter: int, dat: bytearray) -> int:
   return 0xFF - (checksum & 0xFF)
 
 
-def create_lka_msg(packer, CAN: CanBus, lat_active: bool, hud_control):
+def create_lka_msg(packer, CAN: CanBus):
   """
   Creates an empty CAN message for the Ford LKA Command.
 
   This command can apply "Lane Keeping Aid" maneuvers, which are subject to the PSCM lockout.
 
   Frequency is 33Hz.
-
-  # Example hud_control data:
-  hud_control: (
-    speedVisible = false,
-    setSpeed = 12.96416,
-    lanesVisible = true,
-    leadVisible = false,
-    visualAlert = none,
-    audibleAlert = none,
-    rightLaneVisible = true,
-    leftLaneVisible = true,
-    rightLaneDepart = false,
-    leftLaneDepart = false,
-    leadDistanceBars = 3
-  )
-
   """
+
   return packer.make_can_msg("Lane_Assist_Data1", CAN.main, {})
 
 
-
-def create_lat_ctl_msg(packer, CAN: CanBus, lat_active: bool, ramp_type: int, precision_type: int, path_offset: float, path_angle: float,
-                       curvature: float, curvature_rate: float):
+def create_lat_ctl_msg(packer, CAN: CanBus, lat_active: bool, path_offset: float, path_angle: float, curvature: float,
+                       curvature_rate: float):
   """
   Creates a CAN message for the Ford TJA/LCA Command.
 
@@ -89,9 +73,9 @@ def create_lat_ctl_msg(packer, CAN: CanBus, lat_active: bool, ramp_type: int, pr
     "HandsOffCnfm_B_Rq": 0,                     # Unknown: 0=Inactive, 1=Active [0|1]
     "LatCtl_D_Rq": 1 if lat_active else 0,      # Mode: 0=None, 1=ContinuousPathFollowing, 2=InterventionLeft,
                                                 #       3=InterventionRight, 4-7=NotUsed [0|7]
-    "LatCtlRampType_D_Rq": ramp_type,           # Ramp speed: 0=Slow, 1=Medium, 2=Fast, 3=Immediate [0|3]
+    "LatCtlRampType_D_Rq": 0,                   # Ramp speed: 0=Slow, 1=Medium, 2=Fast, 3=Immediate [0|3]
                                                 #             Makes no difference with curvature control
-    "LatCtlPrecision_D_Rq": precision_type,     # Precision: 0=Comfortable, 1=Precise, 2/3=NotUsed [0|3]
+    "LatCtlPrecision_D_Rq": 1,                  # Precision: 0=Comfortable, 1=Precise, 2/3=NotUsed [0|3]
                                                 #            The stock system always uses comfortable
     "LatCtlPathOffst_L_Actl": path_offset,      # Path offset [-5.12|5.11] meter
     "LatCtlPath_An_Actl": path_angle,           # Path angle [-0.5|0.5235] radians
@@ -101,7 +85,7 @@ def create_lat_ctl_msg(packer, CAN: CanBus, lat_active: bool, ramp_type: int, pr
   return packer.make_can_msg("LateralMotionControl", CAN.main, values)
 
 
-def create_lat_ctl2_msg(packer, CAN: CanBus, mode: int, ramp_type: int, precision_type: int, path_offset: float, path_angle: float, curvature: float,
+def create_lat_ctl2_msg(packer, CAN: CanBus, mode: int, path_offset: float, path_angle: float, curvature: float,
                         curvature_rate: float, counter: int):
   """
   Create a CAN message for the new Ford Lane Centering command.
@@ -115,8 +99,8 @@ def create_lat_ctl2_msg(packer, CAN: CanBus, mode: int, ramp_type: int, precisio
   values = {
     "LatCtl_D2_Rq": mode,                       # Mode: 0=None, 1=PathFollowingLimitedMode, 2=PathFollowingExtendedMode,
                                                 #       3=SafeRampOut, 4-7=NotUsed [0|7]
-    "LatCtlRampType_D_Rq": ramp_type,           # 0=Slow, 1=Medium, 2=Fast, 3=Immediate [0|3]
-    "LatCtlPrecision_D_Rq": precision_type,     # 0=Comfortable, 1=Precise, 2/3=NotUsed [0|3]
+    "LatCtlRampType_D_Rq": 0,                   # 0=Slow, 1=Medium, 2=Fast, 3=Immediate [0|3]
+    "LatCtlPrecision_D_Rq": 1,                  # 0=Comfortable, 1=Precise, 2/3=NotUsed [0|3]
     "LatCtlPathOffst_L_Actl": path_offset,      # [-5.12|5.11] meter
     "LatCtlPath_An_Actl": path_angle,           # [-0.5|0.5235] radians
     "LatCtlCurv_No_Actl": curvature,            # [-0.02|0.02094] 1/meter
@@ -133,14 +117,12 @@ def create_lat_ctl2_msg(packer, CAN: CanBus, mode: int, ramp_type: int, precisio
   return packer.make_can_msg("LateralMotionControl2", CAN.main, values)
 
 
-def create_acc_msg(packer, CAN: CanBus, long_active: bool, gas: float, accel: float, accel_pred: float, stopping: bool,
-                  brake_actuate, precharge_actuate, v_ego_kph: float):
+def create_acc_msg(packer, CAN: CanBus, long_active: bool, gas: float, accel: float, stopping: bool, brake_request, v_ego_kph: float):
   """
   Creates a CAN message for the Ford ACC Command.
 
   This command can be used to enable ACC, to set the ACC gas/brake/decel values
-  and to disable ACC. Precharge engages slightly before full brake for smoother
-  decel; both use hysteresis to avoid binary on/off feel.
+  and to disable ACC.
 
   Frequency is 50Hz.
   """
@@ -148,21 +130,23 @@ def create_acc_msg(packer, CAN: CanBus, long_active: bool, gas: float, accel: fl
     "AccBrkTot_A_Rq": accel,                          # Brake total accel request: [-20|11.9449] m/s^2
     "Cmbb_B_Enbl": 1 if long_active else 0,           # Enabled: 0=No, 1=Yes
     "AccPrpl_A_Rq": gas,                              # Acceleration request: [-5|5.23] m/s^2
-    "AccPrpl_A_Pred": accel_pred,                     # From carcontroller (Ford stock: gas when not braking, else AccBrkTot)
+    # No observed acceleration seen from this signal alone. During stock system operation, it appears to
+    # be the raw acceleration request (AccPrpl_A_Rq when positive, AccBrkTot_A_Rq when negative)
+    "AccPrpl_A_Pred": -5.0,                           # Acceleration request: [-5|5.23] m/s^2
     "AccResumEnbl_B_Rq": 1 if long_active else 0,
     # No observed acceleration seen from this signal alone
     "AccVeh_V_Trg": v_ego_kph,                        # Target speed: [0|255] km/h
     # TODO: we may be able to improve braking response by utilizing pre-charging better
     # When setting these two bits without AccBrkTot_A_Rq, an initial jerk is observed and car may be able to brake temporarily with AccPrpl_A_Rq
-    "AccBrkPrchg_B_Rq": 1 if precharge_actuate else 0,   # Pre-charge brake request
-    "AccBrkDecel_B_Rq": 1 if brake_actuate else 0,       # Deceleration request
+    "AccBrkPrchg_B_Rq": 1 if brake_request else 0,            # Pre-charge brake request: 0=No, 1=Yes
+    "AccBrkDecel_B_Rq": 1 if brake_request else 0,            # Deceleration request: 0=Inactive, 1=Active
     "AccStopStat_B_Rq": 1 if stopping else 0,
   }
   return packer.make_can_msg("ACCDATA", CAN.main, values)
 
 
 def create_acc_ui_msg(packer, CAN: CanBus, CP, main_on: bool, enabled: bool, fcw_alert: bool, standstill: bool,
-                      hud_control, stock_values: dict, send_hands_free_msg: bool, send_ui: bool, send_bars: bool, tja_warn: int, tja_msg: int):
+                      show_distance_bars: bool, hud_control, stock_values: dict):
   """
   Creates a CAN message for the Ford IPC adaptive cruise, forward collision warning and traffic jam
   assist status.
@@ -178,8 +162,6 @@ def create_acc_ui_msg(packer, CAN: CanBus, CP, main_on: bool, enabled: bool, fcw
       status = 3  # ActiveInterventionLeft
     elif hud_control.rightLaneDepart:
       status = 4  # ActiveInterventionRight
-    elif send_hands_free_msg:
-      status = 7 # Show BlueCruise UI in the Cluster
     else:
       status = 2  # Active
   elif main_on:
@@ -189,10 +171,8 @@ def create_acc_ui_msg(packer, CAN: CanBus, CP, main_on: bool, enabled: bool, fcw
       status = 6  # ActiveWarningRight
     else:
       status = 1  # Standby
-  elif standstill:
-    status = 0  # Off
   else:
-    status = 1    # Standby
+    status = 0    # Off
 
   values = {s: stock_values[s] for s in [
     "HaDsply_No_Cs",
@@ -200,8 +180,8 @@ def create_acc_ui_msg(packer, CAN: CanBus, CP, main_on: bool, enabled: bool, fcw
     "AccStopStat_D_Dsply",       # ACC stopped status message
     "AccTrgDist2_D_Dsply",       # ACC target distance
     "AccStopRes_B_Dsply",
-    #"TjaWarn_D_Rq",              # TJA warning
-    #"TjaMsgTxt_D_Dsply",         # TJA text
+    "TjaWarn_D_Rq",              # TJA warning
+    "TjaMsgTxt_D_Dsply",         # TJA text
     "IaccLamp_D_Rq",             # iACC status icon
     "AccMsgTxt_D2_Rq",           # ACC text
     "FcwDeny_B_Dsply",           # FCW disabled
@@ -224,15 +204,13 @@ def create_acc_ui_msg(packer, CAN: CanBus, CP, main_on: bool, enabled: bool, fcw
 
   values.update({
     "Tja_D_Stat": status,        # TJA status
-    "TjaWarn_D_Rq": tja_warn,    # TJA warning
-    "TjaMsgTxt_D_Dsply": tja_msg,# TJA text
   })
 
   if CP.openpilotLongitudinalControl:
     values.update({
       "AccStopStat_D_Dsply": 2 if standstill else 0,              # Stopping status text
       "AccMsgTxt_D2_Rq": 0,                                       # ACC text
-      "AccTGap_B_Dsply": 1 if send_bars else 0,      	            # Show time gap control UI
+      "AccTGap_B_Dsply": 1 if show_distance_bars else 0,          # Show time gap control UI
       "AccFllwMde_B_Dsply": 1 if hud_control.leadVisible else 0,  # Lead indicator
       "AccStopMde_B_Dsply": 1 if standstill else 0,
       "AccWarn_D_Dsply": 0,                                       # ACC warning
@@ -242,12 +220,11 @@ def create_acc_ui_msg(packer, CAN: CanBus, CP, main_on: bool, enabled: bool, fcw
   # Forwards FCW alert from IPMA
   if fcw_alert:
     values["FcwVisblWarn_B_Rq"] = 1  # FCW visible alert
-    values["FcwAudioWarn_B_Rq"] = 1  # FCW audio alert
 
   return packer.make_can_msg("ACCDATA_3", CAN.main, values)
 
 
-def create_lkas_ui_msg(packer, CAN: CanBus, main_on: bool, enabled: bool, hands: int, hud_control,
+def create_lkas_ui_msg(packer, CAN: CanBus, main_on: bool, enabled: bool, steer_alert: bool, hud_control,
                        stock_values: dict):
   """
   Creates a CAN message for the Ford IPC IPMA/LKAS status.
@@ -257,63 +234,39 @@ def create_lkas_ui_msg(packer, CAN: CanBus, main_on: bool, enabled: bool, hands:
   Stock functionality is maintained by passing through unmodified signals.
 
   Frequency is 1Hz.
-
-  # Example hud_control data:
-  hud_control: (
-    speedVisible = false,
-    setSpeed = 12.96416,
-    lanesVisible = true,
-    leadVisible = false,
-    visualAlert = none,
-    audibleAlert = none,
-    rightLaneVisible = true,
-    leftLaneVisible = true,
-    rightLaneDepart = false,
-    leftLaneDepart = false,
-    leadDistanceBars = 3
-  )
-
-  # LaActvStats_D_Dsply Value Table
-  # Left \\ Right  | Intervene | Warning | Suppress | Available | None
-  # ---------------------------------------------------------------
-  # Intervene     | 24        | 19      | 14       | 9         | 4
-  # Warning       | 23        | 18      | 13       | 8         | 3
-  # Suppress      | 22        | 17      | 12       | 7         | 2
-  # Available     | 21        | 16      | 11       | 6         | 1
-  # None          | 20        | 15      | 10       | 5         | 0
-
   """
 
+  # LaActvStats_D_Dsply
+  #    R  Intvn Warn Supprs Avail No
+  # L
+  # Intvn  24    19    14     9   4
+  # Warn   23    18    13     8   3
+  # Supprs 22    17    12     7   2
+  # Avail  21    16    11     6   1
+  # No     20    15    10     5   0
+  #
   # TODO: test suppress state
-  lines = 0
-
-  if hud_control is not None:
-    left_status = 2  # Default to Suppress
-    right_status = 10  # Default to Suppress
-
-    # Determine left lane status
+  if enabled:
+    lines = 0  # NoLeft_NoRight
     if hud_control.leftLaneDepart:
-      left_status = 4 # Intervene (Yellow)
-      #left_status = 3 # Warning (Red)
+      lines += 4
     elif hud_control.leftLaneVisible:
-      left_status = 1 # Available
-    else:
-      left_status = 2 # Suppress
-
-    # Determine right lane status
+      lines += 1
     if hud_control.rightLaneDepart:
-      right_status = 20 # Intervene (Yellow)
-      #right_status = 15 # Warning (Red)
+      lines += 20
     elif hud_control.rightLaneVisible:
-      right_status = 5
-    else:
-      right_status = 10 # Suppress
-
-    # Combine left and right lane status
-    lines = left_status + right_status
-  else:
-    #Set this to 0 if hud_control is None
+      lines += 5
+  elif main_on:
     lines = 0
+  else:
+    if hud_control.leftLaneDepart:
+      lines = 3  # WarnLeft_NoRight
+    elif hud_control.rightLaneDepart:
+      lines = 15  # NoLeft_WarnRight
+    else:
+      lines = 30  # LA_Off
+
+  hands_on_wheel_dsply = 1 if steer_alert else 0
 
   values = {s: stock_values[s] for s in [
     "FeatConfigIpmaActl",
@@ -333,21 +286,18 @@ def create_lkas_ui_msg(packer, CAN: CanBus, main_on: bool, enabled: bool, hands:
 
   values.update({
     "LaActvStats_D_Dsply": lines,                 # LKAS status (lines) [0|31]
-    "LaHandsOff_D_Dsply": hands,   # 0=HandsOn, 1=Level1 (w/o chime), 2=Level2 (w/ chime), 3=Suppressed
+    "LaHandsOff_D_Dsply": hands_on_wheel_dsply,   # 0=HandsOn, 1=Level1 (w/o chime), 2=Level2 (w/ chime), 3=Suppressed
   })
   return packer.make_can_msg("IPMA_Data", CAN.main, values)
 
 
-def create_button_msg(packer, bus: int, stock_values: dict, cancel=False, resume=False, tja_toggle=False, icbm_button=None):
+def create_button_msg(packer, bus: int, stock_values: dict, cancel=False, resume=False, tja_toggle=False):
   """
   Creates a CAN message for the Ford SCCM buttons/switches.
 
   Includes cruise control buttons, turn lights and more.
 
   Frequency is 10Hz.
-
-  Args:
-    icbm_button: Optional string signal name for ICBM button press (e.g., "CcAslButtnSetIncPress", "CcAslButtnSetDecPress")
   """
 
   values = {s: stock_values[s] for s in [
@@ -389,9 +339,4 @@ def create_button_msg(packer, bus: int, stock_values: dict, cancel=False, resume
     "CcAsllButtnResPress": 1 if resume else 0,      # CC resume button
     "TjaButtnOnOffPress": 1 if tja_toggle else 0,   # LCA/TJA toggle button
   })
-
-  # ICBM button support - set the specified button signal to 1
-  if icbm_button is not None:
-    values[icbm_button] = 1
-
   return packer.make_can_msg("Steering_Data_FD1", bus, values)

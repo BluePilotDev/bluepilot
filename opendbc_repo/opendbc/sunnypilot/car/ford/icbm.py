@@ -9,7 +9,7 @@ Ford ICBM (Intelligent Cruise Button Management) implementation.
 
 from opendbc.car import structs, DT_CTRL
 from opendbc.car.can_definitions import CanData
-from opendbc.car.ford import fordcan
+from opendbc.sunnypilot.car.ford import fordcan_ext
 from opendbc.sunnypilot.car.intelligent_cruise_button_management_interface_base import IntelligentCruiseButtonManagementInterfaceBase
 
 ButtonType = structs.CarState.ButtonEvent.Type
@@ -55,9 +55,9 @@ class IntelligentCruiseButtonManagementInterface(IntelligentCruiseButtonManageme
       # Only send if enough time has passed since last button press
       if (self.frame - self.last_button_frame) * DT_CTRL > 0.05:
         # Send button press to both camera and main bus (same as cancel/resume)
-        can_sends.append(fordcan.create_button_msg(packer, CAN.camera, CS.buttons_stock_values,
+        can_sends.append(fordcan_ext.create_button_msg(packer, CAN.camera, CS.buttons_stock_values,
                                                      icbm_button=button_signal))
-        can_sends.append(fordcan.create_button_msg(packer, CAN.main, CS.buttons_stock_values,
+        can_sends.append(fordcan_ext.create_button_msg(packer, CAN.main, CS.buttons_stock_values,
                                                      icbm_button=button_signal))
         self.last_button_frame = self.frame
 

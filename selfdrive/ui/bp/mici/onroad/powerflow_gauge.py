@@ -6,7 +6,7 @@ from openpilot.system.ui.lib.application import gui_app
 from openpilot.system.ui.widgets import Widget
 from openpilot.selfdrive.ui.mici.onroad import blend_colors
 from openpilot.system.ui.lib.shader_polygon import draw_polygon, Gradient
-from opendbc.car.ford.helpers import get_hev_power_flow_text, get_hev_engine_on_reason_text
+from opendbc.sunnypilot.car.ford.carstate_ext import get_hev_power_flow_text, get_hev_engine_on_reason_text
 from openpilot.common.filter_simple import FirstOrderFilter
 from openpilot.selfdrive.ui.bp.lib.ui_debug_logger import bp_ui_log
 

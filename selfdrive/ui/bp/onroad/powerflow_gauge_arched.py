@@ -12,7 +12,7 @@ from openpilot.system.ui.lib.text_measure import measure_text_cached
 from openpilot.system.ui.widgets import Widget
 from openpilot.selfdrive.ui.mici.onroad.torque_bar import arc_bar_pts
 from openpilot.system.ui.lib.shader_polygon import draw_polygon
-from opendbc.car.ford.helpers import get_hev_power_flow_text, get_hev_engine_on_reason_text
+from opendbc.sunnypilot.car.ford.carstate_ext import get_hev_power_flow_text, get_hev_engine_on_reason_text
 
 # Constants
 POWERFLOW_ANGLE_SPAN = 15.0  # Slightly longer than torque bar (12.7 degrees)

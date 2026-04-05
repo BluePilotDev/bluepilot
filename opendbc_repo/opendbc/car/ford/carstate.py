@@ -5,13 +5,8 @@ from openpilot.common.params import Params
 from opendbc.car.ford.fordcan import CanBus
 from opendbc.car.ford.values import DBC, CarControllerParams, FordFlags
 from opendbc.car.interfaces import CarStateBase
-from cereal import messaging
-# from bluepilot.logger.bp_logger import debug, info, warning, error, critical
 from opendbc.sunnypilot.car.ford.mads import MadsCarState
 from opendbc.sunnypilot.car.ford.carstate_ext import CarStateExt
-
-# from opendbc.car.ford.fordcanparser import FordCanParser
-from opendbc.car.ford.helpers import get_hev_power_flow_text, get_hev_engine_on_reason_text
 
 ButtonType = structs.CarState.ButtonEvent.Type
 GearShifter = structs.CarState.GearShifter
@@ -25,9 +20,7 @@ class CarState(CarStateBase, MadsCarState, CarStateExt):
     CarStateExt.__init__(self, CP, CP_SP)
     can_define = CANDefine(DBC[CP.carFingerprint][Bus.pt])
     self.params = Params()
-    # self.ford_can_parser = FordCanParser(CP)
 
-    # self.bluecruise_cluster_present = FordConfig.BLUECRUISE_CLUSTER_PRESENT # Sets the value of whether the car has the blue cruise cluster
     if CP.transmissionType == TransmissionType.automatic:
       if CP.flags & FordFlags.CANFD:
         self.shifter_values = can_define.dv["Gear_Shift_by_Wire_FD1"]["TrnRng_D_RqGsm"]
@@ -40,22 +33,16 @@ class CarState(CarStateBase, MadsCarState, CarStateExt):
     self.cluster_speed_hyst_gap = CV.KPH_TO_MS / 2.
     self.distance_button = 0
     self.lc_button = 0
+    # BluePilot: fix uninitialized attribute (used by ALT_STEER_ANGLE steering angle calc)
+    self.steering_angle_offset_deg = 0.0
 
-    # Save the HEV data available flag to a param
+    # BluePilot: Save HEV data available flags to params for UI
     self.params.put_bool("FordPrefHevDataAvailable", True if CP.flags & FordFlags.HEV_CLUSTER_DATA else False)
     self.params.put_bool("FordPrefHevBattDataAvailable", True if CP.flags & FordFlags.HEV_BATTERY_DATA else False)
-    self.hev_data_available = CP.flags & FordFlags.HEV_CLUSTER_DATA
 
   def update(self, can_parsers) -> tuple[structs.CarState, structs.CarStateSP]:
     cp = can_parsers[Bus.pt]
     cp_cam = can_parsers[Bus.cam]
-
-	# Publish CAN data first so any parsing errors don't affect critical CarState updates
-    # if(self.params.get_bool("FordPrefStreamCanData")):
-    #   try:
-    #     self.ford_can_parser.publish_can_data(cp, cp_cam, self.CP.carFingerprint)
-    #   except Exception as e:
-    #     print(f"Error publishing Ford CAN data: {e}")
 
     ret = structs.CarState()
     ret_sp = structs.CarStateSP()
@@ -118,8 +105,9 @@ class CarState(CarStateBase, MadsCarState, CarStateExt):
     ret.cruiseState.standstill = cp.vl["EngBrakeData"]["AccStopMde_D_Rq"] == 3
     ret.accFaulted = cp.vl["EngBrakeData"]["CcStat_D_Actl"] in (1, 2)
 
+    # BluePilot: traffic sign recognition (delegated to carstate_ext)
     if self.CP.flags & FordFlags.CANFD:
-      ret_sp.speedLimit = self.update_traffic_signals(cp_cam)
+      ret_sp.speedLimit = CarStateExt.update_traffic_signals(self, cp_cam)
 
     if not self.CP.openpilotLongitudinalControl:
       ret.accFaulted = ret.accFaulted or cp_cam.vl["ACCDATA"]["CmbbDeny_B_Actl"] == 1
@@ -180,144 +168,9 @@ class CarState(CarStateBase, MadsCarState, CarStateExt):
       *self.button_events,
     ]
 
-    self.car_state_bp_msg = self.update_car_state_bp(cp, cp_cam)
+    # BluePilot: HEV telemetry and brake light status (delegated to carstate_ext)
+    self.car_state_bp_msg = CarStateExt.update_car_state_bp(self, cp, cp_cam)
     return ret, ret_sp
-
-  def update_car_state_bp(self, cp, cp_cam):
-    """Update the CarStateBP message for HEV/PHEV data
-
-    Args:
-        cp: Powertrain bus CAN parser
-        cp_cam: Camera bus CAN parser
-    """
-    # Create a new message
-    dat = messaging.new_message("carStateBP")
-    dat.valid = True
-
-    # Get handles to the message structures
-    hybrid_drive = dat.carStateBP.hybridDrive
-    hybrid_battery = dat.carStateBP.hybridBattery
-    brake_light_status = dat.carStateBP.brakeLightStatus
-
-    # Initialize with default values
-    hybrid_drive.dataAvailable = False
-    hybrid_drive.throttleDemandPercent = 0.0
-    hybrid_drive.throttleThresholdPercent = 0.0
-    hybrid_drive.powerFlowMode = ""
-    hybrid_drive.powerFlowModeValue = 0
-    hybrid_drive.engineOnReason = ""
-    hybrid_drive.engineOnReasonValue = 0
-
-    hybrid_battery.dataAvailable = False
-    hybrid_battery.voltHighLimit = 0.0
-    hybrid_battery.voltLowLimit = 0.0
-    hybrid_battery.voltActual = 0.0
-    hybrid_battery.ampsActual = 0.0
-    hybrid_battery.socMinPerc = 0.0
-    hybrid_battery.socMaxPerc = 0.0
-    hybrid_battery.socActual = 0.0
-
-    # Initialize brake light status
-    brake_light_status.dataAvailable = False
-    brake_light_status.brakeLightsOn = False
-
-    # Brake light status - try BCM message first (more reliable), then fallback to BrakeSysFeatures_2
-    brake_lights_detected = False
-
-    # Primary: BCM_Lamp_Stat_FD1 message (actual brake light status from Body Control Module)
-    try:
-      bcm_data = cp.vl["BCM_Lamp_Stat_FD1"]
-      if bcm_data is not None:
-        brake_light_status.dataAvailable = True
-
-        # Try StopLghtOn_B_Stat signal first (standard DBC signal)
-        if "StopLghtOn_B_Stat" in bcm_data:
-          brake_light_status.brakeLightsOn = bool(bcm_data["StopLghtOn_B_Stat"])
-          brake_lights_detected = True
-        # Fallback: Try other BCM lamp signals that might indicate brake lights
-        elif "RvrseLghtOn_B_Stat" in bcm_data:
-          # Some vehicles may use reverse light status as brake indicator
-          brake_light_status.brakeLightsOn = bcm_data["RvrseLghtOn_B_Stat"] == 1
-          brake_lights_detected = True
-        else:
-          # If no known signals work, mark as unavailable and fall back
-          brake_light_status.dataAvailable = False
-    except (KeyError, AttributeError):
-      pass  # BCM message not available, try fallback
-
-    # Fallback: BrakeSysFeatures_2 message (brake light request signal)
-    if not brake_lights_detected:
-      try:
-        brake_data = cp.vl["BrakeSysFeatures_2"]
-        if brake_data is not None:
-          brake_light_status.dataAvailable = True
-          # BrkLamp_B_Rq indicates when brake lights should be on
-          brake_light_status.brakeLightsOn = brake_data["BrkLamp_B_Rq"] == 1
-          brake_lights_detected = True
-      except (KeyError, AttributeError):
-        pass  # BrakeSysFeatures_2 not available
-
-    # ACC brake light logic (applies to both sources)
-    if brake_lights_detected and self.CP.openpilotLongitudinalControl:
-      try:
-        acc_data = cp_cam.vl["ACCDATA"]  # ACCDATA is on camera bus
-        # Check if openpilot is actively requesting braking via ACC
-        acc_brake_active = (acc_data["AccBrkPrchg_B_Rq"] == 1 or
-                           acc_data["AccBrkDecel_B_Rq"] == 1)
-        brake_light_status.brakeLightsOn = (brake_light_status.brakeLightsOn or
-                                           acc_brake_active)
-      except (KeyError, AttributeError):
-        pass  # ACCDATA not available, use original brake light status
-
-    # HEV cluster data
-    try:
-        if self.CP.flags & FordFlags.HEV_CLUSTER_DATA:
-          hev_data = cp.vl["Cluster_HEV_Data2"]
-          if hev_data is not None:
-            hybrid_drive.dataAvailable = True
-            hybrid_drive.throttleDemandPercent = hev_data["EffWhlLvl2_Pc_Dsply"]
-            hybrid_drive.throttleThresholdPercent = hev_data[
-                "EffWhlThres_Pc_Dsply"
-            ]
-            power_flow_value = int(hev_data["PwrFlowTxt_D_Dsply"])
-            engine_reason_value = int(hev_data["EngOnMsg1_D_Dsply"])
-            hybrid_drive.powerFlowMode = get_hev_power_flow_text(power_flow_value)
-            hybrid_drive.powerFlowModeValue = power_flow_value
-            hybrid_drive.engineOnReason = get_hev_engine_on_reason_text(engine_reason_value)
-            hybrid_drive.engineOnReasonValue = engine_reason_value
-    except (KeyError, AttributeError):
-      pass
-
-    # HEV battery data
-    try:
-      if self.CP.flags & FordFlags.HEV_BATTERY_DATA:
-        batt_data1 = cp.vl["Battery_Traction_1_FD1"]
-        batt_data3 = cp.vl["Battery_Traction_3_FD1"]
-        batt_data4 = cp.vl["Battery_Traction_4_FD1"]
-
-        if all(x is not None for x in [batt_data1, batt_data3, batt_data4]):
-          hybrid_battery.dataAvailable = True
-          hybrid_battery.voltHighLimit = batt_data1["BattTrac_U_LimHi"]
-          hybrid_battery.voltLowLimit = batt_data1["BattTrac_U_LimLo"]
-          hybrid_battery.voltActual = batt_data1["BattTrac_U_Actl"]
-          hybrid_battery.ampsActual = batt_data1["BattTrac_I_Actl"]
-          hybrid_battery.socMinPerc = batt_data3["BattTracSoc_Pc_MnPrtct"]
-          hybrid_battery.socMaxPerc = batt_data3["BattTracSoc_Pc_MxPrtct"]
-          hybrid_battery.socActual = batt_data4["BattTracSoc2_Pc_Actl"]
-    except (KeyError, AttributeError):
-        pass
-
-    return dat
-
-  def update_traffic_signals(self, cp_cam):
-     # TODO: Check if CAN platforms have the same signals
-     if self.CP.flags & FordFlags.CANFD:
-       self.v_limit = cp_cam.vl["Traffic_RecognitnData"]["TsrVLim1MsgTxt_D_Rq"]
-       v_limit_unit = cp_cam.vl["Traffic_RecognitnData"]["TsrVlUnitMsgTxt_D_Rq"]
-
-       speed_factor = CV.MPH_TO_MS if v_limit_unit == 2 else CV.KPH_TO_MS if v_limit_unit == 1 else 0
-
-       return self.v_limit * speed_factor if self.v_limit not in (0, 255) else 0
 
   @staticmethod
   def get_can_parsers(CP, CP_SP):

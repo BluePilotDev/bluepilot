@@ -15,7 +15,7 @@ from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.system.ui.lib.application import FontWeight, gui_app
 from openpilot.system.ui.lib.text_measure import measure_text_cached
 from openpilot.system.ui.widgets import Widget
-from opendbc.car.ford.helpers import get_hev_engine_on_reason_text, get_hev_power_flow_text
+from opendbc.sunnypilot.car.ford.carstate_ext import get_hev_engine_on_reason_text, get_hev_power_flow_text
 from openpilot.selfdrive.ui.bp.lib.ui_debug_logger import bp_ui_log
 
 # --- Size presets (width_ratio, height) for each gauge_scale ---

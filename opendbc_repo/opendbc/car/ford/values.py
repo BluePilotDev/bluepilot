@@ -1,14 +1,12 @@
 import copy
 import re
-import os
-import json
 from dataclasses import dataclass, field, replace
 from enum import Enum, IntFlag
 
 from opendbc.car import Bus, CarSpecs, DbcDict, PlatformConfig, Platforms, uds
 from opendbc.car.lateral import AngleSteeringLimits
 from opendbc.car.structs import CarParams
-from opendbc.car.docs_definitions import CarFootnote, CarHarness, CarDocs, CarParts, Column, Device
+from opendbc.car.docs_definitions import CarFootnote, CarHarness, CarDocs, CarParts, Column
 from opendbc.car.fw_query_definitions import FwQueryConfig, LiveFwVersions, OfflineFwVersions, Request, StdQueries, p16
 
 Ecu = CarParams.Ecu
@@ -22,11 +20,8 @@ class CarControllerParams:
   ACC_UI_STEP = 20      # ACCDATA_3, 5Hz
   BUTTONS_STEP = 5      # Steering_Data_FD1, 10Hz, but send twice as fast
 
-  CURVATURE_MAX = 0.02  # Max curvature for steering command, m^-1
   STEER_DRIVER_ALLOWANCE = 1.0  # Driver intervention threshold, Nm
 
-  # ANGLE_RATE_LIMIT_UP = AngleRateLimit(speed_bp=[5, 25], angle_v=[0.0006, 0.0004]) # windup limit
-  # ANGLE_RATE_LIMIT_DOWN = AngleRateLimit(speed_bp=[5, 25], angle_v=[0.0006, 0.0006]) # unwind limit
   ANGLE_LIMITS: AngleSteeringLimits = AngleSteeringLimits(
     0.02,  # Max curvature for steering command, m^-1
     # Curvature rate limits
@@ -34,10 +29,8 @@ class CarControllerParams:
     #  however max curvature rate linearly decreases as speed increases:
     #  ~0.009 m^-1/sec at 7 m/s, ~0.002 m^-1/sec at 35 m/s
     # Limit to ~2 m/s^3 up, ~3.3 m/s^3 down at 75 mph and match EPS limit at low speed
-    # ([5, 16.0, 25], [0.00045, 0.00025, 0.00010]),
-    # ([5, 16.0, 25], [0.00045, 0.00025, 0.00015])
-    ([5, 16, 25], [0.0025, 0.0012, 0.00008]),
-    ([5, 16, 25], [0.0025, 0.0014, 0.00018])
+    ([5, 25], [0.00045, 0.0001]),
+    ([5, 25], [0.00045, 0.00015])
   )
   CURVATURE_ERROR = 0.002  # ~6 degrees at 10 m/s, ~10 degrees at 35 m/s
 
@@ -49,9 +42,6 @@ class CarControllerParams:
   def __init__(self, CP):
     pass
 
-
-# class FordConfig:
-#   BLUECRUISE_CLUSTER_PRESENT = False
 
 class FordSafetyFlags(IntFlag):
   LONG_CONTROL = 1
@@ -89,19 +79,9 @@ class FordCarDocs(CarDocs):
 
   def init_make(self, CP: CarParams):
     harness = CarHarness.ford_q4 if CP.flags & FordFlags.CANFD else CarHarness.ford_q3
-    if CP.carFingerprint in (
-      CAR.FORD_BRONCO_SPORT_MK1,
-      CAR.FORD_MAVERICK_MK1,
-      CAR.FORD_F_150_MK14,
-      CAR.FORD_F_150_LIGHTNING_MK1,
-      CAR.FORD_ESCAPE_MK4_5,
-      CAR.FORD_MUSTANG_MACH_E_MK1,
-      CAR.FORD_RANGER_MK2,
-      CAR.FORD_EDGE_MK2,
-    ):
-      self.car_parts = CarParts([Device.threex_angled_mount, harness])
-    else:
-      self.car_parts = CarParts([Device.threex, harness])
+    # BluePilot: device mount customization moved to sunnypilot/car/ford/values_ext.py::apply_bp_device_mount()
+    from opendbc.sunnypilot.car.ford.values_ext import apply_bp_device_mount
+    apply_bp_device_mount(self, CP)
 
     if harness == CarHarness.ford_q4:
       self.setup_video = "https://www.youtube.com/watch?v=uUGkH6C_EQU"
