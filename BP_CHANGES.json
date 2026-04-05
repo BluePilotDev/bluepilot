@@ -1,5 +1,44 @@
 {
   "versions": {
+    "6.1.0": {
+      "agnos_version": "17.2",
+      "changes": [
+        "Synced with latest upstream SunnyPilot (Chrysler CUSW, Rivian, Tesla, Honda, Hyundai updates)",
+        "New is_bluepilot() detection system — all stock file overrides are now guarded and labeled",
+        "Refactored BP overrides in card.py, cruise.py, and desire_helper.py into dedicated BP modules",
+        "Extracted rainbow path and gradient circle GPU shaders to bluepilot/ui/lib/bp_shaders.py",
+        "Extracted ICBM cruise helpers to bluepilot/selfdrive/car/bp_cruise.py",
+        "Extracted BP message publishing to bluepilot/selfdrive/car/bp_card_publisher.py",
+        "Extracted blinker pause logic to bluepilot/selfdrive/controls/bp_desire_helper.py",
+        "Extracted WiFi WPA2/WPA3 cipher support to bluepilot/system/ui/lib/bp_wifi.py",
+        "Ford opendbc refactored to sunnypilot extension layer",
+        "Forced fingerprint safety net reads CarPlatformBundle directly in fingerprint()",
+        "Added lateralManeuverPlan support from upstream",
+        "Updated submodules: panda, msgq, rednose",
+        "macOS build support for Cabana with dynamic parallel job detection",
+        "Added replay tool support for non-larch64 architectures"
+      ],
+      "fixes": [
+        "Fixed BigButtonBP crash after upstream removed icon_size parameter",
+        "Fixed MiciLabel import crash after upstream replaced it with UnifiedLabel",
+        "Fixed BigConfirmationDialogV2 rename to BigConfirmationDialog",
+        "Fixed FontWeight.LIGHT removal — replaced with DISPLAY_REGULAR",
+        "Fixed UnifiedLabel font_size property no longer having a setter",
+        "Fixed WiFi _get_connections() removed upstream — use _connections dict directly",
+        "Fixed missing gui_app.texture() tint parameter removed upstream",
+        "Fixed missing pyray import in MICI settings layout",
+        "Fixed ford.h build error: FORD_INACTIVE_CURVATURE_RATE_CANFD constant name mismatch",
+        "Fixed jotpluggler build on macOS: restored missing layout.cc from upstream",
+        "Fixed wifi_manager missing upstream error handling for WiFi properties",
+        "Fixed onroad brightness timer not expiring due to normal alerts resetting it",
+        "Fixed stale scons lock and plotjuggler build issues from merge",
+        "General stability improvements from upstream merge compatibility fixes"
+      ],
+      "removals": [
+        "Removed rainbow/circle shaders from stock shader_polygon.py (preserved in BP module)",
+        "Removed vendored _panda/ directory (now uses submodule)"
+      ]
+    },
     "6.0.1": {
       "agnos_version": "13.1",
       "changes": [
