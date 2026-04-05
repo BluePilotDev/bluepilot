@@ -68,6 +68,9 @@ htmlcov
 
 build/
 
+# Local/generated; Python sources live in common/transformations/*.py
+common/transformations/transformations.cpp
+
 !**/.gitkeep
 
 

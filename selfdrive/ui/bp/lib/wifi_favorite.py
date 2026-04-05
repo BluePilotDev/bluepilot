@@ -130,7 +130,8 @@ class WifiFavoriteManager:
         # Check if favorite is in scan results with sufficient signal strength
         favorite_network = None
         favorite_signal_strength = 0
-        with self._wifi_manager._lock:
+        # Match WifiManager: scan results are updated under _scan_lock (not _lock — upstream rename).
+        with self._wifi_manager._scan_lock:
           for network in self._wifi_manager._networks:
             if network.ssid == favorite_ssid:
               favorite_network = network
