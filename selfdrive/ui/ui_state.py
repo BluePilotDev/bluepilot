@@ -12,6 +12,7 @@ from openpilot.selfdrive.ui.lib.prime_state import PrimeState
 from openpilot.system.ui.lib.application import gui_app
 from openpilot.system.hardware import HARDWARE, PC
 
+from openpilot.common.bluepilot import is_bluepilot
 from openpilot.selfdrive.ui.sunnypilot.ui_state import UIStateSP, DeviceSP
 
 BACKLIGHT_OFFROAD = 65 if HARDWARE.get_device_type() == "mici" else 50
@@ -60,8 +61,8 @@ class UIState(UIStateSP):
         "carControl",
         "liveParameters",
         "rawAudioData",
-        "carStateBP",  # BluePilot: Hybrid battery and drive data
       ] + self.sm_services_ext
+      + (["carStateBP"] if is_bluepilot() else [])  # BluePilot: hybrid battery and drive data
     )
 
     self.prime_state = PrimeState()

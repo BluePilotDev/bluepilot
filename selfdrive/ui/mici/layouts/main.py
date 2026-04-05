@@ -3,10 +3,11 @@ import cereal.messaging as messaging
 from openpilot.selfdrive.ui.mici.layouts.home import MiciHomeLayout
 from openpilot.selfdrive.ui.mici.layouts.settings.settings import SettingsLayout
 from openpilot.selfdrive.ui.mici.layouts.offroad_alerts import MiciOffroadAlerts
-from openpilot.selfdrive.ui.mici.onroad.augmented_road_view import AugmentedRoadView  # noqa: F401
-# BluePilot: START - BP onroad overlays (blindspot, complication, brake coloring, powerflow)
-from openpilot.selfdrive.ui.bp.mici.onroad.augmented_road_view_bp import MiciAugmentedRoadViewBP as AugmentedRoadView  # noqa: F811
-# BluePilot: END - BP onroad overlays
+from openpilot.selfdrive.ui.mici.onroad.augmented_road_view import AugmentedRoadView
+# BluePilot: override onroad view with blindspot, complication, brake coloring, powerflow
+from openpilot.common.bluepilot import is_bluepilot
+if is_bluepilot():
+  from openpilot.selfdrive.ui.bp.mici.onroad.augmented_road_view_bp import MiciAugmentedRoadViewBP as AugmentedRoadView
 from openpilot.selfdrive.ui.ui_state import device, ui_state
 from openpilot.selfdrive.ui.mici.layouts.onboarding import OnboardingWindow
 from openpilot.system.ui.widgets import Widget

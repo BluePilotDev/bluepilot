@@ -483,17 +483,11 @@ class GuiApplication(GuiApplicationExt):
     """Load and resize an image, storing it for later automatic unloading."""
     image = rl.load_image(image_path)
 
-    # BluePilot: corrupt/truncated assets or git LFS pointer files can load as 0x0 and crash in aspect-ratio resize (ZeroDivisionError)
+    # BluePilot: guard against corrupt/truncated assets or LFS pointers that load as 0x0
     if image.width <= 0 or image.height <= 0:
-      cloudlog.error(
-        "Invalid image dimensions from %r: %dx%d (file missing, corrupt, or LFS pointer?)",
-        image_path,
-        image.width,
-        image.height,
-      )
+      cloudlog.error("Invalid image dimensions from %r: %dx%d", image_path, image.width, image.height)
       rl.unload_image(image)
       image = rl.gen_image_color(1, 1, rl.Color(0, 0, 0, 0))
-    # End BluePilot
 
     if alpha_premultiply:
       rl.image_alpha_premultiply(image)
