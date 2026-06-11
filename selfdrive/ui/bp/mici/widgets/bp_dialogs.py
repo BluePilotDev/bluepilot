@@ -160,6 +160,7 @@ class BPInputDialog(_BPDialogBase):
                                     text_color=P.TEXT, max_width=520, wrap_text=False)
 
     self._backspace_held_time: float | None = None
+    self._backspace_repeated = False
     self._backspace_img = gui_app.texture("icons_mici/settings/keyboard/backspace.png", 36, 30)
     self._enter_img = gui_app.texture("icons_mici/settings/keyboard/enter.png", 56, 46)
     self._enter_disabled_img = gui_app.texture("icons_mici/settings/keyboard/enter_disabled.png", 56, 46)
@@ -179,13 +180,16 @@ class BPInputDialog(_BPDialogBase):
     super()._handle_mouse_press(mouse_pos)
     self._backspace_pressed = rl.check_collision_point_rec(mouse_pos, self._top_right_button_rect)
     self._enter_pressed = rl.check_collision_point_rec(mouse_pos, self._top_left_button_rect)
+    if self._backspace_pressed:
+      self._backspace_repeated = False
 
   def _handle_mouse_release(self, mouse_pos: MousePos):
     if self._backspace_pressed and rl.check_collision_point_rec(mouse_pos, self._top_right_button_rect):
       # Backspace
-      if self._backspace_held_time is None:
+      if not self._backspace_repeated:
         self._keyboard.backspace()
       self._backspace_held_time = None
+      self._backspace_repeated = False
     elif self._enter_pressed and rl.check_collision_point_rec(mouse_pos, self._top_left_button_rect):
       # Enter
       if len(self._keyboard.text()) >= self._minimum_length:
@@ -209,8 +213,10 @@ class BPInputDialog(_BPDialogBase):
       if rl.get_time() - self._backspace_held_time > 0.5:
         if gui_app.frame % round(gui_app.target_fps / self.BACKSPACE_RATE) == 0:
           self._keyboard.backspace()
+          self._backspace_repeated = True
     else:
       self._backspace_held_time = None
+      self._backspace_repeated = False
 
   def _render(self, _):
     r = self._rect

@@ -30,6 +30,7 @@ class BigInputDialogBP(BigDialogBase):
     self._minimum_length = minimum_length
 
     self._backspace_held_time: float | None = None
+    self._backspace_repeated = False
 
     self._backspace_img = gui_app.texture("icons_mici/settings/keyboard/backspace.png", 42, 36)
     self._backspace_img_alpha = FirstOrderFilter(0, 0.05, 1 / gui_app.target_fps)
@@ -62,9 +63,11 @@ class BigInputDialogBP(BigDialogBase):
       if rl.get_time() - self._backspace_held_time > 0.5:
         if gui_app.frame % round(gui_app.target_fps / self.BACKSPACE_RATE) == 0:
           self._keyboard.backspace()
+          self._backspace_repeated = True
 
     else:
       self._backspace_held_time = None
+      self._backspace_repeated = False
 
   def _render(self, _):
     text_input_size = 35
@@ -162,12 +165,15 @@ class BigInputDialogBP(BigDialogBase):
     super()._handle_mouse_press(mouse_pos)
     self._backspace_pressed = rl.check_collision_point_rec(mouse_pos, self._top_right_button_rect)
     self._enter_pressed = rl.check_collision_point_rec(mouse_pos, self._top_left_button_rect)
+    if self._backspace_pressed:
+      self._backspace_repeated = False
 
   def _handle_mouse_release(self, mouse_pos: MousePos):
     if self._backspace_pressed and rl.check_collision_point_rec(mouse_pos, self._top_right_button_rect) and self._keyboard.text():
-      if self._backspace_held_time is None:
+      if not self._backspace_repeated:
         self._keyboard.backspace()
       self._backspace_held_time = None
+      self._backspace_repeated = False
     elif self._enter_pressed and rl.check_collision_point_rec(mouse_pos, self._top_left_button_rect) and len(self._keyboard.text()) >= self._minimum_length:
       self._confirm_callback()
     self._enter_pressed = False
