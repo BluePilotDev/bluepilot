@@ -41,6 +41,8 @@ class BigInputDialogBP(BigDialogBase):
     # rects for top buttons
     self._top_left_button_rect = rl.Rectangle(0, 0, 0, 0)
     self._top_right_button_rect = rl.Rectangle(0, 0, 0, 0)
+    self._enter_pressed = False
+    self._backspace_pressed = False
 
     self._ret = None  # Only set to CONFIRM when user taps enter; prevents AttributeError in _render before first confirm
     def confirm_callback_wrapper():
@@ -53,7 +55,7 @@ class BigInputDialogBP(BigDialogBase):
     super()._update_state()
 
     last_mouse_event = gui_app.last_mouse_event
-    if last_mouse_event.left_down and rl.check_collision_point_rec(last_mouse_event.pos, self._top_right_button_rect) and self._backspace_img_alpha.x > 1:
+    if last_mouse_event.left_down and self._backspace_pressed and rl.check_collision_point_rec(last_mouse_event.pos, self._top_right_button_rect):
       if self._backspace_held_time is None:
         self._backspace_held_time = rl.get_time()
 
@@ -116,26 +118,33 @@ class BigInputDialogBP(BigDialogBase):
 
     # draw backspace icon with nice fade
     self._backspace_img_alpha.update(255 * bool(text))
+    backspace_x = int(self._rect.width - self._backspace_img.width - 27)
+    backspace_y = int(text_field_rect.y)
     if self._backspace_img_alpha.x > 1:
       color = rl.Color(255, 255, 255, int(self._backspace_img_alpha.x))
-      rl.draw_texture(self._backspace_img, int(self._rect.width - self._backspace_img.width - 27), int(text_field_rect.y), color)
+      rl.draw_texture(self._backspace_img, backspace_x, backspace_y, color)
 
     if not text and self._hint_label.text and not candidate_char:
       # draw description if no text entered yet and not drawing candidate char
       self._hint_label.render(text_field_rect)
 
-    # TODO: move to update state
-    # make rect take up entire area so it's easier to click
-    self._top_left_button_rect = rl.Rectangle(self._rect.x, self._rect.y, text_field_rect.x, self._rect.height - self._keyboard.get_keyboard_height())
-    self._top_right_button_rect = rl.Rectangle(text_field_rect.x + text_field_rect.width, self._rect.y,
-                                               self._rect.width - (text_field_rect.x + text_field_rect.width), self._top_left_button_rect.height)
-
     # draw enter button (enabled + disabled states, same as stock BigInputDialog)
     self._enter_img_alpha.update(255 if (len(text) >= self._minimum_length) else 0)
+    enter_x = int(self._rect.x + 15)
+    enter_y = int(text_field_rect.y)
     color = rl.Color(255, 255, 255, int(self._enter_img_alpha.x))
-    rl.draw_texture(self._enter_img, int(self._rect.x + 15), int(text_field_rect.y), color)
+    rl.draw_texture(self._enter_img, enter_x, enter_y, color)
     color = rl.Color(255, 255, 255, 255 - int(self._enter_img_alpha.x))
-    rl.draw_texture(self._enter_disabled_img, int(self._rect.x + 15), int(text_field_rect.y), color)
+    rl.draw_texture(self._enter_disabled_img, enter_x, enter_y, color)
+
+    # Use the visible icon bounds with a small padding instead of full header halves.
+    hit_pad = 14
+    self._top_left_button_rect = rl.Rectangle(
+      enter_x - hit_pad, enter_y - hit_pad,
+      self._enter_img.width + hit_pad * 2, self._enter_img.height + hit_pad * 2)
+    self._top_right_button_rect = rl.Rectangle(
+      backspace_x - hit_pad, backspace_y - hit_pad,
+      self._backspace_img.width + hit_pad * 2, self._backspace_img.height + hit_pad * 2)
 
     # keyboard goes over everything
     self._keyboard.render(self._rect)
@@ -151,11 +160,15 @@ class BigInputDialogBP(BigDialogBase):
 
   def _handle_mouse_press(self, mouse_pos: MousePos):
     super()._handle_mouse_press(mouse_pos)
-    # TODO: need to track where press was so enter and back can activate on release rather than press
-    #  or turn into icon widgets :eyes_open:
-    # handle backspace icon click
-    if rl.check_collision_point_rec(mouse_pos, self._top_right_button_rect) and self._backspace_img_alpha.x > 254:
-      self._keyboard.backspace()
-    elif rl.check_collision_point_rec(mouse_pos, self._top_left_button_rect) and self._enter_img_alpha.x > 254:
-      # handle enter icon click
+    self._backspace_pressed = rl.check_collision_point_rec(mouse_pos, self._top_right_button_rect)
+    self._enter_pressed = rl.check_collision_point_rec(mouse_pos, self._top_left_button_rect)
+
+  def _handle_mouse_release(self, mouse_pos: MousePos):
+    if self._backspace_pressed and rl.check_collision_point_rec(mouse_pos, self._top_right_button_rect) and self._keyboard.text():
+      if self._backspace_held_time is None:
+        self._keyboard.backspace()
+      self._backspace_held_time = None
+    elif self._enter_pressed and rl.check_collision_point_rec(mouse_pos, self._top_left_button_rect) and len(self._keyboard.text()) >= self._minimum_length:
       self._confirm_callback()
+    self._enter_pressed = False
+    self._backspace_pressed = False

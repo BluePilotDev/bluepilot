@@ -166,6 +166,8 @@ class BPInputDialog(_BPDialogBase):
 
     self._top_left_button_rect = rl.Rectangle(0, 0, 0, 0)
     self._top_right_button_rect = rl.Rectangle(0, 0, 0, 0)
+    self._enter_pressed = False
+    self._backspace_pressed = False
 
     def _do_confirm():
       text = self._keyboard.text()
@@ -173,33 +175,42 @@ class BPInputDialog(_BPDialogBase):
     self._do_confirm = _do_confirm
 
   # ---- input ----
+  def _handle_mouse_press(self, mouse_pos: MousePos):
+    super()._handle_mouse_press(mouse_pos)
+    self._backspace_pressed = rl.check_collision_point_rec(mouse_pos, self._top_right_button_rect)
+    self._enter_pressed = rl.check_collision_point_rec(mouse_pos, self._top_left_button_rect)
+
   def _handle_mouse_release(self, mouse_pos: MousePos):
-    if rl.check_collision_point_rec(mouse_pos, self._top_right_button_rect):
+    if self._backspace_pressed and rl.check_collision_point_rec(mouse_pos, self._top_right_button_rect):
       # Backspace
       if self._backspace_held_time is None:
         self._keyboard.backspace()
       self._backspace_held_time = None
-      return
-    if rl.check_collision_point_rec(mouse_pos, self._top_left_button_rect):
+    elif self._enter_pressed and rl.check_collision_point_rec(mouse_pos, self._top_left_button_rect):
       # Enter
       if len(self._keyboard.text()) >= self._minimum_length:
         self._do_confirm()
-      return
+    self._enter_pressed = False
+    self._backspace_pressed = False
 
   def _update_state(self):
     super()._update_state()
     if self.is_dismissing:
+      self._enter_pressed = False
+      self._backspace_pressed = False
       self._backspace_held_time = None
       return
 
     # Held backspace repeat (mirrors stock BigInputDialog behavior)
     last = gui_app.last_mouse_event
-    if last.left_down and rl.check_collision_point_rec(last.pos, self._top_right_button_rect):
+    if last.left_down and self._backspace_pressed and rl.check_collision_point_rec(last.pos, self._top_right_button_rect):
       if self._backspace_held_time is None:
         self._backspace_held_time = rl.get_time()
       if rl.get_time() - self._backspace_held_time > 0.5:
         if gui_app.frame % round(gui_app.target_fps / self.BACKSPACE_RATE) == 0:
           self._keyboard.backspace()
+    else:
+      self._backspace_held_time = None
 
   def _render(self, _):
     r = self._rect
