@@ -145,7 +145,7 @@ class CapsState(IntEnum):
   LOCK = 2
 
 
-class MiciKeyboard(Widget):
+class MiciKeyboardBP(Widget):
   def __init__(self, auto_return_to_letters: str = ""):
     super().__init__()
     self._auto_return_to_letters = auto_return_to_letters
