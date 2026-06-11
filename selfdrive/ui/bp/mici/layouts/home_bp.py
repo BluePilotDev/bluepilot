@@ -5,7 +5,7 @@ backdrop. Long-press anywhere on the body (>= 0.5s) toggles ExperimentalMode in
 place; a top progress strip fills as you hold. Tap on body opens settings.
 
 Public API mirrors MiciHomeLayout so main.py wiring works unchanged:
-- set_callbacks(on_settings: Callable | None = None)
+- set_callbacks(on_settings, on_alerts, alert_count_callback, max_severity_callback)
 """
 import time
 import pyray as rl
@@ -17,7 +17,7 @@ from openpilot.system.ui.widgets.label import UnifiedLabel
 from openpilot.system.ui.widgets.icon_widget import IconWidget
 from openpilot.system.ui.lib.application import gui_app, FontWeight, MousePos
 from openpilot.selfdrive.ui.ui_state import ui_state
-from openpilot.selfdrive.ui.mici.layouts.home import NetworkIcon, NETWORK_TYPES
+from openpilot.selfdrive.ui.mici.layouts.home import AlertsPill, NetworkIcon, NETWORK_TYPES
 from openpilot.selfdrive.ui.bp.mici.widgets.bg_radial import BPRadialBackground
 from openpilot.selfdrive.ui.bp.mici.widgets.aurora_wordmark import AuroraWordmark
 from openpilot.selfdrive.ui.bp.mici.widgets.state_pill import StatePill
@@ -37,6 +37,8 @@ class MiciHomeLayoutBP(Widget):
   def __init__(self):
     super().__init__()
     self._on_settings_click: Callable | None = None
+    self._on_alerts_click: Callable | None = None
+    self._alert_count_callback: Callable[[], int] | None = None
 
     # Long-press state
     self._mouse_down_t: float | None = None
@@ -52,6 +54,7 @@ class MiciHomeLayoutBP(Widget):
     self._bg = self._child(BPRadialBackground())
     self._aurora = self._child(AuroraWordmark(get_mode=self._mode))
     self._pill = self._child(StatePill(get_state=self._pill_state))
+    self._alerts_pill = self._child(AlertsPill())
     self._long_press_bar = self._child(LongPressBar())
 
     # Gear (top-right)
@@ -70,8 +73,13 @@ class MiciHomeLayoutBP(Widget):
     )
 
   # ---- public API mirroring MiciHomeLayout ----
-  def set_callbacks(self, on_settings: Callable | None = None):
+  def set_callbacks(self, on_settings: Callable | None = None, on_alerts: Callable | None = None,
+                    alert_count_callback: Callable[[], int] | None = None,
+                    max_severity_callback: Callable[[], int | None] | None = None):
     self._on_settings_click = on_settings
+    self._on_alerts_click = on_alerts
+    self._alert_count_callback = alert_count_callback
+    self._alerts_pill.set_alert_count_callback(alert_count_callback, max_severity_callback)
 
   # ---- mode helpers ----
   def _mode(self) -> str:
@@ -128,6 +136,11 @@ class MiciHomeLayoutBP(Widget):
     if self._did_long_press:
       self._did_long_press = False
       return
+    # Tap on alerts pill → alerts pane.
+    if self._point_in_alerts(mouse_pos):
+      if self._on_alerts_click:
+        self._on_alerts_click()
+      return
     # Tap on gear → settings.
     if self._point_in_gear(mouse_pos):
       if self._on_settings_click:
@@ -146,6 +159,10 @@ class MiciHomeLayoutBP(Widget):
 
   def _point_in_gear(self, p: MousePos) -> bool:
     return rl.check_collision_point_rec(p, self._gear_rect())
+
+  def _point_in_alerts(self, p: MousePos) -> bool:
+    has_alerts = self._alert_count_callback and self._alert_count_callback() > 0
+    return bool(has_alerts and rl.check_collision_point_rec(p, self._alerts_pill.rect))
 
   def _gear_pressed(self) -> bool:
     """Is the user currently pressing inside the gear hit rect?"""
@@ -187,6 +204,11 @@ class MiciHomeLayoutBP(Widget):
     visible_x = g.x + (g.width - GEAR_VISIBLE) / 2
     visible_y = g.y + (g.height - GEAR_VISIBLE) / 2
     self._gear_icon.render(rl.Rectangle(visible_x, visible_y, GEAR_VISIBLE, GEAR_VISIBLE))
+
+    # Alerts pill below the gear so offroad alerts remain reachable.
+    alert_rect = self._alerts_pill.rect
+    self._alerts_pill.set_position(r.x + r.width - alert_rect.width - 10, g.y + g.height + 8)
+    self._alerts_pill.render()
 
     # Meta strip (bottom-left): network icon + label
     meta_y = r.y + r.height - META_FONT_SIZE - 12
