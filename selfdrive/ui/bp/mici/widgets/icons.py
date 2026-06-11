@@ -15,7 +15,7 @@ def _halo(cx: float, cy: float, size: float, color: rl.Color) -> None:
   """Soft blue halo behind an icon. Three concentric circles fading outward."""
   for r_mul, alpha in ((1.6, 0.06), (1.1, 0.10), (0.7, 0.12)):
     c = rl.Color(color.r, color.g, color.b, int(255 * alpha))
-    rl.draw_circle_gradient(int(cx), int(cy), size * r_mul, c, rl.Color(0, 0, 0, 0))
+    rl.draw_circle_gradient(rl.Vector2(int(cx), int(cy)), size * r_mul, c, rl.Color(0, 0, 0, 0))
 
 
 def _draw_with_halo(draw_fn, cx: float, cy: float, size: float,

@@ -36,16 +36,16 @@ class BPRadialBackground(Widget):
 
     # Outer fade (62% stop) — barely-perceptible navy lift at the edges of
     # the gradient extent.
-    rl.draw_circle_gradient(cx, cy, diag * 1.2,
+    rl.draw_circle_gradient(rl.Vector2(cx, cy), diag * 1.2,
       rl.Color(0x14, 0x28, 0x5A, int(0.50 * 255)),
       rl.Color(0, 0, 0, 0))
 
     # Mid stop (28%) — navy tint covering most of the upper-left half.
-    rl.draw_circle_gradient(cx, cy, diag * 0.85,
+    rl.draw_circle_gradient(rl.Vector2(cx, cy), diag * 0.85,
       rl.Color(0x14, 0x28, 0x5A, int(0.65 * 255)),
       rl.Color(0, 0, 0, 0))
 
     # Inner glow (0%) — bright blue near the corner.
-    rl.draw_circle_gradient(cx, cy, diag * 0.55,
+    rl.draw_circle_gradient(rl.Vector2(cx, cy), diag * 0.55,
       rl.Color(0x4A, 0x8C, 0xFF, int(0.42 * 255)),
       rl.Color(0, 0, 0, 0))
