@@ -14,7 +14,7 @@ from openpilot.selfdrive.ui.bp.onroad.hybrid_battery_gauge_arched import HybridB
 from openpilot.selfdrive.ui.bp.onroad.power_flow_gauge import PowerFlowGauge
 from openpilot.selfdrive.ui.bp.onroad.powerflow_gauge_arched import PowerflowGaugeArched, POWERFLOW_ANGLE_SPAN
 from openpilot.selfdrive.ui.bp.onroad.torque_bar_renderer_bp import TorqueBarRendererBP
-from openpilot.selfdrive.ui.bp.mici.onroad.confidence_ball_bp import ConfidenceBallTiciBP
+from openpilot.selfdrive.ui.mici.onroad.confidence_ball import ConfidenceBallTiciBP
 from openpilot.selfdrive.ui.onroad.driver_state import BTN_SIZE
 from openpilot.selfdrive.ui.sunnypilot.onroad.developer_ui import DeveloperUiState, get_bottom_dev_ui_offset
 from openpilot.selfdrive.ui.ui_state import ui_state

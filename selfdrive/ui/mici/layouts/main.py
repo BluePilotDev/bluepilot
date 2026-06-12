@@ -1,6 +1,5 @@
 import pyray as rl
 import cereal.messaging as messaging
-from openpilot.common.bluepilot import is_bluepilot
 from openpilot.selfdrive.ui.mici.layouts.home import MiciHomeLayout
 # BluePilot: replace home with paged-design home (mockups/mici_home.html)
 # if is_bluepilot():
@@ -11,9 +10,6 @@ from openpilot.selfdrive.ui.mici.layouts.offroad_alerts import MiciOffroadAlerts
 # if is_bluepilot():
 #   from openpilot.selfdrive.ui.bp.mici.layouts.offroad_alerts_bp import MiciOffroadAlertsBP as MiciOffroadAlerts
 from openpilot.selfdrive.ui.mici.onroad.augmented_road_view import AugmentedRoadView
-# BluePilot: override onroad view with blindspot, complication, brake coloring, powerflow
-if is_bluepilot():
-  from openpilot.selfdrive.ui.bp.mici.onroad.augmented_road_view_bp import MiciAugmentedRoadViewBP as AugmentedRoadView
 from openpilot.selfdrive.ui.ui_state import device, ui_state
 from openpilot.selfdrive.ui.mici.layouts.onboarding import OnboardingWindow
 from openpilot.selfdrive.ui.body.layouts.onroad import BodyLayout

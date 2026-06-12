@@ -164,6 +164,16 @@ class TorqueBar(Widget):
     if self._demo:
       return
 
+    # BluePilot: Use lateral uncertainty from controllerStateBP when available on angleState
+    if ui_state.sm['controlsState'].lateralControlState.which() == 'angleState':
+      if ui_state.sm.valid.get("controllerStateBP", False):
+        try:
+          lateral_uncertainty = ui_state.sm['controllerStateBP'].lateralUncertainty
+          self._torque_filter.update(min(max(lateral_uncertainty, -1), 1))
+          return
+        except (KeyError, AttributeError):
+          pass
+
     # torque line
     if ui_state.sm['controlsState'].lateralControlState.which() == 'angleState':
       controls_state = ui_state.sm['controlsState']
@@ -190,6 +200,10 @@ class TorqueBar(Widget):
       self._torque_filter.update(-ui_state.sm['carOutput'].actuatorsOutput.torque)
 
   def _render(self, rect: rl.Rectangle) -> None:
+    # BluePilot: hide angle-state torque bar when controllerStateBP is absent
+    if ui_state.sm['controlsState'].lateralControlState.which() == 'angleState' and not ui_state.sm.valid.get("controllerStateBP", False):
+      return
+
     # adjust y pos with torque
     torque_line_offset = np.interp(abs(self._torque_filter.x), [0.5, 1], [22 * self._scale, 26 * self._scale])
     torque_line_height = np.interp(abs(self._torque_filter.x), [0.5, 1], [14 * self._scale, 56 * self._scale])

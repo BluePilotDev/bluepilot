@@ -1,7 +1,10 @@
 import pyray as rl
 from dataclasses import dataclass
 from openpilot.common.constants import CV
+from openpilot.common.params import Params
+from openpilot.selfdrive.ui.mici.onroad.powerflow_gauge import MiciPowerflowGauge
 from openpilot.selfdrive.ui.mici.onroad.torque_bar import TorqueBar
+from openpilot.selfdrive.ui.bp.lib.ui_debug_logger import bp_ui_log
 from openpilot.selfdrive.ui.ui_state import ui_state, UIStatus
 from openpilot.system.ui.lib.application import gui_app, FontWeight
 from openpilot.system.ui.lib.multilang import tr
@@ -117,6 +120,10 @@ class HudRenderer(Widget):
 
     self._turn_intent = TurnIntent()
     self._torque_bar = TorqueBar()
+    # BluePilot: brake status coloring and hybrid powerflow on MICI
+    self._bp_params = Params()
+    self._brakes_on = False
+    self._power_flow = MiciPowerflowGauge()
 
     self._txt_wheel: rl.Texture = gui_app.texture('icons_mici/wheel.png', 50, 50)
     self._txt_wheel_critical: rl.Texture = gui_app.texture('icons_mici/wheel_critical.png', 50, 50)
@@ -169,6 +176,19 @@ class HudRenderer(Widget):
     speed_conversion = CV.MS_TO_KPH if ui_state.is_metric else CV.MS_TO_MPH
     self.speed = max(0.0, v_ego * speed_conversion)
 
+    # BluePilot: brake status coloring from carStateBP
+    if self._bp_params.get_bool("ShowBrakeStatus"):
+      try:
+        car_state_bp = sm['carStateBP']
+        brake_light_status = car_state_bp.brakeLightStatus
+        self._brakes_on = brake_light_status.dataAvailable and brake_light_status.brakeLightsOn
+      except (KeyError, AttributeError):
+        self._brakes_on = False
+    else:
+      self._brakes_on = False
+
+    bp_ui_log.state("MiciHudRenderer", "brakes_on", self._brakes_on)
+
   def _render(self, rect: rl.Rectangle) -> None:
     """Render HUD elements to the screen."""
 
@@ -213,7 +233,11 @@ class HudRenderer(Widget):
     origin = (wheel_txt.width / 2, wheel_txt.height / 2)
 
     # color and draw
-    color = rl.Color(255, 255, 255, int(self._wheel_alpha_filter.x))
+    # BluePilot: wheel turns red while brake lights are active
+    if self._brakes_on:
+      color = rl.Color(255, 60, 60, int(self._wheel_alpha_filter.x))
+    else:
+      color = rl.Color(255, 255, 255, int(self._wheel_alpha_filter.x))
     rl.draw_texture_pro(wheel_txt, src_rect, dest_rect, origin, rotation, color)
 
     if self._show_wheel_critical:
@@ -222,6 +246,16 @@ class HudRenderer(Widget):
       exclamation_pos_x = pos_x - self._txt_exclamation_point.width / 2 + wheel_txt.width / 2 + EXCLAMATION_POINT_SPACING
       exclamation_pos_y = pos_y - self._txt_exclamation_point.height / 2
       rl.draw_texture_ex(self._txt_exclamation_point, rl.Vector2(exclamation_pos_x, exclamation_pos_y), 0.0, 1.0, rl.WHITE)
+
+    # BluePilot: render powerflow gauge around steering wheel
+    power_flow_radius = self._power_flow.RADIUS
+    power_rect = rl.Rectangle(
+      int(rect.x + 21) - power_flow_radius,
+      int(rect.y + rect.height - wheel_txt.height - 14) - power_flow_radius,
+      wheel_txt.width + power_flow_radius * 2,
+      wheel_txt.height + power_flow_radius * 2)
+    self._power_flow.set_wheel_rect(power_rect)
+    self._power_flow.render(rect)
 
   def _draw_set_speed(self, rect: rl.Rectangle) -> None:
     """Draw the MAX speed indicator box."""

@@ -1,19 +1,23 @@
 import numpy as np
 import pyray as rl
 from cereal import car, log
+from openpilot.common.params import Params
 from msgq.visionipc import VisionStreamType
 from openpilot.selfdrive.ui.ui_state import ui_state, UIStatus
 from openpilot.selfdrive.ui.mici.onroad import SIDE_PANEL_WIDTH
 from openpilot.selfdrive.ui.mici.onroad.alert_renderer import AlertRenderer
+from openpilot.selfdrive.ui.mici.onroad.complication import MiciComplication
+from openpilot.selfdrive.ui.mici.onroad.confidence_ball import ConfidenceBallMiciBP
 from openpilot.selfdrive.ui.mici.onroad.driver_state import DriverStateRenderer
 from openpilot.selfdrive.ui.mici.onroad.hud_renderer import HudRenderer
 from openpilot.selfdrive.ui.mici.onroad.model_renderer import ModelRenderer
-from openpilot.selfdrive.ui.mici.onroad.confidence_ball import ConfidenceBall
 from openpilot.selfdrive.ui.mici.onroad.cameraview import CameraView
+from openpilot.selfdrive.ui.bp.lib.ui_debug_logger import bp_ui_log
+from openpilot.selfdrive.ui.bp.onroad.blindspot_renderer import BlindspotRendererMixin
 from openpilot.system.ui.lib.application import FontWeight, gui_app, MousePos, MouseEvent
 from openpilot.system.ui.widgets.label import UnifiedLabel
 from openpilot.system.ui.widgets import Widget
-from openpilot.common.filter_simple import BounceFilter
+from openpilot.common.filter_simple import BounceFilter, FirstOrderFilter
 from openpilot.common.transformations.camera import DEVICE_CAMERAS, DeviceCameraConfig, view_frame_from_device_frame
 from openpilot.common.transformations.orientation import rot_from_euler
 from enum import IntEnum
@@ -38,6 +42,7 @@ WIDE_CAM_MAX_SPEED = 5.0  # m/s (10 mph)
 ROAD_CAM_MIN_SPEED = 10  # m/s (25 mph)
 
 CAM_Y_OFFSET = 20
+MICI_BLIND_SPOT_WIDTH = 125
 
 
 class BookmarkIcon(Widget):
@@ -132,11 +137,14 @@ class BookmarkIcon(Widget):
       rl.draw_texture_ex(self._icon, rl.Vector2(icon_x, icon_y), 0.0, 1.0, rl.WHITE)
 
 
-class AugmentedRoadView(CameraView):
+class AugmentedRoadView(CameraView, BlindspotRendererMixin):
   def __init__(self, bookmark_callback=None, stream_type: VisionStreamType = VisionStreamType.VISION_STREAM_ROAD):
     super().__init__("camerad", stream_type)
     self._bookmark_callback = bookmark_callback
     self._set_placeholder_color(rl.BLACK)
+    # BluePilot: migrated MICI blindspot and border settings
+    self._init_blindspot()
+    self._bp_params = Params()
 
     self.device_camera: DeviceCameraConfig | None = None
     self.view_from_calib = view_frame_from_device_frame.copy()
@@ -154,13 +162,17 @@ class AugmentedRoadView(CameraView):
     self._hud_renderer = HudRenderer()
     self._alert_renderer = AlertRenderer()
     self._driver_state_renderer = DriverStateRenderer()
-    self._confidence_ball = ConfidenceBall()
+    # BluePilot: left-side confidence rail and lead/speed complication
+    self._confidence_ball = ConfidenceBallMiciBP()
+    self._complication = MiciComplication()
     self._offroad_label = UnifiedLabel("start the car to\nuse sunnypilot", 54, FontWeight.DISPLAY,
                                        text_color=rl.Color(255, 255, 255, int(255 * 0.9)),
                                        alignment=rl.GuiTextAlignment.TEXT_ALIGN_CENTER,
                                        alignment_vertical=rl.GuiTextAlignmentVertical.TEXT_ALIGN_MIDDLE)
 
     self._fade_texture = gui_app.texture("icons_mici/onroad/onroad_fade.png")
+    # BluePilot: fade the bottom overlay only when engaged
+    self._fade_alpha_filter = FirstOrderFilter(0, 0.1, 1 / gui_app.target_fps)
 
   def is_swiping_left(self) -> bool:
     """Check if currently swiping left (for scroller to disable)."""
@@ -183,18 +195,9 @@ class AugmentedRoadView(CameraView):
       super()._handle_mouse_release(mouse_pos)
 
   def _render(self, _):
-    # Draw text if not onroad
-    if not ui_state.started:
-      rl.draw_rectangle_rec(self.rect, rl.BLACK)
-      self._offroad_label.render(self._rect)
-      return
-
     self._switch_stream_if_needed(ui_state.sm)
-
-    # Update calibration before rendering
     self._update_calibration()
 
-    # Create inner content area with border padding
     self._content_rect = rl.Rectangle(
       self.rect.x,
       self.rect.y,
@@ -202,8 +205,9 @@ class AugmentedRoadView(CameraView):
       self.rect.height,
     )
 
-    # Enable scissor mode to clip all rendering within content rectangle boundaries
-    # This creates a rendering viewport that prevents graphics from drawing outside the border
+    bp_ui_log.scissor("MiciAugRoadView", "begin",
+                      x=int(self._content_rect.x), y=int(self._content_rect.y),
+                      w=int(self._content_rect.width), h=int(self._content_rect.height))
     rl.begin_scissor_mode(
       int(self._content_rect.x),
       int(self._content_rect.y),
@@ -211,19 +215,17 @@ class AugmentedRoadView(CameraView):
       int(self._content_rect.height)
     )
 
-    # Render the base camera view
     super()._render(self._content_rect)
-
-    # Draw all UI overlays
     self._model_renderer.render(self._content_rect)
 
-    # Fade out bottom of overlays for looks
-    rl.draw_texture_ex(self._fade_texture, rl.Vector2(self._content_rect.x, self._content_rect.y), 0.0, 1.0, rl.WHITE)
+    fade_alpha = self._fade_alpha_filter.update(ui_state.status != UIStatus.DISENGAGED)
+    if fade_alpha > 1e-2:
+      rl.draw_texture_ex(self._fade_texture, rl.Vector2(self._content_rect.x, self._content_rect.y), 0.0, 1.0,
+                         rl.Color(255, 255, 255, int(255 * fade_alpha)))
 
     alert_to_render, not_animating_out = self._alert_renderer.will_render()
 
-    # Hide DMoji when disengaged unless AlwaysOnDM is enabled
-    should_draw_dmoji = (not self._hud_renderer.drawing_top_icons() and
+    should_draw_dmoji = (not self._hud_renderer.drawing_top_icons() and ui_state.is_onroad() and
                          (ui_state.status != UIStatus.DISENGAGED or ui_state.always_on_dm))
     self._driver_state_renderer.set_should_draw(should_draw_dmoji)
     self._driver_state_renderer.set_position(self._rect.x + 16, self._rect.y + 10)
@@ -232,20 +234,35 @@ class AugmentedRoadView(CameraView):
     self._hud_renderer.set_can_draw_top_icons(alert_to_render is None)
     self._hud_renderer.set_wheel_critical_icon(alert_to_render is not None and not not_animating_out and
                                                alert_to_render.visual_alert == car.CarControl.HUDControl.VisualAlert.steerRequired)
-    self._alert_renderer.render(self._content_rect)
+    if ui_state.started:
+      self._alert_renderer.render(self._content_rect)
     self._hud_renderer.render(self._content_rect)
 
-    # Draw fake rounded border
-    rl.draw_rectangle_rounded_lines_ex(self._content_rect, 0.2 * 1.02, 10, 50, rl.BLACK)
-
-    # End clipping region
+    bp_ui_log.scissor("MiciAugRoadView", "end")
     rl.end_scissor_mode()
 
-    # Custom UI extension point - add custom overlays here
-    # Use self._content_rect for positioning within camera bounds
-    self._confidence_ball.render(self.rect)
+    # BluePilot: optionally hide the MICI rounded border
+    if not self._bp_params.get_bool("BPHideOnroadBorder"):
+      rl.draw_rectangle_rounded_lines_ex(self._content_rect, 0.2 * 1.02, 10, 50, rl.BLACK)
+
+    # BluePilot: blindspot indicators live outside the scissor
+    self._draw_blindspot_screen_edges(self.rect, MICI_BLIND_SPOT_WIDTH)
+
+    self._complication.render(self._content_rect)
+
+    ball_rect = rl.Rectangle(
+      self._rect.x + self._rect.width - SIDE_PANEL_WIDTH,
+      self._content_rect.y,
+      SIDE_PANEL_WIDTH,
+      self._content_rect.height,
+    )
+    self._confidence_ball.render(ball_rect)
 
     self._bookmark_icon.render(self.rect)
+
+    if not ui_state.started:
+      rl.draw_rectangle(int(self.rect.x), int(self.rect.y), int(self.rect.width), int(self.rect.height), rl.Color(0, 0, 0, 175))
+      self._offroad_label.render(self._content_rect)
 
   def _switch_stream_if_needed(self, sm):
     if sm['selfdriveState'].experimentalMode and WIDE_CAM in self.available_streams:
