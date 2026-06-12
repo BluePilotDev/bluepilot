@@ -315,6 +315,7 @@ class BluePilotLayoutMici(NavScroller):
 
   def _update_state(self):
     super()._update_state()
+    self._wifi_manager.process_callbacks()
     self._show_lead_vehicle._load_value()
     self._hybrid_power_flow_style._load_value()
     self._update_numeric_labels()
