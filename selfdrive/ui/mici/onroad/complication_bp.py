@@ -32,7 +32,7 @@ class ComplicationType(IntEnumBase):
   lead_car_time = 4
 
 
-class MiciComplication(Widget):
+class MiciComplicationBP(Widget):
   def __init__(self):
     super().__init__()
     self.speed: float = 0.0

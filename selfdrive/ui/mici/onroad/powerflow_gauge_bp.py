@@ -21,7 +21,7 @@ POWERFLOW_REGEN_COLOR = rl.Color(100, 255, 100, 255)
 POWERFLOW_DEMAND_COLOR = rl.Color(100, 150, 255, 255)
 
 
-class MiciPowerflowGauge(Widget):
+class MiciPowerflowGaugeBP(Widget):
   """Widget to display powerflow gauge as an arch above the torque bar."""
   RADIUS = 20
 

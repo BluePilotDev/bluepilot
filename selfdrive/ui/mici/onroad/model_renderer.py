@@ -8,10 +8,13 @@ from openpilot.common.filter_simple import FirstOrderFilter
 from openpilot.selfdrive.locationd.calibrationd import HEIGHT_INIT
 from openpilot.selfdrive.ui.ui_state import ui_state, UIStatus
 from openpilot.selfdrive.ui.mici.onroad import blend_colors
-from openpilot.bluepilot.ui.lib.bp_shaders import draw_rainbow_polygon
 from openpilot.system.ui.lib.application import gui_app
 from openpilot.system.ui.lib.shader_polygon import draw_polygon, Gradient
 from openpilot.system.ui.widgets import Widget
+
+# BluePilot: import rainbow MICI path shader
+from openpilot.bluepilot.ui.lib.bp_shaders import draw_rainbow_polygon
+# End BluePilot
 
 from openpilot.selfdrive.ui.sunnypilot.mici.onroad.model_renderer import LANE_LINE_COLORS_SP, ModelRendererSP
 
@@ -344,12 +347,13 @@ class ModelRenderer(Widget, ModelRendererSP):
     allow_throttle = sm['longitudinalPlan'].allowThrottle or not self._longitudinal_control
     self._blend_filter.update(int(allow_throttle))
 
+    # BluePilot: use the migrated rainbow shader path for MICI
     if ui_state.rainbow_path:
-      # BluePilot: use the migrated rainbow shader path for MICI
       v_ego = sm['carState'].vEgo
       rainbow_v = np.clip(v_ego, 2.5, 35) / 30
       draw_rainbow_polygon(self._rect, self._path.projected_points, rainbow_v=rainbow_v)
       return
+    # End BluePilot
 
     path_pts = self._path.projected_points + np.array([self._rect.x, self._rect.y], dtype=np.float32)
 

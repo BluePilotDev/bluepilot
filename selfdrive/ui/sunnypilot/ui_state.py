@@ -33,7 +33,10 @@ class UIStateSP:
     self.sm_services_ext = [
       "modelManagerSP", "selfdriveStateSP", "longitudinalPlanSP", "backupManagerSP",
       "gpsLocation", "liveTorqueParameters", "carStateSP", "liveMapDataSP", "carParamsSP", "liveDelay",
-      "controllerStateBP",  # BluePilot: lateral uncertainty for torque bar
+      # BluePilot: lateral uncertainty for torque bar + hybrid battery and drive data
+      "controllerStateBP",
+      "carStateBP",
+      # End BluePilot
     ]
 
     self.sunnylink_state = SunnylinkState()

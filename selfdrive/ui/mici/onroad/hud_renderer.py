@@ -1,10 +1,7 @@
 import pyray as rl
 from dataclasses import dataclass
 from openpilot.common.constants import CV
-from openpilot.common.params import Params
-from openpilot.selfdrive.ui.mici.onroad.powerflow_gauge import MiciPowerflowGauge
 from openpilot.selfdrive.ui.mici.onroad.torque_bar import TorqueBar
-from openpilot.selfdrive.ui.bp.lib.ui_debug_logger import bp_ui_log
 from openpilot.selfdrive.ui.ui_state import ui_state, UIStatus
 from openpilot.system.ui.lib.application import gui_app, FontWeight
 from openpilot.system.ui.lib.multilang import tr
@@ -12,6 +9,12 @@ from openpilot.system.ui.lib.text_measure import measure_text_cached
 from openpilot.system.ui.widgets import Widget
 from openpilot.common.filter_simple import FirstOrderFilter
 from cereal import log
+
+# BluePilot: import MICI BP HUD helpers
+from openpilot.common.params import Params
+from openpilot.selfdrive.ui.bp.lib.ui_debug_logger import bp_ui_log
+from openpilot.selfdrive.ui.mici.onroad.powerflow_gauge_bp import MiciPowerflowGaugeBP
+# End BluePilot
 
 EventName = log.OnroadEvent.EventName
 
@@ -123,7 +126,8 @@ class HudRenderer(Widget):
     # BluePilot: brake status coloring and hybrid powerflow on MICI
     self._bp_params = Params()
     self._brakes_on = False
-    self._power_flow = MiciPowerflowGauge()
+    self._power_flow = MiciPowerflowGaugeBP()
+    # End BluePilot
 
     self._txt_wheel: rl.Texture = gui_app.texture('icons_mici/wheel.png', 50, 50)
     self._txt_wheel_critical: rl.Texture = gui_app.texture('icons_mici/wheel_critical.png', 50, 50)
@@ -188,6 +192,7 @@ class HudRenderer(Widget):
       self._brakes_on = False
 
     bp_ui_log.state("MiciHudRenderer", "brakes_on", self._brakes_on)
+    # End BluePilot
 
   def _render(self, rect: rl.Rectangle) -> None:
     """Render HUD elements to the screen."""
@@ -238,6 +243,7 @@ class HudRenderer(Widget):
       color = rl.Color(255, 60, 60, int(self._wheel_alpha_filter.x))
     else:
       color = rl.Color(255, 255, 255, int(self._wheel_alpha_filter.x))
+    # End BluePilot
     rl.draw_texture_pro(wheel_txt, src_rect, dest_rect, origin, rotation, color)
 
     if self._show_wheel_critical:
@@ -256,6 +262,7 @@ class HudRenderer(Widget):
       wheel_txt.height + power_flow_radius * 2)
     self._power_flow.set_wheel_rect(power_rect)
     self._power_flow.render(rect)
+    # End BluePilot
 
   def _draw_set_speed(self, rect: rl.Rectangle) -> None:
     """Draw the MAX speed indicator box."""

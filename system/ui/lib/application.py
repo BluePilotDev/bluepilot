@@ -489,6 +489,7 @@ class GuiApplication(GuiApplicationExt):
       cloudlog.error("Invalid image dimensions from %r: %dx%d", image_path, image.width, image.height)
       rl.unload_image(image)
       image = rl.gen_image_color(1, 1, rl.Color(0, 0, 0, 0))
+    # End BluePilot
 
     if alpha_premultiply:
       rl.image_alpha_premultiply(image)

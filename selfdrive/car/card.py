@@ -27,6 +27,7 @@ from openpilot.sunnypilot.selfdrive.car import interfaces as sunnypilot_interfac
 from openpilot.common.bluepilot import is_bluepilot
 if is_bluepilot():
   from openpilot.bluepilot.selfdrive.car.bp_card_publisher import publish_controller_state_bp, publish_car_state_bp
+# End BluePilot
 
 REPLAY = "REPLAY" in os.environ
 
@@ -77,6 +78,7 @@ class Car:
     self.sm = messaging.SubMaster(['pandaStates', 'carControl', 'onroadEvents'] + ['carControlSP', 'longitudinalPlanSP'])
     # BluePilot: added controllerStateBP, carStateBP to PubMaster
     self.pm = messaging.PubMaster(['sendcan', 'carState', 'carParams', 'carOutput', 'liveTracks'] + ['carParamsSP', 'carStateSP', 'controllerStateBP', 'carStateBP'])
+    # End BluePilot
 
     self.can_rcv_cum_timeout_counter = 0
 
@@ -274,6 +276,7 @@ class Car:
     # BluePilot: publish hybrid drive gauge data (carStateBP)
     if is_bluepilot():
       publish_car_state_bp(self.CI, self.pm, CS.canValid)
+    # End BluePilot
 
   def controls_update(self, CS: car.CarState, CC: car.CarControl, CC_SP: custom.CarControlSP):
     """control update loop, driven by carControl"""
@@ -296,6 +299,7 @@ class Car:
     # BluePilot: publish lateral uncertainty for angleState vehicles (controllerStateBP)
     if is_bluepilot():
       publish_controller_state_bp(self.CI, self.pm)
+    # End BluePilot
 
 
   def step(self):

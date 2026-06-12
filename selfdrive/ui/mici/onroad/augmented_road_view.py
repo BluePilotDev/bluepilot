@@ -1,19 +1,15 @@
 import numpy as np
 import pyray as rl
 from cereal import car, log
-from openpilot.common.params import Params
 from msgq.visionipc import VisionStreamType
 from openpilot.selfdrive.ui.ui_state import ui_state, UIStatus
 from openpilot.selfdrive.ui.mici.onroad import SIDE_PANEL_WIDTH
 from openpilot.selfdrive.ui.mici.onroad.alert_renderer import AlertRenderer
-from openpilot.selfdrive.ui.mici.onroad.complication import MiciComplication
 from openpilot.selfdrive.ui.mici.onroad.confidence_ball import ConfidenceBallMiciBP
 from openpilot.selfdrive.ui.mici.onroad.driver_state import DriverStateRenderer
 from openpilot.selfdrive.ui.mici.onroad.hud_renderer import HudRenderer
 from openpilot.selfdrive.ui.mici.onroad.model_renderer import ModelRenderer
 from openpilot.selfdrive.ui.mici.onroad.cameraview import CameraView
-from openpilot.selfdrive.ui.bp.lib.ui_debug_logger import bp_ui_log
-from openpilot.selfdrive.ui.bp.onroad.blindspot_renderer import BlindspotRendererMixin
 from openpilot.system.ui.lib.application import FontWeight, gui_app, MousePos, MouseEvent
 from openpilot.system.ui.widgets.label import UnifiedLabel
 from openpilot.system.ui.widgets import Widget
@@ -21,6 +17,13 @@ from openpilot.common.filter_simple import BounceFilter, FirstOrderFilter
 from openpilot.common.transformations.camera import DEVICE_CAMERAS, DeviceCameraConfig, view_frame_from_device_frame
 from openpilot.common.transformations.orientation import rot_from_euler
 from enum import IntEnum
+
+# BluePilot: import MICI BP onroad helpers
+from openpilot.common.params import Params
+from openpilot.selfdrive.ui.bp.lib.ui_debug_logger import bp_ui_log
+from openpilot.selfdrive.ui.bp.onroad.blindspot_renderer import BlindspotRendererMixin
+from openpilot.selfdrive.ui.mici.onroad.complication_bp import MiciComplicationBP
+# End BluePilot
 
 if gui_app.sunnypilot_ui():
   from openpilot.selfdrive.ui.sunnypilot.mici.onroad.hud_renderer import HudRendererSP as HudRenderer
@@ -42,7 +45,9 @@ WIDE_CAM_MAX_SPEED = 5.0  # m/s (10 mph)
 ROAD_CAM_MIN_SPEED = 10  # m/s (25 mph)
 
 CAM_Y_OFFSET = 20
+# BluePilot: use narrower blindspot edge indicators on MICI
 MICI_BLIND_SPOT_WIDTH = 125
+# End BluePilot
 
 
 class BookmarkIcon(Widget):
@@ -145,6 +150,7 @@ class AugmentedRoadView(CameraView, BlindspotRendererMixin):
     # BluePilot: migrated MICI blindspot and border settings
     self._init_blindspot()
     self._bp_params = Params()
+    # End BluePilot
 
     self.device_camera: DeviceCameraConfig | None = None
     self.view_from_calib = view_frame_from_device_frame.copy()
@@ -164,7 +170,8 @@ class AugmentedRoadView(CameraView, BlindspotRendererMixin):
     self._driver_state_renderer = DriverStateRenderer()
     # BluePilot: left-side confidence rail and lead/speed complication
     self._confidence_ball = ConfidenceBallMiciBP()
-    self._complication = MiciComplication()
+    self._complication = MiciComplicationBP()
+    # End BluePilot
     self._offroad_label = UnifiedLabel("start the car to\nuse sunnypilot", 54, FontWeight.DISPLAY,
                                        text_color=rl.Color(255, 255, 255, int(255 * 0.9)),
                                        alignment=rl.GuiTextAlignment.TEXT_ALIGN_CENTER,
@@ -173,6 +180,7 @@ class AugmentedRoadView(CameraView, BlindspotRendererMixin):
     self._fade_texture = gui_app.texture("icons_mici/onroad/onroad_fade.png")
     # BluePilot: fade the bottom overlay only when engaged
     self._fade_alpha_filter = FirstOrderFilter(0, 0.1, 1 / gui_app.target_fps)
+    # End BluePilot
 
   def is_swiping_left(self) -> bool:
     """Check if currently swiping left (for scroller to disable)."""
@@ -205,9 +213,11 @@ class AugmentedRoadView(CameraView, BlindspotRendererMixin):
       self.rect.height,
     )
 
+    # BluePilot: log scissor bounds for MICI BP onroad debugging
     bp_ui_log.scissor("MiciAugRoadView", "begin",
                       x=int(self._content_rect.x), y=int(self._content_rect.y),
                       w=int(self._content_rect.width), h=int(self._content_rect.height))
+    # End BluePilot
     rl.begin_scissor_mode(
       int(self._content_rect.x),
       int(self._content_rect.y),
@@ -218,15 +228,19 @@ class AugmentedRoadView(CameraView, BlindspotRendererMixin):
     super()._render(self._content_rect)
     self._model_renderer.render(self._content_rect)
 
+    # BluePilot: fade bottom overlay only while engaged
     fade_alpha = self._fade_alpha_filter.update(ui_state.status != UIStatus.DISENGAGED)
     if fade_alpha > 1e-2:
       rl.draw_texture_ex(self._fade_texture, rl.Vector2(self._content_rect.x, self._content_rect.y), 0.0, 1.0,
                          rl.Color(255, 255, 255, int(255 * fade_alpha)))
+    # End BluePilot
 
     alert_to_render, not_animating_out = self._alert_renderer.will_render()
 
+    # BluePilot: hide DMoji while offroad behind overlays
     should_draw_dmoji = (not self._hud_renderer.drawing_top_icons() and ui_state.is_onroad() and
                          (ui_state.status != UIStatus.DISENGAGED or ui_state.always_on_dm))
+    # End BluePilot
     self._driver_state_renderer.set_should_draw(should_draw_dmoji)
     self._driver_state_renderer.set_position(self._rect.x + 16, self._rect.y + 10)
     self._driver_state_renderer.render()
@@ -234,20 +248,27 @@ class AugmentedRoadView(CameraView, BlindspotRendererMixin):
     self._hud_renderer.set_can_draw_top_icons(alert_to_render is None)
     self._hud_renderer.set_wheel_critical_icon(alert_to_render is not None and not not_animating_out and
                                                alert_to_render.visual_alert == car.CarControl.HUDControl.VisualAlert.steerRequired)
+    # BluePilot: only render MICI alerts while onroad
     if ui_state.started:
       self._alert_renderer.render(self._content_rect)
+    # End BluePilot
     self._hud_renderer.render(self._content_rect)
 
+    # BluePilot: log end of MICI onroad scissor region
     bp_ui_log.scissor("MiciAugRoadView", "end")
+    # End BluePilot
     rl.end_scissor_mode()
 
     # BluePilot: optionally hide the MICI rounded border
     if not self._bp_params.get_bool("BPHideOnroadBorder"):
       rl.draw_rectangle_rounded_lines_ex(self._content_rect, 0.2 * 1.02, 10, 50, rl.BLACK)
+    # End BluePilot
 
     # BluePilot: blindspot indicators live outside the scissor
     self._draw_blindspot_screen_edges(self.rect, MICI_BLIND_SPOT_WIDTH)
+    # End BluePilot
 
+    # BluePilot: render MICI BP complication and confidence rail
     self._complication.render(self._content_rect)
 
     ball_rect = rl.Rectangle(
@@ -257,12 +278,15 @@ class AugmentedRoadView(CameraView, BlindspotRendererMixin):
       self._content_rect.height,
     )
     self._confidence_ball.render(ball_rect)
+    # End BluePilot
 
     self._bookmark_icon.render(self.rect)
 
+    # BluePilot: dim offroad camera content under label overlay
     if not ui_state.started:
       rl.draw_rectangle(int(self.rect.x), int(self.rect.y), int(self.rect.width), int(self.rect.height), rl.Color(0, 0, 0, 175))
       self._offroad_label.render(self._content_rect)
+    # End BluePilot
 
   def _switch_stream_if_needed(self, sm):
     if sm['selfdriveState'].experimentalMode and WIDE_CAM in self.available_streams:

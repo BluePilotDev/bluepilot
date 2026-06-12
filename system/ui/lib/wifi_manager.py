@@ -84,6 +84,7 @@ def get_security_type(flags: int, wpa_flags: int, rsn_flags: int) -> SecurityTyp
   if is_bluepilot():
     from openpilot.bluepilot.system.ui.lib.bp_wifi import SUPPORTS_WPA_EXTENDED
     supports_wpa = SUPPORTS_WPA_EXTENDED
+  # End BluePilot
 
   if (flags == NM_802_11_AP_FLAGS_NONE) or ((flags & NM_802_11_AP_FLAGS_WPS) and not (wpa_props & supports_wpa)):
     return SecurityType.OPEN
@@ -210,6 +211,7 @@ class WifiManager:
     if is_bluepilot():
       from openpilot.selfdrive.ui.bp.lib.wifi_favorite import WifiFavoriteManager
       self._favorite_manager = WifiFavoriteManager(self)
+    # End BluePilot
     self._initialize()
     atexit.register(self.stop)
 
@@ -230,6 +232,7 @@ class WifiManager:
       # BluePilot: start favorite network background scanner
       if is_bluepilot():
         self._favorite_manager.start()
+      # End BluePilot
 
       self._tethering_password = self._get_tethering_password()
       cloudlog.debug("WifiManager initialized")
@@ -857,8 +860,9 @@ class WifiManager:
     if reply.header.message_type == MessageType.error:
       cloudlog.warning(f"Failed to request scan: {reply}")
 
-  def _update_networks(self, block: bool = True,
-                       force: bool = False):  # BluePilot: force=True refreshes AP list when settings UI is hidden
+  # BluePilot: force=True refreshes AP list when settings UI is hidden
+  def _update_networks(self, block: bool = True, force: bool = False):
+    # End BluePilot
     if not self._active and not force:
       return
 
@@ -956,6 +960,7 @@ class WifiManager:
       # BluePilot: stop favorite network auto-connect
       if is_bluepilot() and hasattr(self, '_favorite_manager'):
         self._favorite_manager.stop()
+      # End BluePilot
 
       if self._router_main is not None:
         self._router_main.close()

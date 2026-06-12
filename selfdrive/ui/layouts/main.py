@@ -20,6 +20,7 @@ if is_bluepilot():
   from bluepilot.ui.layouts.home_bp import HomeLayoutBP as HomeLayout
   from openpilot.selfdrive.ui.bp.onroad.augmented_road_view_bp import AugmentedRoadViewBP as AugmentedRoadView
   from bluepilot.ui.widgets.debug import ControlsDebugPanel
+# End BluePilot
 
 if gui_app.sunnypilot_ui():
   from openpilot.selfdrive.ui.sunnypilot.layouts.settings.settings import SettingsLayoutSP as SettingsLayout
@@ -55,6 +56,7 @@ class MainLayout(Widget):
     if is_bluepilot():
       self._debug_panel = ControlsDebugPanel()
       self._debug_toggled_this_frame = False
+    # End BluePilot
 
     # Set callbacks
     self._setup_callbacks()
@@ -73,17 +75,19 @@ class MainLayout(Widget):
     self._render_main_content()
 
   def _setup_callbacks(self):
+    # BluePilot: sidebar debug and network buttons
     self._sidebar.set_callbacks(on_settings=self._on_settings_clicked,
                                 on_flag=self._on_bookmark_clicked,
-                                # BluePilot: sidebar debug and network buttons
                                 **({"on_debug": self._on_debug_clicked,
                                     "on_network": lambda: self.open_settings(PanelType.NETWORK)} if is_bluepilot() else {}),
                                 open_settings=lambda: self.open_settings(PanelType.TOGGLES))
+    # End BluePilot
     self._layouts[MainState.HOME]._setup_widget.set_open_settings_callback(lambda: self.open_settings(PanelType.FIREHOSE))
     self._layouts[MainState.HOME].set_settings_callback(lambda: self.open_settings(PanelType.TOGGLES))
     # BluePilot: model info click opens Models settings panel
     if is_bluepilot() and hasattr(self._layouts[MainState.HOME], 'set_model_settings_callback'):
       self._layouts[MainState.HOME].set_model_settings_callback(lambda: self.open_settings(PanelType.MODELS))
+    # End BluePilot
     self._layouts[MainState.SETTINGS].set_callbacks(on_close=self._set_mode_for_state)
 
     for layout in (self._layouts[MainState.ONROAD], self._home_body_layout):
@@ -143,6 +147,7 @@ class MainLayout(Widget):
     # BluePilot: suppress onroad clicks when debug panel is visible
     if is_bluepilot() and (self._debug_toggled_this_frame or self._debug_panel.is_panel_visible):
       return
+    # End BluePilot
     self._sidebar.set_visible(not self._sidebar.is_visible)
 
   def _on_body_changed(self):
@@ -152,6 +157,7 @@ class MainLayout(Widget):
   def _on_debug_clicked(self):
     self._debug_panel.toggle_visibility()
     self._debug_toggled_this_frame = True
+  # End BluePilot
 
   def _render_main_content(self):
     # Render sidebar
@@ -164,3 +170,4 @@ class MainLayout(Widget):
     # BluePilot: render debug panel overlay on top of onroad view
     if is_bluepilot() and self._current_mode == MainState.ONROAD and self._debug_panel.is_panel_visible:
       self._debug_panel.render(content_rect)
+    # End BluePilot

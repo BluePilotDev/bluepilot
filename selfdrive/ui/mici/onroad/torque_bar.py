@@ -173,6 +173,7 @@ class TorqueBar(Widget):
           return
         except (KeyError, AttributeError):
           pass
+    # End BluePilot
 
     # torque line
     if ui_state.sm['controlsState'].lateralControlState.which() == 'angleState':
@@ -203,6 +204,7 @@ class TorqueBar(Widget):
     # BluePilot: hide angle-state torque bar when controllerStateBP is absent
     if ui_state.sm['controlsState'].lateralControlState.which() == 'angleState' and not ui_state.sm.valid.get("controllerStateBP", False):
       return
+    # End BluePilot
 
     # adjust y pos with torque
     torque_line_offset = np.interp(abs(self._torque_filter.x), [0.5, 1], [22 * self._scale, 26 * self._scale])

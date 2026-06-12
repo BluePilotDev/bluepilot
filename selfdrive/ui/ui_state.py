@@ -65,7 +65,6 @@ class UIState(UIStateSP):
         "testJoystick",
         "rawAudioData",
       ] + self.sm_services_ext
-      + (["carStateBP"] if is_bluepilot() else [])  # BluePilot: hybrid battery and drive data
     )
 
     self.prime_state = PrimeState()

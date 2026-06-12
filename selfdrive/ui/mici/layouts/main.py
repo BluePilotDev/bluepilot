@@ -1,14 +1,8 @@
 import pyray as rl
 import cereal.messaging as messaging
 from openpilot.selfdrive.ui.mici.layouts.home import MiciHomeLayout
-# BluePilot: replace home with paged-design home (mockups/mici_home.html)
-# if is_bluepilot():
-#   from openpilot.selfdrive.ui.bp.mici.layouts.home_bp import MiciHomeLayoutBP as MiciHomeLayout
 from openpilot.selfdrive.ui.mici.layouts.settings.settings import SettingsLayout
 from openpilot.selfdrive.ui.mici.layouts.offroad_alerts import MiciOffroadAlerts
-# BluePilot: paged-carousel offroad alerts on radial backdrop
-# if is_bluepilot():
-#   from openpilot.selfdrive.ui.bp.mici.layouts.offroad_alerts_bp import MiciOffroadAlertsBP as MiciOffroadAlerts
 from openpilot.selfdrive.ui.mici.onroad.augmented_road_view import AugmentedRoadView
 from openpilot.selfdrive.ui.ui_state import device, ui_state
 from openpilot.selfdrive.ui.mici.layouts.onboarding import OnboardingWindow
