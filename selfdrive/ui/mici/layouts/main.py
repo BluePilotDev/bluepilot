@@ -21,13 +21,6 @@ from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.scroller import Scroller
 from openpilot.system.ui.lib.application import gui_app
 
-if gui_app.sunnypilot_ui():
-  from openpilot.selfdrive.ui.sunnypilot.mici.layouts.settings import SettingsLayoutSP as SettingsLayout
-# BluePilot: BP settings landing wins over the SP variant. Keep this AFTER the
-# sunnypilot block so the rebind sticks.
-# if is_bluepilot():
-#   from openpilot.selfdrive.ui.bp.mici.layouts.settings_bp import SettingsLayoutBP as SettingsLayout
-
 ONROAD_DELAY = 2.5  # seconds
 
 
