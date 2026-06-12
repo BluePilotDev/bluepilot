@@ -3,13 +3,13 @@ import cereal.messaging as messaging
 from openpilot.common.bluepilot import is_bluepilot
 from openpilot.selfdrive.ui.mici.layouts.home import MiciHomeLayout
 # BluePilot: replace home with paged-design home (mockups/mici_home.html)
-if is_bluepilot():
-  from openpilot.selfdrive.ui.bp.mici.layouts.home_bp import MiciHomeLayoutBP as MiciHomeLayout
+# if is_bluepilot():
+#   from openpilot.selfdrive.ui.bp.mici.layouts.home_bp import MiciHomeLayoutBP as MiciHomeLayout
 from openpilot.selfdrive.ui.mici.layouts.settings.settings import SettingsLayout
 from openpilot.selfdrive.ui.mici.layouts.offroad_alerts import MiciOffroadAlerts
 # BluePilot: paged-carousel offroad alerts on radial backdrop
-if is_bluepilot():
-  from openpilot.selfdrive.ui.bp.mici.layouts.offroad_alerts_bp import MiciOffroadAlertsBP as MiciOffroadAlerts
+# if is_bluepilot():
+#   from openpilot.selfdrive.ui.bp.mici.layouts.offroad_alerts_bp import MiciOffroadAlertsBP as MiciOffroadAlerts
 from openpilot.selfdrive.ui.mici.onroad.augmented_road_view import AugmentedRoadView
 # BluePilot: override onroad view with blindspot, complication, brake coloring, powerflow
 if is_bluepilot():
@@ -25,8 +25,8 @@ if gui_app.sunnypilot_ui():
   from openpilot.selfdrive.ui.sunnypilot.mici.layouts.settings import SettingsLayoutSP as SettingsLayout
 # BluePilot: BP settings landing wins over the SP variant. Keep this AFTER the
 # sunnypilot block so the rebind sticks.
-if is_bluepilot():
-  from openpilot.selfdrive.ui.bp.mici.layouts.settings_bp import SettingsLayoutBP as SettingsLayout
+# if is_bluepilot():
+#   from openpilot.selfdrive.ui.bp.mici.layouts.settings_bp import SettingsLayoutBP as SettingsLayout
 
 ONROAD_DELAY = 2.5  # seconds
 
