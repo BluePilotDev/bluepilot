@@ -15,12 +15,6 @@ from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.system.ui.lib.application import gui_app
 from openpilot.system.ui.lib.multilang import tr
 import pyray as rl
-# BluePilot: vehicle selector, BP settings panel, and BigButtonBP override
-from openpilot.common.bluepilot import is_bluepilot
-if is_bluepilot():
-  from openpilot.selfdrive.ui.bp.mici.widgets.button_bp import BigButtonBP as BigButton
-  from openpilot.selfdrive.ui.bp.mici.layouts.settings.bluepilot import BluePilotLayoutMici
-  from openpilot.selfdrive.ui.bp.mici.layouts.settings.vehicle_mici import VehicleLayoutMici
 
 ICON_SIZE = 70
 BIG_ICON_SIZE = 110
@@ -65,19 +59,6 @@ class SettingsLayoutSP(OP.SettingsLayout):
 
     items.insert(1, sunnylink_btn)
     items.insert(2, models_btn)
-
-    # BluePilot: insert vehicle fingerprint selector and BP settings buttons (before front slots so indices land after models)
-    if is_bluepilot():
-      vehicle_panel = VehicleLayoutMici(back_callback=gui_app.pop_widget)
-      vehicle_btn = BigButton("vehicle", "", gui_app.texture("../../sunnypilot/selfdrive/assets/offroad/icon_vehicle.png", ICON_SIZE, ICON_SIZE))
-      vehicle_btn.set_click_callback(lambda: gui_app.push_widget(vehicle_panel))
-
-      bp_panel = BluePilotLayoutMici(back_callback=gui_app.pop_widget)
-      bluepilot_btn = BigButton("bluepilot", "", gui_app.texture("icons_mici/settings/car_icon.png", ICON_SIZE, ICON_SIZE))
-      bluepilot_btn.set_click_callback(lambda: gui_app.push_widget(bp_panel))
-
-      items.insert(3, vehicle_btn)
-      items.insert(4, bluepilot_btn)
 
     # front slots (only one ever visible at a time): exit-always-offroad, then enable-onroad
     items.insert(0, self._enable_offroad_btn_onroad)
