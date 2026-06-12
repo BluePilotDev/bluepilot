@@ -1,0 +1,245 @@
+# Page: bluepilot
+# Edit this file. Run compile_settings_ui.py to emit settings_ui.json.
+id: bluepilot
+label: BluePilot
+icon: toggles
+order: 8
+remote_configurable: true
+description: 'BluePilot: Ford-specific features, gauges, and lateral/longitudinal tuning.'
+sections:
+- id: bp_system
+  title: System
+  description: ''
+  items:
+  - key: EnableWebRoutesServer
+    widget: toggle
+    title: Enable Web Routes Server
+    description: Run the BluePilot web portal to view routes and videos over WiFi.
+  - key: BPUIDebugLog
+    widget: toggle
+    title: UI Debug Logging
+    description: Log UI state transitions for diagnosing rendering issues on device.
+- id: bp_vehicle
+  title: Vehicle
+  description: ''
+  items:
+  - key: send_hands_free_cluster_msg
+    widget: toggle
+    title: Show BlueCruise UI on Cluster
+    description: Display BlueCruise UI on the cluster for supported vehicles.
+  - key: vbatt_pause_charging
+    widget: option
+    title: 12V Battery Limit
+    description: Set the 12V battery charging pause limit (11.0-14.0V).
+    min: 11.0
+    max: 14.0
+    step: 0.1
+    unit: V
+- id: bp_visuals
+  title: Visuals
+  description: ''
+  items:
+  - key: BPHideOnroadBorder
+    widget: toggle
+    title: Hide Onroad Border (C3X)
+    description: Hide the colored status border around the driving view.
+  - key: mici_hide_onroad_border
+    widget: toggle
+    title: Hide Screen Border (C4)
+    description: Hide the colored status border around the driving view (comma 4).
+  - key: mici_hide_onroad_fade
+    widget: toggle
+    title: Hide Onroad Fade (C4)
+    description: Hide the onroad fade overlay (comma 4).
+  - key: BPDisableLaneLineStatusColor
+    widget: toggle
+    title: Disable Lane Line Status Color
+    description: Keep lane lines grey instead of changing to green when engaged.
+  - key: ShowBlindspotOverlay
+    widget: toggle
+    title: Show Blindspot Overlay
+    description: Display red overlay when a vehicle is detected in the blindspot.
+  - key: ShowBrakeStatus
+    widget: toggle
+    title: Show Brake Status
+    description: Display the speed setpoint in red when the vehicle is braking.
+  - key: BPShowConfidenceBall
+    widget: toggle
+    title: Show Confidence Ball (C3X)
+    description: Display the confidence ball on the left side of the driving view.
+  - key: BPAnimateSteeringWheel
+    widget: toggle
+    title: Animate Steering Wheel
+    description: Rotate the steering wheel icon to match the current steering angle.
+  - key: mici_complication
+    widget: multiple_button
+    title: Lower Right Display (C4)
+    description: Choose what is shown in the lower-right corner of the driving view (comma 4).
+    options:
+    - value: 0
+      label: 'Off'
+    - value: 1
+      label: Lead Car Speed
+    - value: 2
+      label: Speed
+    - value: 3
+      label: Lead Car Distance
+    - value: 4
+      label: Time to Lead Car
+  - key: FordPrefShowRadarLeadOverlay
+    widget: toggle
+    title: Show Radar Lead Overlay (Ford ACC)
+    description: Display a chevron with lead vehicle info when using Ford stock ACC.
+  - key: FordPrefRadarOverlaySize
+    widget: multiple_button
+    title: Radar Overlay Size
+    description: Set the size of the radar lead overlay chevron and info boxes.
+    options:
+    - value: 0
+      label: Small
+    - value: 1
+      label: Medium
+    - value: 2
+      label: Large
+    enablement:
+    - type: param
+      key: FordPrefShowRadarLeadOverlay
+      equals: true
+  - key: FordPrefHybridBatteryStatus
+    widget: toggle
+    title: Show Hybrid/EV Battery Status
+    description: Display the hybrid battery gauge with SOC, voltage, and amps.
+  - key: FordPrefHybridPowerFlow
+    widget: toggle
+    title: Show Hybrid/EV Power Flow
+    description: Display the power flow gauge showing throttle demand and regenerative braking.
+  - key: FordPrefHybridDriveGaugeSize
+    widget: multiple_button
+    title: Hybrid/EV Gauge Size (C3X)
+    description: Set the size of the battery and power flow gauges.
+    options:
+    - value: 1
+      label: Small
+    - value: 2
+      label: Large
+    enablement:
+    - type: param
+      key: FordPrefHybridPowerFlow
+      equals: true
+  - key: FordPrefHybridGaugeStyle
+    widget: multiple_button
+    title: Hybrid Gauge Style (C3X)
+    description: 'Flat: horizontal bar in a shared container. Arched: arch above the torque bar.'
+    options:
+    - value: flat
+      label: Flat
+    - value: arched
+      label: Arched
+    enablement:
+    - type: param
+      key: FordPrefHybridPowerFlow
+      equals: true
+  - key: FordPrefHybridPowerFlowAlternate
+    widget: toggle
+    title: Hybrid/EV Gauge Style (C4)
+    description: Use the alternate hybrid gauge style (comma 4).
+- id: bp_longitudinal
+  title: Longitudinal Tuning
+  description: ''
+  items:
+  - key: disable_BP_long_UI
+    widget: toggle
+    title: Bypass BP Longitudinal Control
+    description: Use stock longitudinal logic instead of BluePilot TTC/coasting tuning.
+  - key: disable_downhill_comp_UI
+    widget: toggle
+    title: Disable Downhill Compensation
+    description: Disable pitch-based brake/gas compensation when going downhill.
+- id: bp_lateral
+  title: Lateral Tuning
+  description: ''
+  items:
+  - key: disable_BP_lat_UI
+    widget: toggle
+    title: Disable BP Lateral Control
+    description: Disable BluePilot 4-signal Ford lateral control.
+  - key: enable_human_turn_detection
+    widget: toggle
+    title: Enable Human Turn Detection
+    description: Detect human-initiated turns and briefly latch out of lateral control.
+  - key: BlinkerPauseLaneChange
+    widget: toggle
+    title: Disable Lane Change Under Speed
+    description: Pause lateral control when the blinker is on and below the minimum speed.
+  - key: lane_change_factor_high
+    widget: option
+    title: Lane Change Factor High
+    description: Adjust the high-speed lane change factor (0.5-1.0).
+    min: 0.5
+    max: 1.0
+    step: 0.05
+  - key: enable_lane_positioning
+    widget: toggle
+    title: Enable Lane Positioning
+    description: Enable custom in-lane positioning controls.
+  - key: custom_path_offset
+    widget: option
+    title: In-Lane Offset
+    description: Adjust the in-lane offset (-0.5 to 0.5 m).
+    min: -0.5
+    max: 0.5
+    step: 0.05
+    enablement:
+    - type: param
+      key: enable_lane_positioning
+      equals: true
+  - key: enable_lane_full_mode
+    widget: toggle
+    title: Enable Lanefull Mode
+    description: Enable lanefull mode for lane positioning.
+    enablement:
+    - type: param
+      key: enable_lane_positioning
+      equals: true
+  - key: custom_profile
+    widget: toggle
+    title: Use Custom Tuning Profile
+    description: Enable custom lateral tuning profile settings.
+  - key: pc_blend_ratio_high_C_UI
+    widget: option
+    title: Predicted Curvature Blend Ratio High
+    description: Adjust the high curvature blend ratio (0.0-1.0).
+    min: 0.0
+    max: 1.0
+    step: 0.05
+    enablement:
+    - type: param
+      key: custom_profile
+      equals: true
+  - key: pc_blend_ratio_low_C_UI
+    widget: option
+    title: Predicted Curvature Blend Ratio Low
+    description: Adjust the low curvature blend ratio (0.0-1.0).
+    min: 0.0
+    max: 1.0
+    step: 0.05
+    enablement:
+    - type: param
+      key: custom_profile
+      equals: true
+  - key: LC_PID_gain_UI
+    widget: option
+    title: Low Curvature PID Gain
+    description: Adjust the low curvature PID gain (0.0-5.0).
+    min: 0.0
+    max: 5.0
+    step: 0.1
+    enablement:
+    - type: all
+      conditions:
+      - type: param
+        key: enable_lane_positioning
+        equals: true
+      - type: param
+        key: custom_profile
+        equals: true
