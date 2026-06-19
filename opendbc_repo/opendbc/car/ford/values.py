@@ -162,7 +162,10 @@ class CAR(Platforms):
   FORD_BRONCO_MK6 = FordPlatformConfig(
     [FordCarDocs("Ford Bronco 6G 2021-24")],
     CarSpecs(mass=2156, wheelbase=2.949, steerRatio=16.0),
-    flags=FordFlags.CANFD_PSCM_RP,
+    # Phase 1 (monitoring): tres on CAN/IPMA bus sends LMC2 via gateway (CANFD_PSCM),
+    # red panda passively monitors PSCM CANFD connector to confirm LMC2 arrives (CANFD_PSCM_RP_MON).
+    # Once confirmed, switch to CANFD_PSCM_RP to have red panda TX LMC2 directly.
+    flags=FordFlags.CANFD_PSCM | FordFlags.CANFD_PSCM_RP_MON,
   )
   FORD_EDGE_MK2 = FordPlatformConfig(
     [FordCarDocs("Ford Edge 2022")],
