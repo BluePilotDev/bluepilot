@@ -201,20 +201,20 @@ def main() -> None:
 
     first_run = False
 
-    # Launch pandad C++ process for each panda with its bus index
+    # Launch a single pandad C++ process for the primary panda.
+    # Secondary panda serials are passed as extra args (serial idx pairs) so
+    # the primary pandad manages all CAN recv through a single PubMaster,
+    # avoiding the msgq single-writer constraint on the "can" topic.
     os.environ['MANAGER_DAEMON'] = 'pandad'
     pandad_path = os.path.join(BASEDIR, "selfdrive/pandad")
-    processes = [subprocess.Popen(["./pandad", panda_serial, "0"], cwd=pandad_path)]
+    cmd = ["./pandad", panda_serial, "0"]
     for serial, idx in secondary_serials:
-      cloudlog.info(f"Launching pandad for secondary panda {serial} at index {idx}")
-      processes.append(subprocess.Popen(["./pandad", serial, str(idx)], cwd=pandad_path))
+      cloudlog.info(f"Passing secondary panda {serial} (index {idx}) to primary pandad")
+      cmd += [serial, str(idx)]
+    processes = [subprocess.Popen(cmd, cwd=pandad_path)]
 
-    # Wait for primary process; when it exits clean up secondary processes
+    # Wait for the single pandad process to exit
     processes[0].wait()
-    for p in processes[1:]:
-      if p.poll() is None:
-        p.send_signal(signal.SIGINT)
-        p.wait()
     processes = []
 
 

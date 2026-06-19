@@ -370,36 +370,27 @@ void process_peripheral_state(Panda *panda, PubMaster *pm, bool no_fan_control) 
   }
 }
 
-void pandad_run(Panda *panda, int panda_index) {
+void pandad_run(Panda *panda, int panda_index,
+                std::vector<std::pair<Panda*, int>> &secondary_pandas) {
   const bool no_fan_control = getenv("NO_FAN_CONTROL") != nullptr;
   const bool spoofing_started = getenv("STARTED") != nullptr;
   const bool fake_send = getenv("FAKESEND") != nullptr;
 
-  // Start the CAN send thread
+  // Start the CAN send thread for the primary panda
   std::thread send_thread(can_send_thread, panda, fake_send);
 
   Params params;
   RateKeeper rk("pandad", 100);
   PandaSafety panda_safety(panda, panda_index);
 
-  if (panda_index > 0) {
-    // Secondary panda (e.g. red panda on CANFD bus): safety management only.
-    // Does NOT publish to "can" — msgq is single-writer and the primary panda
-    // owns that topic. Physical TX is suppressed via NO_OUTPUT until car params
-    // explicitly configure a safety model for this index.
-    bool is_onroad = false;
-    while (!do_exit && check_connected(panda)) {
-      if (rk.frame() % 10 == 0) {
-        is_onroad = params.getBool("IsOnroad");
-        panda_safety.configureSafetyMode(is_onroad);
-      }
-      rk.keepTime();
-    }
-    send_thread.join();
-    return;
+  // Safety managers for secondary pandas (one per panda, constructed in-place)
+  std::vector<PandaSafety> secondary_safeties;
+  secondary_safeties.reserve(secondary_pandas.size());
+  for (auto &[p, idx] : secondary_pandas) {
+    secondary_safeties.emplace_back(p, idx);
   }
 
-  // Primary panda: full loop including state publishing
+  // Primary panda: full loop including state publishing and secondary panda CAN recv
   SubMaster sm({"selfdriveState", "selfdriveStateSP", "carParams"});
   PubMaster pm({"can", "pandaStates", "peripheralState"});
   bool engaged = false;
@@ -407,9 +398,18 @@ void pandad_run(Panda *panda, int panda_index) {
   bool is_onroad = false;
   bool always_offroad = false;
 
-  // Main loop: receive CAN data and process states
+  // Main loop: receive CAN data from all pandas and process states
   while (!do_exit && check_connected(panda)) {
     can_recv(panda, &pm);
+
+    // Receive CAN from secondary pandas using the same publisher.
+    // Each secondary panda already has its bus offset set (e.g. +4 for index 1),
+    // so frames appear on buses 4-7 in the "can" stream without any further mapping.
+    for (auto &[p, idx] : secondary_pandas) {
+      if (p->connected()) {
+        can_recv(p, &pm);
+      }
+    }
 
     // Process peripheral state at 20 Hz
     if (rk.frame() % 5 == 0) {
@@ -425,6 +425,13 @@ void pandad_run(Panda *panda, int panda_index) {
       always_offroad = panda_safety.getOffroadMode();
       process_panda_state(panda, &pm, engaged, engaged_mads, is_onroad, spoofing_started, always_offroad);
       panda_safety.configureSafetyMode(is_onroad);
+
+      // Configure safety for secondary pandas
+      for (size_t i = 0; i < secondary_pandas.size(); i++) {
+        if (secondary_pandas[i].first->connected()) {
+          secondary_safeties[i].configureSafetyMode(is_onroad);
+        }
+      }
     }
 
     // Send out peripheralState at 2Hz
@@ -456,7 +463,8 @@ void pandad_run(Panda *panda, int panda_index) {
   send_thread.join();
 }
 
-void pandad_main_thread(std::string serial, int panda_index) {
+void pandad_main_thread(std::string serial, int panda_index,
+                        std::vector<std::pair<std::string, int>> secondary_serials) {
   if (serial.empty()) {
     auto serials = Panda::list();
 
@@ -479,7 +487,27 @@ void pandad_main_thread(std::string serial, int panda_index) {
   if (!do_exit) {
     panda->set_bus_offset(static_cast<uint8_t>(panda_index * PANDA_BUS_OFFSET));
     LOGW("connected to panda (index %d, bus_offset %d)", panda_index, panda_index * PANDA_BUS_OFFSET);
-    pandad_run(panda, panda_index);
+
+    // Connect secondary pandas; their CAN recv is handled in the primary pandad_run
+    // loop so that all "can" publishing goes through a single PubMaster.
+    std::vector<std::pair<Panda*, int>> secondary_pandas;
+    for (auto &[sec_serial, sec_idx] : secondary_serials) {
+      LOGW("connecting to secondary panda: %s (index %d)", sec_serial.c_str(), sec_idx);
+      Panda *secondary = connect(sec_serial);
+      if (secondary) {
+        secondary->set_bus_offset(static_cast<uint8_t>(sec_idx * PANDA_BUS_OFFSET));
+        LOGW("connected to secondary panda (index %d, bus_offset %d)", sec_idx, sec_idx * PANDA_BUS_OFFSET);
+        secondary_pandas.push_back({secondary, sec_idx});
+      } else {
+        LOGE("failed to connect to secondary panda %s (index %d), skipping", sec_serial.c_str(), sec_idx);
+      }
+    }
+
+    pandad_run(panda, panda_index, secondary_pandas);
+
+    for (auto &[p, _] : secondary_pandas) {
+      delete p;
+    }
   }
 
   delete panda;

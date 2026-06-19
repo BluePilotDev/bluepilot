@@ -1,11 +1,14 @@
 #pragma once
 
 #include <string>
+#include <utility>
+#include <vector>
 
 #include "common/params.h"
 #include "selfdrive/pandad/panda.h"
 
-void pandad_main_thread(std::string serial, int panda_index = 0);
+void pandad_main_thread(std::string serial, int panda_index = 0,
+                        std::vector<std::pair<std::string, int>> secondary_pandas = {});
 
 // deprecated devices
 static const std::vector<cereal::PandaState::PandaType> SUPPORTED_PANDA_TYPES = {
