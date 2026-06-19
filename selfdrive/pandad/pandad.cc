@@ -383,11 +383,10 @@ void pandad_run(Panda *panda, int panda_index,
   RateKeeper rk("pandad", 100);
   PandaSafety panda_safety(panda, panda_index);
 
-  // Safety managers for secondary pandas (one per panda, constructed in-place)
-  std::vector<PandaSafety> secondary_safeties;
-  secondary_safeties.reserve(secondary_pandas.size());
+  // Safety managers for secondary pandas — heap-allocated because Params is non-copyable/movable
+  std::vector<std::unique_ptr<PandaSafety>> secondary_safeties;
   for (auto &[p, idx] : secondary_pandas) {
-    secondary_safeties.emplace_back(p, idx);
+    secondary_safeties.push_back(std::make_unique<PandaSafety>(p, idx));
   }
 
   // Primary panda: full loop including state publishing and secondary panda CAN recv
@@ -429,7 +428,7 @@ void pandad_run(Panda *panda, int panda_index,
       // Configure safety for secondary pandas
       for (size_t i = 0; i < secondary_pandas.size(); i++) {
         if (secondary_pandas[i].first->connected()) {
-          secondary_safeties[i].configureSafetyMode(is_onroad);
+          secondary_safeties[i]->configureSafetyMode(is_onroad);
         }
       }
     }
