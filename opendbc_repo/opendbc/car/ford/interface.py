@@ -89,8 +89,13 @@ class CarInterface(CarInterfaceBase):
       tres_param = ret.safetyConfigs[0].safetyParam
       tres_cfg = get_safety_config(structs.CarParams.SafetyModel.ford)
       tres_cfg.safetyParam = tres_param
-      rp_cfg = get_safety_config(structs.CarParams.SafetyModel.ford)
-      rp_cfg.safetyParam = FordSafetyFlags.CANFD.value | (tres_param & FordSafetyFlags.LONG_CONTROL.value)
+      if ret.flags & FordFlags.CANFD_PSCM_RP_MON:
+        # Monitor-only: red panda must not transmit on the PSCM CANFD bus.
+        # noOutput still relays received CAN frames to USB (buses 4/6 appear in Cabana).
+        rp_cfg = get_safety_config(structs.CarParams.SafetyModel.noOutput)
+      else:
+        rp_cfg = get_safety_config(structs.CarParams.SafetyModel.ford)
+        rp_cfg.safetyParam = FordSafetyFlags.CANFD.value | (tres_param & FordSafetyFlags.LONG_CONTROL.value)
       ret.safetyConfigs = [tres_cfg, rp_cfg]
 
     # for fw in car_fw:
