@@ -14,13 +14,17 @@
 const bool PANDAD_MAXOUT = getenv("PANDAD_MAXOUT") != nullptr;
 
 Panda::Panda(std::string serial) {
-  auto spi_serials = PandaSpiHandle::list();
-  if (std::find(spi_serials.begin(), spi_serials.end(), serial) != spi_serials.end()) {
-    handle = std::make_unique<PandaSpiHandle>(serial);
-    LOGW("connected to %s over SPI", serial.c_str());
-  } else {
+  // try USB first, then SPI (mirrors AdventurePilot angle-overnight approach)
+  try {
     handle = std::make_unique<PandaUsbHandle>(serial);
     LOGW("connected to %s over USB", serial.c_str());
+  } catch (std::exception &e) {
+#ifndef __APPLE__
+    handle = std::make_unique<PandaSpiHandle>(serial);
+    LOGW("connected to %s over SPI", serial.c_str());
+#else
+    throw;
+#endif
   }
 
   hw_type = get_hw_type();
@@ -40,10 +44,15 @@ std::string Panda::hw_serial() {
 }
 
 std::vector<std::string> Panda::list() {
-  auto spi = PandaSpiHandle::list();
-  auto usb = PandaUsbHandle::list();
-  spi.insert(spi.end(), usb.begin(), usb.end());
-  return spi;
+  std::vector<std::string> serials = PandaUsbHandle::list();
+#ifndef __APPLE__
+  for (const auto &s : PandaSpiHandle::list()) {
+    if (std::find(serials.begin(), serials.end(), s) == serials.end()) {
+      serials.push_back(s);
+    }
+  }
+#endif
+  return serials;
 }
 
 void Panda::set_safety_model(cereal::CarParams::SafetyModel safety_model, uint16_t safety_param) {
