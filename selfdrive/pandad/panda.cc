@@ -2,6 +2,7 @@
 
 #include <unistd.h>
 
+#include <algorithm>
 #include <cassert>
 #include <stdexcept>
 #include <vector>
@@ -13,8 +14,14 @@
 const bool PANDAD_MAXOUT = getenv("PANDAD_MAXOUT") != nullptr;
 
 Panda::Panda(std::string serial) {
-  handle = std::make_unique<PandaSpiHandle>(serial);
-  LOGW("connected to %s over SPI", serial.c_str());
+  auto spi_serials = PandaSpiHandle::list();
+  if (std::find(spi_serials.begin(), spi_serials.end(), serial) != spi_serials.end()) {
+    handle = std::make_unique<PandaSpiHandle>(serial);
+    LOGW("connected to %s over SPI", serial.c_str());
+  } else {
+    handle = std::make_unique<PandaUsbHandle>(serial);
+    LOGW("connected to %s over USB", serial.c_str());
+  }
 
   hw_type = get_hw_type();
   can_reset_communications();
@@ -33,7 +40,10 @@ std::string Panda::hw_serial() {
 }
 
 std::vector<std::string> Panda::list() {
-  return PandaSpiHandle::list();
+  auto spi = PandaSpiHandle::list();
+  auto usb = PandaUsbHandle::list();
+  spi.insert(spi.end(), usb.begin(), usb.end());
+  return spi;
 }
 
 void Panda::set_safety_model(cereal::CarParams::SafetyModel safety_model, uint16_t safety_param) {
