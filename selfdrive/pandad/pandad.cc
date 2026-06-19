@@ -383,12 +383,12 @@ void pandad_run(Panda *panda, int panda_index) {
   PandaSafety panda_safety(panda, panda_index);
 
   if (panda_index > 0) {
-    // Secondary panda (e.g. red panda on CANFD bus): CAN send/recv + safety only.
-    // Primary panda publishes pandaStates and peripheralState.
-    PubMaster pm({"can"});
+    // Secondary panda (e.g. red panda on CANFD bus): safety management only.
+    // Does NOT publish to "can" — msgq is single-writer and the primary panda
+    // owns that topic. Physical TX is suppressed via NO_OUTPUT until car params
+    // explicitly configure a safety model for this index.
     bool is_onroad = false;
     while (!do_exit && check_connected(panda)) {
-      can_recv(panda, &pm);
       if (rk.frame() % 10 == 0) {
         is_onroad = params.getBool("IsOnroad");
         panda_safety.configureSafetyMode(is_onroad);

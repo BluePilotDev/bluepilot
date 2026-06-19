@@ -23,7 +23,12 @@ void PandaSafety::configureSafetyMode(bool is_onroad) {
 void PandaSafety::updateMultiplexingMode() {
   // OBD multiplexing only applies to the primary panda (tres on CAN bus)
   if (panda_index_ > 0) {
-    initialized_ = true;
+    // Secondary panda must be set to NO_OUTPUT immediately so it cannot transmit
+    // on the physical CAN bus until car params explicitly configure it otherwise.
+    if (!initialized_) {
+      panda_->set_safety_model(cereal::CarParams::SafetyModel::NO_OUTPUT, 0U);
+      initialized_ = true;
+    }
     return;
   }
 
