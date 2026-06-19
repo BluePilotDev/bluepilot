@@ -45,18 +45,17 @@ class FakeResponse:
     self.request = FakeRequest()
 
 
-def get_directory_sort(d: str) -> list[str]:
-  # ensure old format is sorted sooner
-  o = ["0", ] if d.startswith("2024-") else ["1", ]
-  return o + [s.rjust(10, '0') for s in d.rsplit('--', 1)]
-
 def listdir_by_creation(d: str) -> list[str]:
   if not os.path.isdir(d):
     return []
 
   try:
     paths = [f for f in os.listdir(d) if os.path.isdir(os.path.join(d, f))]
-    paths = sorted(paths, key=get_directory_sort)
+    # Sort by actual mtime so truly old data is deleted/uploaded first, regardless
+    # of directory-name ordering. Name-based sorting breaks when RouteCount recycles
+    # after a params reset — a fresh route can share the same hex prefix as year-old
+    # data and the random hash determines deletion order (~56% chance wrong direction).
+    paths = sorted(paths, key=lambda f: os.path.getmtime(os.path.join(d, f)))
     return paths
   except OSError:
     cloudlog.exception("listdir_by_creation failed")

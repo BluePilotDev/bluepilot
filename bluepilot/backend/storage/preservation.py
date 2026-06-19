@@ -50,7 +50,7 @@ except ImportError:
             return []
         try:
             paths = [f for f in os.listdir(d) if os.path.isdir(os.path.join(d, f))]
-            return sorted(paths)
+            return sorted(paths, key=lambda f: os.path.getmtime(os.path.join(d, f)))
         except OSError:
             return []
 
