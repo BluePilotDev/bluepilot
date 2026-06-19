@@ -45,7 +45,7 @@ struct can_frame {
 
 class Panda {
 private:
-  std::unique_ptr<PandaSpiHandle> handle;
+  std::unique_ptr<PandaHandle> handle;
   uint8_t bus_offset_ = 0;
 
 public:
