@@ -489,16 +489,23 @@ void pandad_main_thread(std::string serial, int panda_index,
 
     // Connect secondary pandas; their CAN recv is handled in the primary pandad_run
     // loop so that all "can" publishing goes through a single PubMaster.
+    // Use a retry loop matching the primary — the USB device may not be immediately
+    // available after pandad.py closes its Python connection to the secondary panda.
     std::vector<std::pair<Panda*, int>> secondary_pandas;
     for (auto &[sec_serial, sec_idx] : secondary_serials) {
       LOGW("connecting to secondary panda: %s (index %d)", sec_serial.c_str(), sec_idx);
-      Panda *secondary = connect(sec_serial);
+      Panda *secondary = nullptr;
+      for (int attempt = 0; attempt < 50 && !do_exit; attempt++) {
+        secondary = connect(sec_serial);
+        if (secondary) break;
+        util::sleep_for(100);
+      }
       if (secondary) {
         secondary->set_bus_offset(static_cast<uint8_t>(sec_idx * PANDA_BUS_OFFSET));
         LOGW("connected to secondary panda (index %d, bus_offset %d)", sec_idx, sec_idx * PANDA_BUS_OFFSET);
         secondary_pandas.push_back({secondary, sec_idx});
       } else {
-        LOGE("failed to connect to secondary panda %s (index %d), skipping", sec_serial.c_str(), sec_idx);
+        LOGE("failed to connect to secondary panda %s (index %d) after retries, skipping", sec_serial.c_str(), sec_idx);
       }
     }
 

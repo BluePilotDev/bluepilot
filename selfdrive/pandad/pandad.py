@@ -229,6 +229,11 @@ def main() -> None:
 
     first_run = False
 
+    # Give the secondary panda's USB device time to settle after Python closes
+    # its connection before the C++ pandad tries to open it.
+    if secondary_serials:
+      time.sleep(0.5)
+
     # Launch a single pandad C++ process for the primary panda.
     # Secondary panda serials are passed as extra args (serial idx pairs) so
     # the primary pandad manages all CAN recv through a single PubMaster,
