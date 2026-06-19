@@ -61,7 +61,9 @@ class CarInterface(CarInterfaceBase):
 
     CAN = CanBus(fingerprint=fingerprint)
     cfgs = [get_safety_config(structs.CarParams.SafetyModel.ford)]
-    if CAN.main >= 4:
+    # Don't prepend noOutput for RP variants — they build their own dual-panda configs below,
+    # and inserting noOutput here would cause tres_param to be read from the wrong config.
+    if CAN.main >= 4 and not ret.flags & (FordFlags.CANFD_PSCM_RP | FordFlags.CANFD_PSCM_RP_MON):
       cfgs.insert(0, get_safety_config(structs.CarParams.SafetyModel.noOutput))
     ret.safetyConfigs = cfgs
 
