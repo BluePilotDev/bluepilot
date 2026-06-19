@@ -371,7 +371,8 @@ void process_peripheral_state(Panda *panda, PubMaster *pm, bool no_fan_control) 
 }
 
 void pandad_run(Panda *panda, int panda_index,
-                std::vector<std::pair<Panda*, int>> &secondary_pandas) {
+                std::vector<std::pair<Panda*, int>> &secondary_pandas,
+                const std::vector<std::pair<std::string, int>> &secondary_serials) {
   const bool no_fan_control = getenv("NO_FAN_CONTROL") != nullptr;
   const bool spoofing_started = getenv("STARTED") != nullptr;
   const bool fake_send = getenv("FAKESEND") != nullptr;
@@ -426,6 +427,21 @@ void pandad_run(Panda *panda, int panda_index,
       always_offroad = panda_safety.getOffroadMode();
       process_panda_state(panda, &pm, engaged, engaged_mads, is_onroad, spoofing_started, always_offroad);
       panda_safety.configureSafetyMode(is_onroad);
+
+      // Reconnect any secondary pandas that lost USB (e.g. truck power cycle drops panda power)
+      for (size_t i = 0; i < secondary_pandas.size(); i++) {
+        auto &[p, idx] = secondary_pandas[i];
+        if (!p->connected()) {
+          LOGW("secondary panda (index %d) disconnected, attempting reconnect...", idx);
+          if (Panda *new_p = connect(secondary_serials[i].first)) {
+            delete p;
+            p = new_p;
+            p->set_bus_offset(static_cast<uint8_t>(idx * PANDA_BUS_OFFSET));
+            secondary_safeties[i] = std::make_unique<PandaSafety>(new_p, idx);
+            LOGW("reconnected to secondary panda (index %d, bus_offset %d)", idx, idx * PANDA_BUS_OFFSET);
+          }
+        }
+      }
 
       // Configure safety for secondary pandas
       for (size_t i = 0; i < secondary_pandas.size(); i++) {
@@ -511,7 +527,7 @@ void pandad_main_thread(std::string serial, int panda_index,
       }
     }
 
-    pandad_run(panda, panda_index, secondary_pandas);
+    pandad_run(panda, panda_index, secondary_pandas, secondary_serials);
 
     for (auto &[p, _] : secondary_pandas) {
       delete p;
