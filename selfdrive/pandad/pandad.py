@@ -133,20 +133,31 @@ def main() -> None:
 
       # When multiple pandas are present (e.g. red panda attached), USB enumeration
       # order is non-deterministic — the internal tres can appear at any position.
-      # Explicitly identify and move it to index 0 before flashing so the is_internal()
-      # guard below doesn't spin-loop for minutes waiting for list order to flip.
+      # Mirror the AdventurePilot check_panda_support() pattern: try SPI first
+      # (no USB open needed), then fall back to is_internal() for USB pandas.
       if HARDWARE.has_internal_panda() and len(panda_serials) > 1:
+        primary_serial = None
+        # 1. SPI panda (comma 3X / newer hardware) — always internal
+        spi_serials = set(Panda.spi_list())
         for s in panda_serials:
-          try:
-            p = Panda(s)
-            if p.is_internal():
+          if s in spi_serials:
+            primary_serial = s
+            break
+        # 2. USB internal panda (TICI / tizi) — check is_internal() per serial
+        if primary_serial is None:
+          for s in panda_serials:
+            try:
+              p = Panda(s)
+              if p.is_internal():
+                primary_serial = s
+                p.close()
+                break
               p.close()
-              panda_serials = [s] + [x for x in panda_serials if x != s]
-              cloudlog.info(f"Internal panda {s} identified, reordered list: {panda_serials}")
-              break
-            p.close()
-          except Exception:
-            cloudlog.exception(f"Error checking panda {s} for internal status")
+            except Exception:
+              cloudlog.exception(f"Error checking panda {s} for internal status")
+        if primary_serial is not None:
+          panda_serials = [primary_serial] + [x for x in panda_serials if x != primary_serial]
+          cloudlog.info(f"Internal panda {primary_serial} identified, reordered list: {panda_serials}")
 
       # Flash the primary panda (tres / internal)
       panda_serial = panda_serials[0]
