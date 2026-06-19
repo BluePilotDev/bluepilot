@@ -28,25 +28,28 @@ PandaUsbHandle::PandaUsbHandle(std::string serial) : PandaCommsHandle(serial) {
   libusb_device **dev_list = NULL;
   int err = 0;
   ctx = init_usb_ctx();
-  if (!ctx) { goto fail; }
+  if (!ctx) { LOGE("USB: libusb init failed"); goto fail; }
 
   // connect by serial
   num_devices = libusb_get_device_list(ctx, &dev_list);
-  if (num_devices < 0) { goto fail; }
+  LOGW("USB: scanning %zd devices for serial '%s'", num_devices, serial.c_str());
+  if (num_devices < 0) { LOGE("USB: get_device_list failed %zd", num_devices); goto fail; }
   for (size_t i = 0; i < num_devices; ++i) {
     libusb_device_descriptor desc;
     libusb_get_device_descriptor(dev_list[i], &desc);
     bool vid_match = (desc.idVendor == 0xbbaa) || (desc.idVendor == 0x3801);
     bool pid_match = (desc.idProduct == 0xddee) || (desc.idProduct == 0xddcc);
     if (vid_match && pid_match) {
+      LOGW("USB: found panda VID=%04x PID=%04x, opening...", desc.idVendor, desc.idProduct);
       int ret = libusb_open(dev_list[i], &dev_handle);
-      if (dev_handle == NULL || ret < 0) { goto fail; }
+      if (dev_handle == NULL || ret < 0) { LOGE("USB: open failed %d", ret); goto fail; }
 
       unsigned char desc_serial[26] = { 0 };
       ret = libusb_get_string_descriptor_ascii(dev_handle, desc.iSerialNumber, desc_serial, std::size(desc_serial));
-      if (ret < 0) { goto fail; }
+      if (ret < 0) { LOGE("USB: get serial failed %d", ret); goto fail; }
 
       hw_serial = std::string((char *)desc_serial, ret);
+      LOGW("USB: device serial='%s' want='%s'", hw_serial.c_str(), serial.c_str());
       if (serial.empty() || serial == hw_serial) {
         break;
       }
@@ -54,20 +57,26 @@ PandaUsbHandle::PandaUsbHandle(std::string serial) : PandaCommsHandle(serial) {
       dev_handle = NULL;
     }
   }
-  if (dev_handle == NULL) goto fail;
+  if (dev_handle == NULL) { LOGE("USB: no device matched serial '%s'", serial.c_str()); goto fail; }
   libusb_free_device_list(dev_list, 1);
   dev_list = nullptr;
 
-  if (libusb_kernel_driver_active(dev_handle, 0) == 1) {
-    libusb_detach_kernel_driver(dev_handle, 0);
+  err = libusb_kernel_driver_active(dev_handle, 0);
+  LOGW("USB: kernel_driver_active=%d", err);
+  if (err == 1) {
+    err = libusb_detach_kernel_driver(dev_handle, 0);
+    LOGW("USB: detach_kernel_driver=%d", err);
   }
 
   err = libusb_set_configuration(dev_handle, 1);
+  LOGW("USB: set_configuration=%d (%s)", err, libusb_strerror((libusb_error)err));
   if (err != 0) { goto fail; }
 
   err = libusb_claim_interface(dev_handle, 0);
+  LOGW("USB: claim_interface=%d (%s)", err, libusb_strerror((libusb_error)err));
   if (err != 0) { goto fail; }
 
+  LOGW("USB: successfully connected to '%s'", hw_serial.c_str());
   return;
 
 fail:
