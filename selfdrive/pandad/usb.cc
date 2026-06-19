@@ -32,9 +32,9 @@ std::vector<std::string> PandaUsbHandle::list() {
     libusb_device_handle *h = nullptr;
     if (libusb_open(devs[i], &h) != 0) continue;
 
-    char buf[17] = {};
+    char buf[33] = {};
     int r = libusb_get_string_descriptor_ascii(h, desc.iSerialNumber,
-                                               (unsigned char *)buf, 16);
+                                               (unsigned char *)buf, 32);
     libusb_close(h);
     if (r > 0) serials.emplace_back(buf);
   }
@@ -62,9 +62,9 @@ PandaUsbHandle::PandaUsbHandle(std::string serial) {
     libusb_device_handle *h = nullptr;
     if (libusb_open(devs[i], &h) != 0) continue;
 
-    char buf[17] = {};
+    char buf[33] = {};
     int r = libusb_get_string_descriptor_ascii(h, desc.iSerialNumber,
-                                               (unsigned char *)buf, 16);
+                                               (unsigned char *)buf, 32);
     libusb_close(h);
 
     if (r > 0 && (serial.empty() || serial == std::string(buf))) {
