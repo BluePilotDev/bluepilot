@@ -232,11 +232,11 @@ void Panda::can_send(const capnp::List<cereal::CanData>::Reader &can_data_list) 
   });
 }
 
-bool Panda::can_receive(std::vector<can_frame>& out_vec) {
+bool Panda::can_receive(std::vector<can_frame>& out_vec, unsigned int timeout) {
   // Check if enough space left in buffer to store RECV_SIZE data
   assert(receive_buffer_size + RECV_SIZE <= sizeof(receive_buffer));
 
-  int recv = handle->bulk_read(0x81, &receive_buffer[receive_buffer_size], RECV_SIZE);
+  int recv = handle->bulk_read(0x81, &receive_buffer[receive_buffer_size], RECV_SIZE, timeout);
   if (!comms_healthy()) {
     return false;
   }

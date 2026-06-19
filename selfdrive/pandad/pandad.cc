@@ -107,11 +107,11 @@ void can_send_thread(Panda *panda, bool fake_send) {
   }
 }
 
-void can_recv(Panda *panda, PubMaster *pm) {
+void can_recv(Panda *panda, PubMaster *pm, unsigned int timeout = 0) {
   static std::vector<can_frame> raw_can_data;
   {
     raw_can_data.clear();
-    bool comms_healthy = panda->can_receive(raw_can_data);
+    bool comms_healthy = panda->can_receive(raw_can_data, timeout);
 
     MessageBuilder msg;
     auto evt = msg.initEvent();
@@ -404,9 +404,11 @@ void pandad_run(Panda *panda, int panda_index,
     // Receive CAN from secondary pandas using the same publisher.
     // Each secondary panda already has its bus offset set (e.g. +4 for index 1),
     // so frames appear on buses 4-7 in the "can" stream without any further mapping.
+    // Use a 10 ms timeout on the USB secondary so bulk_read never blocks the primary loop
+    // indefinitely when the monitored bus is momentarily quiet.
     for (auto &[p, idx] : secondary_pandas) {
       if (p->connected()) {
-        can_recv(p, &pm);
+        can_recv(p, &pm, 10);
       }
     }
 
