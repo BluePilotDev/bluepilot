@@ -149,6 +149,7 @@ FW_VERSIONS = {
       b'RJ6T-14H102-BBC\x00\x00\x00\x00\x00\x00\x00\x00\x00',
     ],
   },
+  CAR.FORD_F_150_MK14_RP_MON: {},
   CAR.FORD_F_150_LIGHTNING_MK1: {
     (Ecu.abs, 0x760, None): [
       b'PL38-2D053-AA\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00',

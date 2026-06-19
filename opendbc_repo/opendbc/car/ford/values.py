@@ -67,6 +67,7 @@ class FordFlags(IntFlag):
   HEV_BATTERY_DATA = 8
   CANFD_PSCM = 16  # CAN main bus but CANFD PSCM — uses LateralMotionControl2 via gateway
   CANFD_PSCM_RP = 32  # CAN main bus but CANFD PSCM — uses LateralMotionControl2 via external red panda on CANFD bus
+  CANFD_PSCM_RP_MON = 64  # CANFD platform; external red panda passively monitors PSCM connector bus
 
 
 class RADAR:
@@ -97,6 +98,7 @@ class FordCarDocs(CarDocs):
       CAR.FORD_BRONCO_MK6,
       CAR.FORD_MAVERICK_MK1,
       CAR.FORD_F_150_MK14,
+      CAR.FORD_F_150_MK14_RP_MON,
       CAR.FORD_F_150_LIGHTNING_MK1,
       CAR.FORD_ESCAPE_MK4_5,
       CAR.FORD_MUSTANG_MACH_E_MK1,
@@ -110,7 +112,7 @@ class FordCarDocs(CarDocs):
     if harness == CarHarness.ford_q4:
       self.setup_video = "https://www.youtube.com/watch?v=uUGkH6C_EQU"
 
-    if CP.carFingerprint in (CAR.FORD_F_150_MK14, CAR.FORD_F_150_LIGHTNING_MK1, CAR.FORD_EXPEDITION_MK4):
+    if CP.carFingerprint in (CAR.FORD_F_150_MK14, CAR.FORD_F_150_MK14_RP_MON, CAR.FORD_F_150_LIGHTNING_MK1, CAR.FORD_EXPEDITION_MK4):
       self.setup_video = "https://www.youtube.com/watch?v=MewJc9LYp9M"
 
 
@@ -196,6 +198,11 @@ class CAR(Platforms):
   FORD_F_150_MK14 = FordCANFDPlatformConfig(
     [FordCarDocs("Ford F-150 2021-23", "Co-Pilot360 Assist 2.0", hybrid=True)],
     CarSpecs(mass=3334, wheelbase=3.99, steerRatio=17.0),
+  )
+  FORD_F_150_MK14_RP_MON = FordCANFDPlatformConfig(
+    [FordCarDocs("Ford F-150 2021-23 RP Monitor", "Co-Pilot360 Assist 2.0", hybrid=True)],
+    CarSpecs(mass=3334, wheelbase=3.99, steerRatio=17.0),
+    flags=FordFlags.CANFD_PSCM_RP_MON,
   )
   FORD_F_150_LIGHTNING_MK1 = FordF150LightningPlatform(
     [FordCarDocs("Ford F-150 Lightning 2022-23", "Co-Pilot360 Assist 2.0")],

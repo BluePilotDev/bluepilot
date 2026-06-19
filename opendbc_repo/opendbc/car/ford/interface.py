@@ -80,8 +80,9 @@ class CarInterface(CarInterfaceBase):
       # Enable LMC2 in panda TX allowlist for both native CANFD and CANFD-PSCM (gateway) vehicles
       ret.safetyConfigs[-1].safetyParam |= FordSafetyFlags.CANFD.value
 
-    if ret.flags & FordFlags.CANFD_PSCM_RP:
-      # Dual-panda: tres (index 0) handles regular CAN, red panda (index 1) handles CANFD PSCM.
+    if ret.flags & (FordFlags.CANFD_PSCM_RP | FordFlags.CANFD_PSCM_RP_MON):
+      # Dual-panda: tres (index 0) handles normal operation, red panda (index 1) on PSCM connector.
+      # CANFD_PSCM_RP routes LMC2 to the red panda (bus 4); CANFD_PSCM_RP_MON keeps LMC2 on tres.
       # Read tres param now (may already have LONG_CONTROL set above), then rebuild both configs.
       tres_param = ret.safetyConfigs[0].safetyParam
       tres_cfg = get_safety_config(structs.CarParams.SafetyModel.ford)
@@ -122,7 +123,7 @@ class CarInterface(CarInterfaceBase):
     # CANFD_PSCM vehicles (e.g. Bronco 6G) have the shift-by-wire module on CANFD,
     # so 0x5A won't appear on the CAN main bus fingerprint — force automatic.
     found_ecus = [fw.ecu for fw in car_fw]
-    if Ecu.shiftByWire in found_ecus or 0x5A in fingerprint[CAN.main] or docs or ret.flags & (FordFlags.CANFD_PSCM | FordFlags.CANFD_PSCM_RP):
+    if Ecu.shiftByWire in found_ecus or 0x5A in fingerprint[CAN.main] or docs or ret.flags & (FordFlags.CANFD_PSCM | FordFlags.CANFD_PSCM_RP | FordFlags.CANFD_PSCM_RP_MON):
       ret.transmissionType = TransmissionType.automatic
     else:
       ret.transmissionType = TransmissionType.manual

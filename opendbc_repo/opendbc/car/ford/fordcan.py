@@ -8,9 +8,9 @@ class CanBus(CanBusBase):
   def __init__(self, CP=None, fingerprint=None) -> None:
     super().__init__(CP, fingerprint)
     self._cp_flags = int(CP.flags) if CP is not None else 0
-    # For RP variant: force offset to 0 so all regular CAN stays on bus 0 (tres).
-    # LMC2 is routed to the red panda via canfd_pscm (always logical bus 4).
-    if self._cp_flags & int(FordFlags.CANFD_PSCM_RP):
+    # For RP variants: force offset to 0 so all regular CAN stays on bus 0 (tres),
+    # regardless of how many safety configs are active.
+    if self._cp_flags & int(FordFlags.CANFD_PSCM_RP | FordFlags.CANFD_PSCM_RP_MON):
       self.offset = 0
 
   @property
@@ -27,7 +27,8 @@ class CanBus(CanBusBase):
 
   @property
   def canfd_pscm(self) -> int:
-    """Bus for LMC2: logical bus 4 (red panda bus 0) for RP variant, main bus otherwise."""
+    """Bus for LMC2: logical bus 4 (red panda bus 0) for CANFD_PSCM_RP, main bus otherwise.
+    CANFD_PSCM_RP_MON keeps LMC2 on bus 0 (tres); red panda only monitors."""
     if self._cp_flags & int(FordFlags.CANFD_PSCM_RP):
       return 4
     return self.offset
