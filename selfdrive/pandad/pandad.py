@@ -131,6 +131,23 @@ def main() -> None:
 
       cloudlog.info(f"{len(panda_serials)} panda(s) found, connecting - {panda_serials}")
 
+      # When multiple pandas are present (e.g. red panda attached), USB enumeration
+      # order is non-deterministic — the internal tres can appear at any position.
+      # Explicitly identify and move it to index 0 before flashing so the is_internal()
+      # guard below doesn't spin-loop for minutes waiting for list order to flip.
+      if HARDWARE.has_internal_panda() and len(panda_serials) > 1:
+        for s in panda_serials:
+          try:
+            p = Panda(s)
+            if p.is_internal():
+              p.close()
+              panda_serials = [s] + [x for x in panda_serials if x != s]
+              cloudlog.info(f"Internal panda {s} identified, reordered list: {panda_serials}")
+              break
+            p.close()
+          except Exception:
+            cloudlog.exception(f"Error checking panda {s} for internal status")
+
       # Flash the primary panda (tres / internal)
       panda_serial = panda_serials[0]
       panda = flash_panda(panda_serial)
