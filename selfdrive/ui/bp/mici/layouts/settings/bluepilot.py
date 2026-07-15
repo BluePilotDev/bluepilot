@@ -72,6 +72,7 @@ class BluePilotLayoutMici(NavWidget):
     self.clear_model_cache = BigButtonBP("clear crashed model", "", "icons_mici/settings/device/reboot.png")
     self.clear_model_cache.set_click_callback(self._clear_model_cache)
     self.ui_debug_log = BigParamControlBP("ui debug logging", "BPUIDebugLog")
+    self.use_konik = BigParamControlBP("use Konik instead of comma connect", "BPUseKonik")
     self.vbatt_pause_charging = BigParamFloatControl("12V battery limit", "vbatt_pause_charging", min=11.0, max=14.0, step=0.1)
 
     # Hybrid/EV power flow: enable toggle (like C3X) + style dropdown Flat/Round (C4), same pattern as Lower Right Display
@@ -118,6 +119,7 @@ class BluePilotLayoutMici(NavWidget):
       self.disable_dowhill_comp,
       self.clear_model_cache,
       self.ui_debug_log,
+      self.use_konik,
     ])
 
     # Toggle lists
@@ -140,6 +142,7 @@ class BluePilotLayoutMici(NavWidget):
       ("BPUIDebugLog", self.ui_debug_log),
       ("mici_hide_onroad_fade", self.hide_fade),
       ("BPHideOnroadBorder", self.hide_border),
+      ("BPUseKonik", self.use_konik),
     )
 
     ui_state.add_offroad_transition_callback(self._update_toggles)

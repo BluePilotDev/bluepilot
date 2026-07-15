@@ -24,7 +24,15 @@ class PairingDialog(NavWidget):
     self._last_qr_generation = float("-inf")
 
     self._txt_pair = gui_app.texture("icons_mici/settings/device/pair.png", 33, 60)
-    self._pair_label = UnifiedLabel("pair with comma connect", font_size=48, font_weight=FontWeight.BOLD, line_height=0.8)
+    # BluePilot: pair with Konik when the "Use Konik instead of comma connect" toggle is on
+    pair_with = "Konik" if self._use_konik() else "comma connect"
+    self._pair_label = UnifiedLabel(f"pair with {pair_with}", font_size=48, font_weight=FontWeight.BOLD, line_height=0.8)
+
+  def _use_konik(self) -> bool:
+    try:
+      return self._params.get_bool("BPUseKonik")
+    except Exception:
+      return False
 
   def _get_pairing_url(self) -> str:
     try:
@@ -33,7 +41,8 @@ class PairingDialog(NavWidget):
     except Exception as e:
       cloudlog.warning(f"Failed to get pairing token: {e}")
       token = ""
-    return f"https://connect.comma.ai/?pair={token}"
+    host = "stable.konik.ai" if self._use_konik() else "connect.comma.ai"
+    return f"https://{host}/?pair={token}"
 
   def _generate_qr_code(self) -> None:
     try:

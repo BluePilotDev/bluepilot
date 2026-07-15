@@ -74,6 +74,7 @@ class BluePilotLayout(Widget):
       ("disable_BP_long_UI", self._disable_BP_long),
       ("disable_downhill_comp_UI", self._disable_dowhill_comp),
       ("BPUIDebugLog", self._ui_debug_log),
+      ("BPUseKonik", self._use_konik),
     )
 
     ui_state.add_offroad_transition_callback(self._update_toggles)
@@ -362,6 +363,15 @@ class BluePilotLayout(Widget):
       icon="warning.png"
     )
 
+    # Use Konik instead of comma connect toggle
+    self._use_konik = toggle_item(
+      lambda: tr("Use Konik instead of comma connect"),
+      lambda: tr("Send routes, location & telemetry to Konik (stable.konik.ai) instead of comma connect. Reboot to apply, then re-pair at stable.konik.ai."),
+      initial_state=self._safe_get_bool(self._params, "BPUseKonik"),
+      callback=lambda state: self._toggle_callback(state, "BPUseKonik"),
+      icon="warning.png"
+    )
+
     # Disable BP lateral control toggle
     self._disable_BP_lat = toggle_item(
       lambda: tr("Disable BP Lateral Control"),
@@ -413,6 +423,7 @@ class BluePilotLayout(Widget):
       self._preferred_network_btn,
       self._clear_model_cache_btn,
       self._ui_debug_log,
+      self._use_konik,
       SectionHeader(tr("Vehicle")),
       self._show_hands_free_ui,
       self._vbatt_pause_charging,
