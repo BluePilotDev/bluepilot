@@ -202,5 +202,36 @@ class TestInitializeFord(unittest.TestCase):
     self.assertIs(type(CP_SP.safetyParam), int)
 
 
+class TestLowSpeedStallRescue(unittest.TestCase):
+  """With the pinion measurement enabled, stall detection extends below the deviation
+  clip's 9 m/s gate (down to 5 m/s, the ford.h path-offset floor), charging on the raw
+  gap where the clip can never bind. With the flag off, gating is bit-identical to
+  before: nothing charges below 9 m/s (yaw measurement distrust stands)."""
+
+  def _drive_stalled(self, ext, CP, v_ego, frames):
+    # hands-off, measured curvature 0 (wheel straight), planner asking 0.01 -> raw gap
+    # 0.01 > _STALL_GAP_MIN; below 9 m/s the deviation clip is inert so devLim stays False
+    cs = _CS(vEgoRaw=v_ego, vEgo=v_ego, yawRate=0.0, steeringAngleDeg=0.0)
+    for _ in range(frames):
+      ext.update_angle_strategy(_CC(latActive=True), cs, _Actuators(curvature=0.01), CP)
+
+  def test_pinion_rescues_below_clip_gate(self):
+    ext, CP = _pinion_harness(flag=True)
+    self._drive_stalled(ext, CP, v_ego=6.0, frames=12)
+    self.assertEqual(ext.stall_blip_count, 1)  # blip fired from gap-only accumulation
+
+  def test_pinion_inert_below_stall_gate(self):
+    ext, CP = _pinion_harness(flag=True)
+    self._drive_stalled(ext, CP, v_ego=4.5, frames=12)
+    self.assertEqual(ext.stall_blip_count, 0)
+    self.assertEqual(ext.stall_blip_hold_s, 0.0)
+
+  def test_yaw_mode_unchanged_below_gate(self):
+    ext, CP = _pinion_harness(flag=False)
+    self._drive_stalled(ext, CP, v_ego=6.0, frames=12)
+    self.assertEqual(ext.stall_blip_count, 0)
+    self.assertEqual(ext.stall_blip_hold_s, 0.0)
+
+
 if __name__ == '__main__':
   unittest.main()
