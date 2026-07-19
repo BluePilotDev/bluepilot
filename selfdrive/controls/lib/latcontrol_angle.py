@@ -4,7 +4,13 @@ from cereal import log
 from openpilot.selfdrive.controls.lib.latcontrol import LatControl
 
 # TODO This is speed dependent
-STEER_ANGLE_SATURATION_THRESHOLD = 2.5  # Degrees
+# BluePilot tuning experiment: 2.5 -> 3.5 deg. Measured desired-vs-actual lag during
+# normal engaged driving on a Ford Explorer (angle mode, pinion measurement): median
+# ~1.0 deg, p95 ~3.9 deg -- 2.5 sits inside the normal-operation distribution and fires
+# on self-correcting transients (curve entry, PSCM post-press attenuation recovery).
+# 3.5 cuts sustained alert episodes ~60-70% on recorded routes while genuinely
+# at-the-limit driving (hairpin routes) still alerts richly.
+STEER_ANGLE_SATURATION_THRESHOLD = 3.5  # Degrees
 
 
 class LatControlAngle(LatControl):
