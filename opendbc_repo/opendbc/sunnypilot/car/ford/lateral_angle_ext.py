@@ -228,7 +228,15 @@ class LateralAngleExt:
       self.bp_curvature_rate_limited = False
       self.bp_curvature_deviation_limited = False
       self.sim_curvature_last = 0.0
-      self.bp_kappa_cmd = 0.0
+      # Publish the shadow curvature from the measured curvature while inactive. LKA keeps
+      # carrying angle_mode_engaged whenever angle mode is configured (independent of
+      # latActive), and ford.h latches the shadow from every LKA frame -- so the latched
+      # value must track reality here, not sit at a stale zero. Otherwise the first enabled
+      # LMC frame after (re-)engage races LKA's 33Hz latch against LMC's 20Hz enable bit and
+      # ford.h's deviation check compares a zero shadow against real measured curvature.
+      # (ford.h skips the check while steer_control_enabled is 0, so the value is free to
+      # follow the measurement during the inactive period itself.)
+      self.bp_kappa_cmd = self.get_current_curvature(CS)
       self.human_turn_detector.reset()
       self.angle_human_turn_active = False
       self.stall_blip_hold_s = 0.0
@@ -265,9 +273,10 @@ class LateralAngleExt:
       self.bp_curvature_rate_limited = False
       self.bp_curvature_deviation_limited = False
       self.sim_curvature_last = 0.0
-      # Zero the shadow curvature on the wire during the override (mirrors the inactive path);
-      # ford.h skips the deviation check while steer_control_enabled is 0 either way.
-      self.bp_kappa_cmd = 0.0
+      # Truthful shadow during the override (mirrors the inactive path -- see the comment
+      # there): the driver is steering, so the honest command is the car's actual curvature,
+      # and the panda-latched shadow stays current for the re-engage frame.
+      self.bp_kappa_cmd = self.get_current_curvature(CS)
       # Keep exit detection current so resume doesn't compare against a stale pre-turn value.
       self._desired_curvature_last = float(actuators.curvature)
       # A human turn ends any stall episode -- its own mode 0 does the PSCM reset job. That also
@@ -317,7 +326,8 @@ class LateralAngleExt:
       self.bp_curvature_rate_limited = False
       self.bp_curvature_deviation_limited = False
       self.sim_curvature_last = 0.0
-      self.bp_kappa_cmd = 0.0
+      # Truthful shadow during the blip (see the inactive-path comment).
+      self.bp_kappa_cmd = self.get_current_curvature(CS)
       self._desired_curvature_last = float(actuators.curvature)
       self.precision_type = 1
       if self.stall_blip_frames_left <= 0:
@@ -427,7 +437,7 @@ class LateralAngleExt:
     # routinely, not just on genuine pothole/override divergence. Curvature mode has always clipped
     # here; this brings angle mode's actual steering intent in line with that proven behavior rather
     # than only clipping the value reported to panda (which would make the check a no-op).
-    current_curvature = -CS.out.yawRate / max(v_ego, 0.1)
+    current_curvature = self.get_current_curvature(CS)
     self.bp_curvature_deviation_limited = False
     if v_ego > 9:
       _kappa_cmd_pre_error_clip = kappa_cmd
@@ -505,7 +515,13 @@ class LateralAngleExt:
     # BluePilot: the error-clipped kappa path_angle was derived from -- carcontroller.py reads this
     # as shadow_curvature for ford.h's angle-mode deviation check (see fordcan_ext.create_lka_msg).
     # Not just telemetry: an actively-consumed value, unlike the removed *_kappa_cmd_raw stubs.
-    self.bp_kappa_cmd = kappa_cmd
+    # While the driver is pressing (before the human-turn override latches), the clipped planner
+    # kappa can't follow the wheel: the driver moves the measured curvature faster than the
+    # deviation clip tracks it, so the shadow can exit ford.h's error band mid-curve -- the one
+    # in-drive lateral safety block observed across ~3h of replayed road-test routes was exactly
+    # this (driver fighting a sustained curve with the mode still enabled). The honest command
+    # during a press is the driver's actual curvature.
+    self.bp_kappa_cmd = self.get_current_curvature(CS) if CS.out.steeringPressed else kappa_cmd
 
     # BluePilot: would the equivalent curvature (kappa_cmd) have been rate-limited by curvature-mode's
     # ROC (apply_std_steer_angle_limits)? kappa_cmd is already error-clipped above (same clip

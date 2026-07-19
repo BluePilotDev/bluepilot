@@ -230,6 +230,17 @@ class LateralCurvExt:
     # branch LateralCurvExt state is initialized eagerly in __init__, so nothing to do here.
     pass
 
+  def get_current_curvature(self, CS):
+    """Measured curvature of the car right now (OP sign convention).
+
+    The single measurement source for every BluePilot lateral consumer: the deviation
+    clip, the stall detector, and the shadow curvature published to ford.h's angle-mode
+    deviation check. Sourced from the RCM yaw rate -- the same family ford.h derives its
+    angle_meas from. The shadow value judged against that check must always come from
+    the same measurement as the check's own reference, so route all reads through here.
+    """
+    return -CS.out.yawRate / max(CS.out.vEgoRaw, 0.1)
+
   def update_sm(self):
     """Update SubMaster and vehicle model. Called each frame before lateral/long update."""
     self.sm.update(0)
@@ -285,7 +296,7 @@ class LateralCurvExt:
       self.pc_blend_ratio_v = [self.pc_blend_ratio_low_C, self.pc_blend_ratio_high_C]
 
       # Current and desired curvature
-      current_curvature = -CS.out.yawRate / max(CS.out.vEgoRaw, 0.1)
+      current_curvature = self.get_current_curvature(CS)
       desired_curvature = actuators.curvature
 
       # Extract predicted curvature from modelV2
