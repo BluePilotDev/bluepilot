@@ -90,6 +90,9 @@ class CarStateExt:
     self.cruise_enabled_prev = False
     # Track if mainCruise was pressed recently (to handle delayed cruise enable)
     self.main_cruise_pressed_recently = False
+    # Latches True once Lane_Assist_Data3_FD1 is seen — the message is non-critical in the
+    # parser, so cp.vl would otherwise report zeros on cars that never broadcast it
+    self.lane_assist_data3_seen = False
 
   def update(self, ret: structs.CarState, ret_sp: structs.CarStateSP, can_parsers: dict[StrEnum, CANParser]):
     """
@@ -339,6 +342,23 @@ class CarStateExt:
 
     brake_light_status.dataAvailable = False
     brake_light_status.brakeLightsOn = False
+
+    pscm_lat_ctl = dat.carStateBP.pscmLatCtl
+    pscm_lat_ctl.dataAvailable = False
+
+    # PSCM lateral-control status (Lane_Assist_Data3_FD1)
+    try:
+      if len(cp.vl_all["Lane_Assist_Data3_FD1"]["LaActAvail_D_Actl"]) > 0:
+        self.lane_assist_data3_seen = True
+      if self.lane_assist_data3_seen:
+        lad3 = cp.vl["Lane_Assist_Data3_FD1"]
+        pscm_lat_ctl.dataAvailable = True
+        pscm_lat_ctl.laActAvail = int(lad3["LaActAvail_D_Actl"])
+        pscm_lat_ctl.laActDeny = bool(lad3["LaActDeny_B_Actl"])
+        pscm_lat_ctl.laHandsOff = bool(lad3["LaHandsOff_B_Actl"])
+        pscm_lat_ctl.tjaHandsOnConfidence = bool(lad3["TjaHandsOnCnfdnc_B_Est"])
+    except (KeyError, AttributeError):
+      pass
 
     # Brake light status — try BCM message first, then fallback to BrakeSysFeatures_2
     brake_lights_detected = False

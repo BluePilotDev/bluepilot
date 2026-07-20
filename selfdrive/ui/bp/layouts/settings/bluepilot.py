@@ -70,6 +70,7 @@ class BluePilotLayout(Widget):
     self._refresh_toggles = (
       ("send_hands_free_cluster_msg", self._show_hands_free_ui),
       ("FordPrefSteerAngleCurvature", self._steer_angle_curvature),
+      ("FordPrefHideSteerSaturatedAlerts", self._hide_steer_sat_alerts),
       ("BPDisableLaneLineStatusColor", self._disable_lane_line_status_color),
       ("BPHideCameraView", self._hide_camera_view),
       ("BPRadRacerTheme", self._rad_racer_theme),
@@ -118,6 +119,14 @@ class BluePilotLayout(Widget):
       lambda: tr('Measures how the car is turning from the steering pinion angle sensor instead of a faulty RCM yaw sensor (symptoms: "Turn Exceeds Steering Limit" warnings, weak curve tracking, "Service AdvanceTrac"). Check with tools/ford_yaw_health_check.py. Applies the next time the car starts. Not available on the Edge.'),
       initial_state=self._safe_get_bool(self._params, "FordPrefSteerAngleCurvature"),
       callback=lambda state: self._toggle_callback(state, "FordPrefSteerAngleCurvature"),
+      icon="monitoring.png"
+    )
+
+    self._hide_steer_sat_alerts = toggle_item(
+      lambda: tr("Hide Steering-Limit Alerts While Holding the Wheel"),
+      lambda: tr('Hides the "Turn Exceeds Steering Limit" warning only while the power steering itself reports your hands on the wheel. Light pressure against the turn usually triggers these warnings, and the steering rack detects that grip well below the pressure the driving software needs. If the rack reports hands-off, the warning always shows.'),
+      initial_state=self._safe_get_bool(self._params, "FordPrefHideSteerSaturatedAlerts"),
+      callback=lambda state: self._toggle_callback(state, "FordPrefHideSteerSaturatedAlerts"),
       icon="monitoring.png"
     )
 
@@ -655,6 +664,7 @@ class BluePilotLayout(Widget):
       _section(tr("Vehicle"), [
         self._show_hands_free_ui,
         self._steer_angle_curvature,
+        self._hide_steer_sat_alerts,
         self._vbatt_pause_charging,
       ]) +
       _section(tr("Audio"), [
