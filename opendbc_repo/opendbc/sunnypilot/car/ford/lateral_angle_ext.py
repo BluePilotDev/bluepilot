@@ -139,6 +139,15 @@ _PSCM_SAT_UNWIND_RATE = 0.02        # rad/call (0.02 * 20Hz = 0.40 rad/s)
 # see the in-line comment at the detection site for why it is not simply direction-agnostic.
 _STEER_DT = CarControllerParams.STEER_STEP * DT_CTRL  # 20 Hz lateral tick (matches human_turn.py)
 _STALL_GAP_MIN = 2.0 * CarControllerParams.CURVATURE_ERROR  # desired/measured must diverge by 2x the clip tolerance
+# A stall is a FRACTIONAL failure, not just an absolute gap: during an honest deep-curve
+# entry the car tracks at 0.7-0.85x of a large, fast-rising demand, which clears
+# _STALL_GAP_MIN on magnitude alone -- and a mid-curve pulse releases steering exactly
+# when the car is already behind (observed on-road: two such fires in one windy section,
+# each followed by the driver grabbing the wheel within 0.2 s). True stalls measure
+# 0.28-0.59x delivered across every diagnosed route; entry transients 0.64x and above.
+# (Ported from upstream PR #148; applies to the classic branch only -- the drift branch
+# below has its own near-straight guard and fires when measured LEADS desired.)
+_STALL_DELIVERY_FRACTION = 0.65
 _STALL_HOLD_S = 0.5          # accumulated divergence time before a pulse fires
 _STALL_BLIP_FRAMES = 6       # mode-0 pulse length (6 frames @ 20 Hz = 300 ms; PSCM acked mode 0 in ~150 ms on-road)
 _STALL_COOLDOWN_S = 2.0      # re-arm delay after a pulse (release ramp + PSCM response time)
@@ -266,7 +275,15 @@ class LateralAngleExt:
       self.bp_curvature_rate_limited = False
       self.bp_curvature_deviation_limited = False
       self.sim_curvature_last = 0.0
-      self.bp_kappa_cmd = 0.0
+      # Publish the shadow curvature from the measured curvature while inactive. LKA keeps
+      # carrying angle_mode_engaged whenever angle mode is configured (independent of
+      # latActive), and ford.h latches the shadow from every LKA frame -- so the latched
+      # value must track reality here, not sit at a stale zero. Otherwise the first enabled
+      # LMC frame after (re-)engage races LKA's 33Hz shadow latch against LMC's 20Hz enable
+      # bit and ford.h's deviation check compares a zero shadow against real measured
+      # curvature. (ford.h skips the check while steer_control_enabled is 0, so the value is
+      # free to follow the measurement during the inactive period itself.) Upstream PR #144.
+      self.bp_kappa_cmd = self.get_current_curvature(CS)
       self.human_turn_detector.reset()
       self.angle_human_turn_active = False
       self.stall_blip_hold_s = 0.0
@@ -303,9 +320,10 @@ class LateralAngleExt:
       self.bp_curvature_rate_limited = False
       self.bp_curvature_deviation_limited = False
       self.sim_curvature_last = 0.0
-      # Zero the shadow curvature on the wire during the override (mirrors the inactive path);
-      # ford.h skips the deviation check while steer_control_enabled is 0 either way.
-      self.bp_kappa_cmd = 0.0
+      # Truthful shadow during the override (mirrors the inactive path -- see the comment
+      # there): the driver is steering, so the honest command is the car's actual curvature,
+      # and the panda-latched shadow stays current for the re-engage frame. Upstream PR #144.
+      self.bp_kappa_cmd = self.get_current_curvature(CS)
       # Keep exit detection current so resume doesn't compare against a stale pre-turn value.
       self._desired_curvature_last = float(actuators.curvature)
       # A human turn ends any stall episode -- its own mode 0 does the PSCM reset job. That also
@@ -355,7 +373,8 @@ class LateralAngleExt:
       self.bp_curvature_rate_limited = False
       self.bp_curvature_deviation_limited = False
       self.sim_curvature_last = 0.0
-      self.bp_kappa_cmd = 0.0
+      # Truthful shadow during the blip (see the inactive-path comment). Upstream PR #144.
+      self.bp_kappa_cmd = self.get_current_curvature(CS)
       self._desired_curvature_last = float(actuators.curvature)
       self.precision_type = 1
       if self.stall_blip_frames_left <= 0:
@@ -465,7 +484,7 @@ class LateralAngleExt:
     # routinely, not just on genuine pothole/override divergence. Curvature mode has always clipped
     # here; this brings angle mode's actual steering intent in line with that proven behavior rather
     # than only clipping the value reported to panda (which would make the check a no-op).
-    current_curvature = -CS.out.yawRate / max(v_ego, 0.1)
+    current_curvature = self.get_current_curvature(CS)
     self.bp_curvature_deviation_limited = False
     if v_ego > 9:
       _kappa_cmd_pre_error_clip = kappa_cmd
@@ -565,7 +584,13 @@ class LateralAngleExt:
     # BluePilot: the error-clipped kappa path_angle was derived from -- carcontroller.py reads this
     # as shadow_curvature for ford.h's angle-mode deviation check (see fordcan_ext.create_lka_msg).
     # Not just telemetry: an actively-consumed value, unlike the removed *_kappa_cmd_raw stubs.
-    self.bp_kappa_cmd = kappa_cmd
+    # While the driver is pressing (before the human-turn override latches), the clipped planner
+    # kappa can't follow the wheel: the driver moves the measured curvature faster than the
+    # deviation clip tracks it, so the shadow can exit ford.h's error band mid-curve -- the only
+    # in-drive lateral safety blocks observed across ~4.5h of replayed routes were exactly this
+    # (driver fighting a sustained curve with the mode still enabled). The honest command during
+    # a press is the driver's actual curvature. Upstream PR #144.
+    self.bp_kappa_cmd = self.get_current_curvature(CS) if CS.out.steeringPressed else kappa_cmd
 
     # BluePilot: would the equivalent curvature (kappa_cmd) have been rate-limited by curvature-mode's
     # ROC (apply_std_steer_angle_limits)? kappa_cmd is already error-clipped above (same clip
@@ -583,7 +608,11 @@ class LateralAngleExt:
     self.stall_blip_cooldown_s = max(0.0, self.stall_blip_cooldown_s - _STEER_DT)
     _stall_gap = desired_curvature - current_curvature
     # Two stall directions (see module docstring):
-    #   classic -- "car won't turn enough": desired leads measured (the original condition).
+    #   classic -- "car won't turn enough": the car is delivering under _STALL_DELIVERY_FRACTION of
+    #              the demand. Fractional, not just desired-leads-measured: an honest deep-curve
+    #              entry transient (0.7-0.85x of a large, fast-rising demand) clears the absolute
+    #              gap threshold on magnitude alone, and a mode-0 pulse mid-curve releases steering
+    #              exactly when the car is already behind (upstream PR #148's on-road evidence).
     #   drift   -- "car turns when it shouldn't": measured leads while the model wants ~straight.
     # The drift branch is deliberately narrow: it also requires |desired| to be inside the deviation
     # clip's own noise band, i.e. the model is genuinely commanding near-straight. Without that guard,
@@ -592,7 +621,7 @@ class LateralAngleExt:
     # 4-6 extra blips per minute in curve-rich stretches, and a 300 ms mode-0 gap mid-exit is itself a
     # hazard. With the guard, replay fires exactly one extra blip per logged drift incident, ~1.4 s
     # before the driver had to intervene, and none during curve entries/exits.
-    _stalled_classic = abs(desired_curvature) > abs(current_curvature)
+    _stalled_classic = abs(current_curvature) < _STALL_DELIVERY_FRACTION * abs(desired_curvature)
     _stalled_drift = (abs(desired_curvature) <= abs(current_curvature)
                       and abs(desired_curvature) < 1.5 * CarControllerParams.CURVATURE_ERROR)
     _stalled = (not CS.out.steeringPressed and not self.lane_change and v_ego > 9.0
