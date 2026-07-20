@@ -225,6 +225,9 @@ class CarState(CarStateBase, MadsCarState, CarStateExt):
     else:
       pt_messages += [
         ("INSTRUMENT_PANEL", 1),
+        # BluePilot: PSCM LatCtl status telemetry — broadcast by CAN platforms too (measured 33Hz on
+        # Ford Q3), but presence isn't guaranteed fleet-wide, so keep it out of CAN validity
+        ("Lane_Assist_Data3_FD1", float('nan')),
       ]
 
     if CP.transmissionType == TransmissionType.automatic:
