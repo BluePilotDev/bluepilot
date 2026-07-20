@@ -6,10 +6,12 @@ from openpilot.selfdrive.ui.onroad.model_renderer import ModelRenderer, LeadVehi
 from openpilot.selfdrive.ui.bp.onroad.chevron_metrics_bp import ChevronMetricsBP
 from openpilot.selfdrive.ui.ui_state import ui_state, UIStatus
 from openpilot.system.ui.lib.application import gui_app
-from openpilot.system.ui.lib.shader_polygon import draw_polygon
+from openpilot.system.ui.lib.shader_polygon import draw_polygon, Gradient
 # BluePilot: Rainbow shader moved to BP module after upstream removal
 from openpilot.bluepilot.ui.lib.bp_shaders import draw_rainbow_polygon
 from openpilot.selfdrive.ui.bp.lib.ui_debug_logger import bp_ui_log
+# BluePilot: seasonal theme packs (colors.json overrides for road colors)
+from openpilot.selfdrive.ui.bp.lib import theme_pack
 
 # BluePilot: Lane line colors by status (upstream removed LANE_LINE_COLORS dict)
 LANE_LINE_COLORS_BP = {
@@ -68,9 +70,11 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
     self._hide_camera_view = self._bp_params.get_bool("BPHideCameraView")
     self._rainbow_lane_lines = self._bp_params.get_bool("BPRainbowLines")
     # BluePilot: Rad Racer 8-bit theme (green game road, dash scroll animation state)
-    self._rad_racer = self._bp_params.get_bool("BPRadRacerTheme")
+    self._rad_racer = theme_pack.rad_racer_active(self._bp_params)
     self._dash_phase = 0.0
     self._transform_dirty = True
+    # BluePilot: seasonal theme pack (None when disabled)
+    self._theme_pack = theme_pack.get_active_pack(force=True)
 
     # BluePilot: Lead position smoothing filters to reduce radar jitter
     dt = 1 / gui_app.target_fps
@@ -99,7 +103,7 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
       self._transform_dirty = True
     self._hide_camera_view = hide_camera_view
 
-    rad_racer = self._bp_params.get_bool("BPRadRacerTheme")
+    rad_racer = theme_pack.rad_racer_active(self._bp_params)
     if rad_racer != self._rad_racer:
       self._transform_dirty = True
     self._rad_racer = rad_racer
@@ -107,6 +111,10 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
     self.ford_overlay_enabled = self._bp_params.get_bool("FordPrefShowRadarLeadOverlay")
     self._disable_lane_line_status_color = self._bp_params.get_bool("BPDisableLaneLineStatusColor")
     self._rainbow_lane_lines = self._bp_params.get_bool("BPRainbowLines")
+    new_pack = theme_pack.get_active_pack()
+    if (new_pack is None) != (self._theme_pack is None):
+      self._transform_dirty = True  # themed lane widths differ; re-project on toggle
+    self._theme_pack = new_pack
 
   def _render(self, rect: rl.Rectangle):
     sm = ui_state.sm
@@ -261,7 +269,7 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
     for i, lane_line in enumerate(self._lane_lines):
       is_current_lane = (i == 1 or i == 2)
       lane_line_width = LANE_LINE_WIDTH
-      if self._hide_camera_view or self._rad_racer:
+      if self._hide_camera_view or self._rad_racer or self._theme_pack is not None:
         lane_line_width = MINIMAL_VIEW_LANE_LINE_WIDTH if is_current_lane else MINIMAL_VIEW_OUTER_LANE_LINE_WIDTH
       lane_line.projected_points = self._map_line_to_polygon(
         lane_line.raw_points, lane_line_width * self._lane_line_probs[i], 0.0, max_idx, max_distance
@@ -270,8 +278,10 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
     # BluePilot: Rad Racer solid outer lines are thicker than minimal view
     if self._rad_racer:
       road_edge_width = RAD_RACER_ROAD_EDGE_WIDTH
+    elif self._hide_camera_view or self._theme_pack is not None:
+      road_edge_width = MINIMAL_VIEW_ROAD_EDGE_WIDTH
     else:
-      road_edge_width = MINIMAL_VIEW_ROAD_EDGE_WIDTH if self._hide_camera_view else ROAD_EDGE_WIDTH
+      road_edge_width = ROAD_EDGE_WIDTH
     for road_edge in self._road_edges:
       road_edge.projected_points = self._map_line_to_polygon(road_edge.raw_points, road_edge_width, 0.0, max_idx, max_distance)
 
@@ -338,6 +348,12 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
     if ui_state.status == UIStatus.DISENGAGED:
       return rl.Color(0, 0, 0, 255)
 
+    # BluePilot: theme pack lane color replaces status/white coloring (disengaged stays black)
+    if self._theme_pack is not None:
+      pack_color = self._theme_pack.rl_colors().get("LaneLines")
+      if pack_color is not None:
+        return pack_color
+
     if not is_current_lane or self._disable_lane_line_status_color:
       return rl.Color(255, 255, 255, 255)
 
@@ -371,7 +387,8 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
       if road_edge.projected_points.size == 0:
         continue
       edge_alpha = np.clip(1.0 - self._road_edge_stds[i], 0.0, 1.0) * 0.6
-      color = rl.Color(255, 0, 0, int(edge_alpha * 255))
+      edge_base = self._road_edge_base_color()
+      color = rl.Color(edge_base.r, edge_base.g, edge_base.b, int(edge_alpha * 255))
       draw_polygon(self._rect, road_edge.projected_points, color)
 
     self._draw_road_edge_glow_effects()
@@ -394,9 +411,19 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
       base_color = self._get_ll_color(float(self._lane_line_probs[i]), is_current_lane)
       expanded_points = self._expand_polygon(lane_line.projected_points, 12.0)
       if expanded_points.size > 0:
-        alpha = int(base_alpha * 0.12 * 255)
+        # Themed lanes get a stronger halo so the pack color reads as glow, not just a line
+        glow_mult = 0.22 if self._theme_pack is not None else 0.12
+        alpha = int(base_alpha * glow_mult * 255)
         color = rl.Color(base_color.r, base_color.g, base_color.b, alpha)
         draw_polygon(self._rect, expanded_points, color)
+
+  def _road_edge_base_color(self) -> rl.Color:
+    """Road edge color: theme pack RoadEdges when set, stock red otherwise."""
+    if self._theme_pack is not None:
+      pack_color = self._theme_pack.rl_colors().get("RoadEdges")
+      if pack_color is not None:
+        return pack_color
+    return rl.Color(255, 0, 0, 255)
 
   def _rainbow_lane_lines_active(self, sm) -> bool:
     """Return true when inner lane lines should use the rainbow shader."""
@@ -421,8 +448,10 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
         continue
       expanded_points = self._expand_polygon(road_edge.projected_points, 18.0)
       if expanded_points.size > 0:
-        alpha = int(edge_alpha * 0.08 * 255)
-        color = rl.Color(255, 0, 0, alpha)
+        glow_mult = 0.16 if self._theme_pack is not None else 0.08
+        alpha = int(edge_alpha * glow_mult * 255)
+        edge_base = self._road_edge_base_color()
+        color = rl.Color(edge_base.r, edge_base.g, edge_base.b, alpha)
         draw_polygon(self._rect, expanded_points, color)
 
   def _expand_polygon(self, points: np.ndarray, width: float) -> np.ndarray:
@@ -488,10 +517,33 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
 
     if ui_state.rainbow_path:
       draw_rainbow_polygon(self._rect, self._path.projected_points, rainbow_v=self._rainbow_v)
+    elif (themed_gradient := self._themed_path_gradient()) is not None:
+      # BluePilot: theme pack path colors replace the throttle/no-throttle gradient
+      draw_polygon(self._rect, self._path.projected_points, gradient=themed_gradient)
     else:
       super()._draw_path(sm)
 
     self._draw_path_edges()
+
+  def _themed_path_gradient(self) -> Gradient | None:
+    """Bottom-to-top path gradient from the active theme pack, or None.
+
+    PathEdge tints the near end, Path carries the ribbon and fades out at the horizon —
+    same alpha profile as the stock throttle gradient so depth perception is unchanged.
+    """
+    if self._theme_pack is None:
+      return None
+    colors = self._theme_pack.rl_colors()
+    path = colors.get("Path")
+    if path is None:
+      return None
+    edge = colors.get("PathEdge", path)
+    return Gradient(
+      start=(0.0, 1.0),
+      end=(0.0, 0.0),
+      colors=[rl.Color(edge.r, edge.g, edge.b, 190), rl.Color(path.r, path.g, path.b, 150), rl.Color(path.r, path.g, path.b, 30)],
+      stops=[0.0, 0.5, 1.0],
+    )
 
   def _draw_path_edges(self):
     """Draw path edges (left, right, and front) with status-based colors.
@@ -510,7 +562,11 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
     left_edge = points[:mid_point]
     right_edge = points[mid_point:][::-1]
 
-    if self._disable_lane_line_status_color and ui_state.status != UIStatus.DISENGAGED:
+    pack_edge = self._theme_pack.rl_colors().get("PathEdge") if self._theme_pack is not None else None
+    if pack_edge is not None and ui_state.status != UIStatus.DISENGAGED:
+      # BluePilot: theme pack path edge color (disengaged keeps the status blackout)
+      edge_color = pack_edge
+    elif self._disable_lane_line_status_color and ui_state.status != UIStatus.DISENGAGED:
       edge_color = rl.Color(255, 255, 255, 255)
     else:
       edge_color = LANE_LINE_COLORS_BP.get(ui_state.status, LANE_LINE_COLORS_BP[UIStatus.DISENGAGED])
@@ -581,8 +637,11 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
                                  LEAD_RADAR_CHEVRON_BASE.b, lead.fill_alpha)
       else:
         glow_color = LEAD_VISION_GLOW
-        chevron_color = rl.Color(LEAD_VISION_CHEVRON_BASE.r, LEAD_VISION_CHEVRON_BASE.g,
-                                 LEAD_VISION_CHEVRON_BASE.b, lead.fill_alpha)
+        # BluePilot: theme pack lead marker color for vision leads (radar leads stay blue)
+        vision_base = LEAD_VISION_CHEVRON_BASE
+        if self._theme_pack is not None:
+          vision_base = self._theme_pack.rl_colors().get("LeadMarker", vision_base)
+        chevron_color = rl.Color(vision_base.r, vision_base.g, vision_base.b, lead.fill_alpha)
 
       rl.draw_triangle_fan(lead.glow, len(lead.glow), glow_color)
       rl.draw_triangle_fan(lead.chevron, len(lead.chevron), chevron_color)

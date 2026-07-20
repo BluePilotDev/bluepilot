@@ -6,6 +6,8 @@ from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.selfdrive.ui.sunnypilot.onroad.chevron_metrics import ChevronMetrics, ChevronOptions
 from openpilot.system.ui.lib.text_measure import measure_text_cached
 from openpilot.selfdrive.ui.bp.lib.ui_debug_logger import bp_ui_log
+# BluePilot: seasonal theme packs (LeadMarker recolors the vision-lead box border)
+from openpilot.selfdrive.ui.bp.lib import theme_pack
 
 # BluePilot: Inversion thresholds for radar overlay (close-proximity mode)
 # When lead is closer than INVERT_UNDER_M, overlay moves to top with chevron flipped
@@ -145,15 +147,19 @@ class ChevronMetricsBP(ChevronMetrics):
       else:
         y = chevron_y + CHEVRON_H
 
-      # Border color: blue for radar, red for vision
+      # Border color: blue for radar, red (or theme pack LeadMarker) for vision
       if is_radar:
         glow_color = LEAD_RADAR_GLOW
         border_color = rl.Color(RADAR_BORDER_COLOR_BASE.r, RADAR_BORDER_COLOR_BASE.g,
                                 RADAR_BORDER_COLOR_BASE.b, alpha)
       else:
-        glow_color = LEAD_VISION_GLOW
-        border_color = rl.Color(VISION_BORDER_COLOR_BASE.r, VISION_BORDER_COLOR_BASE.g,
-                                VISION_BORDER_COLOR_BASE.b, alpha)
+        vision_base, glow_color = VISION_BORDER_COLOR_BASE, LEAD_VISION_GLOW
+        pack = theme_pack.get_active_pack()
+        if pack is not None:
+          pack_marker = pack.rl_colors().get("LeadMarker")
+          if pack_marker is not None:
+            vision_base = glow_color = pack_marker
+        border_color = rl.Color(vision_base.r, vision_base.g, vision_base.b, alpha)
 
       border_thickness = max(2, int(6 * scale))
       # Gap between triangle outline and box edge so the outline doesn't bleed into the box

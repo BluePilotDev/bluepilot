@@ -1,7 +1,10 @@
 import pyray as rl
 from openpilot.common.params import Params
 from opendbc.sunnypilot.car.ford.lateral_curv_ext import PrimaryLateralControl
-from openpilot.selfdrive.ui.mici.onroad.hud_renderer import HudRenderer
+from openpilot.selfdrive.ui.mici.onroad.hud_renderer import (
+  HudRenderer, FONT_SIZES, KM_TO_MILE, CRUISE_DISABLED_CHAR, SET_SPEED_PERSISTENCE,
+)
+from openpilot.system.ui.lib.multilang import tr
 from openpilot.selfdrive.ui.bp.mici.onroad.powerflow_gauge import MiciPowerflowGauge
 from openpilot.selfdrive.ui.ui_state import ui_state, UIStatus
 from openpilot.selfdrive.ui.bp.lib.steering_wheel_style import (
@@ -10,6 +13,8 @@ from openpilot.selfdrive.ui.bp.lib.steering_wheel_style import (
   SteeringWheelIconStyle,
 )
 from openpilot.selfdrive.ui.bp.lib.ui_debug_logger import bp_ui_log
+# BluePilot: seasonal theme packs (steering wheel icon override)
+from openpilot.selfdrive.ui.bp.lib import theme_pack
 from openpilot.system.ui.lib.text_measure import measure_text_cached
 from openpilot.system.ui.lib.application import gui_app
 from openpilot.bluepilot.ui.lib.bp_shaders import draw_shader_circle_gradient
@@ -29,6 +34,7 @@ class MiciHudRendererBP(HudRenderer):
     self._txt_wheel_comma_3x = gui_app.texture("icons/chffr_wheel.png", self._txt_wheel.width, self._txt_wheel.height)
     self._animate_steering_wheel = self._bp_params.get_bool("BPAnimateSteeringWheel")
     self._wheel_icon_style = ensure_steering_wheel_icon_style_initialized(self._bp_params, SteeringWheelIconStyle.COMMA_4)
+    self._theme_pack = theme_pack.get_active_pack(force=True)
     self._animate_wheel_param_counter = 0
     self.show_lateral_control = False
     self.disable_bp_lat = True
@@ -47,6 +53,7 @@ class MiciHudRendererBP(HudRenderer):
       self._animate_wheel_param_counter = 0
       self._animate_steering_wheel = self._bp_params.get_bool("BPAnimateSteeringWheel")
       self._wheel_icon_style = get_steering_wheel_icon_style(self._bp_params, SteeringWheelIconStyle.COMMA_4)
+      self._theme_pack = theme_pack.get_active_pack()
 
     if self._bp_params.get_bool("ShowBrakeStatus"):
       sm = ui_state.sm
@@ -78,6 +85,11 @@ class MiciHudRendererBP(HudRenderer):
   def _draw_steering_wheel(self, rect: rl.Rectangle) -> None:
     """Override to add brake status coloring to wheel icon, powerflow gauge, and lateral control overlay."""
     normal_wheel_txt = self._txt_wheel_comma_3x if self._wheel_icon_style == SteeringWheelIconStyle.COMMA_3X else self._txt_wheel
+    # BluePilot: theme pack steering wheel icon wins over the built-in styles
+    if self._theme_pack is not None:
+      pack_wheel = self._theme_pack.wheel_texture(self._txt_wheel.width)
+      if pack_wheel is not None:
+        normal_wheel_txt = pack_wheel
     # BluePilot: Preserve the upstream critical-alert wheel regardless of the user's normal wheel style.
     wheel_txt = self._txt_wheel_critical if self._show_wheel_critical else normal_wheel_txt
 
@@ -138,6 +150,36 @@ class MiciHudRendererBP(HudRenderer):
       wheel_txt.height + power_flow_radius * 2)
     self._power_flow.set_wheel_rect(power_rect)
     self._power_flow.render(rect)
+
+  def _draw_set_speed(self, rect: rl.Rectangle) -> None:
+    """Upstream set-speed drawing, with the theme pack Accent tinting the value text."""
+    accent = self._theme_pack.rl_colors().get("Accent") if self._theme_pack is not None else None
+    if accent is None:
+      super()._draw_set_speed(rect)
+      return
+
+    alpha = self._set_speed_alpha_filter.update(0 < rl.get_time() - self._set_speed_changed_time < SET_SPEED_PERSISTENCE and
+                                                self._can_draw_top_icons and self._engaged)
+    if alpha < 1e-2:
+      return
+
+    x, y = rect.x, rect.y
+    circle_radius = 162 // 2
+    rl.draw_circle_gradient(rl.Vector2(x + circle_radius, y + circle_radius), circle_radius,
+                            rl.Color(0, 0, 0, int(255 / 2 * alpha)), rl.BLANK)
+
+    set_speed_color = rl.Color(accent.r, accent.g, accent.b, int(255 * 0.9 * alpha))
+    max_color = rl.Color(255, 255, 255, int(255 * 0.9 * alpha))
+
+    set_speed = self.set_speed
+    if self.is_cruise_set and not ui_state.is_metric:
+      set_speed *= KM_TO_MILE
+
+    set_speed_text = CRUISE_DISABLED_CHAR if not self.is_cruise_set else str(round(set_speed))
+    rl.draw_text_ex(self._font_display, set_speed_text, rl.Vector2(x + 13 + 4, y + 3 - 8 - 3 + 4),
+                    FONT_SIZES.set_speed, 0, set_speed_color)
+    rl.draw_text_ex(self._font_semi_bold, tr("MAX"), rl.Vector2(x + 25, y + FONT_SIZES.set_speed - 7 + 4),
+                    FONT_SIZES.max_speed, 0, max_color)
 
   def _draw_lateral_control_overlay(self, center_x: int, center_y: int, wheel_size: int) -> None:
     """Draw a letter overlay indicating current lateral control mode (only when wheel is visible)."""

@@ -9,6 +9,8 @@ from openpilot.system.ui.lib.shader_polygon import draw_polygon, Gradient
 from openpilot.bluepilot.ui.lib.bp_shaders import draw_rainbow_polygon
 # BluePilot: Rad Racer 8-bit road, shared with the TICI renderer
 from openpilot.selfdrive.ui.bp.onroad.rad_racer_road import RadRacerRoadMixin, RAD_RACER_DASH_LEN_M, RAD_RACER_GAP_LEN_M
+# BluePilot: seasonal theme packs (colors.json overrides for road colors)
+from openpilot.selfdrive.ui.bp.lib import theme_pack
 
 class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
   def __init__(self):
@@ -18,8 +20,10 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
     self._disable_lane_line_status_color = self._bp_params.get_bool("BPDisableLaneLineStatusColor")
     self._rainbow_lane_lines = self._bp_params.get_bool("BPRainbowLines")
     # BluePilot: Rad Racer 8-bit theme (green game road; dash scroll animation state)
-    self._rad_racer = self._bp_params.get_bool("BPRadRacerTheme")
+    self._rad_racer = theme_pack.rad_racer_active(self._bp_params)
     self._dash_phase = 0.0
+    # BluePilot: seasonal theme pack (None when disabled)
+    self._theme_pack = theme_pack.get_active_pack(force=True)
 
   def prepare_projection(self, rect: rl.Rectangle) -> None:
     """Set clip region so _map_to_screen works before render().
@@ -38,7 +42,8 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
     if self._counter % 60 == 0:
       self._disable_lane_line_status_color = self._bp_params.get_bool("BPDisableLaneLineStatusColor")
       self._rainbow_lane_lines = self._bp_params.get_bool("BPRainbowLines")
-      self._rad_racer = self._bp_params.get_bool("BPRadRacerTheme")
+      self._rad_racer = theme_pack.rad_racer_active(self._bp_params)
+      self._theme_pack = theme_pack.get_active_pack()
 
     if ui_state.rainbow_path or self._rainbow_lane_lines:
       v = sm['carState'].vEgo
@@ -55,8 +60,46 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
       return
     if ui_state.rainbow_path:
       draw_rainbow_polygon(self._rect, self._path.projected_points, rainbow_v=self._rainbow_v)
+    elif (themed_gradient := self._themed_path_gradient()) is not None:
+      # BluePilot: theme pack path colors replace the throttle/no-throttle gradient
+      if not self._path.projected_points.size:
+        return
+      path_pts = self._path.projected_points + np.array([self._rect.x, self._rect.y], dtype=np.float32)
+      if ui_state.status == UIStatus.DISENGAGED:
+        draw_polygon(self._rect, path_pts, rl.Color(0, 0, 0, 90))
+      else:
+        draw_polygon(self._rect, path_pts, gradient=themed_gradient)
     else:
       super()._draw_path(sm)
+
+  def _themed_path_gradient(self) -> Gradient | None:
+    """Bottom-to-top path gradient from the active theme pack, or None.
+
+    PathEdge tints the near end, Path carries the ribbon and fades out at the horizon —
+    same alpha profile as the stock throttle gradient so depth perception is unchanged.
+    """
+    if self._theme_pack is None:
+      return None
+    colors = self._theme_pack.rl_colors()
+    path = colors.get("Path")
+    if path is None:
+      return None
+    edge = colors.get("PathEdge", path)
+    return Gradient(
+      start=(0.0, 1.0),
+      end=(0.0, 0.0),
+      colors=[rl.Color(edge.r, edge.g, edge.b, 190), rl.Color(path.r, path.g, path.b, 150), rl.Color(path.r, path.g, path.b, 30)],
+      stops=[0.0, 0.5, 1.0],
+    )
+
+  def _get_ll_color(self, prob: float, adjacent: bool, left: bool):
+    """BluePilot: theme pack lane color with upstream's confidence-based alpha (disengaged stays black)."""
+    if self._theme_pack is not None and ui_state.status != UIStatus.DISENGAGED:
+      pack_color = self._theme_pack.rl_colors().get("LaneLines")
+      if pack_color is not None:
+        alpha = float(np.clip(prob, 0.0, 0.7)) * (pack_color.a / 255.0)
+        return rl.Color(pack_color.r, pack_color.g, pack_color.b, int(alpha * 255))
+    return super()._get_ll_color(prob, adjacent, left)
 
   def _draw_lane_lines(self):
     """Draw lane lines and road edges, with optional rainbow inner lane lines."""

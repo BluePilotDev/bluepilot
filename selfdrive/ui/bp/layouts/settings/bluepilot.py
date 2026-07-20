@@ -19,6 +19,8 @@ from openpilot.selfdrive.ui.bp.lib.steering_wheel_style import (
   get_steering_wheel_icon_style,
   SteeringWheelIconStyle,
 )
+# BluePilot: seasonal theme packs
+from openpilot.selfdrive.ui.bp.lib import theme_pack
 from openpilot.selfdrive.ui.bp.lib.dm_icon_style import (
   DMIconStyle,
   ensure_dm_icon_style_initialized,
@@ -72,7 +74,6 @@ class BluePilotLayout(Widget):
       ("FordPrefSteerAngleCurvature", self._steer_angle_curvature),
       ("BPDisableLaneLineStatusColor", self._disable_lane_line_status_color),
       ("BPHideCameraView", self._hide_camera_view),
-      ("BPRadRacerTheme", self._rad_racer_theme),
       ("BPRainbowLines", self._rainbow_lane_lines),
       ("ShowBlindspotOverlay", self._show_blindspot),
       ("ShowBrakeStatus", self._show_brake_status),
@@ -139,15 +140,6 @@ class BluePilotLayout(Widget):
       icon="chffr_wheel.png"
     )
 
-    # Rad Racer 8-bit theme toggle
-    self._rad_racer_theme = toggle_item(
-      lambda: tr("8-Bit Racer Theme"),
-      lambda: tr("Retro racing game onroad view: hides the camera, draws the road as green game lines, and shows a bottom gauge cluster."),
-      initial_state=self._safe_get_bool(self._params, "BPRadRacerTheme"),
-      callback=lambda state: self._toggle_callback(state, "BPRadRacerTheme"),
-      icon="chffr_wheel.png"
-    )
-
     # Rainbow lane lines toggle
     self._rainbow_lane_lines = toggle_item(
       lambda: tr("Rainbow Lane Lines"),
@@ -200,6 +192,20 @@ class BluePilotLayout(Widget):
       initial_state=self._safe_get_bool(self._params, "BPAnimateSteeringWheel"),
       callback=lambda state: self._toggle_callback(state, "BPAnimateSteeringWheel"),
       icon="chffr_wheel.png"
+    )
+
+    # BluePilot: one theme selector for everything (8-Bit Racer + seasonal packs),
+    # same entries and param as the MICI page — see theme_pack.selector_entries().
+    # A dialog (not a button row) so any number of packs stays inside the item box.
+    self._theme_entries = theme_pack.selector_entries()
+    self._theme_dialog: MultiOptionDialog | None = None
+    self._theme_action = ButtonAction(lambda: tr("SELECT"))
+    self._theme_action.set_value(lambda: self._get_theme_display())
+    self._theme_pack_btn = ListItem(
+      lambda: tr("Theme"),
+      description=lambda: tr("8-Bit Racer game view, or a seasonal theme pack (recolors the road and the wheel icon)."),
+      action_item=self._theme_action,
+      callback=self._select_theme,
     )
 
     wheel_style_idx = int(ensure_steering_wheel_icon_style_initialized(self._params, SteeringWheelIconStyle.COMMA_3X))
@@ -665,7 +671,7 @@ class BluePilotLayout(Widget):
         self._hide_onroad_border,
         self._disable_lane_line_status_color,
         self._hide_camera_view,
-        self._rad_racer_theme,
+        self._theme_pack_btn,
         self._rainbow_lane_lines,
         self._show_blindspot,
         self._show_brake_status,
@@ -994,6 +1000,29 @@ class BluePilotLayout(Widget):
   def _set_overlay_size(self, button_index: int):
     """Handle overlay size button selection."""
     self._params.put("FordPrefRadarOverlaySize", button_index)
+
+  def _get_theme_display(self) -> str:
+    """Label of the currently selected theme entry (falls back to Off)."""
+    stored = self._safe_get(self._params, theme_pack.PARAM_KEY) or ""
+    if isinstance(stored, bytes):
+      stored = stored.decode("utf-8", errors="replace")
+    return next((label for label, v in self._theme_entries if v and v.lower() == stored.lower()), tr("Off"))
+
+  def _select_theme(self):
+    """Open a scrollable option dialog; stores the selected entry's param value."""
+    def handle_selection(selection):
+      if selection:
+        value = next((v for label, v in self._theme_entries if label == selection), "")
+        self._params.put(theme_pack.PARAM_KEY, value)
+      self._theme_dialog = None
+
+    self._theme_dialog = MultiOptionDialog(
+      tr("Select Theme"),
+      [label for label, _ in self._theme_entries],
+      self._get_theme_display(),
+      callback=handle_selection,
+    )
+    gui_app.push_widget(self._theme_dialog)
 
   def _set_wheel_icon_style(self, button_index: int):
     """Handle wheel icon style: 0 = comma 4, 1 = comma 3X."""

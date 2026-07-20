@@ -161,6 +161,33 @@ class BigMultiParamToggleBoolBP(BigMultiParamToggleBP):
     self._params.put_bool(self._param, bool(new_idx), block=False)
 
 
+class BigMultiParamToggleStrBP(BigMultiParamToggleBP):
+  """Like BigMultiParamToggleBP but for a STRING param, with display labels decoupled from
+  stored values via `values` (parallel to `options`; defaults to the labels themselves,
+  with option index 0 stored as ""). Dynamic option lists (e.g. theme packs discovered on
+  disk) stay stable when entries come and go.
+  """
+
+  def __init__(self, text: str, param: str, options: list[str], values: list[str] | None = None, **kwargs):
+    # _values must exist before super().__init__ — parent construction calls _load_value()
+    self._values = values if values is not None else [""] + options[1:]
+    assert len(self._values) == len(options)
+    super().__init__(text, param, options, **kwargs)
+
+  def _load_value(self):
+    stored = self._params.get(self._param) or ""
+    if isinstance(stored, bytes):
+      stored = stored.decode("utf-8", errors="replace")
+    # Case-insensitive value match so entries written by scripts still light up their option
+    idx = next((i for i, v in enumerate(self._values) if v and v.lower() == stored.lower()), 0)
+    self.set_value(self._options[idx])
+
+  def _handle_mouse_release(self, mouse_pos):
+    # Advance option and update display (BigMultiToggle), but store the option's VALUE, not its label.
+    BigMultiToggle._handle_mouse_release(self, mouse_pos)
+    self._params.put(self._param, self._values[self._options.index(self.value)], block=False)
+
+
 
 class BigParamControlBP(BigToggleBP, BigParamControl):
   def __init__(self, text: str, param: str, is_active_param: str = None, toggle_callback: Callable = None,

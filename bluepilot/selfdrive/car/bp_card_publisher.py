@@ -76,7 +76,7 @@ def _refresh_settings_cache() -> dict:
     "bmsHideOnroadBorder":             _get_bool(p, "BPHideOnroadBorder"),
     "bmsDisableLaneLineStatusColor":   _get_bool(p, "BPDisableLaneLineStatusColor"),
     "bmsMinimalDrivingView":           _get_bool(p, "BPHideCameraView"),
-    "bmsEightBitRacerTheme":           _get_bool(p, "BPRadRacerTheme"),
+    "bmsEightBitRacerTheme":           _get_str(p, "BPThemePack").strip().lower() == "rad_racer",
     "bmsRainbowLaneLines":             _get_bool(p, "BPRainbowLines"),
     "bmsShowBlindspotOverlay":         _get_bool(p, "ShowBlindspotOverlay", True),
     "bmsShowBrakeStatus":              _get_bool(p, "ShowBrakeStatus"),

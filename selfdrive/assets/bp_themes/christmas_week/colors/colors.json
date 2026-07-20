@@ -1,0 +1,44 @@
+{
+  "Background": {
+    "red": 6,
+    "green": 26,
+    "blue": 16,
+    "alpha": 255
+  },
+  "Path": {
+    "red": 30,
+    "green": 150,
+    "blue": 70,
+    "alpha": 255
+  },
+  "PathEdge": {
+    "red": 220,
+    "green": 50,
+    "blue": 60,
+    "alpha": 255
+  },
+  "LaneLines": {
+    "red": 255,
+    "green": 245,
+    "blue": 230,
+    "alpha": 230
+  },
+  "RoadEdges": {
+    "red": 200,
+    "green": 35,
+    "blue": 50,
+    "alpha": 255
+  },
+  "LeadMarker": {
+    "red": 220,
+    "green": 50,
+    "blue": 60,
+    "alpha": 255
+  },
+  "Accent": {
+    "red": 255,
+    "green": 200,
+    "blue": 90,
+    "alpha": 255
+  }
+}

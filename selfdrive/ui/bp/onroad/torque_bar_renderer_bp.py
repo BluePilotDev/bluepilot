@@ -23,6 +23,18 @@ from openpilot.system.ui.lib.application import gui_app
 from openpilot.system.ui.lib.shader_polygon import draw_polygon, Gradient
 from openpilot.selfdrive.ui.bp.lib.ui_debug_logger import bp_ui_log
 from openpilot.selfdrive.ui.bp.onroad.torque_bar_state_bp import TorqueBarStateBP
+# BluePilot: seasonal theme packs (Accent recolors the active fill)
+from openpilot.selfdrive.ui.bp.lib import theme_pack
+
+
+def _accent_or(default: rl.Color, alpha: int) -> rl.Color:
+  """Theme pack Accent color at the given alpha, or the default color."""
+  pack = theme_pack.get_active_pack()
+  if pack is not None:
+    accent = pack.rl_colors().get("Accent")
+    if accent is not None:
+      return rl.Color(accent.r, accent.g, accent.b, alpha)
+  return default
 
 # Arc geometry (legacy arc — kept for MICI / fallback)
 TORQUE_ANGLE_SPAN = 12.7
@@ -232,20 +244,21 @@ class TorqueBarRendererBP(TorqueBarStateBP):
       end_grad_pt = (cx * (1 - 0.65) + (max(bg_pts[:, 0]) * 0.65)) / effective_rect.width
 
     if is_active:
-      # Smooth color transition: white → yellow/orange at high torque
+      # Smooth color transition: base (white or theme Accent) → yellow/orange at high torque
       high_blend = max(0.0, abs_torque - 0.75) * 4
+      base = _accent_or(rl.Color(255, 255, 255, int(255 * 0.9 * alpha)), int(255 * 0.9 * alpha))
       start_color = blend_colors(
-        rl.Color(255, 255, 255, int(255 * 0.9 * alpha)),
+        base,
         rl.Color(255, 200, 0, int(255 * alpha)),
         high_blend,
       )
       end_color = blend_colors(
-        rl.Color(255, 255, 255, int(255 * 0.9 * alpha)),
+        base,
         rl.Color(255, 115, 0, int(255 * alpha)),
         high_blend,
       )
     else:
-      start_color = end_color = rl.Color(255, 255, 255, int(255 * 0.35 * alpha))
+      start_color = end_color = _accent_or(rl.Color(255, 255, 255, int(255 * 0.35 * alpha)), int(255 * 0.35 * alpha))
 
     gradient = Gradient(
       start=(start_grad_pt, 0),

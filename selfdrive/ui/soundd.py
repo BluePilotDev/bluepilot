@@ -16,6 +16,9 @@ from openpilot.system.hardware import HARDWARE
 
 from openpilot.sunnypilot.selfdrive.ui.quiet_mode import QuietMode
 
+# BluePilot: seasonal theme packs (sound overrides by matching filename)
+from openpilot.selfdrive.ui.bp.lib import theme_pack
+
 SAMPLE_RATE = 48000
 SAMPLE_BUFFER = 4096 # (approx 100ms)
 MAX_VOLUME = 1.0
@@ -93,17 +96,31 @@ class Soundd(QuietMode):
   def load_sounds(self):
     self.loaded_sounds: dict[int, np.ndarray] = {}
 
+    # BluePilot: theme pack sound overrides — pack wavs replace stock files of the same name
+    pack = theme_pack.get_active_pack(force=True)
+    self._theme_pack_name = pack.name if pack else ""
+
     # Load all sounds
     for sound in sound_list:
       filename, play_count, volume = sound_list[sound]
 
-      with wave.open(BASEDIR + "/selfdrive/assets/sounds/" + filename, 'r') as wavefile:
-        assert wavefile.getnchannels() == 1
-        assert wavefile.getsampwidth() == 2
-        assert wavefile.getframerate() == SAMPLE_RATE
+      stock_path = BASEDIR + "/selfdrive/assets/sounds/" + filename
+      pack_path = pack.sound_path(filename) if pack else None
+      for path in filter(None, (pack_path, stock_path)):
+        try:
+          with wave.open(path, 'r') as wavefile:
+            assert wavefile.getnchannels() == 1
+            assert wavefile.getsampwidth() == 2
+            assert wavefile.getframerate() == SAMPLE_RATE
 
-        length = wavefile.getnframes()
-        self.loaded_sounds[sound] = np.frombuffer(wavefile.readframes(length), dtype=np.int16).astype(np.float32) / (2**16/2)
+            length = wavefile.getnframes()
+            self.loaded_sounds[sound] = np.frombuffer(wavefile.readframes(length), dtype=np.int16).astype(np.float32) / (2**16/2)
+          break
+        except (OSError, AssertionError, wave.Error) as e:
+          # A malformed pack wav (stereo/44.1kHz/mp3-in-disguise) falls back to the stock sound
+          if path == stock_path:
+            raise
+          cloudlog.warning(f"soundd: theme pack sound {path} unusable ({e}), using stock {filename}")
 
   def get_sound_data(self, frames): # get "frames" worth of data from the current alert sound, looping when required
 
@@ -176,6 +193,12 @@ class Soundd(QuietMode):
         sm.update(0)
 
         self.load_param()
+
+        # BluePilot: hot-reload sounds when the theme pack changes (only while no alert plays)
+        if self.current_alert == AudibleAlert.none:
+          pack = theme_pack.get_active_pack()
+          if (pack.name if pack else "") != self._theme_pack_name:
+            self.load_sounds()
 
         # Always update volume, even when alert is playing
         if sm.updated['soundPressure']:

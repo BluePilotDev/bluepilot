@@ -20,6 +20,8 @@ from openpilot.selfdrive.ui.bp.lib.ui_debug_logger import bp_ui_log
 from openpilot.selfdrive.ui.bp.mici.onroad.lateral_debug_mici import LateralDebugMici
 from openpilot.selfdrive.ui.bp.mici.onroad.rad_racer_mici import RadRacerThemeMici
 from openpilot.system.ui.widgets import Widget
+# BluePilot: unified theme selector (BPThemePack param)
+from openpilot.selfdrive.ui.bp.lib import theme_pack
 
 # BluePilot: Margin to keep confidence ball inside the MICI rounded border
 MICI_BALL_BORDER_MARGIN = 25  # half of 50px MICI border thickness
@@ -92,7 +94,7 @@ class MiciAugmentedRoadViewBP(MiciCameraViewBP, AugmentedRoadView, BlindspotRend
 
     # BluePilot: Rad Racer 8-bit theme (MICI-scaled; no gauge cluster on the small screen)
     self._rad_racer_theme = RadRacerThemeMici()
-    self._rad_racer_active = self._bp_params.get_bool("BPRadRacerTheme")
+    self._rad_racer_active = theme_pack.rad_racer_active(self._bp_params)
     self._rad_racer_param_counter = 0
 
   def _on_swipe_down(self):
@@ -148,10 +150,13 @@ class MiciAugmentedRoadViewBP(MiciCameraViewBP, AugmentedRoadView, BlindspotRend
     self._rad_racer_param_counter += 1
     if self._rad_racer_param_counter >= 60:
       self._rad_racer_param_counter = 0
-      self._rad_racer_active = self._bp_params.get_bool("BPRadRacerTheme")
+      self._rad_racer_active = theme_pack.rad_racer_active(self._bp_params)
     if self._rad_racer_active:
       self._model_renderer.prepare_projection(self._content_rect)
       self._rad_racer_theme.render_background(self._content_rect, self._model_renderer)
+    else:
+      # BluePilot: theme pack sky — packs paint the background when the camera is hidden
+      theme_pack.draw_background(self._content_rect, getattr(self, "_bp_hide_camera_view", False))
 
     # Model overlays
     self._model_renderer.render(self._content_rect)

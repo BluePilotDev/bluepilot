@@ -17,7 +17,10 @@ from openpilot.selfdrive.ui.bp.mici.widgets.button_bp import (
   BigParamControlBP,
   BigMultiParamToggleBP,
   BigMultiParamToggleBoolBP,
+  BigMultiParamToggleStrBP,
 )
+# BluePilot: seasonal theme packs (discovered on disk at panel build time)
+from openpilot.selfdrive.ui.bp.lib import theme_pack
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.system.ui.widgets.scroller import NavScroller
 
@@ -33,7 +36,14 @@ class VisualsLayoutMici(NavScroller):
       ["off", "lead car speed", "speed", "lead car distance", "time to lead car"],
     )
     self.rainbow_mode = BigParamControlBP("Rainbow Mode", "RainbowMode")
-    self.rad_racer_theme = BigParamControlBP("8-Bit Racer Theme", "BPRadRacerTheme")
+    # BluePilot: one theme selector for everything (8-Bit Racer + seasonal packs),
+    # same entries and param as the C3X page — see theme_pack.selector_entries().
+    _theme_entries = theme_pack.selector_entries()
+    self.theme_pack_sel = BigMultiParamToggleStrBP(
+      "Theme", theme_pack.PARAM_KEY,
+      [label for label, _ in _theme_entries], values=[value for _, value in _theme_entries],
+      value_size=24,
+    )
     self.hide_fade = BigParamControlBP("Hide Onroad Fade", "mici_hide_onroad_fade")
     self.hide_border = BigParamControlBP("Hide Onroad Border", "BPHideOnroadBorder")
     self.hide_camera_view = BigParamControlBP("Minimal Driving View", "BPHideCameraView")
@@ -57,7 +67,7 @@ class VisualsLayoutMici(NavScroller):
     self._scroller.add_widgets([
       self.show_lead_vehicle,
       self.rainbow_mode,
-      self.rad_racer_theme,
+      self.theme_pack_sel,
       self.hide_fade,
       self.hide_border,
       self.hide_camera_view,
@@ -73,7 +83,6 @@ class VisualsLayoutMici(NavScroller):
 
     self._refresh_toggles = (
       ("RainbowMode", self.rainbow_mode),
-      ("BPRadRacerTheme", self.rad_racer_theme),
       ("mici_hide_onroad_fade", self.hide_fade),
       ("BPHideOnroadBorder", self.hide_border),
       ("BPHideCameraView", self.hide_camera_view),

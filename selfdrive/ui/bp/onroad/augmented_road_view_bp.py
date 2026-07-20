@@ -23,6 +23,8 @@ from openpilot.selfdrive.ui.onroad.driver_state import BTN_SIZE
 from openpilot.selfdrive.ui.sunnypilot.onroad.developer_ui import DeveloperUiState, get_bottom_dev_ui_offset
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.selfdrive.ui.bp.lib.ui_debug_logger import bp_ui_log
+# BluePilot: unified theme selector (BPThemePack param)
+from openpilot.selfdrive.ui.bp.lib import theme_pack
 
 
 class GaugeStyle(IntEnum):
@@ -86,7 +88,7 @@ class AugmentedRoadViewBP(CameraViewBP, AugmentedRoadView, BlindspotRendererMixi
 
     # BluePilot: Rad Racer 8-bit theme
     self._rad_racer_theme = RadRacerTheme()
-    self._rad_racer_active = self._bp_params.get_bool("BPRadRacerTheme")
+    self._rad_racer_active = theme_pack.rad_racer_active(self._bp_params)
 
   def update_fade_out_bottom_overlay(self, _content_rect):
     """BluePilot: Skip MICI fade overlay on TICI — causes unwanted black gradient at bottom."""
@@ -110,7 +112,7 @@ class AugmentedRoadViewBP(CameraViewBP, AugmentedRoadView, BlindspotRendererMixi
         self._cached_gauge_size = 2
       self._hybrid_gauge_style = GaugeStyle(self._bp_params.get("FordPrefGaugeStyle", return_default=True) or 0)
       # BluePilot: Rad Racer theme toggle
-      self._rad_racer_active = self._bp_params.get_bool("BPRadRacerTheme")
+      self._rad_racer_active = theme_pack.rad_racer_active(self._bp_params)
 
     self._switch_stream_if_needed(ui_state.sm)
     self._update_calibration()
@@ -149,6 +151,9 @@ class AugmentedRoadViewBP(CameraViewBP, AugmentedRoadView, BlindspotRendererMixi
     if self._rad_racer_active:
       self._render_rad_racer_scene(rect)
       return
+
+    # BluePilot: theme pack sky — packs paint the background when the camera is hidden
+    theme_pack.draw_background(self._content_rect, getattr(self, "_bp_hide_camera_view", False))
 
     # Render model (uses full content rect for camera-space overlays)
     self.model_renderer.render(self._content_rect)
