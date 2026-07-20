@@ -1,19 +1,35 @@
 import numpy as np
 import pyray as rl
 from openpilot.common.params import Params
-from openpilot.selfdrive.ui.mici.onroad.model_renderer import ModelRenderer, THROTTLE_COLORS, NO_THROTTLE_COLORS
+from openpilot.selfdrive.ui.mici.onroad.model_renderer import ModelRenderer, THROTTLE_COLORS, NO_THROTTLE_COLORS, CLIP_MARGIN
 from openpilot.selfdrive.ui.ui_state import ui_state, UIStatus
+from openpilot.system.ui.lib.application import gui_app
 from openpilot.system.ui.lib.shader_polygon import draw_polygon, Gradient
 # BluePilot: Rainbow shader moved to BP module after upstream removal
 from openpilot.bluepilot.ui.lib.bp_shaders import draw_rainbow_polygon
+# BluePilot: Rad Racer 8-bit road, shared with the TICI renderer
+from openpilot.selfdrive.ui.bp.onroad.rad_racer_road import RadRacerRoadMixin, RAD_RACER_DASH_LEN_M, RAD_RACER_GAP_LEN_M
 
-class ModelRendererBP(ModelRenderer):
+class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
   def __init__(self):
     super().__init__()
     self._bp_params = Params()
     self._rainbow_v = 20
     self._disable_lane_line_status_color = self._bp_params.get_bool("BPDisableLaneLineStatusColor")
     self._rainbow_lane_lines = self._bp_params.get_bool("BPRainbowLines")
+    # BluePilot: Rad Racer 8-bit theme (green game road; dash scroll animation state)
+    self._rad_racer = self._bp_params.get_bool("BPRadRacerTheme")
+    self._dash_phase = 0.0
+
+  def prepare_projection(self, rect: rl.Rectangle) -> None:
+    """Set clip region so _map_to_screen works before render().
+
+    Rad Racer draws skyline/signs behind the road and calls _map_to_screen during
+    that background pass, before the base render() initializes the clip rect.
+    """
+    self._clip_region = rl.Rectangle(
+      rect.x - CLIP_MARGIN, rect.y - CLIP_MARGIN, rect.width + 2 * CLIP_MARGIN, rect.height + 2 * CLIP_MARGIN
+    )
 
   def _update_state(self):
     super()._update_state()
@@ -22,12 +38,21 @@ class ModelRendererBP(ModelRenderer):
     if self._counter % 60 == 0:
       self._disable_lane_line_status_color = self._bp_params.get_bool("BPDisableLaneLineStatusColor")
       self._rainbow_lane_lines = self._bp_params.get_bool("BPRainbowLines")
+      self._rad_racer = self._bp_params.get_bool("BPRadRacerTheme")
 
     if ui_state.rainbow_path or self._rainbow_lane_lines:
       v = sm['carState'].vEgo
       self._rainbow_v = np.clip(v, 2.5, 35) / 30
 
+    # BluePilot: Advance dash scroll animation for the Rad Racer road
+    if self._rad_racer and sm.valid.get('carState', False):
+      period = RAD_RACER_DASH_LEN_M + RAD_RACER_GAP_LEN_M
+      self._dash_phase = (self._dash_phase + max(0.0, sm['carState'].vEgo) / gui_app.target_fps) % period
+
   def _draw_path(self, sm):
+    # BluePilot: Rad Racer theme draws the path ribbon in _draw_rad_racer_road
+    if self._rad_racer:
+      return
     if ui_state.rainbow_path:
       draw_rainbow_polygon(self._rect, self._path.projected_points, rainbow_v=self._rainbow_v)
     else:
@@ -35,6 +60,10 @@ class ModelRendererBP(ModelRenderer):
 
   def _draw_lane_lines(self):
     """Draw lane lines and road edges, with optional rainbow inner lane lines."""
+    # BluePilot: Rad Racer theme replaces all road rendering with the 8-bit game road
+    if self._rad_racer:
+      self._draw_rad_racer_road()
+      return
     offset = np.array([self._rect.x, self._rect.y], dtype=np.float32)
     rainbow_lane_lines_active = self._rainbow_lane_lines_active(ui_state.sm)
 

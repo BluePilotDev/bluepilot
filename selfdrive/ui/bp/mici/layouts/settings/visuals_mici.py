@@ -33,6 +33,7 @@ class VisualsLayoutMici(NavScroller):
       ["off", "lead car speed", "speed", "lead car distance", "time to lead car"],
     )
     self.rainbow_mode = BigParamControlBP("Rainbow Mode", "RainbowMode")
+    self.rad_racer_theme = BigParamControlBP("8-Bit Racer Theme", "BPRadRacerTheme")
     self.hide_fade = BigParamControlBP("Hide Onroad Fade", "mici_hide_onroad_fade")
     self.hide_border = BigParamControlBP("Hide Onroad Border", "BPHideOnroadBorder")
     self.hide_camera_view = BigParamControlBP("Minimal Driving View", "BPHideCameraView")
@@ -56,6 +57,7 @@ class VisualsLayoutMici(NavScroller):
     self._scroller.add_widgets([
       self.show_lead_vehicle,
       self.rainbow_mode,
+      self.rad_racer_theme,
       self.hide_fade,
       self.hide_border,
       self.hide_camera_view,
@@ -71,6 +73,7 @@ class VisualsLayoutMici(NavScroller):
 
     self._refresh_toggles = (
       ("RainbowMode", self.rainbow_mode),
+      ("BPRadRacerTheme", self.rad_racer_theme),
       ("mici_hide_onroad_fade", self.hide_fade),
       ("BPHideOnroadBorder", self.hide_border),
       ("BPHideCameraView", self.hide_camera_view),

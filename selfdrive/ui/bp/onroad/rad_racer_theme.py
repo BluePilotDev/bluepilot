@@ -27,21 +27,15 @@ DM_RESERVED_WIDTH = 250      # left inset for cluster label layout (legacy wedge
 DM_CLUSTER_GAP = 16          # clearance between DM widget and gauge cluster top
 
 # --- Scene ---
-SKYLINE_PX_SCALE = 4.2       # skyline texture pixel size on screen
 SKYLINE_PARALLAX = 0.55        # how much skyline shifts vs path center at the horizon
 SKYLINE_LOOKAHEAD_M = 150.0    # forward distance used to estimate road bend
 SKYLINE_OFFSET_SMOOTH = 0.14   # scroll smoothing (higher = snappier)
-SKYLINE_MAX_OFFSET = 420.0    # clamp skyline travel in pixels
 STAR_PARALLAX = 0.22           # stars drift slightly with the skyline
-STAR_COUNT = 28
 SIGN_SPACING_M = 55.0        # distance between consecutive roadside signs
 SIGN_MIN_M = 7.0             # respawn signs once they pass this distance
 SIGN_MAX_M = SIGN_MIN_M + 3 * SIGN_SPACING_M
 SIGN_LATERAL_M = 7.5         # lateral offset from path center, alternating sides
 SIGN_TOP_Z = 4.2             # sign face top height in meters
-EGO_CAR_PX = 9.0             # ego sprite pixel scale
-EGO_CLUSTER_PAD = 6          # gap between ego sprite bottom and gauge cluster top
-LEAD_EGO_GAP = 14            # min gap between lead sprite bottom and ego sprite top
 LEAD_MAX_DRAW_M = 120.0
 
 # --- Cluster bar geometry ---
@@ -57,7 +51,19 @@ BOX_BORDER = rl.Color(20, 10, 40, 255)
 
 
 class RadRacerTheme:
-  """Renders the 8-bit racing scene. Textures are built lazily on first render."""
+  """Renders the 8-bit racing scene. Textures are built lazily on first render.
+
+  Screen-scale knobs live as class attributes (TICI 2160x1080 values here) so device
+  variants can subclass and rescale — see RadRacerThemeMici for the comma four.
+  """
+
+  SKYLINE_PX_SCALE = 4.2       # skyline texture pixel size on screen
+  SKYLINE_MAX_OFFSET = 420.0   # clamp skyline travel in pixels
+  STAR_COUNT = 28
+  EGO_CAR_PX = 9.0             # ego sprite pixel scale
+  EGO_CLUSTER_PAD = 6          # gap between ego sprite bottom and gauge cluster top
+  LEAD_EGO_GAP = 14            # min gap between lead sprite bottom and ego sprite top
+  LEAD_SPRITE_PX = (10.0, 5.0, 2.0)  # lead sprite pixel scale at dRel 5/40/100 m
 
   def __init__(self):
     self._loaded = False
@@ -85,7 +91,7 @@ class RadRacerTheme:
     self._skyline_tex = assets.build_skyline_texture()
     import random
     rng = random.Random(7)
-    self._stars = [(rng.random(), rng.random(), rng.randint(2, 4)) for _ in range(STAR_COUNT)]
+    self._stars = [(rng.random(), rng.random(), rng.randint(2, 4)) for _ in range(self.STAR_COUNT)]
     self._loaded = True
 
   # ------------------------------------------------------------------
@@ -99,7 +105,7 @@ class RadRacerTheme:
     skyline_scroll = self._update_skyline_scroll(rect, model_renderer)
 
     # Star field in the sky band (subtle parallax with the skyline)
-    sky_h = max(1.0, horizon_y - rect.y - SKYLINE_PX_SCALE * self._skyline_tex.height)
+    sky_h = max(1.0, horizon_y - rect.y - self.SKYLINE_PX_SCALE * self._skyline_tex.height)
     star_shift = skyline_scroll * STAR_PARALLAX
     for fx, fy, size in self._stars:
       sx = rect.x + fx * rect.width + star_shift
@@ -108,12 +114,12 @@ class RadRacerTheme:
       rl.draw_rectangle(int(sx), int(sy), size, size, color)
 
     # City skyline, bottom-aligned to the horizon, tiled with curvature parallax
-    sky_w = self._skyline_tex.width * SKYLINE_PX_SCALE
-    sky_hh = self._skyline_tex.height * SKYLINE_PX_SCALE
+    sky_w = self._skyline_tex.width * self.SKYLINE_PX_SCALE
+    sky_hh = self._skyline_tex.height * self.SKYLINE_PX_SCALE
     x = rect.x - (skyline_scroll % sky_w)
     while x < rect.x + rect.width:
       w = min(sky_w, rect.x + rect.width - x)
-      src = rl.Rectangle(0, 0, w / SKYLINE_PX_SCALE, self._skyline_tex.height)
+      src = rl.Rectangle(0, 0, w / self.SKYLINE_PX_SCALE, self._skyline_tex.height)
       dst = rl.Rectangle(x, horizon_y - sky_hh, w, sky_hh)
       rl.draw_texture_pro(self._skyline_tex, src, dst, rl.Vector2(0, 0), 0.0, rl.WHITE)
       x += sky_w
@@ -139,7 +145,7 @@ class RadRacerTheme:
 
     center_x = rect.x + rect.width / 2
     # Path center left of screen -> scroll skyline right (classic horizon parallax)
-    target = float(np.clip((center_x - pt[0]) * SKYLINE_PARALLAX, -SKYLINE_MAX_OFFSET, SKYLINE_MAX_OFFSET))
+    target = float(np.clip((center_x - pt[0]) * SKYLINE_PARALLAX, -self.SKYLINE_MAX_OFFSET, self.SKYLINE_MAX_OFFSET))
     self._skyline_scroll += SKYLINE_OFFSET_SMOOTH * (target - self._skyline_scroll)
     return self._skyline_scroll
 
@@ -219,13 +225,13 @@ class RadRacerTheme:
   def render_foreground(self, rect: rl.Rectangle, model_renderer, cluster_top: float):
     self._ensure_loaded()
 
-    ego_w = self._ego_tex.width * EGO_CAR_PX
-    ego_h = self._ego_tex.height * EGO_CAR_PX
+    ego_w = self._ego_tex.width * self.EGO_CAR_PX
+    ego_h = self._ego_tex.height * self.EGO_CAR_PX
     ego_cx = self._ego_path_center_x(model_renderer)
     if ego_cx is None:
       ego_cx = rect.x + rect.width / 2
-    ego_top = cluster_top - ego_h - EGO_CLUSTER_PAD
-    max_lead_bottom = ego_top - LEAD_EGO_GAP
+    ego_top = cluster_top - ego_h - self.EGO_CLUSTER_PAD
+    max_lead_bottom = ego_top - self.LEAD_EGO_GAP
 
     # Ego car first so lead sprites always paint on top when close
     ego_src = rl.Rectangle(0, 0, self._ego_tex.width, self._ego_tex.height)
@@ -246,7 +252,7 @@ class RadRacerTheme:
         cx = lv.chevron[1][0]
         # Anchor lead bottom to chevron base, but never below the ego car icon
         base_y = min(float(lv.chevron[0][1]), max_lead_bottom)
-        px = float(np.interp(lead.dRel, [5.0, 40.0, 100.0], [10.0, 5.0, 2.0]))
+        px = float(np.interp(lead.dRel, [5.0, 40.0, 100.0], self.LEAD_SPRITE_PX))
         tex = self._lead_tex[i]
         w, h = tex.width * px, tex.height * px
         src = rl.Rectangle(0, 0, tex.width, tex.height)

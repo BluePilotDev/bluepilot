@@ -13,6 +13,8 @@ class MiciCameraViewBP(MiciCameraView):
     super().__init__(*args, **kwargs)
     self._bp_camera_params = Params()
     self._bp_hide_camera_view = self._bp_camera_params.get_bool("BPHideCameraView")
+    # BluePilot: Rad Racer theme draws its own scene over a black sky (mirrors TICI)
+    self._bp_rad_racer_theme = self._bp_camera_params.get_bool("BPRadRacerTheme")
     self._bp_camera_param_counter = 0
 
   def _update_state(self):
@@ -21,10 +23,11 @@ class MiciCameraViewBP(MiciCameraView):
     if self._bp_camera_param_counter >= 60:
       self._bp_camera_param_counter = 0
       self._bp_hide_camera_view = self._bp_camera_params.get_bool("BPHideCameraView")
+      self._bp_rad_racer_theme = self._bp_camera_params.get_bool("BPRadRacerTheme")
 
   def _should_hide_camera_view(self) -> bool:
     return (
-      self._bp_hide_camera_view and
+      (self._bp_hide_camera_view or self._bp_rad_racer_theme) and
       ui_state.is_onroad() and
       self._stream_type != VisionStreamType.VISION_STREAM_DRIVER
     )

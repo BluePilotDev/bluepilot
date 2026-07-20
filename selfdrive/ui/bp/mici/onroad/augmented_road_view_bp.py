@@ -18,6 +18,7 @@ from openpilot.selfdrive.ui.ui_state import ui_state, UIStatus
 from openpilot.selfdrive.ui.bp.lib.ui_debug_logger import bp_ui_log
 # BluePilot: swipe-down shortcut to lateral debug screen
 from openpilot.selfdrive.ui.bp.mici.onroad.lateral_debug_mici import LateralDebugMici
+from openpilot.selfdrive.ui.bp.mici.onroad.rad_racer_mici import RadRacerThemeMici
 from openpilot.system.ui.widgets import Widget
 
 # BluePilot: Margin to keep confidence ball inside the MICI rounded border
@@ -89,6 +90,11 @@ class MiciAugmentedRoadViewBP(MiciCameraViewBP, AugmentedRoadView, BlindspotRend
     self._lat_debug: LateralDebugMici | None = None
     self._swipe_detector = _VerticalSwipeDetector(self._on_swipe_down)
 
+    # BluePilot: Rad Racer 8-bit theme (MICI-scaled; no gauge cluster on the small screen)
+    self._rad_racer_theme = RadRacerThemeMici()
+    self._rad_racer_active = self._bp_params.get_bool("BPRadRacerTheme")
+    self._rad_racer_param_counter = 0
+
   def _on_swipe_down(self):
     if not ui_state.is_onroad():
       return
@@ -138,8 +144,24 @@ class MiciAugmentedRoadViewBP(MiciCameraViewBP, AugmentedRoadView, BlindspotRend
     # Render the base camera view. Minimal Driving View suppression lives in MiciCameraViewBP.
     MiciCameraViewBP._render(self, self._content_rect)
 
+    # BluePilot: Rad Racer theme — refresh cached param (~1s), then sky/skyline/signs behind the road
+    self._rad_racer_param_counter += 1
+    if self._rad_racer_param_counter >= 60:
+      self._rad_racer_param_counter = 0
+      self._rad_racer_active = self._bp_params.get_bool("BPRadRacerTheme")
+    if self._rad_racer_active:
+      self._model_renderer.prepare_projection(self._content_rect)
+      self._rad_racer_theme.render_background(self._content_rect, self._model_renderer)
+
     # Model overlays
     self._model_renderer.render(self._content_rect)
+
+    # BluePilot: Rad Racer sprites (ego + leads) over the road; no gauge cluster on MICI,
+    # so the ego car anchors to the bottom edge of the content rect instead.
+    if self._rad_racer_active:
+      self._rad_racer_theme.render_foreground(
+        self._content_rect, self._model_renderer,
+        self._content_rect.y + self._content_rect.height - 4)
 
     # Fade out bottom overlay (only when engaged)
     fade_alpha = self._fade_alpha_filter.update(ui_state.status != UIStatus.DISENGAGED)
