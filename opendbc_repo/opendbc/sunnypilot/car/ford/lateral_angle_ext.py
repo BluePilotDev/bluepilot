@@ -51,6 +51,36 @@ _CANFD_SUV_CARS = frozenset({
   CAR.FORD_ESCAPE_MK4_5,
 })
 
+# BluePilot: low-speed path_angle authority boost (2026-07-20), curvature-gated revision.
+# path_angle = kappa * v * factor scales directly with speed, and the gain schedule (curvature_factor
+# below) is flat below the 13.5 m/s (30 mph) knee -- so for the same commanded curvature, path_angle
+# shrinks the slower you go, with nothing compensating below 30 mph. Below ~20 mph this leaves
+# genuine curve commands too weak for the PSCM to track (logged: desired curvature reaching 0.012
+# with actual stuck under 0.003 -- see lateral_angle_ext stall-blip module docstring).
+#
+# A first attempt at this (bp-7.0-lsgt) boosted path_angle by up to 1.51x on speed alone, with no
+# regard for how large the underlying command was. Road-tested and made things worse: it boosts
+# EVERY path_angle value below 30 mph equally, including near-zero/noise-level values during normal
+# straight-line driving -- amplifying exactly the kind of small spurious signal that was already
+# causing unprovoked hands-off drift on straight roads (two separate logged incidents, route
+# bfef784d32f5351d/00000001--f5fbd93372, ~20:14:49 and ~20:16:05: measured curvature grew on its own
+# while desired stayed near zero). Confirmed on-road worse, not just theorized.
+#
+# This version gates the boost on |requested_curvature| (the model/planner's own pre-clip signal --
+# see the in-line comment at the apply site for why NOT kappa_cmd): no boost at all inside the
+# deviation clip's own noise band (CURVATURE_ERROR), ramping to full boost only once the command
+# clearly represents a real, intentional curve (2x that tolerance -- reusing the stall detector's own
+# _STALL_GAP_MIN threshold for consistency rather than inventing a new number). Applied to path_angle
+# only, exactly like the original attempt -- kappa_cmd/shadow_curvature is left untouched because
+# ford.h's ford_shadow_curvature_error_check deviation-checks it against measured curvature; boosting
+# it risks tripping that panda-side check and faulting steering outright, a worse failure than what
+# this fixes.
+_LSGT_V_HIGH_MS = 13.5                # m/s (30 mph) -- boost = 1.0 at/above this (today's schedule knee)
+_LSGT_V_KNEE_MS = 20.0 * 0.44704      # m/s (20 mph) -- boost reaches its peak here, held flat below
+_LSGT_PEAK = _LSGT_V_HIGH_MS / _LSGT_V_KNEE_MS   # ~1.51x -- extrapolated authority parity with 30 mph
+_LSGT_KAPPA_GATE_LO = CarControllerParams.CURVATURE_ERROR        # 0.002 -- below this, boost = 1.0 (no-op)
+_LSGT_KAPPA_GATE_HI = 2.0 * CarControllerParams.CURVATURE_ERROR  # 0.004 -- at/above this, full boost applies
+
 
 # DBC ``LatCtlPath_An_Actl`` (rad) — panda safety uses the same in ``ford.h``; PSCM enforces in firmware.
 FORD_DBC_PATH_ANGLE_MIN = -0.5
@@ -99,9 +129,17 @@ _PSCM_SAT_UNWIND_RATE = 0.02        # rad/call (0.02 * 20Hz = 0.40 rad/s)
 # climbed to 3x measured, EPS motor current ~0 A). A short mode-0 pulse -- the identical
 # panda-clean wire pattern the human-turn override sends, no ford.h involvement -- resets the
 # PSCM's authority, after which path_angle ramps back in from zero through the soft ROC.
+#
+# Drift branch (2026-07-20): three logged interventions on the same route showed the detector
+# missed the mirror case entirely -- hands-off, desired curvature flat/near-zero while *measured*
+# curvature grew on its own (car curving when the model wanted straight), twice, because the trigger
+# required abs(desired) > abs(current). That's backwards from the classic stall this was built for,
+# so it never armed until the driver had already corrected. The detection below now has a second,
+# deliberately narrow branch for exactly that case (measured leads AND the model wants ~straight);
+# see the in-line comment at the detection site for why it is not simply direction-agnostic.
 _STEER_DT = CarControllerParams.STEER_STEP * DT_CTRL  # 20 Hz lateral tick (matches human_turn.py)
-_STALL_GAP_MIN = 2.0 * CarControllerParams.CURVATURE_ERROR  # desired must lead measured by 2x the clip tolerance
-_STALL_HOLD_S = 0.5          # accumulated clip-binding time before a pulse fires
+_STALL_GAP_MIN = 2.0 * CarControllerParams.CURVATURE_ERROR  # desired/measured must diverge by 2x the clip tolerance
+_STALL_HOLD_S = 0.5          # accumulated divergence time before a pulse fires
 _STALL_BLIP_FRAMES = 6       # mode-0 pulse length (6 frames @ 20 Hz = 300 ms; PSCM acked mode 0 in ~150 ms on-road)
 _STALL_COOLDOWN_S = 2.0      # re-arm delay after a pulse (release ramp + PSCM response time)
 _STALL_MAX_BLIPS = 3         # give up on a stuck episode; devLim telemetry keeps recording the stall
@@ -449,6 +487,28 @@ class LateralAngleExt:
     self.curvature_factor = interp(abs(kappa_cmd), [0.0007, 0.001], [self.low_gain_calc, self.high_gain_calc])
 
     path_angle_calc = kappa_cmd * v_ego * self.curvature_factor
+
+    # BluePilot: low-speed path_angle authority boost (LSGT, curvature-gated -- see module constants
+    # for why the gate exists and what it replaced). Speed component: 1.0 at/above 30 mph, ramping to
+    # ~1.51x by the 20 mph knee and held flat below. Curvature gate: 0.0 inside the deviation clip's
+    # own noise band (no-op on near-straight commands), ramping to 1.0 (full speed boost applies) once
+    # the command is unambiguously a real curve. Applied to path_angle only -- kappa_cmd/shadow_curvature
+    # must stay exactly as clipped above for the panda-side deviation check.
+    #
+    # Gates on requested_curvature (pre-deviation-clip), NOT kappa_cmd. Caught by offline replay
+    # against the logged drift incidents (2026-07-20): kappa_cmd is clamped to current_curvature +-
+    # CURVATURE_ERROR once the clip binds, so during an unprovoked drift (desired ~= 0, but measured
+    # curvature grows on its own) kappa_cmd gets dragged along with the drifting measurement and can
+    # exceed the gate threshold even though the model wants ~straight -- which boosted the drift
+    # instead of suppressing it (replay showed path_angle up to ~4 deg worse than unboosted at the
+    # peak of the segment-6 incident). requested_curvature is the model/planner's own signal, computed
+    # before the clip ever sees measured curvature, so it stays near zero through a drift and only
+    # rises for a genuine commanded curve.
+    _lsgt_speed_boost = float(interp(v_ego, [_LSGT_V_KNEE_MS, _LSGT_V_HIGH_MS], [_LSGT_PEAK, 1.0]))
+    _lsgt_kappa_gate = float(interp(abs(requested_curvature), [_LSGT_KAPPA_GATE_LO, _LSGT_KAPPA_GATE_HI], [0.0, 1.0]))
+    low_speed_boost = 1.0 + (_lsgt_speed_boost - 1.0) * _lsgt_kappa_gate
+    path_angle_calc *= low_speed_boost
+
     path_angle = path_angle_calc
 
 
@@ -522,9 +582,22 @@ class LateralAngleExt:
     # accumulator rather than resetting it; a closed gap or driver press ends the episode.
     self.stall_blip_cooldown_s = max(0.0, self.stall_blip_cooldown_s - _STEER_DT)
     _stall_gap = desired_curvature - current_curvature
+    # Two stall directions (see module docstring):
+    #   classic -- "car won't turn enough": desired leads measured (the original condition).
+    #   drift   -- "car turns when it shouldn't": measured leads while the model wants ~straight.
+    # The drift branch is deliberately narrow: it also requires |desired| to be inside the deviation
+    # clip's own noise band, i.e. the model is genuinely commanding near-straight. Without that guard,
+    # "measured leads desired" also matches normal curve EXITS (planner unwinds ahead of the car, both
+    # values still large) -- offline replay of the incident route showed the unguarded version firing
+    # 4-6 extra blips per minute in curve-rich stretches, and a 300 ms mode-0 gap mid-exit is itself a
+    # hazard. With the guard, replay fires exactly one extra blip per logged drift incident, ~1.4 s
+    # before the driver had to intervene, and none during curve entries/exits.
+    _stalled_classic = abs(desired_curvature) > abs(current_curvature)
+    _stalled_drift = (abs(desired_curvature) <= abs(current_curvature)
+                      and abs(desired_curvature) < 1.5 * CarControllerParams.CURVATURE_ERROR)
     _stalled = (not CS.out.steeringPressed and not self.lane_change and v_ego > 9.0
                 and abs(_stall_gap) > _STALL_GAP_MIN
-                and abs(desired_curvature) > abs(current_curvature))
+                and (_stalled_classic or _stalled_drift))
     if _stalled:
       if self.bp_curvature_deviation_limited and self.stall_blip_cooldown_s <= 0.0:
         self.stall_blip_hold_s += _STEER_DT
