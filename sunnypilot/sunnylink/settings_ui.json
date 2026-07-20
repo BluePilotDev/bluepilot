@@ -2123,6 +2123,13 @@
           "needs_onroad_cycle": true,
           "title": "[Vehicle] Use Pinion Yaw Sensor",
           "description": "Measures how the car is turning from the steering pinion angle sensor instead of the RCM yaw sensor, in both the control software and the panda safety firmware. Use this if your Ford has a faulty yaw sensor: frequent \"Turn Exceeds Steering Limit\" warnings and weak curve tracking with healthy steering, often alongside \"Service AdvanceTrac\" messages. Run tools/ford_yaw_health_check.py on a few drives to check. Takes effect the next time the car starts. Not available on the Edge (its pinion sensor only reports a relative angle).",
+          "enablement": [
+            {
+              "type": "offroad_only"
+            }
+          ]
+        },
+        {
           "key": "BPUseCustomSounds",
           "widget": "toggle",
           "needs_onroad_cycle": true,
