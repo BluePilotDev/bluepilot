@@ -19,17 +19,20 @@ class VehicleLayoutMici(NavScroller):
     self.show_hands_free_ui = BigParamControlBP("Show BlueCruise UI on Cluster", "send_hands_free_cluster_msg")
     # Init-time param (read once at car init, mirrored into panda safety); takes effect after restart
     self.steer_angle_curvature = BigParamControlBP("Use Pinion Yaw Sensor", "FordPrefSteerAngleCurvature")
+    self.hide_steer_sat_alerts = BigParamControlBP("Hide Steer-Limit Alerts (Hands On)", "FordPrefHideSteerSaturatedAlerts")
     self.vbatt_pause_charging = BigParamFloatControl("12V Battery Limit", "vbatt_pause_charging", min=11.0, max=14.0, step=0.1)
 
     self._scroller.add_widgets([
       self.show_hands_free_ui,
       self.steer_angle_curvature,
+      self.hide_steer_sat_alerts,
       self.vbatt_pause_charging,
     ])
 
     self._refresh_toggles = (
       ("send_hands_free_cluster_msg", self.show_hands_free_ui),
       ("FordPrefSteerAngleCurvature", self.steer_angle_curvature),
+      ("FordPrefHideSteerSaturatedAlerts", self.hide_steer_sat_alerts),
     )
 
     ui_state.add_offroad_transition_callback(self._update_toggles)

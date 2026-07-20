@@ -9,6 +9,7 @@ from cereal import car, log, custom
 from msgq.visionipc import VisionIpcClient, VisionStreamType
 
 
+from openpilot.common.bluepilot import is_bluepilot
 from openpilot.common.params import Params
 from openpilot.common.realtime import config_realtime_process, Priority, Ratekeeper, DT_CTRL
 from openpilot.common.swaglog import cloudlog
@@ -91,7 +92,10 @@ class SelfdriveD(CruiseHelper):
     # TODO: de-couple selfdrived with card/conflate on carState without introducing controls mismatches
     self.car_state_sock = messaging.sub_sock('carState', timeout=20)
 
-    ignore = self.sensor_packets + self.gps_packets + ['alertDebug', 'lateralManeuverPlan'] + ['modelDataV2SP']
+    # BluePilot: carStateBP is only published by brands whose carstate builds the message
+    # (Ford today), so it must never gate all_checks()/commIssue on other cars
+    ignore = self.sensor_packets + self.gps_packets + ['alertDebug', 'lateralManeuverPlan'] + ['modelDataV2SP'] \
+             + (['carStateBP'] if is_bluepilot() else [])
     if SIMULATION:
       ignore += ['driverCameraState', 'managerState']
     if REPLAY:
@@ -102,6 +106,7 @@ class SelfdriveD(CruiseHelper):
                                    'managerState', 'liveParameters', 'radarState', 'liveTorqueParameters',
                                    'controlsState', 'carControl', 'driverAssistance', 'alertDebug', 'userBookmark', 'audioFeedback',
                                    'lateralManeuverPlan', 'modelDataV2SP', 'longitudinalPlanSP'] + \
+                                   (['carStateBP'] if is_bluepilot() else []) + \
                                    self.camera_packets + self.sensor_packets + self.gps_packets,
                                   ignore_alive=ignore, ignore_avg_freq=ignore,
                                   ignore_valid=ignore, frequency=int(1/DT_CTRL))
@@ -110,6 +115,8 @@ class SelfdriveD(CruiseHelper):
     self.is_metric = self.params.get_bool("IsMetric")
     self.is_ldw_enabled = self.params.get_bool("IsLdwEnabled")
     self.disengage_on_accelerator = self.params.get_bool("DisengageOnAccelerator")
+    # BluePilot: hide steerSaturated while the EPS confirms hands on the wheel (Ford PSCM)
+    self.hide_steer_sat_hands_on = self.params.get_bool("FordPrefHideSteerSaturatedAlerts")
 
     car_recognized = self.CP.brand != 'mock'
 
@@ -444,7 +451,16 @@ class SelfdriveD(CruiseHelper):
       turning = abs(desired_lateral_accel) > 1.0
       # TODO: lac.saturated includes speed and other checks, should be pulled out
       if undershooting and turning and lac.saturated:
-        self.events.add(EventName.steerSaturated)
+        # BluePilot: the Ford PSCM's LaHandsOff broadcast detects hands at ~0.5 Nm where
+        # steeringPressed needs ~1.0 -- and those sub-threshold resisting hands both cause
+        # these episodes and prove the driver is already engaged with the wheel. Optionally
+        # hide the alert in exactly that case; if the EPS says hands-off, it always shows.
+        suppress = False
+        if self.hide_steer_sat_hands_on and 'carStateBP' in self.sm.data:
+          pscm = self.sm['carStateBP'].pscmLatCtl
+          suppress = pscm.dataAvailable and not pscm.laHandsOff
+        if not suppress:
+          self.events.add(EventName.steerSaturated)
 
     # Check for FCW
     stock_long_is_braking = self.enabled and not self.CP.openpilotLongitudinalControl and CS.aEgo < -1.25
@@ -620,6 +636,7 @@ class SelfdriveD(CruiseHelper):
       self.is_metric = self.params.get_bool("IsMetric")
       self.is_ldw_enabled = self.params.get_bool("IsLdwEnabled")
       self.disengage_on_accelerator = self.params.get_bool("DisengageOnAccelerator")
+      self.hide_steer_sat_hands_on = self.params.get_bool("FordPrefHideSteerSaturatedAlerts")
       self.experimental_mode = self.params.get_bool("ExperimentalMode") and self.CP.openpilotLongitudinalControl
       self.personality = self.params.get("LongitudinalPersonality", return_default=True)
 

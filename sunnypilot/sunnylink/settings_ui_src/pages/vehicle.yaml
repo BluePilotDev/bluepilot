@@ -57,6 +57,14 @@ sections:
       the Edge (its pinion sensor only reports a relative angle).'
     enablement:
     - $ref: '#/macros/offroad'
+  - key: FordPrefHideSteerSaturatedAlerts
+    widget: toggle
+    title: '[Vehicle] Hide Steering-Limit Alerts While Holding the Wheel'
+    description: 'Hides the "Turn Exceeds Steering Limit" warning only while the power
+      steering itself reports your hands on the wheel. Light pressure against the turn
+      is what usually triggers these warnings, and the steering rack detects that grip
+      well below the pressure the driving software needs to notice it. If the steering
+      rack reports hands-off, the warning always shows.'
   # --- Audio ---
   - key: BPUseCustomSounds
     widget: toggle
