@@ -101,6 +101,13 @@ _PSCM_SAT_UNWIND_RATE = 0.02        # rad/call (0.02 * 20Hz = 0.40 rad/s)
 # PSCM's authority, after which path_angle ramps back in from zero through the soft ROC.
 _STEER_DT = CarControllerParams.STEER_STEP * DT_CTRL  # 20 Hz lateral tick (matches human_turn.py)
 _STALL_GAP_MIN = 2.0 * CarControllerParams.CURVATURE_ERROR  # desired must lead measured by 2x the clip tolerance
+# A stall is a FRACTIONAL failure, not just an absolute gap: during an honest deep-curve
+# entry the car tracks at 0.7-0.85x of a large, fast-rising demand, which clears
+# _STALL_GAP_MIN on magnitude alone -- and a mid-curve pulse releases steering exactly
+# when the car is already behind (observed on-road: two such fires in one windy section,
+# each followed by the driver grabbing the wheel within 0.2 s). True stalls measure
+# 0.28-0.59x delivered across every diagnosed route; entry transients 0.64x and above.
+_STALL_DELIVERY_FRACTION = 0.65
 _STALL_HOLD_S = 0.5          # accumulated clip-binding time before a pulse fires
 _STALL_BLIP_FRAMES = 6       # mode-0 pulse length (6 frames @ 20 Hz = 300 ms; PSCM acked mode 0 in ~150 ms on-road)
 _STALL_COOLDOWN_S = 2.0      # re-arm delay after a pulse (release ramp + PSCM response time)
@@ -533,14 +540,16 @@ class LateralAngleExt:
 
     # Post-override stall detection (mechanism in the module constants' comment). Fires the mode-0
     # blip when, hands-free, desired curvature has led measured by more than 2x the deviation
-    # clip's tolerance while the clip was actually binding for _STALL_HOLD_S accumulated seconds.
+    # clip's tolerance AND the car is delivering under _STALL_DELIVERY_FRACTION of the demand,
+    # while the clip was actually binding for _STALL_HOLD_S accumulated seconds. The fractional
+    # condition separates a true stall from an honest deep-curve entry transient (see the constant).
     # devLim flickers mid-stall (~63% duty on the diagnosis route), so off frames hold the
     # accumulator rather than resetting it; a closed gap or driver press ends the episode.
     self.stall_blip_cooldown_s = max(0.0, self.stall_blip_cooldown_s - _STEER_DT)
     _stall_gap = desired_curvature - current_curvature
     _stalled = (not CS.out.steeringPressed and not self.lane_change and v_ego > 9.0
                 and abs(_stall_gap) > _STALL_GAP_MIN
-                and abs(desired_curvature) > abs(current_curvature))
+                and abs(current_curvature) < _STALL_DELIVERY_FRACTION * abs(desired_curvature))
     if _stalled:
       if self.bp_curvature_deviation_limited and self.stall_blip_cooldown_s <= 0.0:
         self.stall_blip_hold_s += _STEER_DT
