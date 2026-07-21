@@ -21,35 +21,29 @@ resumed. Mode 0 is panda-clean by construction: every ford.h check has a legitim
 back in from zero through the soft ROC below (no jump seed) -- generous at human-turn speeds, and
 admitted by ford.h's path_angle ROC check (2% looser) without any bypass.
 """
+import re
+
 import numpy as np
 from numpy import clip, interp
 
 from opendbc.car import DT_CTRL
 from opendbc.car.lateral import apply_std_steer_angle_limits
 from opendbc.car.ford.values import CAR, CarControllerParams
+from opendbc.sunnypilot.car.ford.angle_autocal import AutoCalPipeline, VERIFY_TOL, MAX_ROUNDS
 from opendbc.sunnypilot.car.ford.lateral_curv_ext import LateralResult
 from opendbc.sunnypilot.car.ford.human_turn import HumanTurnDetector
 from opendbc.sunnypilot.car.ford.values_ext import BP_ANGLE_LIMITS
 from selfdrive.modeld.constants import ModelConstants
 
-# Hard-coded per-platform gain defaults (not user-tunable).
-# CAN vehicles (Escape MK4, Bronco Sport, Explorer, Maverick, Edge)
-_GAIN_CAN         = (1.00, 1.15)
-# CAN-FD body-on-frame trucks (F-150, Lightning, Expedition, Ranger)
-_GAIN_CANFD_BOF   = (0.95, 0.95)
-# CAN-FD unibody SUVs (Mustang Mach-E, Escape MK4.5)
-_GAIN_CANFD_SUV   = (1.00, 1.05)
-
-_CANFD_BOF_CARS = frozenset({
-  CAR.FORD_F_150_MK14,
-  CAR.FORD_F_150_LIGHTNING_MK1,
-  CAR.FORD_EXPEDITION_MK4,
-  CAR.FORD_RANGER_MK2,
-})
-_CANFD_SUV_CARS = frozenset({
-  CAR.FORD_MUSTANG_MACH_E_MK1,
-  CAR.FORD_ESCAPE_MK4_5,
-})
+# Hard-coded per-platform gain defaults (not user-tunable). Single source lives in
+# angle_autocal.py so the offline analyzer and the auto-calibrator share them.
+from opendbc.sunnypilot.car.ford.angle_autocal import (  # noqa: E402
+  GAIN_CAN as _GAIN_CAN,
+  GAIN_CANFD_BOF as _GAIN_CANFD_BOF,
+  GAIN_CANFD_SUV as _GAIN_CANFD_SUV,
+  CANFD_BOF_CARS as _CANFD_BOF_CARS,
+  CANFD_SUV_CARS as _CANFD_SUV_CARS,
+)
 
 
 # DBC ``LatCtlPath_An_Actl`` (rad) — panda safety uses the same in ``ford.h``; PSCM enforces in firmware.
@@ -171,6 +165,19 @@ class LateralAngleExt:
     self.stall_blip_count = 0         # pulses fired this stall episode
     self.angle_stall_blip_active = False
     self.press_timer_s = 0.0          # continuous steeringPressed time, for the hand-off blip
+    # BluePilot: one-time auto-calibration of the speed factors (see angle_autocal.py).
+    # Enabled by FordAngleAutoCal; FordAngleAutoCalState empty = collecting, "done ..." = locked.
+    # The values are per-car constants, so once converged the factors are written and the
+    # calibrator never runs again (toggling the setting off clears the state to allow a re-run).
+    self.autocal_enabled = False
+    self.autocal_done = True  # conservative until params are read
+    self.autocal = None       # AutoCalPipeline while collecting
+    self._autocal_round = 1
+    self._autocal_param_ctr = 100  # >= threshold so the very first call reads params
+    self._autocal_params_handle = None
+    # Telemetry + autocal gate: the command this frame was modified by PSCM authority
+    # limits or the DBC clamp — the car could not make the requested turn.
+    self.bp_angle_saturated = False
 
   def update_angle_params(self, params):
     """Sets per-platform gain defaults and reads user feel-factor params."""
@@ -201,6 +208,35 @@ class LateralAngleExt:
             float(raw.decode("utf-8", errors="replace") if isinstance(raw, bytes) else raw), 0.85, 1.50))
       except Exception:
         pass
+      # BluePilot: auto-calibration arm/disarm (checked ~1 Hz; this method runs at 100 Hz)
+      self._autocal_param_ctr += 1
+      if self._autocal_param_ctr >= 100:
+        self._autocal_param_ctr = 0
+        try:
+          enabled = bool(params.get_bool("FordAngleAutoCal"))
+          state = params.get("FordAngleAutoCalState", return_default=True) or ""
+          if isinstance(state, bytes):
+            state = state.decode("utf-8", errors="replace")
+          self.autocal_done = state.startswith("done")
+          self.autocal_enabled = enabled and not self.autocal_done
+          # Verification round number: 1 on a fresh start, parsed back from the state string
+          # after an "applied" round so rounds survive restarts and drives.
+          _m = re.search(r"round (\d+)", state)
+          self._autocal_round = int(_m.group(1)) if _m else 1
+          # (Re)build the pipeline when arming, and restart it if the user hand-changes a
+          # factor mid-collection — samples are relative to the factors in force when taken.
+          factors_changed = (self.autocal is not None and
+                             (abs(self.autocal.est.low_factor_applied - self.low_speed_curv_factor) > 1e-6 or
+                              abs(self.autocal.est.high_factor_applied - self.high_speed_curv_factor) > 1e-6))
+          if self.autocal_enabled and (self.autocal is None or factors_changed):
+            self.autocal = AutoCalPipeline(self.path_angle_gain_highC_highV,
+                                           self.low_speed_curv_factor,
+                                           self.high_speed_curv_factor, dt=_STEER_DT)
+          elif not self.autocal_enabled:
+            self.autocal = None
+          self._autocal_params_handle = params
+        except Exception:
+          self.autocal_enabled = False
 
   def update_angle_strategy(self, CC, CS, actuators, CP):
     """
@@ -246,6 +282,9 @@ class LateralAngleExt:
       self.angle_stall_blip_active = False
       self.press_timer_s = 0.0
       self.precision_type = 1
+      self.bp_angle_saturated = False
+      if self.autocal is not None:  # steady-state timer and staged samples must not span disengagements
+        self.autocal.idle()
       return LateralResult(
         apply_curvature=0.0,
         curvature_rate=0.0,
@@ -289,6 +328,9 @@ class LateralAngleExt:
       self.angle_stall_blip_active = False
       self.press_timer_s = 0.0
       self.precision_type = 1
+      self.bp_angle_saturated = False
+      if self.autocal is not None:  # steady-state timer and staged samples must not span disengagements
+        self.autocal.idle()
       return LateralResult(
         apply_curvature=0.0,
         curvature_rate=0.0,
@@ -481,7 +523,11 @@ class LateralAngleExt:
     elif _pscm_lim >= 1:  # LimitClose (F150/non-angle-mode only): block increases only
       path_angle = float(clip(path_angle, -abs(self.path_angle_last), abs(self.path_angle_last)))
 
+    _pre_dbc_clamp = path_angle
     path_angle = min(FORD_DBC_PATH_ANGLE_MAX, max(FORD_DBC_PATH_ANGLE_MIN, path_angle))
+    # BluePilot: the car cannot make the requested turn this frame — PSCM authority limit
+    # active or the DBC clamp bit. Telemetry + a hard no-sample gate for the auto-calibration.
+    self.bp_angle_saturated = bool(_in_hard_sat or _pscm_lim >= 1 or path_angle != _pre_dbc_clamp)
 
     # Soft ROC limit — unconditional, slightly tighter than ford.h, applied before the
     # hardware bypass in ford.h is re-enabled.  Lets us observe whether the limit would
@@ -555,6 +601,21 @@ class LateralAngleExt:
 
     ramp_type = 2
 
+    # BluePilot: one-time auto-calibration — feed steady engaged curves to the estimator and,
+    # on convergence, write the corrected factors once and lock. kappa_cmd here is the exact
+    # post-clip curvature path_angle was derived from; current_curvature is the same measured
+    # value the strategy itself steers against. The pipeline stages samples for 1s (a grip
+    # cancels them retroactively), holds a 3s post-grip cooldown, and drops any frame where
+    # the car couldn't make the turn (PSCM authority / DBC saturation, tire-limit lat accel).
+    if self.autocal_enabled and self.autocal is not None:
+      self.autocal.update(v_ego, kappa_cmd, current_curvature,
+                          CS.out.steeringPressed,
+                          self.bp_angle_rate_limited, self.bp_curvature_deviation_limited,
+                          self.angle_human_turn_active, self.angle_stall_blip_active,
+                          saturated=self.bp_angle_saturated,
+                          driver_torque=float(CS.out.steeringTorque))
+      if self.autocal.est.n > 0 and self.autocal.est.n % 20 == 0 and self.autocal.est.converged():
+        self._autocal_finish()
 
     return LateralResult(
       apply_curvature=0.0,
@@ -565,3 +626,41 @@ class LateralAngleExt:
       precision_type=self.precision_type,
       lateralUncertainty=lateral_uncertainty,
     )
+
+  def _autocal_finish(self):
+    """A round converged. Apply the factors; lock only when a verification round confirms.
+
+    Round semantics: the ratio model is first-order, so a large correction is applied and
+    then re-measured with the new factors in force. When a round's recommendation is a
+    no-change within VERIFY_TOL (or MAX_ROUNDS is hit), the calibration locks for good.
+    """
+    result = self.autocal.est.solve()
+    if result is None or self._autocal_params_handle is None:
+      return
+    low_new, high_new, stats = result
+    delta_low = abs(low_new - self.autocal.est.low_factor_applied)
+    delta_high = abs(high_new - self.autocal.est.high_factor_applied)
+    verified = delta_low <= VERIFY_TOL and delta_high <= VERIFY_TOL
+    final = verified or self._autocal_round >= MAX_ROUNDS
+    if final:
+      state = (f"done low={low_new:.2f} high={high_new:.2f} rounds={self._autocal_round} "
+               f"{'verified' if verified else 'round-limit'} n={stats['n']} "
+               f"se={stats['stderr_low']:.3f}/{stats['stderr_high']:.3f}")
+    else:
+      state = (f"round {self._autocal_round + 1} collecting; applied low={low_new:.2f} "
+               f"high={high_new:.2f} (moved {delta_low:.2f}/{delta_high:.2f})")
+    try:
+      self._autocal_params_handle.put("FordLowSpeedFactor_ang", f"{low_new:.2f}")
+      self._autocal_params_handle.put("FordHighSpeedFactor_ang", f"{high_new:.2f}")
+      self._autocal_params_handle.put("FordAngleAutoCalState", state)
+    except Exception:
+      return
+    # Apply immediately so this drive benefits without waiting for the param round-trip.
+    self.low_speed_curv_factor = float(low_new)
+    self.high_speed_curv_factor = float(high_new)
+    self.autocal = None  # verification rounds rebuild against the new factors on the next param tick
+    if final:
+      self.autocal_done = True
+      self.autocal_enabled = False
+    else:
+      self._autocal_round += 1
