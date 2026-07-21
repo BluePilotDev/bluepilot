@@ -11,7 +11,7 @@ from opendbc.sunnypilot.car.ford.angle_autocal import (
   PRESS_HOLDBACK_S, PRESS_COOLDOWN_S, MAX_LAT_ACCEL, MAX_LONG_ACCEL,
   PEAK_MIN_KAPPA, PEAK_PROMINENCE, PEAK_MEDIAN_N, PEAK_WEIGHT_S,
   SPIKE_MEAS_RATE, DISTURBANCE_BLANK_S, ROUGH_RMS_MAX, WS_SPREAD_JUMP,
-  TAU_EVIDENCE_S, OUTLIER_MIN_WEIGHT, OUTLIER_GATE, LR_MIN_WEIGHT, LR_TOL,
+  TAU_EVIDENCE_S, LR_MIN_WEIGHT, LR_TOL,
   NUDGE_PERIOD_S, NUDGE_MIN_WEIGHT, NUDGE_DEADBAND, NUDGE_STEP, MAX_DRIVE_DELTA,
   LOCK_MIN_WEIGHT, LOCK_DEADBAND, LOCK_STABLE_S,
 )
@@ -88,24 +88,6 @@ class TestAngleFactorEstimator:
     w0 = est.s_w
     est.decay(TAU_EVIDENCE_S * math.log(2.0))
     assert abs(est.s_w - 0.5 * w0) < 1e-9
-
-  def test_outlier_gate_arms_with_weight(self):
-    est = AngleFactorEstimator(PLATFORM_GAIN_HIGH)
-    # Solid clean evidence at truth (factors 1.0 -> r = 1) at BOTH anchors — a single
-    # anchor leaves the two-parameter fit singular and the gate unarmed.
-    n = int(OUTLIER_MIN_WEIGHT / DT) + 50
-    for v, kappa in ((10.0, 0.002), (28.0, 0.0015)):
-      g = applied_gain(v, 1.0, 1.0)
-      for _ in range(n):
-        est.add_sample(v, kappa, kappa, g, weight=DT)
-    assert est.weight_low >= OUTLIER_MIN_WEIGHT
-    g = applied_gain(10.0, 1.0, 1.0)
-    # A sample implying a gain 1.5x the gate outside the fit is rejected...
-    r_bad = g / (LOW_ANCHOR_BASE + 1.5 * OUTLIER_GATE)
-    assert not est.add_sample(10.0, 0.002, 0.002 * r_bad, g, weight=DT)
-    # ...while a mildly-off sample still lands.
-    r_mild = g / (LOW_ANCHOR_BASE + 0.3 * OUTLIER_GATE)
-    assert est.add_sample(10.0, 0.002, 0.002 * r_mild, g, weight=DT)
 
   def test_lr_divergence_flags_bank_bias(self):
     est = AngleFactorEstimator(PLATFORM_GAIN_HIGH)

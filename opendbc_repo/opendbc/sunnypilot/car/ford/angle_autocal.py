@@ -81,8 +81,10 @@ MAX_LAT_ACCEL = 2.5         # m/s^2; kappa*v^2 above this is tire/comfort-limit 
 # zero over the last LAT_ACCEL_SOFT_BAND m/s^2 below MAX_LAT_ACCEL.
 LAT_ACCEL_SOFT_BAND = 1.0
 # Longitudinal load transfer changes the effective lateral gain — no evidence while
-# braking/accelerating hard mid-curve.
-MAX_LONG_ACCEL = 1.0        # m/s^2 |aEgo|
+# braking/accelerating hard mid-curve. 1.0 rejected 8587 frames of ordinary city
+# braking-into-corners on the reference drive (route 00000006); 2.0 keeps those and
+# still cuts genuine hard stops (541 frames).
+MAX_LONG_ACCEL = 2.0        # m/s^2 |aEgo|
 
 # Driver-contamination guards. Ford flips steeringPressed at STEER_DRIVER_ALLOWANCE (1.0 Nm)
 # sustained — a light grip below that threshold still steers the car, and the PSCM under-delivers
@@ -92,20 +94,23 @@ PRESS_HOLDBACK_S = 1.0      # samples are staged this long; any grip during stag
 PRESS_COOLDOWN_S = 3.0      # after any grip ends, delivery is suspect this long — no samples
 
 # --- Disturbance / road-quality rejection ------------------------------------------------
+# All four thresholds below were tuned on the 2.7 h Mach-E reference drive (route
+# 00000006--319e078ab5): tight enough to catch real disturbances, loose enough that the
+# pinion-derived measurement's normal noise floor doesn't starve the estimator.
 # A bump, pothole, crosswind gust or passing truck flicks the car without the command
 # moving: measured curvature jumps while the command is steady. Not gain information.
-SPIKE_MEAS_RATE = 0.008     # 1/m/s measured-curvature rate with a quiet command = disturbance
+SPIKE_MEAS_RATE = 0.02      # 1/m/s measured-curvature rate with a quiet command = disturbance
 DISTURBANCE_BLANK_S = 1.0   # no evidence while a disturbance settles
 DISTURBANCE_POISON_S = 0.3  # peak-buffer frames this far BACK from detection are suspect too
 # A bump shakes the wheels before it shows in the pinion: a jump in the wheel-speed spread
 # (max-min of the four wheels) corroborates and triggers/extends the blanking.
-WS_SPREAD_JUMP = 0.3        # m/s frame-to-frame change of the spread
+WS_SPREAD_JUMP = 0.6        # m/s frame-to-frame change of the spread
 # Washboard / broken pavement: sustained high-frequency content in measured curvature.
 # The residual is high-passed (curve content lives below ~1 Hz and stays in the low-pass),
 # so ordinary cornering — sweepers, S-curves, apexes — can never trip this.
 ROUGH_LP_TAU_S = 0.3        # low-pass defining the "curve content" of the measurement
 ROUGH_RMS_TAU_S = 2.0       # window of the residual RMS
-ROUGH_RMS_MAX = 0.0006      # 1/m residual RMS above this = rough stretch, no evidence
+ROUGH_RMS_MAX = 0.0015      # 1/m residual RMS above this = rough stretch, no evidence
 
 # --- Peak (apex) evidence ----------------------------------------------------------------
 # The manual method compares the tops/bottoms of the requested vs actual curvature traces.
@@ -119,13 +124,24 @@ PEAK_LAG_MAX_S = 0.7        # measured extremum searched this far after the comm
 PEAK_MIN_KAPPA = 0.0012     # 1/m minimum apex amplitude
 PEAK_PROMINENCE = 0.0004    # 1/m above the window minimum — rejects ripple
 PEAK_REFRACTORY_S = 1.0     # one apex per this interval
-PEAK_WEIGHT_S = 3.0         # one clean apex counts like this many seconds of steady evidence
+# Apex evidence carries real transient content (the plant attenuates fast transients a bit
+# more than steady curves), so it supplements the steady evidence rather than dominating:
+# on the reference drive w=3.0 pulled the low anchor ~0.02 above the steady-only fit,
+# w=1.5 keeps the combined fit within ±0.015 of it while still covering winding roads
+# where the steady gate never fires.
+PEAK_WEIGHT_S = 1.5         # one clean apex counts like this many seconds of steady evidence
 PEAK_MEDIAN_N = 3           # apexes commit as the median of this many — kills single outliers
 
 # --- Estimator robustness ----------------------------------------------------------------
-TAU_EVIDENCE_S = 1800.0     # evidence forgetting time constant (seconds of active collection)
-OUTLIER_MIN_WEIGHT = 20.0   # anchor weight before the outlier gate arms
-OUTLIER_GATE = 0.15         # reject samples whose implied gain is this far from the fit
+# Forgetting: slow enough that a normal drive's evidence equilibrium (commit rate x TAU)
+# clears the lock threshold — the reference drive commits ~0.012-0.023 s/s per anchor,
+# giving equilibria of ~90-165 s — while old drives still fade within a couple of hours
+# of active collection. (An outlier gate against the running fit was tried here and
+# removed: it is path-dependent — early evidence anchors the fit, then contradicting
+# evidence gets rejected — and it visibly distorted the reference-drive fit. Robustness
+# comes from the frame quality layer, the ratio sanity bounds, staging cancellation and
+# the apex median-of-3 instead.)
+TAU_EVIDENCE_S = 7200.0     # evidence forgetting time constant (seconds of active collection)
 # Banked/crowned roads bias one turn direction. If the left- and right-turn estimates of an
 # anchor diverge beyond LR_TOL the divergence excess inflates that anchor's effective stderr,
 # blocking nudges and lock until balanced evidence arrives.
@@ -141,7 +157,10 @@ NUDGE_STEP = 0.02           # max factor change per nudge (menu granularity is 0
 MAX_DRIVE_DELTA = 0.10      # per-factor cumulative cap per drive (card process lifetime)
 
 # --- Lock --------------------------------------------------------------------------------
-LOCK_MIN_WEIGHT = 120.0     # per-anchor evidence before locking is possible
+# LOCK_MIN_WEIGHT sits below the reference drive's decay equilibrium (~90 s on the weaker
+# anchor) so a normally-driven car can actually reach it; the 5-minute stability window is
+# the real proof that there is nothing left to adjust.
+LOCK_MIN_WEIGHT = 60.0      # per-anchor evidence before locking is possible
 LOCK_DEADBAND = 0.03        # applied factors this close to the estimate count as "nothing to adjust"
 LOCK_STABLE_S = 300.0       # this much active collection with nothing to adjust => locked
 
@@ -206,16 +225,6 @@ class AngleFactorEstimator:
       return False
     y = float(applied_gain) / r
     a = speed_alpha(v_ego)
-    # Robustness backstop behind the frame-level quality layer: once an anchor has real
-    # evidence, a sample that disagrees wildly with the fit is a glitch, not information.
-    sol = self.solve()
-    if sol is not None:
-      _, _, st = sol
-      w_anchor = st["weight_low"] if a < 0.5 else st["weight_high"]
-      if w_anchor >= OUTLIER_MIN_WEIGHT:
-        y_pred = (1.0 - a) * st["anchor_low"] + a * st["anchor_high"]
-        if abs(y - y_pred) > OUTLIER_GATE:
-          return False
     w = float(weight)
     la = 1.0 - a
     self.s_ll += w * la * la
