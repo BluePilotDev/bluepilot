@@ -22,6 +22,12 @@ class LateralLayoutMici(NavScroller):
     self.high_speed_factor = BigParamFloatControl(
       "High Speed Adjustment Factor", "FordHighSpeedFactor_ang", min=0.5, max=1.5, step=0.01,
     )
+    # One-time auto-calibration of the two factors above; toggling off clears the lock
+    # so re-enabling starts a fresh collection.
+    self.angle_autocal = BigParamControlBP(
+      "Auto-Calibrate Factors", "FordAngleAutoCal",
+      toggle_callback=self._on_autocal_toggled,
+    )
     self.lane_change_factor_high_ang = BigParamFloatControl(
       "Lane Change Factor High", "lane_change_factor_high_ang", min=0.85, max=1.50,
     )
@@ -69,6 +75,7 @@ class LateralLayoutMici(NavScroller):
     self._scroller.add_widgets([
       self.low_speed_factor,
       self.high_speed_factor,
+      self.angle_autocal,
       self.lane_change_factor_high_ang,
       self.disable_lane_change_under_speed,
       self.blinker_min_speed,
@@ -86,6 +93,7 @@ class LateralLayoutMici(NavScroller):
     ])
 
     self._refresh_toggles = (
+      ("FordAngleAutoCal", self.angle_autocal),
       ("disable_BP_lat_UI", self.disable_BP_lat),
       ("BlinkerPauseLaneChange", self.disable_lane_change_under_speed),
       ("enable_human_turn_detection_curv", self.enable_human_turn_detection),
@@ -96,6 +104,11 @@ class LateralLayoutMici(NavScroller):
     )
 
     ui_state.add_offroad_transition_callback(self._update_toggles)
+
+  def _on_autocal_toggled(self, state: bool):
+    """Disarming clears a finished calibration's lock so re-enabling starts fresh."""
+    if not state:
+      ui_state.params.put("FordAngleAutoCalState", "")
 
   def show_event(self):
     super().show_event()
@@ -110,6 +123,7 @@ class LateralLayoutMici(NavScroller):
     is_curv = not is_angle
     self.low_speed_factor.set_visible(is_angle)
     self.high_speed_factor.set_visible(is_angle)
+    self.angle_autocal.set_visible(is_angle)
     self.lane_change_factor_high_ang.set_visible(is_angle)
     self.blinker_min_speed.set_enabled(ui_state.params.get_bool("BlinkerPauseLaneChange"))
     for item in (

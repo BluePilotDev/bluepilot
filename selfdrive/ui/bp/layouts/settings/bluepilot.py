@@ -78,6 +78,7 @@ class BluePilotLayout(Widget):
     self._refresh_toggles = (
       ("send_hands_free_cluster_msg", self._show_hands_free_ui),
       ("FordPrefSteerAngleCurvature", self._steer_angle_curvature),
+      ("FordAngleAutoCal", self._angle_autocal),
       ("BPDisableLaneLineStatusColor", self._disable_lane_line_status_color),
       ("BPHideCameraView", self._hide_camera_view),
       ("BPRadRacerTheme", self._rad_racer_theme),
@@ -532,6 +533,18 @@ class BluePilotLayout(Widget):
       step=0.01,
       icon="chffr_wheel.png"
     )
+    # BluePilot: one-time auto-calibration of the two factors above. Compares requested vs
+    # actual turn in steady engaged curves and writes the corrected factors once, then locks.
+    self._angle_autocal = toggle_item(
+      lambda: tr("Auto-Calibrate Adjustment Factors"),
+      lambda: tr("Learns the low/high speed factors automatically by comparing requested and actual "
+                 "turn in steady engaged curves, then locks them (one-time, per car). Drive normally "
+                 "with lateral engaged; curves at city and highway speeds both needed. Toggle off and "
+                 "back on to recalibrate."),
+      initial_state=self._safe_get_bool(self._params, "FordAngleAutoCal"),
+      callback=self._toggle_angle_autocal,
+      icon="chffr_wheel.png"
+    )
     # Disable BP lateral control toggle
     self._disable_BP_lat = toggle_item(
       lambda: tr("Disable BP Lateral Control"),
@@ -614,6 +627,7 @@ class BluePilotLayout(Widget):
     angle_items = [
       self._low_speed_curv_factor,
       self._high_speed_curv_factor,
+      self._angle_autocal,
       self._lane_change_factor_high_ang,
     ]
     angle_header = CollapsibleSectionHeader(tr("Angle Tuning"))
@@ -861,6 +875,7 @@ class BluePilotLayout(Widget):
     # Angle-mode items: always visible (Angle Tuning section), greyed out when curvature mode is active
     self._low_speed_curv_factor.action_item.set_enabled(is_angle)
     self._high_speed_curv_factor.action_item.set_enabled(is_angle)
+    self._angle_autocal.action_item.set_enabled(is_angle)
     self._lane_change_factor_high_ang.action_item.set_enabled(is_angle)
     # Curvature-mode items: always visible (Curvature Tuning section), greyed out when angle mode is active
     self._lane_change_factor_high_curv.action_item.set_enabled(is_curv)
@@ -1003,6 +1018,16 @@ class BluePilotLayout(Widget):
   def _set_overlay_size(self, button_index: int):
     """Handle overlay size button selection."""
     self._params.put("FordPrefRadarOverlaySize", button_index)
+
+  def _toggle_angle_autocal(self, state: bool):
+    """Arm/disarm the one-time factor auto-calibration; disarming clears a finished
+    calibration's lock so re-enabling starts a fresh collection."""
+    self._toggle_callback(state, "FordAngleAutoCal")
+    if not state:
+      try:
+        self._params.put("FordAngleAutoCalState", "")
+      except UnknownKeyName:
+        pass
 
   def _set_wheel_icon_style(self, button_index: int):
     """Handle wheel icon style: 0 = comma 4, 1 = comma 3X."""
