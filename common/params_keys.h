@@ -309,6 +309,8 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"LC_PID_gain_UI_curv", {PERSISTENT | BACKUP, FLOAT, "3.0"}},
     {"FordLowSpeedFactor_ang", {PERSISTENT | BACKUP, FLOAT, "1.0"}},
     {"FordHighSpeedFactor_ang", {PERSISTENT | BACKUP, FLOAT, "1.0"}},
+    {"FordAngleAutoCal", {PERSISTENT | BACKUP, BOOL, "0"}},           // one-time auto-calibration of the angle speed factors
+    {"FordAngleAutoCalState", {PERSISTENT | BACKUP, STRING, ""}},     // "" = collecting; "done ..." = calibrated and locked
     {"BPLateralSchemeParamsMigratedV1", {PERSISTENT | BACKUP, STRING, "0"}},
 
     {"disable_BP_lat_UI", {PERSISTENT | BACKUP, BOOL, "0"}},

@@ -104,6 +104,8 @@ def _refresh_settings_cache() -> dict:
     "bmsMinimumSpeedToPauseLaneChange": _get_int(p, "BlinkerMinLateralControlSpeed", 20),
     "bmsShowLateralControlMode":       _get_bool(p, "BpShowLateralControl"),
     # --- Angle Tuning ---
+    "bmsAngleAutoCalibrate":           _get_bool(p, "FordAngleAutoCal"),
+    "bmsAngleAutoCalState":            _get_str(p, "FordAngleAutoCalState"),
     "bmsLowSpeedAdjustmentFactor":     _get_float(p, "FordLowSpeedFactor_ang", 1.0),
     "bmsHighSpeedAdjustmentFactor":    _get_float(p, "FordHighSpeedFactor_ang", 1.0),
     "bmsLaneChangeFactorHighAngle":    _get_float(p, "lane_change_factor_high_ang", 1.0),
@@ -131,6 +133,7 @@ def publish_controller_state_bp(CI, pm):
     cs_bp.curvatureDeviationLimited = getattr(CI.CC, "curvatureDeviationLimited", False)
     cs_bp.humanTurnLateralPaused = bool(getattr(CI.CC, "humanTurnLateralPaused", False))
     cs_bp.stallBlipActive = bool(getattr(CI.CC, "stallBlipActive", False))
+    cs_bp.angleSaturated = bool(getattr(CI.CC, "bp_angle_saturated", False))
 
     # BluePilot: settings snapshot -- refreshed at most every _SETTINGS_INTERVAL s so Params
     # reads don't add latency to every card.py tick.
