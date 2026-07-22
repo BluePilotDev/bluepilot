@@ -312,6 +312,8 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"FordAngleAutoCal", {PERSISTENT | BACKUP, BOOL, "0"}},           // one-time auto-calibration of the angle speed factors
     {"FordAngleAutoCalState", {PERSISTENT | BACKUP, STRING, ""}},     // "" = collecting; JSON = evidence; "locked"/"done ..." = finished
     {"FordAngleAutoCalError", {PERSISTENT, STRING, ""}},              // diagnostics only — separate channel so an error can never clobber evidence
+    {"FordAngleSmoothing", {PERSISTENT | BACKUP, BOOL, "1"}},         // anti-weave smoothing of the angle command path
+    {"FordAngleSmoothStrength", {PERSISTENT | BACKUP, FLOAT, "1.0"}}, // 0.0=minimal .. 1.0=tuned default .. 1.5=strong
     {"BPLateralSchemeParamsMigratedV1", {PERSISTENT | BACKUP, STRING, "0"}},
 
     {"disable_BP_lat_UI", {PERSISTENT | BACKUP, BOOL, "0"}},

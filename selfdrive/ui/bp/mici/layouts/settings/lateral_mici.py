@@ -28,6 +28,13 @@ class LateralLayoutMici(NavScroller):
       "Auto-Calibrate Factors", "FordAngleAutoCal",
       toggle_callback=self._on_autocal_toggled,
     )
+    # Anti-weave smoothing of the angle command path (see lateral_angle_ext.py _SM_*).
+    self.angle_smoothing = BigParamControlBP(
+      "Smooth Steering (Anti-Weave)", "FordAngleSmoothing",
+    )
+    self.angle_smoothing_strength = BigParamFloatControl(
+      "Smoothing Strength", "FordAngleSmoothStrength", min=1.0, max=2.5, step=0.1,
+    )
     self.lane_change_factor_high_ang = BigParamFloatControl(
       "Lane Change Factor High", "lane_change_factor_high_ang", min=0.85, max=1.50,
     )
@@ -76,6 +83,8 @@ class LateralLayoutMici(NavScroller):
       self.low_speed_factor,
       self.high_speed_factor,
       self.angle_autocal,
+      self.angle_smoothing,
+      self.angle_smoothing_strength,
       self.lane_change_factor_high_ang,
       self.disable_lane_change_under_speed,
       self.blinker_min_speed,
@@ -94,6 +103,7 @@ class LateralLayoutMici(NavScroller):
 
     self._refresh_toggles = (
       ("FordAngleAutoCal", self.angle_autocal),
+      ("FordAngleSmoothing", self.angle_smoothing),
       ("disable_BP_lat_UI", self.disable_BP_lat),
       ("BlinkerPauseLaneChange", self.disable_lane_change_under_speed),
       ("enable_human_turn_detection_curv", self.enable_human_turn_detection),
@@ -124,6 +134,8 @@ class LateralLayoutMici(NavScroller):
     self.low_speed_factor.set_visible(is_angle)
     self.high_speed_factor.set_visible(is_angle)
     self.angle_autocal.set_visible(is_angle)
+    self.angle_smoothing.set_visible(is_angle)
+    self.angle_smoothing_strength.set_visible(is_angle)
     self.lane_change_factor_high_ang.set_visible(is_angle)
     self.blinker_min_speed.set_enabled(ui_state.params.get_bool("BlinkerPauseLaneChange"))
     for item in (

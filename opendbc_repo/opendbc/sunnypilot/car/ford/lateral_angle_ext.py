@@ -30,6 +30,7 @@ from opendbc.car.lateral import apply_std_steer_angle_limits
 from opendbc.car.ford.values import CarControllerParams
 from opendbc.sunnypilot.car.ford.angle_autocal import Frame
 from opendbc.sunnypilot.car.ford.angle_autocal_controller import AutoCalController
+from opendbc.sunnypilot.car.ford.angle_smoothing import AngleSmoother
 from opendbc.sunnypilot.car.ford.lateral_curv_ext import LateralResult
 from opendbc.sunnypilot.car.ford.human_turn import HumanTurnDetector
 from opendbc.sunnypilot.car.ford.values_ext import (BP_ANGLE_LIMITS, platform_gains,
@@ -42,6 +43,10 @@ FORD_DBC_PATH_ANGLE_MIN = -0.5
 FORD_DBC_PATH_ANGLE_MAX = 0.5235
 
 # Auto-cal state persistence cadence: losing a save costs at most this much evidence.
+
+# --- Anti-weave smoothing (FordAngleSmoothing) -------------------------------------------
+# All constants, semantics, and filter math live in angle_smoothing.AngleSmoother (pure,
+# unit-tested). Menu 1.0 = stock/no smoothing, bit-identical to the toggle being off.
 
 
 # PSCM d_ref (m) vs speed (m/s) — 6 points; above ~55.6 m/s use plateau + optional cap to 5 m.
@@ -163,10 +168,30 @@ class LateralAngleExt:
     # nudge writes, save cadence, errors, telemetry status) lives in AutoCalController —
     # this class only routes frames and adopts returned nudges.
     self.autocal_ctl = AutoCalController(dt=_STEER_DT)
-    self._autocal_param_ctr = 100  # >= threshold so the very first call reads params
+    self._autocal_param_ctr = 100  # >= threshold so the very first call reads params (also gates smoothing reads)
+    # BluePilot: anti-weave smoothing (FordAngleSmoothing; see angle_smoothing.py).
+    self.smoother = AngleSmoother(dt=_STEER_DT)
     # Telemetry + autocal gate: the command this frame was modified by PSCM authority
     # limits or the DBC clamp — the car could not make the requested turn.
     self.bp_angle_saturated = False
+
+
+  # -- smoothing compat surface (offline replay tooling sets these directly) ---------------
+  @property
+  def smoothing_enabled(self) -> bool:
+    return self.smoother.enabled
+
+  @smoothing_enabled.setter
+  def smoothing_enabled(self, v: bool):
+    self.smoother.enabled = bool(v)
+
+  @property
+  def smoothing_strength(self) -> float:
+    return self.smoother.strength
+
+  @smoothing_strength.setter
+  def smoothing_strength(self, v: float):
+    self.smoother.strength = float(v)
 
   def update_angle_params(self, params):
     """Sets per-platform gain defaults and reads user feel-factor params."""
@@ -196,6 +221,16 @@ class LateralAngleExt:
       self._autocal_param_ctr += 1
       if self._autocal_param_ctr >= 100:
         self._autocal_param_ctr = 0
+        try:
+          _sm_enabled = bool(params.get_bool("FordAngleSmoothing"))
+          raw_strength = params.get("FordAngleSmoothStrength", return_default=True)
+          _menu = 1.0 + self.smoother.strength  # keep current on unreadable/empty
+          if raw_strength is not None and raw_strength != b"":
+            _menu = float(
+              raw_strength.decode("utf-8", errors="replace") if isinstance(raw_strength, bytes) else raw_strength)
+          self.smoother.configure(_sm_enabled, _menu)
+        except Exception:
+          pass  # keep the previous values; defaults are enabled / 1.0
         self.autocal_ctl.poll_params(params, self.low_speed_curv_factor,
                                      self.high_speed_curv_factor,
                                      self.path_angle_gain_highC_highV)
@@ -255,6 +290,7 @@ class LateralAngleExt:
       self.precision_type = 1
       self.bp_angle_saturated = False
       self.autocal_ctl.idle()  # steady-state timer and staged samples must not span disengagements
+      self.smoother.reset()
       return LateralResult(
         apply_curvature=0.0,
         curvature_rate=0.0,
@@ -300,6 +336,7 @@ class LateralAngleExt:
       self.precision_type = 1
       self.bp_angle_saturated = False
       self.autocal_ctl.idle()  # steady-state timer and staged samples must not span disengagements
+      self.smoother.reset()
       return LateralResult(
         apply_curvature=0.0,
         curvature_rate=0.0,
@@ -346,6 +383,7 @@ class LateralAngleExt:
       # the steady-state baseline and straddles the apex buffer, so staged evidence and
       # peak windows must not survive it.
       self.autocal_ctl.idle()
+      self.smoother.reset()  # path ramps back from zero; filters must too
       if self.stall_blip_frames_left <= 0:
         self.stall_blip_cooldown_s = _STALL_COOLDOWN_S
       return LateralResult(
@@ -378,7 +416,10 @@ class LateralAngleExt:
     if self.model is not None and len(self.model.orientationRate.z) >= 17:
       _curvatures_ref = np.array(self.model.orientationRate.z) / max(0.01, v_ego)
       _kappa_at_t_base = abs(float(interp(_t_base, ModelConstants.T_IDXS, _curvatures_ref)))
-    _kappa_entering = _kappa_at_t_base > abs(desired_curvature)
+    # Anti-weave: hysteresis so noise straddling the entering/exiting boundary can't flip
+    # this boolean (and with it the exit-blend gate) frame to frame near zero curvature.
+    _kappa_entering = self.smoother.entering(_kappa_at_t_base - abs(desired_curvature),
+                                             _kappa_at_t_base > abs(desired_curvature))
     if _kappa_entering:
       _kappa_factor = 1.0  # curve deepening ahead: full extra lookahead for gradual entry
     else:
@@ -392,6 +433,9 @@ class LateralAngleExt:
       predicted_curvature = float(
         interp(curvature_lookup_time, ModelConstants.T_IDXS, curvatures)
       )
+    # Anti-weave: low-pass the model prediction to strip frame-to-frame jitter (details
+    # in angle_smoothing.prediction — inside the VLT's slack, so no curve-entry cost).
+    predicted_curvature = self.smoother.prediction(predicted_curvature)
 
     b = float(self.path_angle_blend_ratio)
     b = float(clip(b, 0.0, 1.0))
@@ -420,7 +464,9 @@ class LateralAngleExt:
     # Same bug class and fix as _PSCM_SAT_UNWIND_RATE and _soft_roc above.
     _desired_falling = abs(desired_curvature) < abs(self._desired_curvature_last) - 0.010
     _on_exit_near_limit = not _kappa_entering and (_pscm_lim >= 1 or _in_hard_sat or _desired_falling)
-    b_blend = float(clip(b * 0.25, 0.0, 1.0)) if _on_exit_near_limit else b
+    _b_target = float(clip(b * 0.25, 0.0, 1.0)) if _on_exit_near_limit else b
+    # Anti-weave: slew instead of stepping the exit blend (bounded ramps, no 4x steps).
+    b_blend = self.smoother.blend(_b_target)
     requested_curvature = predicted_curvature * b_blend + desired_curvature * (1.0 - b_blend)
     self._desired_curvature_last = desired_curvature
 
@@ -473,8 +519,12 @@ class LateralAngleExt:
                                  [(LOW_ANCHOR_BASE * self.low_speed_curv_factor),
                                   (self.path_angle_gain_highC_highV * self.high_speed_curv_factor)])
 
-    # As the curve gets bigger, we will need a little boost to the signal to to not understeer
-    self.curvature_factor = interp(abs(kappa_cmd), [0.0007, 0.001], [self.low_gain_calc, self.high_gain_calc])
+    # As the curve grows the signal needs a boost to not understeer. The smoother's
+    # asymmetric filter on |kappa| is the PRIMARY anti-weave fix (see angle_smoothing.py).
+    # COUPLING: the interp knee top (0.001) is auto-cal's MIN_KAPPA — the calibrator only
+    # samples fully inside the high branch. If this band moves, MIN_KAPPA moves with it.
+    _kappa_for_gain = self.smoother.kappa_schedule(abs(kappa_cmd))
+    self.curvature_factor = interp(_kappa_for_gain, [0.0007, 0.001], [self.low_gain_calc, self.high_gain_calc])
 
     path_angle_calc = kappa_cmd * v_ego * self.curvature_factor
     path_angle = path_angle_calc
@@ -521,6 +571,10 @@ class LateralAngleExt:
                             self.path_angle_last + _soft_roc))
     # BluePilot: did the soft ROC clip actually limit the path_angle we wanted to send this frame?
     self.bp_angle_rate_limited = bool(abs(path_angle - _path_angle_pre_roc) > 1e-9)
+
+    # Anti-weave: 1-LSB wire hold on the outgoing path_angle (kills LSB dither; held
+    # frames are zero-ROC and cannot trip panda — details in angle_smoothing.wire).
+    path_angle = self.smoother.wire(path_angle)
 
 
     # c0 always zero -- no centering trim in angle mode.

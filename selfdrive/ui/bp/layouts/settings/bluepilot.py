@@ -79,6 +79,7 @@ class BluePilotLayout(Widget):
       ("send_hands_free_cluster_msg", self._show_hands_free_ui),
       ("FordPrefSteerAngleCurvature", self._steer_angle_curvature),
       ("FordAngleAutoCal", self._angle_autocal),
+      ("FordAngleSmoothing", self._angle_smoothing),
       ("BPDisableLaneLineStatusColor", self._disable_lane_line_status_color),
       ("BPHideCameraView", self._hide_camera_view),
       ("BPRadRacerTheme", self._rad_racer_theme),
@@ -545,6 +546,29 @@ class BluePilotLayout(Widget):
       callback=self._toggle_angle_autocal,
       icon="chffr_wheel.png"
     )
+    # BluePilot: anti-weave smoothing of the angle command path (gain-schedule filter,
+    # wire-quantization hold, blend slew — see lateral_angle_ext.py _SM_* constants).
+    self._angle_smoothing = toggle_item(
+      lambda: tr("Smooth Steering (Anti-Weave)"),
+      lambda: tr("Removes the rhythmic left-right centering motion in angle mode by filtering "
+                 "the sources of steering dither on straight roads. No effect in curves. "
+                 "Turn off to compare against the unsmoothed behavior."),
+      initial_state=self._safe_get_bool(self._params, "FordAngleSmoothing", default=True),
+      callback=lambda state: self._toggle_callback(state, "FordAngleSmoothing"),
+      icon="chffr_wheel.png"
+    )
+    # Manual strength for the smoothing above: 0 = minimal, 1.0 = tuned default, 1.5 = strong.
+    self._angle_smoothing_strength = float_control_item(
+      lambda: tr("Smoothing Strength"),
+      lambda: tr("1.0 = stock steering (no smoothing). Step up for more damping of the "
+                 "straight-road weave; 2.0 = the log-tuned setting, 2.5 = strongest. "
+                 "Curve response is unaffected at any strength."),
+      param="FordAngleSmoothStrength",
+      min_value=1.0,
+      max_value=2.5,
+      step=0.1,
+      icon="chffr_wheel.png"
+    )
     # Disable BP lateral control toggle
     self._disable_BP_lat = toggle_item(
       lambda: tr("Disable BP Lateral Control"),
@@ -628,6 +652,8 @@ class BluePilotLayout(Widget):
       self._low_speed_curv_factor,
       self._high_speed_curv_factor,
       self._angle_autocal,
+      self._angle_smoothing,
+      self._angle_smoothing_strength,
       self._lane_change_factor_high_ang,
     ]
     angle_header = CollapsibleSectionHeader(tr("Angle Tuning"))
@@ -876,6 +902,8 @@ class BluePilotLayout(Widget):
     self._low_speed_curv_factor.action_item.set_enabled(is_angle)
     self._high_speed_curv_factor.action_item.set_enabled(is_angle)
     self._angle_autocal.action_item.set_enabled(is_angle)
+    self._angle_smoothing.action_item.set_enabled(is_angle)
+    self._angle_smoothing_strength.action_item.set_enabled(is_angle)
     self._lane_change_factor_high_ang.action_item.set_enabled(is_angle)
     # Curvature-mode items: always visible (Curvature Tuning section), greyed out when angle mode is active
     self._lane_change_factor_high_curv.action_item.set_enabled(is_curv)

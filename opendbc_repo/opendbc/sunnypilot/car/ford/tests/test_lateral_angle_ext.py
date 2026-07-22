@@ -202,5 +202,212 @@ class TestInitializeFord(unittest.TestCase):
     self.assertIs(type(CP_SP.safetyParam), int)
 
 
+class _SmModel:
+  """Minimal modelV2 stand-in: constant curvature along the horizon."""
+  class _OR:
+    def __init__(self, z):
+      self.z = z
+
+  class _Meta:
+    laneChangeState = 0
+    laneChangeDirection = 0
+
+  def __init__(self, kappa, v):
+    self.orientationRate = self._OR([kappa * v] * 33)
+    self.meta = self._Meta()
+
+
+class _SmParams:
+  """Typed-enough mock params for the smoothing toggle glue."""
+  def __init__(self, values):
+    self.values = values
+
+  def get(self, key, return_default=False):
+    return self.values.get(key)
+
+  def get_bool(self, key):
+    return bool(self.values.get(key))
+
+  def put(self, key, value):
+    self.values[key] = value
+
+
+class TestAngleSmoothing(unittest.TestCase):
+  """Anti-weave smoothing (FordAngleSmoothing). The OFF path must behave exactly like the
+  unsmoothed math; the ON path must remove dither injectors without softening curve entry."""
+
+  V = 20.0
+
+  def _ext(self, smoothing):
+    cp = _explorer_cp()
+    ext = _Harness(cp)
+    ext.CP = cp  # update_angle_params reads self.CP (set by carcontroller in the real stack)
+    ext.human_turn_detector = _ForcedDetector(False)
+    ext.smoothing_enabled = smoothing
+    # Effective scale (menu - 1.0): tests exercise the tuned package (menu 2.0).
+    ext.smoothing_strength = 1.0 if smoothing else 0.0
+    return ext
+
+  def _cs(self, desired=0.0):
+    # yaw tracks desired so the deviation clip never binds and measured == desired.
+    return _CS(vEgoRaw=self.V, vEgo=self.V, yawRate=-desired * self.V)
+
+  def _drive(self, ext, desired_seq, model_kappa=None):
+    out = []
+    for d in desired_seq:
+      if model_kappa is not None:
+        ext.model = _SmModel(model_kappa, self.V)
+      out.append(ext.update_angle_strategy(_CC(), self._cs(d), _Actuators(curvature=d), _explorer_cp()).path_angle)
+    return out
+
+  def test_off_gain_schedule_uses_raw_kappa(self):
+    from numpy import interp as np_interp
+    ext = self._ext(False)
+    for d in [0.0006, 0.0011, 0.0006, 0.0011] * 10:
+      ext.update_angle_strategy(_CC(), self._cs(d), _Actuators(curvature=d), _explorer_cp())
+      expected = float(np_interp(abs(ext.bp_kappa_cmd), [0.0007, 0.001],
+                                 [ext.low_gain_calc, ext.high_gain_calc]))
+      self.assertAlmostEqual(ext.curvature_factor, expected, places=12)
+    # OFF path must leave the smoothing filters untouched at their reset values.
+    self.assertEqual(ext.smoother._sched, 0.0)
+    self.assertIsNone(ext.smoother._b_blend)
+
+  def test_on_gain_schedule_filters_oscillation(self):
+    ext = self._ext(True)
+    factors = []
+    for d in [0.0006, 0.0011] * 40:  # square wave straddling the interp band
+      ext.update_angle_strategy(_CC(), self._cs(d), _Actuators(curvature=d), _explorer_cp())
+      factors.append(ext.curvature_factor)
+    tail = factors[-20:]
+    # Raw input would swing the factor across the whole low<->high range every frame;
+    # the filtered schedule input must pin it nearly constant once settled.
+    self.assertLess(max(tail) - min(tail), 0.05)
+
+  def test_gain_filter_asymmetry(self):
+    from opendbc.sunnypilot.car.ford.angle_smoothing import GAIN_RC_UP as _SM_GAIN_RC_UP, GAIN_RC_DOWN as _SM_GAIN_RC_DOWN
+    ext = self._ext(True)
+    rise_frames = int(2.3 * _SM_GAIN_RC_UP / 0.05) + 2
+    self._drive(ext, [0.002] * rise_frames, model_kappa=0.002)
+    self.assertGreater(ext.smoother._sched, 0.9 * 0.002)
+    fall_frames = int(_SM_GAIN_RC_DOWN / 0.05)
+    self._drive(ext, [0.0] * fall_frames, model_kappa=0.0)
+    self.assertGreater(ext.smoother._sched, 0.3 * 0.002)
+
+  def test_wire_hold_stops_sub_lsb_dither(self):
+    from opendbc.sunnypilot.car.ford.angle_smoothing import WIRE_HOLD as _SM_WIRE_HOLD
+    ext = self._ext(True)
+    self._drive(ext, [0.0015] * 60)  # settle onto a working point
+    held = ext.path_angle_last
+    eps = _SM_WIRE_HOLD / (self.V * 3.0)
+    out = self._drive(ext, [0.0015 + (eps if i % 2 else -eps) for i in range(40)])
+    self.assertTrue(all(abs(pa - held) < 1e-12 for pa in out[5:]))
+    out = self._drive(ext, [0.0030] * 30)  # a genuine move releases the hold
+    self.assertNotAlmostEqual(out[-1], held, places=6)
+
+  def test_blend_slew_bounded(self):
+    from opendbc.sunnypilot.car.ford.angle_smoothing import BLEND_SLEW as _SM_BLEND_SLEW
+    ext = self._ext(True)
+    ext.model = _SmModel(0.002, self.V)
+    prev = None
+    for d in [0.002] * 20 + [0.015, 0.002] * 20:  # >0.010 drops toggle _desired_falling
+      ext.update_angle_strategy(_CC(), self._cs(d), _Actuators(curvature=d), _explorer_cp())
+      if prev is not None and ext.smoother._b_blend is not None:
+        self.assertLessEqual(abs(ext.smoother._b_blend - prev), _SM_BLEND_SLEW + 1e-9)
+      prev = ext.smoother._b_blend
+
+  def test_kappa_entering_hysteresis(self):
+    ext = self._ext(True)
+    flips = 0
+    last = None
+    for i in range(60):
+      mk = 0.0005 + (0.0001 if i % 2 else -0.0001)  # dither inside the +-0.0003 band
+      ext.model = _SmModel(mk, self.V)
+      ext.update_angle_strategy(_CC(), self._cs(0.0005), _Actuators(curvature=0.0005), _explorer_cp())
+      if last is not None and ext.smoother._entering != last:
+        flips += 1
+      last = ext.smoother._entering
+    self.assertEqual(flips, 0)
+
+  def test_curve_entry_not_softened(self):
+    ramp = [min(0.003, 0.0002 * i) for i in range(60)]
+    off = self._drive(self._ext(False), ramp)
+    on = self._drive(self._ext(True), ramp)
+    target = 0.9 * off[-1]
+    t_off = next(i for i, x in enumerate(off) if x >= target)
+    t_on = next(i for i, x in enumerate(on) if x >= target)
+    self.assertLessEqual(t_on - t_off, 2)  # <=0.1 s later at 20 Hz
+    self.assertAlmostEqual(on[-1], off[-1], delta=abs(off[-1]) * 0.02 + 1e-9)
+
+  def test_roc_property_holds_with_smoothing(self):
+    import random
+    rng = random.Random(3)
+    ext = self._ext(True)
+    prev = ext.path_angle_last
+    for _ in range(300):
+      d = rng.uniform(-0.004, 0.004)
+      ext.update_angle_strategy(_CC(), self._cs(d), _Actuators(curvature=d), _explorer_cp())
+      self.assertLessEqual(abs(ext.path_angle_last - prev), 0.055 + 1e-9)  # loosest soft ROC
+      prev = ext.path_angle_last
+
+  def test_resets_on_override_paths(self):
+    ext = self._ext(True)
+    self._drive(ext, [0.002] * 40)
+    self.assertGreater(ext.smoother._sched, 0.0)
+    ext.human_turn_detector = _ForcedDetector(True)  # forces the override early-return
+    ext.update_angle_strategy(_CC(), self._cs(0.002), _Actuators(curvature=0.002), _explorer_cp())
+    self.assertEqual(ext.smoother._sched, 0.0)
+    self.assertEqual(ext.smoother._wire, 0.0)
+    self.assertIsNone(ext.smoother._b_blend)
+
+  def test_menu_one_is_bit_identical_stock(self):
+    # Menu 1.0 (effective 0) must equal the toggle-off path EXACTLY, frame by frame.
+    import random
+    rng = random.Random(7)
+    seq = [rng.uniform(-0.003, 0.003) for _ in range(200)]
+    off = self._drive(self._ext(False), seq)
+    neutral = self._ext(True)
+    neutral.smoothing_strength = 0.0  # menu 1.0
+    on = self._drive(neutral, seq)
+    self.assertEqual(off, on)
+
+  def test_strength_max_entry_still_fast(self):
+    ramp = [min(0.003, 0.0002 * i) for i in range(60)]
+    off = self._drive(self._ext(False), ramp)
+    strong = self._ext(True)
+    strong.smoothing_strength = 1.5
+    on = self._drive(strong, ramp)
+    target = 0.9 * off[-1]
+    t_off = next(i for i, x in enumerate(off) if x >= target)
+    t_on = next(i for i, x in enumerate(on) if x >= target)
+    self.assertLessEqual(t_on - t_off, 2)  # entry guarantee is strength-independent
+
+  def test_param_glue_reads_strength(self):
+    ext = self._ext(True)
+    p = _SmParams({"FordAngleSmoothing": True, "FordAngleSmoothStrength": 1.5,
+                   "FordAngleAutoCal": 0, "FordAngleAutoCalState": ""})
+    for _ in range(101):
+      ext.update_angle_params(p)
+    self.assertAlmostEqual(ext.smoothing_strength, 0.5)  # menu 1.5 -> effective 0.5
+    p.values["FordAngleSmoothStrength"] = 9.0  # clamped to the menu max (2.5)
+    for _ in range(101):
+      ext.update_angle_params(p)
+    self.assertAlmostEqual(ext.smoothing_strength, 1.5)
+    p.values["FordAngleSmoothStrength"] = 0.2  # below stock clamps to menu 1.0 = neutral
+    for _ in range(101):
+      ext.update_angle_params(p)
+    self.assertAlmostEqual(ext.smoothing_strength, 0.0)
+
+  def test_param_glue_reads_toggle(self):
+    ext = self._ext(True)
+    p = _SmParams({"FordAngleSmoothing": False, "FordAngleAutoCal": 0, "FordAngleAutoCalState": ""})
+    for _ in range(101):
+      ext.update_angle_params(p)
+    self.assertFalse(ext.smoothing_enabled)
+    p.values["FordAngleSmoothing"] = True
+    for _ in range(101):
+      ext.update_angle_params(p)
+    self.assertTrue(ext.smoothing_enabled)
+
+
 if __name__ == '__main__':
   unittest.main()
