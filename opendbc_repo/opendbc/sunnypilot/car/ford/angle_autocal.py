@@ -32,43 +32,8 @@ The estimator is pure math with no I/O so the exact same code runs in two places
 """
 import math
 
-from opendbc.car.ford.values import CAR
-
-# Hard-coded per-platform gain defaults (moved here from lateral_angle_ext so this module
-# and the offline analyzer share one source; lateral_angle_ext imports them back).
-# CAN vehicles (Escape MK4, Bronco Sport, Explorer, Maverick, Edge)
-GAIN_CAN = (1.00, 1.15)
-# CAN-FD body-on-frame trucks (F-150, Lightning, Expedition, Ranger)
-GAIN_CANFD_BOF = (0.95, 0.95)
-# CAN-FD unibody SUVs (Mustang Mach-E, Escape MK4.5)
-GAIN_CANFD_SUV = (1.00, 1.05)
-
-CANFD_BOF_CARS = frozenset({
-  CAR.FORD_F_150_MK14,
-  CAR.FORD_F_150_LIGHTNING_MK1,
-  CAR.FORD_EXPEDITION_MK4,
-  CAR.FORD_RANGER_MK2,
-})
-CANFD_SUV_CARS = frozenset({
-  CAR.FORD_MUSTANG_MACH_E_MK1,
-  CAR.FORD_ESCAPE_MK4_5,
-})
-
-
-def platform_gains(fingerprint: str) -> tuple[float, float]:
-  """(lowC_highV, highC_highV) platform gain pair for a car fingerprint."""
-  if fingerprint in CANFD_BOF_CARS:
-    return GAIN_CANFD_BOF
-  if fingerprint in CANFD_SUV_CARS:
-    return GAIN_CANFD_SUV
-  return GAIN_CAN
-
-
-# Speed anchors of the gain interpolation in lateral_angle_ext (m/s: ~30 mph and ~60 mph).
-V_LOW = 13.5
-V_HIGH = 26.82
-# Fixed multiplier on the low-speed anchor in lateral_angle_ext.
-LOW_ANCHOR_BASE = 1.30
+# The strategy owns the gain model; this module (and the offline analyzer) consume it.
+from opendbc.sunnypilot.car.ford.values_ext import V_LOW, V_HIGH, LOW_ANCHOR_BASE
 
 # Sample admission gates (mirrored by both the offline analyzer and the onboard hook).
 MIN_SPEED = 9.5             # m/s; below this the deviation clip is off and measurement is noisy

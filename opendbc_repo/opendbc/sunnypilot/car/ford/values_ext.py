@@ -123,3 +123,42 @@ def apply_bp_device_mount(car_docs, CP):
   else:
     car_docs.car_parts = CarParts([Device.threex, harness])
 
+
+
+# ---------------------------------------------------------------------------------------
+# Angle-mode gain model — owned by the strategy (lateral_angle_ext), consumed by the
+# auto-calibrator (angle_autocal) and the offline analyzer. Single source of truth here
+# so the strategy never imports its own gain model back out of the calibrator.
+#
+# Hard-coded per-platform gain defaults (not user-tunable):
+GAIN_CAN = (1.00, 1.15)        # CAN vehicles (Escape MK4, Bronco Sport, Explorer, Maverick, Edge)
+GAIN_CANFD_BOF = (0.95, 0.95)  # CAN-FD body-on-frame trucks (F-150, Lightning, Expedition, Ranger)
+GAIN_CANFD_SUV = (1.00, 1.05)  # CAN-FD unibody SUVs (Mustang Mach-E, Escape MK4.5)
+
+CANFD_BOF_CARS = frozenset({
+  CAR.FORD_F_150_MK14,
+  CAR.FORD_F_150_LIGHTNING_MK1,
+  CAR.FORD_EXPEDITION_MK4,
+  CAR.FORD_RANGER_MK2,
+})
+CANFD_SUV_CARS = frozenset({
+  CAR.FORD_MUSTANG_MACH_E_MK1,
+  CAR.FORD_ESCAPE_MK4_5,
+})
+
+
+def platform_gains(fingerprint: str) -> tuple[float, float]:
+  """(lowC_highV, highC_highV) platform gain pair for a car fingerprint."""
+  if fingerprint in CANFD_BOF_CARS:
+    return GAIN_CANFD_BOF
+  if fingerprint in CANFD_SUV_CARS:
+    return GAIN_CANFD_SUV
+  return GAIN_CAN
+
+
+# Speed anchors of the strategy's gain interpolation (m/s: ~30 mph and ~60 mph), and the
+# fixed multiplier on the low-speed anchor. The auto-calibrator's fit is expressed
+# against these — if the strategy's interp changes, they must move together.
+V_LOW = 13.5
+V_HIGH = 26.82
+LOW_ANCHOR_BASE = 1.30

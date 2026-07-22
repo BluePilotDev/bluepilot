@@ -28,22 +28,13 @@ from numpy import clip, interp
 
 from opendbc.car import DT_CTRL
 from opendbc.car.lateral import apply_std_steer_angle_limits
-from opendbc.car.ford.values import CAR, CarControllerParams
+from opendbc.car.ford.values import CarControllerParams
 from opendbc.sunnypilot.car.ford.angle_autocal import AutoCalPipeline
 from opendbc.sunnypilot.car.ford.lateral_curv_ext import LateralResult
 from opendbc.sunnypilot.car.ford.human_turn import HumanTurnDetector
-from opendbc.sunnypilot.car.ford.values_ext import BP_ANGLE_LIMITS
+from opendbc.sunnypilot.car.ford.values_ext import (BP_ANGLE_LIMITS, platform_gains,
+                                                    V_LOW, V_HIGH, LOW_ANCHOR_BASE)
 from selfdrive.modeld.constants import ModelConstants
-
-# Hard-coded per-platform gain defaults (not user-tunable). Single source lives in
-# angle_autocal.py so the offline analyzer and the auto-calibrator share them.
-from opendbc.sunnypilot.car.ford.angle_autocal import (  # noqa: E402
-  GAIN_CAN as _GAIN_CAN,
-  GAIN_CANFD_BOF as _GAIN_CANFD_BOF,
-  GAIN_CANFD_SUV as _GAIN_CANFD_SUV,
-  CANFD_BOF_CARS as _CANFD_BOF_CARS,
-  CANFD_SUV_CARS as _CANFD_SUV_CARS,
-)
 
 
 # DBC ``LatCtlPath_An_Actl`` (rad) — panda safety uses the same in ``ford.h``; PSCM enforces in firmware.
@@ -218,12 +209,7 @@ class LateralAngleExt:
     """Sets per-platform gain defaults and reads user feel-factor params."""
     self._ensure_lateral_curv_initialized(self.CP)
     fp = getattr(self.CP, 'carFingerprint', '')
-    if fp in _CANFD_BOF_CARS:
-      low, high = _GAIN_CANFD_BOF
-    elif fp in _CANFD_SUV_CARS:
-      low, high = _GAIN_CANFD_SUV
-    else:
-      low, high = _GAIN_CAN
+    low, high = platform_gains(fp)
     self.path_angle_gain_lowC_highV = low
     self.path_angle_gain_highC_highV = high
     if params is not None and hasattr(params, "get"):
@@ -563,8 +549,10 @@ class LateralAngleExt:
 
 
     # Speed-interpolated gain: at low speed both curves use 1.0; at high speed the params take effect.
-    self.low_gain_calc = interp(v_ego, [13.5, 26.82], [1.0, self.path_angle_gain_lowC_highV])
-    self.high_gain_calc = interp(v_ego, [13.5, 26.82], [(1.30 * self.low_speed_curv_factor), (self.path_angle_gain_highC_highV * self.high_speed_curv_factor)])
+    self.low_gain_calc = interp(v_ego, [V_LOW, V_HIGH], [1.0, self.path_angle_gain_lowC_highV])
+    self.high_gain_calc = interp(v_ego, [V_LOW, V_HIGH],
+                                 [(LOW_ANCHOR_BASE * self.low_speed_curv_factor),
+                                  (self.path_angle_gain_highC_highV * self.high_speed_curv_factor)])
 
     # As the curve gets bigger, we will need a little boost to the signal to to not understeer
     self.curvature_factor = interp(abs(kappa_cmd), [0.0007, 0.001], [self.low_gain_calc, self.high_gain_calc])
