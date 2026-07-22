@@ -586,25 +586,28 @@ class LateralAngleExt:
     # road-disturbance cancels them retroactively), holds a 3s post-grip cooldown, and
     # rejects any frame where cmd != meas has an explanation other than gain error (bump
     # flick, rough surface, tire-limit lat accel, longitudinal load transfer, saturation).
-    ws = CS.out.wheelSpeeds
-    ws_vals = (float(ws.fl), float(ws.fr), float(ws.rl), float(ws.rr))
     # Human-turn and stall-blip frames never reach here (their branches early-return after
     # idling the pipeline). The controller owns the liveDelay warmup gate, nudge writes,
     # save cadence, and the lock -> disarm transition; a returned pair is adopted as the
-    # live factors so this very frame steers with the new gain.
-    nudged = self.autocal_ctl.feed(
-      Frame(v_ego=v_ego, kappa_cmd=kappa_cmd, kappa_meas=current_curvature,
-            steering_pressed=bool(CS.out.steeringPressed),
-            angle_rate_limited=self.bp_angle_rate_limited,
-            deviation_limited=self.bp_curvature_deviation_limited,
-            saturated=self.bp_angle_saturated,
-            driver_torque=float(CS.out.steeringTorque), a_ego=float(CS.out.aEgo),
-            ws_spread=max(ws_vals) - min(ws_vals),
-            low_factor=self.low_speed_curv_factor, high_factor=self.high_speed_curv_factor),
-      delay_estimated=str(self.sm['liveDelay'].status) == "estimated")
-    if nudged is not None:
-      self.low_speed_curv_factor = float(nudged[0])
-      self.high_speed_curv_factor = float(nudged[1])
+    # live factors so this very frame steers with the new gain. Frame construction (and
+    # its signal reads) only happens while the calibrator is armed — for everyone else
+    # this whole block is one attribute check per frame.
+    if self.autocal_ctl.enabled:
+      ws = CS.out.wheelSpeeds
+      ws_vals = (float(ws.fl), float(ws.fr), float(ws.rl), float(ws.rr))
+      nudged = self.autocal_ctl.feed(
+        Frame(v_ego=v_ego, kappa_cmd=kappa_cmd, kappa_meas=current_curvature,
+              steering_pressed=bool(CS.out.steeringPressed),
+              angle_rate_limited=self.bp_angle_rate_limited,
+              deviation_limited=self.bp_curvature_deviation_limited,
+              saturated=self.bp_angle_saturated,
+              driver_torque=float(CS.out.steeringTorque), a_ego=float(CS.out.aEgo),
+              ws_spread=max(ws_vals) - min(ws_vals),
+              low_factor=self.low_speed_curv_factor, high_factor=self.high_speed_curv_factor),
+        delay_estimated=str(self.sm['liveDelay'].status) == "estimated")
+      if nudged is not None:
+        self.low_speed_curv_factor = float(nudged[0])
+        self.high_speed_curv_factor = float(nudged[1])
 
     return LateralResult(
       apply_curvature=0.0,
