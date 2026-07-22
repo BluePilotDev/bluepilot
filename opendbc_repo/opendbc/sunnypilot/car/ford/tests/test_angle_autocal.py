@@ -118,7 +118,7 @@ class TestSteadyStateGate:
   def test_requires_sustained_steady(self):
     gate = SteadyStateGate(dt=DT)
     needed = int(STEADY_TIME_S / DT)
-    results = [gate.update(True, MIN_KAPPA * 2, False, False, False, False, False)
+    results = [gate.update(True, MIN_KAPPA * 2, False, False, False)
                for _ in range(needed + 2)]
     assert not any(results[:needed - 1])
     assert results[-1]
@@ -126,23 +126,23 @@ class TestSteadyStateGate:
   def test_resets_on_any_flag(self):
     gate = SteadyStateGate(dt=DT)
     for _ in range(int(STEADY_TIME_S / DT) + 1):
-      gate.update(True, MIN_KAPPA * 2, False, False, False, False, False)
-    assert gate.update(True, MIN_KAPPA * 2, False, False, False, False, False)
-    gate.update(True, MIN_KAPPA * 2, True, False, False, False, False)  # pressed
+      gate.update(True, MIN_KAPPA * 2, False, False, False)
+    assert gate.update(True, MIN_KAPPA * 2, False, False, False)
+    gate.update(True, MIN_KAPPA * 2, True, False, False)  # pressed
     assert gate.steady_s == 0.0
 
   def test_saturation_blocks(self):
     gate = SteadyStateGate(dt=DT)
     for _ in range(int(STEADY_TIME_S / DT) + 2):
-      assert not gate.update(True, 0.002, False, False, False, False, False, saturated=True)
+      assert not gate.update(True, 0.002, False, False, False, saturated=True)
 
   def test_light_torque_starts_cooldown(self):
     gate = SteadyStateGate(dt=DT)
-    gate.update(True, 0.002, False, False, False, False, False, driver_torque=0.7)
+    gate.update(True, 0.002, False, False, False, driver_torque=0.7)
     assert gate.grip_cooldown_s > 0.0
     blocked = int(PRESS_COOLDOWN_S / DT) - 1
     for _ in range(blocked):
-      assert not gate.update(True, 0.002, False, False, False, False, False)
+      assert not gate.update(True, 0.002, False, False, False)
 
 
 class TestQualityMonitor:
@@ -277,7 +277,7 @@ def run_pipeline(pipe, n, torque=0.0, pressed=False, saturated=False, kappa=0.00
                  low=1.0, high=1.0):
   committed = []
   for _ in range(n):
-    committed += pipe.update(v, kappa, kappa, pressed, False, False, False, False,
+    committed += pipe.update(v, kappa, kappa, pressed, False, False,
                              saturated=saturated, driver_torque=torque,
                              low_factor=low, high_factor=high)
   return committed
@@ -296,7 +296,7 @@ class TestAutoCalPipeline:
     warm = int(STEADY_TIME_S / DT) + 1 + int(PRESS_HOLDBACK_S / DT) // 2
     run_pipeline(pipe, warm)
     assert len(pipe._staged) > 0 and pipe.est.n == 0
-    pipe.update(20.0, 0.002, 0.002, True, False, False, False, False)  # grip
+    pipe.update(20.0, 0.002, 0.002, True, False, False)  # grip
     assert len(pipe._staged) == 0
     assert pipe.est.n == 0  # nothing from before the grip ever reached the estimator
 
@@ -306,7 +306,7 @@ class TestAutoCalPipeline:
     run_pipeline(pipe, warm)
     assert len(pipe._staged) > 0 and pipe.est.n == 0
     # Bump: measured curvature jumps while the command sits still.
-    pipe.update(20.0, 0.002, 0.002 + SPIKE_MEAS_RATE * DT * 2, False, False, False, False, False)
+    pipe.update(20.0, 0.002, 0.002 + SPIKE_MEAS_RATE * DT * 2, False, False, False)
     assert len(pipe._staged) == 0 and pipe.est.n == 0
     # And the blanking window keeps evidence off while the car settles.
     committed = run_pipeline(pipe, int(DISTURBANCE_BLANK_S / DT) - 2)
@@ -330,7 +330,7 @@ class TestAutoCalPipeline:
     kappa_meas = 0.0010
     staged_during_sweep = 0
     for _ in range(warm):
-      pipe.update(20.0, 0.002, kappa_meas, False, False, False, False, False)
+      pipe.update(20.0, 0.002, kappa_meas, False, False, False)
       if kappa_meas < 0.0019:
         kappa_meas += 0.0002  # 0.004/s sweep, far above the settle bound
         staged_during_sweep = len(pipe._staged) + pipe.est.n
@@ -367,7 +367,7 @@ class TestFactorNudger:
       pipe.gate.steady_s = 0.0
       pipe._meas_last = None
       for _ in range(n):
-        pipe.update(v, kappa, kappa * r, False, False, False, False, False,
+        pipe.update(v, kappa, kappa * r, False, False, False,
                     low_factor=applied[0], high_factor=applied[1])
     return pipe
 
@@ -389,7 +389,7 @@ class TestFactorNudger:
     assert pipe.recommend(1.02, 1.02) is None  # inside NUDGE_PERIOD_S
     # advance active time
     for _ in range(int(NUDGE_PERIOD_S / DT) + 1):
-      pipe.update(10.0, 0.004, 0.004, False, False, False, False, False,
+      pipe.update(10.0, 0.004, 0.004, False, False, False,
                   low_factor=1.02, high_factor=1.02)
     assert pipe.recommend(1.02, 1.02) is not None
 
@@ -405,7 +405,7 @@ class TestFactorNudger:
       for _f in range(int(NUDGE_PERIOD_S / DT) + 1):
         g = applied_gain(10.0, *applied)
         r = g / ideal_gain(10.0, 1.40, 1.40)
-        pipe.update(10.0, 0.004, 0.004 * r, False, False, False, False, False,
+        pipe.update(10.0, 0.004, 0.004 * r, False, False, False,
                     low_factor=applied[0], high_factor=applied[1])
       rec = pipe.recommend(*applied)
       if rec is not None:
@@ -452,7 +452,7 @@ class TestClosedLoopConvergence:
       bump = rng.random() < 0.001  # ~one flick per 50 s
       meas = k_meas + (SPIKE_MEAS_RATE * DT * 3 if bump else 0.0)
       grip = 1.2 if rng.random() < 0.0005 else 0.0
-      pipe.update(v, k_cmd, meas, False, False, False, False, False,
+      pipe.update(v, k_cmd, meas, False, False, False,
                   driver_torque=grip, a_ego=0.1,
                   low_factor=applied[0], high_factor=applied[1])
       rec = pipe.recommend(*applied)

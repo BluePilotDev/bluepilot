@@ -154,7 +154,14 @@ NUDGE_MIN_WEIGHT = 10.0     # anchor evidence before it may move its factor
 NUDGE_MAX_STDERR = 0.06     # effective stderr must be at least this good
 NUDGE_DEADBAND = 0.015      # |target - applied| below this: leave it alone
 NUDGE_STEP = 0.02           # max factor change per nudge (menu granularity is 0.01)
-MAX_DRIVE_DELTA = 0.10      # per-factor cumulative cap per drive (card process lifetime)
+MAX_DRIVE_DELTA = 0.10      # high-factor cumulative cap per drive (card process lifetime)
+# The low anchor accumulates evidence far slower than the high one (city curve frames are
+# mostly grip/accel-rejected), so each sample moves it more. On-road 2026-07-22 the low
+# factor round-tripped 0.98->1.06->1.00 inside one drive on ~70s of evidence and the
+# +-6% curve-branch gain swing (x1.30 branch) was felt as turn-in overshoot. Half the cap
+# bounds any single drive's wander to two steps while still allowing full convergence
+# (0.96->1.00 fit within it).
+MAX_DRIVE_DELTA_LOW = 0.04  # low-factor cumulative cap per drive
 
 # --- Lock --------------------------------------------------------------------------------
 # LOCK_MIN_WEIGHT sits below the reference drive's decay equilibrium (~90 s on the weaker
@@ -522,14 +529,22 @@ class SteadyStateGate:
     self.kappa_last = None
     self.grip_cooldown_s = 0.0
 
+  def reset(self):
+    """Inactive frame (disengaged / human turn / stall blip): steadiness restarts and the
+    last-command baseline is dropped; the grip cooldown keeps decaying in real time."""
+    self.grip_cooldown_s = max(0.0, self.grip_cooldown_s - self.dt)
+    self.steady_s = 0.0
+    self.kappa_last = None
+
   def update(self, lat_active: bool, kappa_cmd: float, steering_pressed: bool,
              angle_rate_limited: bool, deviation_limited: bool,
-             human_turn: bool, stall_blip: bool,
              saturated: bool = False, driver_torque: float = 0.0) -> bool:
+    # Human-turn and stall-blip frames never reach this call — the strategy early-returns
+    # and idles the pipeline instead — so those flags are not parameters here.
     # Any grip — including light torque below the steeringPressed threshold — starts a
     # cooldown: the driver was steering, and the PSCM's delivery stays suspect for a while
     # after release (post-touch attenuation).
-    grip = steering_pressed or human_turn or abs(driver_torque) > TORQUE_GUARD_NM
+    grip = steering_pressed or abs(driver_torque) > TORQUE_GUARD_NM
     if grip:
       self.grip_cooldown_s = PRESS_COOLDOWN_S
     else:
@@ -537,7 +552,7 @@ class SteadyStateGate:
 
     ok = (lat_active and not grip and self.grip_cooldown_s <= 0.0
           and not angle_rate_limited and not deviation_limited
-          and not stall_blip and not saturated
+          and not saturated
           and abs(kappa_cmd) >= MIN_KAPPA)
     if ok and self.kappa_last is not None:
       ok = abs(kappa_cmd - self.kappa_last) / self.dt <= MAX_KAPPA_RATE
@@ -581,8 +596,8 @@ class AutoCalPipeline:
     return (1.0 - a) * (LOW_ANCHOR_BASE * low_factor) + a * (self.platform_gain_high * high_factor)
 
   def idle(self):
-    """Call on frames where lateral is inactive (disengaged / human-turn override)."""
-    self.gate.update(False, 0.0, False, False, False, False, False)
+    """Call on frames where lateral is inactive (disengaged / human turn / stall blip)."""
+    self.gate.reset()
     self.quality.idle()
     self.peaks.clear()
     self._staged.clear()
@@ -590,7 +605,6 @@ class AutoCalPipeline:
 
   def update(self, v_ego: float, kappa_cmd: float, kappa_meas: float,
              steering_pressed: bool, angle_rate_limited: bool, deviation_limited: bool,
-             human_turn: bool, stall_blip: bool,
              saturated: bool = False, driver_torque: float = 0.0,
              a_ego: float = 0.0, ws_spread: float | None = None,
              low_factor: float = 1.0, high_factor: float = 1.0) -> list:
@@ -601,7 +615,7 @@ class AutoCalPipeline:
     if self.locked:
       return []
 
-    grip = steering_pressed or human_turn or abs(driver_torque) > TORQUE_GUARD_NM
+    grip = steering_pressed or abs(driver_torque) > TORQUE_GUARD_NM
     if grip:
       self._staged.clear()
       self.quality.counters["grip"] += 1
@@ -614,7 +628,6 @@ class AutoCalPipeline:
 
     eligible = self.gate.update(True, kappa_cmd, steering_pressed,
                                 angle_rate_limited, deviation_limited,
-                                human_turn, stall_blip,
                                 saturated=saturated, driver_torque=driver_torque)
     eligible = eligible and q_ok
 
@@ -654,7 +667,7 @@ class AutoCalPipeline:
     # definition not steady). Quality, grip, limit flags all poison the window.
     frame_ok = (q_ok and not grip and self.gate.grip_cooldown_s <= 0.0
                 and not angle_rate_limited and not deviation_limited
-                and not stall_blip and not saturated and margin_w > 0.0)
+                and not saturated and margin_w > 0.0)
     for (pv, pk, pm, pg) in self.peaks.push(kappa_cmd, kappa_meas, v_ego, gain_now, frame_ok):
       p_margin = min(1.0, max(0.0, (MAX_LAT_ACCEL - abs(pk) * pv * pv) / LAT_ACCEL_SOFT_BAND))
       if self.est.add_sample(pv, pk, pm, pg, weight=PEAK_WEIGHT_S * p_margin):
@@ -698,20 +711,22 @@ class AutoCalPipeline:
       return None
     low_t, high_t, st = sol
 
-    def step(target, applied, weight, stderr_eff, drive_delta):
+    def step(target, applied, weight, stderr_eff, drive_delta, drive_cap):
       if weight < NUDGE_MIN_WEIGHT or stderr_eff > NUDGE_MAX_STDERR:
         return None
       err = target - applied
       if abs(err) <= NUDGE_DEADBAND:
         return None
       s = max(-NUDGE_STEP, min(NUDGE_STEP, err))
-      if abs(drive_delta + s) > MAX_DRIVE_DELTA:
+      if abs(drive_delta + s) > drive_cap:
         return None  # enough movement for one drive — pick it up next drive
       new = round(max(FACTOR_MIN, min(FACTOR_MAX, applied + s)), 2)
       return new if abs(new - applied) >= 0.005 else None
 
-    new_low = step(low_t, low_factor, st["weight_low"], st["stderr_eff_low"], self.drive_delta_low)
-    new_high = step(high_t, high_factor, st["weight_high"], st["stderr_eff_high"], self.drive_delta_high)
+    new_low = step(low_t, low_factor, st["weight_low"], st["stderr_eff_low"],
+                   self.drive_delta_low, MAX_DRIVE_DELTA_LOW)
+    new_high = step(high_t, high_factor, st["weight_high"], st["stderr_eff_high"],
+                    self.drive_delta_high, MAX_DRIVE_DELTA)
     if new_low is None and new_high is None:
       return None
     out_low = new_low if new_low is not None else round(low_factor, 2)

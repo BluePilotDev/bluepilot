@@ -310,7 +310,8 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"FordLowSpeedFactor_ang", {PERSISTENT | BACKUP, FLOAT, "1.0"}},
     {"FordHighSpeedFactor_ang", {PERSISTENT | BACKUP, FLOAT, "1.0"}},
     {"FordAngleAutoCal", {PERSISTENT | BACKUP, BOOL, "0"}},           // one-time auto-calibration of the angle speed factors
-    {"FordAngleAutoCalState", {PERSISTENT | BACKUP, STRING, ""}},     // "" = collecting; "done ..." = calibrated and locked
+    {"FordAngleAutoCalState", {PERSISTENT | BACKUP, STRING, ""}},     // "" = collecting; JSON = evidence; "locked"/"done ..." = finished
+    {"FordAngleAutoCalError", {PERSISTENT, STRING, ""}},              // diagnostics only — separate channel so an error can never clobber evidence
     {"BPLateralSchemeParamsMigratedV1", {PERSISTENT | BACKUP, STRING, "0"}},
 
     {"disable_BP_lat_UI", {PERSISTENT | BACKUP, BOOL, "0"}},

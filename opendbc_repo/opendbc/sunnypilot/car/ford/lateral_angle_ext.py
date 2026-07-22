@@ -435,6 +435,12 @@ class LateralAngleExt:
       self.bp_kappa_cmd = self.get_current_curvature(CS)
       self._desired_curvature_last = float(actuators.curvature)
       self.precision_type = 1
+      self.bp_angle_saturated = False  # published flag must not stay stale across the blip
+      # Same discontinuity handling as the disengage/human-turn branches: the blip breaks
+      # the steady-state baseline and straddles the apex buffer, so staged evidence and
+      # peak windows must not survive it.
+      if self.autocal is not None:
+        self.autocal.idle()
       if self.stall_blip_frames_left <= 0:
         self.stall_blip_cooldown_s = _STALL_COOLDOWN_S
       return LateralResult(
@@ -676,10 +682,11 @@ class LateralAngleExt:
     if self.autocal_enabled and self.autocal is not None:
       ws = CS.out.wheelSpeeds
       ws_vals = (float(ws.fl), float(ws.fr), float(ws.rl), float(ws.rr))
+      # Human-turn and stall-blip frames never reach here (their branches early-return
+      # after idling the pipeline), so those flags are not passed — they'd be dead False.
       committed = self.autocal.update(v_ego, kappa_cmd, current_curvature,
                                       CS.out.steeringPressed,
                                       self.bp_angle_rate_limited, self.bp_curvature_deviation_limited,
-                                      self.angle_human_turn_active, self.angle_stall_blip_active,
                                       saturated=self.bp_angle_saturated,
                                       driver_torque=float(CS.out.steeringTorque),
                                       a_ego=float(CS.out.aEgo),
@@ -717,8 +724,8 @@ class LateralAngleExt:
 
     The params are TYPED (FLOAT) in this fork: writes must be python floats — a string
     raises TypeError. That failure mode was invisible once (swallowed except -> nudges
-    silently never landed); now any write error is recorded in the state param so it
-    shows up in the next drive's logs instead of vanishing."""
+    silently never landed); now any write error is recorded in FordAngleAutoCalError so
+    it shows up in the next drive's logs instead of vanishing."""
     low_new, high_new = rec
     if self._autocal_params_handle is None:
       return
@@ -735,13 +742,13 @@ class LateralAngleExt:
     self._autocal_save("collecting")
 
   def _autocal_error(self, msg: str):
-    """Self-reporting diagnostics: park the error in the state param (STRING) so it is
-    visible in qlogs/initData and to the offline analyzer. Evidence in the estimator is
-    NOT touched; the error string replaces the serialized state only until the next
-    successful save. Never raises."""
+    """Self-reporting diagnostics: park the error in its OWN param so it is visible in
+    qlogs/initData without ever touching FordAngleAutoCalState — an error written just
+    before ignition-off must not be able to replace (and thereby erase) the serialized
+    evidence from the last good save. Never raises."""
     try:
       if self._autocal_params_handle is not None:
-        self._autocal_params_handle.put("FordAngleAutoCalState", f"error: {msg[:300]}")
+        self._autocal_params_handle.put("FordAngleAutoCalError", f"{msg[:300]}")
     except Exception:
       pass
 
