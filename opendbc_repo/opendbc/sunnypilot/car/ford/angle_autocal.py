@@ -31,9 +31,31 @@ The estimator is pure math with no I/O so the exact same code runs in two places
   - onboard, fed from lateral_angle_ext during normal driving
 """
 import math
+from dataclasses import dataclass
+from typing import NamedTuple
 
 # The strategy owns the gain model; this module (and the offline analyzer) consume it.
 from opendbc.sunnypilot.car.ford.values_ext import V_LOW, V_HIGH, LOW_ANCHOR_BASE
+
+
+@dataclass(frozen=True)
+class Frame:
+  """One 20 Hz lateral frame of evidence inputs, shared verbatim by the onboard
+  controller and the offline analyzer. Every field is required — defaults on physical
+  signals (a_ego, saturated, ...) were a silent-wrong-answer risk whenever the two
+  consumers drifted on parameter order."""
+  v_ego: float
+  kappa_cmd: float
+  kappa_meas: float
+  steering_pressed: bool
+  angle_rate_limited: bool
+  deviation_limited: bool
+  saturated: bool
+  driver_torque: float
+  a_ego: float
+  ws_spread: float | None
+  low_factor: float
+  high_factor: float
 
 # Sample admission gates (mirrored by both the offline analyzer and the onboard hook).
 MIN_SPEED = 9.5             # m/s; below this the deviation clip is off and measurement is noisy
@@ -396,6 +418,15 @@ class QualityMonitor:
     self._ws_spread_last = None
 
 
+class _PeakFrame(NamedTuple):
+  """One ring-buffer slot of the apex matcher — named so nothing indexes it by magic number."""
+  kappa_cmd: float
+  kappa_meas: float
+  v_ego: float
+  gain: float
+  clean: bool
+
+
 class PeakMatcher:
   """Apex evidence — the video method. A ring buffer of recent frames; when a command
   apex (dominant, prominent local extremum with an all-clean neighborhood) scrolls to
@@ -409,7 +440,7 @@ class PeakMatcher:
     self.half_w = int(round(PEAK_HALF_WINDOW_S / dt))   # 20
     self.lag_max = int(round(PEAK_LAG_MAX_S / dt))      # 14
     self.c = self.n_buf - 1 - max(self.half_w, self.lag_max)  # decision index
-    self.buf: list[tuple] = []    # (kappa_cmd, kappa_meas, v, applied_gain, ok)
+    self.buf: list[_PeakFrame] = []
     self._refractory = 0
     self._pending: dict[int, list] = {0: [], 1: []}     # anchor half -> [(r, sample), ...]
     self.apexes_seen = 0
@@ -425,14 +456,13 @@ class PeakMatcher:
     (the bump was already moving the car). Mark them not-ok retroactively."""
     n = int(round(seconds / self.dt))
     for i in range(max(0, len(self.buf) - n), len(self.buf)):
-      k, m, v, g, _ = self.buf[i]
-      self.buf[i] = (k, m, v, g, False)
+      self.buf[i] = self.buf[i]._replace(clean=False)
 
   def push(self, kappa_cmd: float, kappa_meas: float, v_ego: float,
            applied_gain: float, ok: bool) -> list[tuple]:
     """Advance one frame. Returns samples to commit: (v, kappa_cmd, kappa_meas,
     applied_gain) tuples (already median-filtered)."""
-    self.buf.append((kappa_cmd, kappa_meas, v_ego, applied_gain, ok))
+    self.buf.append(_PeakFrame(kappa_cmd, kappa_meas, v_ego, applied_gain, ok))
     if len(self.buf) > self.n_buf:
       self.buf.pop(0)
     if self._refractory > 0:
@@ -441,16 +471,17 @@ class PeakMatcher:
       return []
 
     c = self.c
-    k_c, _, v_c, g_c, _ = self.buf[c]
+    fc = self.buf[c]
+    k_c, v_c, g_c = fc.kappa_cmd, fc.v_ego, fc.gain
     if abs(k_c) < PEAK_MIN_KAPPA or v_c < MIN_SPEED:
       return []
     if abs(k_c) * v_c * v_c > MAX_LAT_ACCEL:
       return []
     window = self.buf[c - self.half_w:c + self.half_w + 1]
     # Every frame around the apex must be clean — the retroactive-cancel analog for peaks.
-    if not all(f[4] for f in window):
+    if not all(f.clean for f in window):
       return []
-    mags = [abs(f[0]) for f in window]
+    mags = [abs(f.kappa_cmd) for f in window]
     k_mag = abs(k_c)
     # Dominant: >= everything before, strictly > everything after (fires once per plateau).
     before = mags[:self.half_w + 1]
@@ -467,10 +498,10 @@ class PeakMatcher:
     sign = 1.0 if k_c > 0 else -1.0
     m_pk = 0.0
     for f in self.buf[c:c + self.lag_max + 1]:
-      if not f[4]:
+      if not f.clean:
         return []  # disturbance inside the match window: the pair is unusable
-      if f[1] * sign > m_pk:
-        m_pk = f[1] * sign
+      if f.kappa_meas * sign > m_pk:
+        m_pk = f.kappa_meas * sign
     if m_pk <= 0.0:
       return []
     r = (m_pk * sign) / k_c
@@ -502,6 +533,9 @@ class SteadyStateGate:
     self.kappa_last = None
     self.kappa_window_start = None  # command value when the current steady window opened
     self.grip_cooldown_s = 0.0
+    self.grip_this_frame = False    # grip seen on the frame last passed to update()
+    self.frame_clear = False        # per-frame admission (no grip/cooldown/limiter flags),
+                                    # computed ONCE here and shared with the apex path
 
   def reset(self):
     """Inactive frame (disengaged / human turn / stall blip): steadiness restarts and the
@@ -510,6 +544,8 @@ class SteadyStateGate:
     self.steady_s = 0.0
     self.kappa_last = None
     self.kappa_window_start = None
+    self.grip_this_frame = False
+    self.frame_clear = False
 
   def update(self, lat_active: bool, kappa_cmd: float, steering_pressed: bool,
              angle_rate_limited: bool, deviation_limited: bool,
@@ -520,15 +556,18 @@ class SteadyStateGate:
     # cooldown: the driver was steering, and the PSCM's delivery stays suspect for a while
     # after release (post-touch attenuation).
     grip = steering_pressed or abs(driver_torque) > TORQUE_GUARD_NM
+    self.grip_this_frame = grip
     if grip:
       self.grip_cooldown_s = PRESS_COOLDOWN_S
     else:
       self.grip_cooldown_s = max(0.0, self.grip_cooldown_s - self.dt)
 
-    ok = (lat_active and not grip and self.grip_cooldown_s <= 0.0
-          and not angle_rate_limited and not deviation_limited
-          and not saturated
-          and abs(kappa_cmd) >= MIN_KAPPA)
+    # The per-frame admission predicate, computed exactly once: the pipeline's apex path
+    # reads it back instead of maintaining a hand-synced copy.
+    self.frame_clear = (not grip and self.grip_cooldown_s <= 0.0
+                        and not angle_rate_limited and not deviation_limited
+                        and not saturated)
+    ok = lat_active and self.frame_clear and abs(kappa_cmd) >= MIN_KAPPA
     if ok and self.kappa_last is not None:
       ok = abs(kappa_cmd - self.kappa_last) / self.dt <= MAX_KAPPA_RATE
     # Actuation-lag protection: per-frame rate alone admits slow ramps whose same-frame
@@ -588,32 +627,30 @@ class AutoCalPipeline:
     self._staged.clear()
     self._meas_last = None
 
-  def update(self, v_ego: float, kappa_cmd: float, kappa_meas: float,
-             steering_pressed: bool, angle_rate_limited: bool, deviation_limited: bool,
-             saturated: bool = False, driver_torque: float = 0.0,
-             a_ego: float = 0.0, ws_spread: float | None = None,
-             low_factor: float = 1.0, high_factor: float = 1.0) -> list:
-    """Advance one frame. low_factor/high_factor are the values currently steering the
-    car — each committed sample records the gain that produced it. Returns the samples
+  def update(self, frame: Frame) -> list:
+    """Advance one frame. frame.low_factor/high_factor are the values currently steering
+    the car — each committed sample records the gain that produced it. Returns the samples
     committed to the estimator this frame as (v, kappa_cmd, kappa_meas) tuples — the
     offline analyzer plots them; the onboard hook ignores the return value."""
     if self.locked:
       return []
+    v_ego, kappa_cmd, kappa_meas = frame.v_ego, frame.kappa_cmd, frame.kappa_meas
 
-    grip = steering_pressed or abs(driver_torque) > TORQUE_GUARD_NM
-    if grip:
+    # The gate computes grip + the per-frame admission predicate once; everything
+    # below reads them back instead of keeping a hand-synced copy.
+    eligible = self.gate.update(True, kappa_cmd, frame.steering_pressed,
+                                frame.angle_rate_limited, frame.deviation_limited,
+                                saturated=frame.saturated, driver_torque=frame.driver_torque)
+    if self.gate.grip_this_frame:
       self._staged.clear()
       self.quality.counters["grip"] += 1
 
-    q_ok = self.quality.update(kappa_cmd, kappa_meas, a_ego=a_ego, ws_spread=ws_spread)
+    q_ok = self.quality.update(kappa_cmd, kappa_meas, a_ego=frame.a_ego, ws_spread=frame.ws_spread)
     if self.quality.flick_fired:
       # Retroactive: the bump was already moving the car before detection tripped.
       self._staged.clear()
       self.peaks.poison_recent(DISTURBANCE_POISON_S)
 
-    eligible = self.gate.update(True, kappa_cmd, steering_pressed,
-                                angle_rate_limited, deviation_limited,
-                                saturated=saturated, driver_torque=driver_torque)
     eligible = eligible and q_ok
 
     # The CAR must be settled too, not just the command: during closed-loop compensation
@@ -631,7 +668,7 @@ class AutoCalPipeline:
       self.quality.counters["limit"] += 1
       eligible = False
 
-    gain_now = self.applied_gain(v_ego, low_factor, high_factor)
+    gain_now = self.applied_gain(v_ego, frame.low_factor, frame.high_factor)
 
     # Age the staging queue; entries that survived the holdback graduate to the estimator.
     committed = []
@@ -649,10 +686,9 @@ class AutoCalPipeline:
       self._staged.append([0.0, v_ego, kappa_cmd, kappa_meas, gain_now, self.dt * margin_w])
 
     # Apex evidence: gated by everything EXCEPT the steadiness timer (an apex is by
-    # definition not steady). Quality, grip, limit flags all poison the window.
-    frame_ok = (q_ok and not grip and self.gate.grip_cooldown_s <= 0.0
-                and not angle_rate_limited and not deviation_limited
-                and not saturated and margin_w > 0.0)
+    # definition not steady). Quality, grip, limit flags all poison the window —
+    # the grip/flag part is the gate's own frame_clear, computed once above.
+    frame_ok = q_ok and self.gate.frame_clear and margin_w > 0.0
     for (pv, pk, pm, pg) in self.peaks.push(kappa_cmd, kappa_meas, v_ego, gain_now, frame_ok):
       p_margin = min(1.0, max(0.0, (MAX_LAT_ACCEL - abs(pk) * pv * pv) / LAT_ACCEL_SOFT_BAND))
       if self.est.add_sample(pv, pk, pm, pg, weight=PEAK_WEIGHT_S * p_margin):
@@ -670,7 +706,7 @@ class AutoCalPipeline:
       low_t, high_t, st = sol
       ready = (st["weight_low"] >= LOCK_MIN_WEIGHT and st["weight_high"] >= LOCK_MIN_WEIGHT
                and st["stderr_eff_low"] <= NUDGE_MAX_STDERR and st["stderr_eff_high"] <= NUDGE_MAX_STDERR
-               and abs(low_t - low_factor) <= LOCK_DEADBAND and abs(high_t - high_factor) <= LOCK_DEADBAND)
+               and abs(low_t - frame.low_factor) <= LOCK_DEADBAND and abs(high_t - frame.high_factor) <= LOCK_DEADBAND)
       if ready:
         self.stable_s += self.dt
         if self.stable_s >= LOCK_STABLE_S:

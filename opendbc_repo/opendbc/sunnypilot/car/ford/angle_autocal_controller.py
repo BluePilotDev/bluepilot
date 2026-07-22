@@ -15,9 +15,11 @@ live steering values in exactly one place (the caller).
 """
 import json
 
-from opendbc.sunnypilot.car.ford.angle_autocal import AutoCalPipeline
+from opendbc.sunnypilot.car.ford.angle_autocal import AutoCalPipeline, Frame
 
 SAVE_PERIOD_S = 30.0
+EDIT_TOL = 0.005    # half the menu granularity (0.01): a factor moved further than this
+                    # without the nudger writing it is a driver hand-edit
 
 
 def _state_locked(state: str) -> bool:
@@ -55,7 +57,7 @@ class AutoCalController:
     self.pipeline = None        # AutoCalPipeline while collecting
     self.status = ""            # live ground-truth status, published in telemetry
     self._params = None
-    self._last_written = None   # ("x.xx", "x.xx") the nudger last wrote; edits differ
+    self._last_written = None   # (low, high) floats the nudger last wrote; edits differ
     self._edit_pending = False  # user edit needs 2 consecutive ticks (async put lag)
     self._save_s = 0.0
     self._dirty = False
@@ -79,7 +81,7 @@ class AutoCalController:
         # The currently applied factors are the nudge baseline.
         self.pipeline = AutoCalPipeline(platform_gain_high, dt=self.dt)
         _restore(self.pipeline, state)
-        self._last_written = (f"{low_factor:.2f}", f"{high_factor:.2f}")
+        self._last_written = (float(low_factor), float(high_factor))
         self._edit_pending = False
       elif not self.enabled:
         self.pipeline = None
@@ -88,11 +90,13 @@ class AutoCalController:
         # Confirmed on two consecutive ticks — an async put of our own nudge may not be
         # readable yet on the first tick after it. The driver's judgment is adopted
         # (values already live in the strategy); evidence is soft-reset, not wiped.
-        cur = (f"{low_factor:.2f}", f"{high_factor:.2f}")
-        if self._last_written is not None and cur != self._last_written:
+        lw = self._last_written
+        moved = lw is not None and (abs(low_factor - lw[0]) > EDIT_TOL
+                                    or abs(high_factor - lw[1]) > EDIT_TOL)
+        if moved:
           if self._edit_pending:
             self.pipeline.user_edit()
-            self._last_written = cur
+            self._last_written = (float(low_factor), float(high_factor))
             self._edit_pending = False
             self._dirty = True
           else:
@@ -123,10 +127,7 @@ class AutoCalController:
     if self.pipeline is not None:
       self.pipeline.idle()
 
-  def feed(self, v_ego: float, kappa_cmd: float, kappa_meas: float,
-           steering_pressed: bool, angle_rate_limited: bool, deviation_limited: bool,
-           saturated: bool, driver_torque: float, a_ego: float, ws_spread: float,
-           low_factor: float, high_factor: float, delay_estimated: bool):
+  def feed(self, frame: Frame, delay_estimated: bool):
     """One active lateral frame. Returns a nudged (low, high) pair the strategy should
     adopt, or None. Save cadence and the lock -> disarm transition happen here."""
     if not self.enabled or self.pipeline is None:
@@ -138,16 +139,12 @@ class AutoCalController:
       # samples and peak windows must not straddle the unestimated period.
       self.idle()
       return None
-    committed = self.pipeline.update(v_ego, kappa_cmd, kappa_meas,
-                                     steering_pressed, angle_rate_limited, deviation_limited,
-                                     saturated=saturated, driver_torque=driver_torque,
-                                     a_ego=a_ego, ws_spread=ws_spread,
-                                     low_factor=low_factor, high_factor=high_factor)
+    committed = self.pipeline.update(frame)
     if committed:
       self._dirty = True
-    applied = (low_factor, high_factor)
+    applied = (frame.low_factor, frame.high_factor)
     out = None
-    rec = self.pipeline.recommend(low_factor, high_factor)
+    rec = self.pipeline.recommend(frame.low_factor, frame.high_factor)
     if rec is not None and self._apply_nudge(rec, applied):
       applied = rec
       out = rec
@@ -180,7 +177,7 @@ class AutoCalController:
     except Exception as e:
       self._error(f"nudge write failed: {type(e).__name__}: {e}")
       return False
-    self._last_written = (f"{low_new:.2f}", f"{high_new:.2f}")
+    self._last_written = (float(low_new), float(high_new))
     self._edit_pending = False
     self._save("collecting", rec)
     return True

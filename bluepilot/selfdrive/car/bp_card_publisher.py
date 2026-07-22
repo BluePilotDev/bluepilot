@@ -104,8 +104,9 @@ def _refresh_settings_cache() -> dict:
     "bmsMinimumSpeedToPauseLaneChange": _get_int(p, "BlinkerMinLateralControlSpeed", 20),
     "bmsShowLateralControlMode":       _get_bool(p, "BpShowLateralControl"),
     # --- Angle Tuning ---
-    "bmsAngleAutoCalibrate":           _get_bool(p, "FordAngleAutoCal"),
-    "bmsAngleAutoCalState":            _get_str(p, "FordAngleAutoCalState"),
+    # bmsAngleAutoCalibrate / bmsAngleAutoCalState are intentionally NOT here: they are
+    # ground truth from the live controller (set below from CI.CC every publish) — a
+    # param-snapshot copy would be a second source of truth that is silently overwritten.
     "bmsLowSpeedAdjustmentFactor":     _get_float(p, "FordLowSpeedFactor_ang", 1.0),
     "bmsHighSpeedAdjustmentFactor":    _get_float(p, "FordHighSpeedFactor_ang", 1.0),
     "bmsLaneChangeFactorHighAngle":    _get_float(p, "lane_change_factor_high_ang", 1.0),

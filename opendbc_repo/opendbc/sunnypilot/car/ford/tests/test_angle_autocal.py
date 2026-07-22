@@ -6,6 +6,7 @@ import random
 import pytest
 
 from opendbc.sunnypilot.car.ford.angle_autocal import (
+  Frame,
   AngleFactorEstimator, AutoCalPipeline, PeakMatcher, QualityMonitor, SteadyStateGate,
   speed_alpha, V_LOW, V_HIGH, LOW_ANCHOR_BASE, STEADY_TIME_S, MIN_KAPPA,
   PRESS_HOLDBACK_S, PRESS_COOLDOWN_S, MAX_LAT_ACCEL, MAX_LONG_ACCEL,
@@ -293,9 +294,9 @@ def run_pipeline(pipe, n, torque=0.0, pressed=False, saturated=False, kappa=0.00
                  low=1.0, high=1.0):
   committed = []
   for _ in range(n):
-    committed += pipe.update(v, kappa, kappa, pressed, False, False,
-                             saturated=saturated, driver_torque=torque,
-                             low_factor=low, high_factor=high)
+    committed += pipe.update(_frame(v, kappa, kappa, pressed=pressed,
+                                    saturated=saturated, torque=torque,
+                                    low=low, high=high))
   return committed
 
 
@@ -312,7 +313,7 @@ class TestAutoCalPipeline:
     warm = int(STEADY_TIME_S / DT) + 1 + int(PRESS_HOLDBACK_S / DT) // 2
     run_pipeline(pipe, warm)
     assert len(pipe._staged) > 0 and pipe.est.n == 0
-    pipe.update(20.0, 0.002, 0.002, True, False, False)  # grip
+    pipe.update(_frame(20.0, 0.002, 0.002, pressed=True))  # grip
     assert len(pipe._staged) == 0
     assert pipe.est.n == 0  # nothing from before the grip ever reached the estimator
 
@@ -322,7 +323,7 @@ class TestAutoCalPipeline:
     run_pipeline(pipe, warm)
     assert len(pipe._staged) > 0 and pipe.est.n == 0
     # Bump: measured curvature jumps while the command sits still.
-    pipe.update(20.0, 0.002, 0.002 + SPIKE_MEAS_RATE * DT * 2, False, False, False)
+    pipe.update(_frame(20.0, 0.002, 0.002 + SPIKE_MEAS_RATE * DT * 2))
     assert len(pipe._staged) == 0 and pipe.est.n == 0
     # And the blanking window keeps evidence off while the car settles.
     committed = run_pipeline(pipe, int(DISTURBANCE_BLANK_S / DT) - 2)
@@ -346,7 +347,7 @@ class TestAutoCalPipeline:
     kappa_meas = 0.0010
     staged_during_sweep = 0
     for _ in range(warm):
-      pipe.update(20.0, 0.002, kappa_meas, False, False, False)
+      pipe.update(_frame(20.0, 0.002, kappa_meas))
       if kappa_meas < 0.0019:
         kappa_meas += 0.0002  # 0.004/s sweep, far above the settle bound
         staged_during_sweep = len(pipe._staged) + pipe.est.n
@@ -383,8 +384,7 @@ class TestFactorNudger:
       pipe.gate.steady_s = 0.0
       pipe._meas_last = None
       for _ in range(n):
-        pipe.update(v, kappa, kappa * r, False, False, False,
-                    low_factor=applied[0], high_factor=applied[1])
+        pipe.update(_frame(v, kappa, kappa * r, low=applied[0], high=applied[1]))
     return pipe
 
   def test_nudges_toward_target_bounded(self):
@@ -405,8 +405,7 @@ class TestFactorNudger:
     assert pipe.recommend(1.02, 1.02) is None  # inside NUDGE_PERIOD_S
     # advance active time
     for _ in range(int(NUDGE_PERIOD_S / DT) + 1):
-      pipe.update(10.0, 0.004, 0.004, False, False, False,
-                  low_factor=1.02, high_factor=1.02)
+      pipe.update(_frame(10.0, 0.004, 0.004, low=1.02, high=1.02))
     assert pipe.recommend(1.02, 1.02) is not None
 
   def test_insufficient_evidence_no_nudge(self):
@@ -421,8 +420,7 @@ class TestFactorNudger:
       for _f in range(int(NUDGE_PERIOD_S / DT) + 1):
         g = applied_gain(10.0, *applied)
         r = g / ideal_gain(10.0, 1.40, 1.40)
-        pipe.update(10.0, 0.004, 0.004 * r, False, False, False,
-                    low_factor=applied[0], high_factor=applied[1])
+        pipe.update(_frame(10.0, 0.004, 0.004 * r, low=applied[0], high=applied[1]))
       rec = pipe.recommend(*applied)
       if rec is not None:
         moved += abs(rec[0] - applied[0])
@@ -468,9 +466,8 @@ class TestClosedLoopConvergence:
       bump = rng.random() < 0.001  # ~one flick per 50 s
       meas = k_meas + (SPIKE_MEAS_RATE * DT * 3 if bump else 0.0)
       grip = 1.2 if rng.random() < 0.0005 else 0.0
-      pipe.update(v, k_cmd, meas, False, False, False,
-                  driver_torque=grip, a_ego=0.1,
-                  low_factor=applied[0], high_factor=applied[1])
+      pipe.update(_frame(v, k_cmd, meas, torque=grip, a_ego=0.1,
+                         low=applied[0], high=applied[1]))
       rec = pipe.recommend(*applied)
       if rec is not None:
         nudge_log.append(rec)
@@ -503,6 +500,15 @@ class TestClosedLoopConvergence:
     # No oscillation: once inside the deadband the nudger must not bounce in and out.
     lows = [r[0] for r in all_nudges]
     assert all(l2 >= l1 - NUDGE_STEP - 1e-9 for l1, l2 in zip(lows, lows[1:])), lows
+
+
+def _frame(v, kc, km, pressed=False, rate=False, dev=False, saturated=False,
+           torque=0.0, a_ego=0.0, ws=None, low=1.0, high=1.0) -> Frame:
+  """Test scaffolding: Frame with benign defaults (the production dataclass has none)."""
+  return Frame(v_ego=v, kappa_cmd=kc, kappa_meas=km, steering_pressed=pressed,
+               angle_rate_limited=rate, deviation_limited=dev, saturated=saturated,
+               driver_torque=torque, a_ego=a_ego, ws_spread=ws,
+               low_factor=low, high_factor=high)
 
 
 class _MockParams:
@@ -574,7 +580,7 @@ class TestOnboardGlue:
                      "FordLowSpeedFactor_ang": "1.10", "FordHighSpeedFactor_ang": "0.95"})
     ext.update_angle_params(p)
     assert ext.autocal_enabled and ext.autocal_ctl.pipeline is not None
-    assert ext.autocal_ctl._last_written == ("1.10", "0.95")
+    assert ext.autocal_ctl._last_written == (1.10, 0.95)
 
   def test_arming_restores_serialized_evidence(self):
     donor = AutoCalPipeline(PLATFORM_GAIN_HIGH)
@@ -635,7 +641,7 @@ class TestOnboardGlue:
     self._tick(ext, p, n=1)   # second tick: confirmed
     assert not ext.autocal_ctl._edit_pending
     assert abs(ext.autocal_ctl.pipeline.est.s_w - 0.5 * w0) < 1e-9  # soft reset, not a wipe
-    assert ext.autocal_ctl._last_written == ("1.08", "1.00")
+    assert ext.autocal_ctl._last_written == (1.08, 1.00)
 
   def test_save_restore_round_trip_through_param(self):
     ext = self._ext()
