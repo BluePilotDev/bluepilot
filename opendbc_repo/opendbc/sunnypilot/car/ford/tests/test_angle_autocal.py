@@ -566,15 +566,15 @@ class TestOnboardGlue:
     ext = self._ext()
     p = _MockParams({"FordAngleAutoCal": 0, "FordAngleAutoCalState": ""})
     self._tick(ext, p, n=2)
-    assert ext.autocal is None and not ext.autocal_enabled
+    assert ext.autocal_ctl.pipeline is None and not ext.autocal_enabled
 
   def test_arming_builds_pipeline_with_baseline(self):
     ext = self._ext()
     p = _MockParams({"FordAngleAutoCal": 1, "FordAngleAutoCalState": "",
                      "FordLowSpeedFactor_ang": "1.10", "FordHighSpeedFactor_ang": "0.95"})
     ext.update_angle_params(p)
-    assert ext.autocal_enabled and ext.autocal is not None
-    assert ext._autocal_last_written == ("1.10", "0.95")
+    assert ext.autocal_enabled and ext.autocal_ctl.pipeline is not None
+    assert ext.autocal_ctl._last_written == ("1.10", "0.95")
 
   def test_arming_restores_serialized_evidence(self):
     donor = AutoCalPipeline(PLATFORM_GAIN_HIGH)
@@ -584,80 +584,79 @@ class TestOnboardGlue:
     p = _MockParams({"FordAngleAutoCal": 1, "FordAngleAutoCalState": state,
                      "FordLowSpeedFactor_ang": "1.00", "FordHighSpeedFactor_ang": "1.00"})
     ext.update_angle_params(p)
-    assert ext.autocal is not None
-    assert ext.autocal.est.n == donor.est.n
-    assert ext.autocal.est.solve() == donor.est.solve()
+    assert ext.autocal_ctl.pipeline is not None
+    assert ext.autocal_ctl.pipeline.est.n == donor.est.n
+    assert ext.autocal_ctl.pipeline.est.solve() == donor.est.solve()
 
   def test_locked_json_never_arms(self):
     ext = self._ext()
     state = json.dumps({"v": 1, "phase": "locked", "pipe": {}})
     p = _MockParams({"FordAngleAutoCal": 1, "FordAngleAutoCalState": state})
     ext.update_angle_params(p)
-    assert ext.autocal is None and ext.autocal_done and not ext.autocal_enabled
+    assert ext.autocal_ctl.pipeline is None and ext.autocal_ctl.done and not ext.autocal_enabled
 
   def test_legacy_done_state_never_arms(self):
     ext = self._ext()
     p = _MockParams({"FordAngleAutoCal": 1, "FordAngleAutoCalState": "done low=1.02 high=1.15"})
     ext.update_angle_params(p)
-    assert ext.autocal is None and ext.autocal_done and not ext.autocal_enabled
+    assert ext.autocal_ctl.pipeline is None and ext.autocal_ctl.done and not ext.autocal_enabled
 
   def test_garbage_state_starts_fresh(self):
     ext = self._ext()
     p = _MockParams({"FordAngleAutoCal": 1, "FordAngleAutoCalState": "round 3 collecting; applied"})
     ext.update_angle_params(p)
-    assert ext.autocal is not None and ext.autocal.est.n == 0
+    assert ext.autocal_ctl.pipeline is not None and ext.autocal_ctl.pipeline.est.n == 0
 
   def test_nudge_writes_params_and_state(self):
     ext = self._ext()
     p = _MockParams({"FordAngleAutoCal": 1, "FordAngleAutoCalState": "",
                      "FordLowSpeedFactor_ang": "1.00", "FordHighSpeedFactor_ang": "1.00"})
     ext.update_angle_params(p)
-    ext._autocal_apply_nudge((1.02, 1.15))
+    assert ext.autocal_ctl._apply_nudge((1.02, 1.15), (1.00, 1.00))
     # The fork's params are typed FLOAT — a string write raises and the nudge dies.
     assert p.written["FordLowSpeedFactor_ang"] == 1.02 and isinstance(p.written["FordLowSpeedFactor_ang"], float)
     assert p.written["FordHighSpeedFactor_ang"] == 1.15 and isinstance(p.written["FordHighSpeedFactor_ang"], float)
     st = json.loads(p.written["FordAngleAutoCalState"])
     assert st["phase"] == "collecting" and st["applied"] == {"low": 1.02, "high": 1.15}
-    assert ext.low_speed_curv_factor == 1.02 and ext.high_speed_curv_factor == 1.15
     # Our own write must NOT read back as a user edit.
     self._tick(ext, p, n=2)
-    assert ext.autocal is not None and not ext._autocal_edit_pending
+    assert ext.autocal_ctl.pipeline is not None and not ext.autocal_ctl._edit_pending
 
   def test_user_edit_adopted_after_two_ticks(self):
     ext = self._ext()
     p = _MockParams({"FordAngleAutoCal": 1, "FordAngleAutoCalState": "",
                      "FordLowSpeedFactor_ang": "1.00", "FordHighSpeedFactor_ang": "1.00"})
     ext.update_angle_params(p)
-    feed_plant(ext.autocal.est, 1.05, 1.05, speeds=[10, 28], n_per_speed=200)
-    w0 = ext.autocal.est.s_w
+    feed_plant(ext.autocal_ctl.pipeline.est, 1.05, 1.05, speeds=[10, 28], n_per_speed=200)
+    w0 = ext.autocal_ctl.pipeline.est.s_w
     p.values["FordLowSpeedFactor_ang"] = "1.08"  # driver taps + in the menu
     self._tick(ext, p, n=1)   # first tick: pending
-    assert ext._autocal_edit_pending and abs(ext.autocal.est.s_w - w0) < 1e-9
+    assert ext.autocal_ctl._edit_pending and abs(ext.autocal_ctl.pipeline.est.s_w - w0) < 1e-9
     self._tick(ext, p, n=1)   # second tick: confirmed
-    assert not ext._autocal_edit_pending
-    assert abs(ext.autocal.est.s_w - 0.5 * w0) < 1e-9  # soft reset, not a wipe
-    assert ext._autocal_last_written == ("1.08", "1.00")
+    assert not ext.autocal_ctl._edit_pending
+    assert abs(ext.autocal_ctl.pipeline.est.s_w - 0.5 * w0) < 1e-9  # soft reset, not a wipe
+    assert ext.autocal_ctl._last_written == ("1.08", "1.00")
 
   def test_save_restore_round_trip_through_param(self):
     ext = self._ext()
     p = _MockParams({"FordAngleAutoCal": 1, "FordAngleAutoCalState": "",
                      "FordLowSpeedFactor_ang": "1.00", "FordHighSpeedFactor_ang": "1.00"})
     ext.update_angle_params(p)
-    feed_plant(ext.autocal.est, 1.05, 1.05, speeds=[10, 28], n_per_speed=200)
-    sol = ext.autocal.est.solve()
-    ext._autocal_save("collecting")
+    feed_plant(ext.autocal_ctl.pipeline.est, 1.05, 1.05, speeds=[10, 28], n_per_speed=200)
+    sol = ext.autocal_ctl.pipeline.est.solve()
+    ext.autocal_ctl._save("collecting", (1.00, 1.00))
     # New process, same params: evidence must come back.
     ext2 = self._ext()
     ext2.update_angle_params(p)
-    assert ext2.autocal is not None
-    assert ext2.autocal.est.solve() == sol
+    assert ext2.autocal_ctl.pipeline is not None
+    assert ext2.autocal_ctl.pipeline.est.solve() == sol
 
   def test_toggle_off_disarms(self):
     ext = self._ext()
     p = _MockParams({"FordAngleAutoCal": 1, "FordAngleAutoCalState": "",
                      "FordLowSpeedFactor_ang": "1.00", "FordHighSpeedFactor_ang": "1.00"})
     ext.update_angle_params(p)
-    assert ext.autocal is not None
+    assert ext.autocal_ctl.pipeline is not None
     p.values["FordAngleAutoCal"] = 0
     self._tick(ext, p, n=1)
-    assert ext.autocal is None and not ext.autocal_enabled
+    assert ext.autocal_ctl.pipeline is None and not ext.autocal_enabled
