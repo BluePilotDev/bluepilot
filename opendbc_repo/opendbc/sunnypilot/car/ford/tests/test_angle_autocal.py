@@ -131,6 +131,22 @@ class TestSteadyStateGate:
     gate.update(True, MIN_KAPPA * 2, True, False, False)  # pressed
     assert gate.steady_s == 0.0
 
+  def test_slow_ramp_bounded_by_window_drift(self):
+    # A ramp inside the per-frame rate bound but drifting through the window must not
+    # pass: the same-frame ratio would be actuation-lag-biased (liveDelay up to ~0.42s).
+    gate = SteadyStateGate(dt=DT)
+    k = MIN_KAPPA * 2
+    admitted = False
+    for _ in range(int(STEADY_TIME_S / DT) * 4):
+      admitted |= gate.update(True, k, False, False, False)
+      k += 0.5 * 0.0015 * DT   # half the per-frame rate limit, sustained
+    assert not admitted
+    # A truly flat command still passes — one extra frame for the drift reset that
+    # closes the ramp's stale window, then a full fresh steady period.
+    for _ in range(int(STEADY_TIME_S / DT) + 3):
+      ok = gate.update(True, k, False, False, False)
+    assert ok
+
   def test_saturation_blocks(self):
     gate = SteadyStateGate(dt=DT)
     for _ in range(int(STEADY_TIME_S / DT) + 2):

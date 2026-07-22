@@ -75,6 +75,14 @@ MIN_SPEED = 9.5             # m/s; below this the deviation clip is off and meas
 MIN_KAPPA = 0.001           # 1/m; fully inside the high-curvature branch the factors scale
 MAX_KAPPA_RATE = 0.0015     # 1/m/s; quasi-steady curvature only
 STEADY_TIME_S = 0.6         # command must be steady this long before samples count (PSCM lag)
+# The measurement lags the command by the actuation delay (liveDelay: ~0.15s typical, up to
+# ~0.42s observed), so on a slow ramp a same-frame ratio compares meas(t) ~ cmd(t - tau)
+# against cmd(t). The per-frame rate bound alone admits ramps whose lag error reaches
+# tau*MAX_KAPPA_RATE/kappa — tens of percent at the MIN_KAPPA floor. Bounding the TOTAL
+# drift across the steady window caps that error at DRIFT_FRAC * (tau / STEADY_TIME_S)
+# regardless of the actual delay: <= ~7% instantaneous even at the 0.42s extreme, sign-
+# symmetric over entries/exits, well inside the stderr machinery.
+STEADY_DRIFT_FRAC = 0.10    # max |kappa - window start| as a fraction of |kappa|
 MIN_RATIO, MAX_RATIO = 0.4, 2.5  # discard absurd ratios (measurement glitches)
 MAX_LAT_ACCEL = 2.5         # m/s^2; kappa*v^2 above this is tire/comfort-limit territory, not gain error
 # Near the limit cmd!=meas is physics, not gain error: evidence weight fades linearly to
@@ -527,6 +535,7 @@ class SteadyStateGate:
     self.dt = dt
     self.steady_s = 0.0
     self.kappa_last = None
+    self.kappa_window_start = None  # command value when the current steady window opened
     self.grip_cooldown_s = 0.0
 
   def reset(self):
@@ -535,6 +544,7 @@ class SteadyStateGate:
     self.grip_cooldown_s = max(0.0, self.grip_cooldown_s - self.dt)
     self.steady_s = 0.0
     self.kappa_last = None
+    self.kappa_window_start = None
 
   def update(self, lat_active: bool, kappa_cmd: float, steering_pressed: bool,
              angle_rate_limited: bool, deviation_limited: bool,
@@ -556,8 +566,18 @@ class SteadyStateGate:
           and abs(kappa_cmd) >= MIN_KAPPA)
     if ok and self.kappa_last is not None:
       ok = abs(kappa_cmd - self.kappa_last) / self.dt <= MAX_KAPPA_RATE
+    # Actuation-lag protection: per-frame rate alone admits slow ramps whose same-frame
+    # ratio is lag-biased; the window-total drift bound caps that (see STEADY_DRIFT_FRAC).
+    if ok and self.kappa_window_start is not None:
+      ok = abs(kappa_cmd - self.kappa_window_start) <= STEADY_DRIFT_FRAC * abs(kappa_cmd)
     self.kappa_last = kappa_cmd if lat_active else None
-    self.steady_s = self.steady_s + self.dt if ok else 0.0
+    if ok:
+      if self.kappa_window_start is None:
+        self.kappa_window_start = kappa_cmd
+      self.steady_s += self.dt
+    else:
+      self.steady_s = 0.0
+      self.kappa_window_start = None
     return self.steady_s >= STEADY_TIME_S
 
 

@@ -680,19 +680,30 @@ class LateralAngleExt:
     # rejects any frame where cmd != meas has an explanation other than gain error (bump
     # flick, rough surface, tire-limit lat accel, longitudinal load transfer, saturation).
     if self.autocal_enabled and self.autocal is not None:
-      ws = CS.out.wheelSpeeds
-      ws_vals = (float(ws.fl), float(ws.fr), float(ws.rl), float(ws.rr))
-      # Human-turn and stall-blip frames never reach here (their branches early-return
-      # after idling the pipeline), so those flags are not passed — they'd be dead False.
-      committed = self.autocal.update(v_ego, kappa_cmd, current_curvature,
-                                      CS.out.steeringPressed,
-                                      self.bp_angle_rate_limited, self.bp_curvature_deviation_limited,
-                                      saturated=self.bp_angle_saturated,
-                                      driver_torque=float(CS.out.steeringTorque),
-                                      a_ego=float(CS.out.aEgo),
-                                      ws_spread=max(ws_vals) - min(ws_vals),
-                                      low_factor=self.low_speed_curv_factor,
-                                      high_factor=self.high_speed_curv_factor)
+      # Measurement-chain warmup gate: kappa_meas comes through the vehicle model with
+      # liveParameters' angle offset / steer ratio, and the same locationd stack that
+      # feeds them also estimates the actuation delay. Until lagd reports 'estimated',
+      # those inputs are defaults/converging — evidence collected then is not comparing
+      # the command against a trustworthy measurement. Idle (not pause): staged samples
+      # and peak windows must not straddle the unestimated period. Status is effectively
+      # monotonic within a drive, so this costs only the warmup minutes.
+      if str(self.sm['liveDelay'].status) != "estimated":
+        self.autocal.idle()
+        committed = []
+      else:
+        ws = CS.out.wheelSpeeds
+        ws_vals = (float(ws.fl), float(ws.fr), float(ws.rl), float(ws.rr))
+        # Human-turn and stall-blip frames never reach here (their branches early-return
+        # after idling the pipeline), so those flags are not passed — they'd be dead False.
+        committed = self.autocal.update(v_ego, kappa_cmd, current_curvature,
+                                        CS.out.steeringPressed,
+                                        self.bp_angle_rate_limited, self.bp_curvature_deviation_limited,
+                                        saturated=self.bp_angle_saturated,
+                                        driver_torque=float(CS.out.steeringTorque),
+                                        a_ego=float(CS.out.aEgo),
+                                        ws_spread=max(ws_vals) - min(ws_vals),
+                                        low_factor=self.low_speed_curv_factor,
+                                        high_factor=self.high_speed_curv_factor)
       if committed:
         self._autocal_dirty = True
       rec = self.autocal.recommend(self.low_speed_curv_factor, self.high_speed_curv_factor)
