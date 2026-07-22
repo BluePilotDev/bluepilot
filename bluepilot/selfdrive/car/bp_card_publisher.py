@@ -148,6 +148,17 @@ def publish_controller_state_bp(CI, pm):
       for field, value in _settings_cache.items():
         setattr(cs_bp, field, value)
 
+    # BluePilot: auto-cal fields are GROUND TRUTH from the live controller, not the param
+    # snapshot — a device once had params armed while the controller ran disarmed, and the
+    # param-sourced telemetry made that undiagnosable from logs. bp_autocal_status carries
+    # the controller's own view (armed/evidence/nudges, "off", "locked", or an error).
+    cc = CI.CC
+    if hasattr(cc, "autocal_enabled"):
+      cs_bp.bmsAngleAutoCalibrate = bool(cc.autocal_enabled)
+    status = getattr(cc, "bp_autocal_status", "")
+    if status:
+      cs_bp.bmsAngleAutoCalState = str(status)
+
     # BluePilot: fingerprint info -- plain attribute reads on CarParams, no Params round-trip
     # needed, so no caching required (fingerprint never changes after startup).
     CP = getattr(CI, "CP", None)

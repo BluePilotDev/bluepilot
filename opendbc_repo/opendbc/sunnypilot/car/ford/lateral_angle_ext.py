@@ -209,6 +209,7 @@ class LateralAngleExt:
     self._autocal_edit_pending = False  # user edit needs 2 consecutive ticks (async put lag)
     self._autocal_save_s = 0.0
     self._autocal_dirty = False
+    self.bp_autocal_status = ""        # live ground-truth status, published in telemetry
     # Telemetry + autocal gate: the command this frame was modified by PSCM authority
     # limits or the DBC clamp — the car could not make the requested turn.
     self.bp_angle_saturated = False
@@ -283,8 +284,22 @@ class LateralAngleExt:
             else:
               self._autocal_edit_pending = False
           self._autocal_params_handle = params
-        except Exception:
+          # Live status for telemetry: published from the EXT's actual state (ground
+          # truth), never from a param re-read — a param/telemetry mismatch is exactly
+          # the failure mode that made earlier on-device issues undiagnosable.
+          if self.autocal_done:
+            self.bp_autocal_status = "locked"
+          elif not self.autocal_enabled:
+            self.bp_autocal_status = "off"
+          else:
+            est = self.autocal.est
+            self.bp_autocal_status = (f"armed n={est.n} w={est.weight_low:.0f}/{est.weight_high:.0f}"
+                                      f" applied={self.low_speed_curv_factor:.2f}/{self.high_speed_curv_factor:.2f}"
+                                      f" nudges={self.autocal.nudges}")
+        except Exception as e:
           self.autocal_enabled = False
+          self.bp_autocal_status = f"tick error: {type(e).__name__}: {e}"[:200]
+          self._autocal_error(self.bp_autocal_status)
 
   def update_angle_strategy(self, CC, CS, actuators, CP):
     """
@@ -698,20 +713,37 @@ class LateralAngleExt:
 
   def _autocal_apply_nudge(self, rec):
     """Write a nudged factor pair to the params (the lateral tuning menu shows them move)
-    and apply in-memory immediately so this very frame steers with the new gain."""
+    and apply in-memory immediately so this very frame steers with the new gain.
+
+    The params are TYPED (FLOAT) in this fork: writes must be python floats — a string
+    raises TypeError. That failure mode was invisible once (swallowed except -> nudges
+    silently never landed); now any write error is recorded in the state param so it
+    shows up in the next drive's logs instead of vanishing."""
     low_new, high_new = rec
     if self._autocal_params_handle is None:
       return
     try:
-      self._autocal_params_handle.put("FordLowSpeedFactor_ang", f"{low_new:.2f}")
-      self._autocal_params_handle.put("FordHighSpeedFactor_ang", f"{high_new:.2f}")
-    except Exception:
+      self._autocal_params_handle.put("FordLowSpeedFactor_ang", float(low_new))
+      self._autocal_params_handle.put("FordHighSpeedFactor_ang", float(high_new))
+    except Exception as e:
+      self._autocal_error(f"nudge write failed: {type(e).__name__}: {e}")
       return
     self.low_speed_curv_factor = float(low_new)
     self.high_speed_curv_factor = float(high_new)
     self._autocal_last_written = (f"{low_new:.2f}", f"{high_new:.2f}")
     self._autocal_edit_pending = False
     self._autocal_save("collecting")
+
+  def _autocal_error(self, msg: str):
+    """Self-reporting diagnostics: park the error in the state param (STRING) so it is
+    visible in qlogs/initData and to the offline analyzer. Evidence in the estimator is
+    NOT touched; the error string replaces the serialized state only until the next
+    successful save. Never raises."""
+    try:
+      if self._autocal_params_handle is not None:
+        self._autocal_params_handle.put("FordAngleAutoCalState", f"error: {msg[:300]}")
+    except Exception:
+      pass
 
   def _autocal_save(self, phase: str):
     """Serialize the pipeline into FordAngleAutoCalState (JSON). Async put is fine:
@@ -734,7 +766,8 @@ class LateralAngleExt:
       d["stable_s"] = round(self.autocal.stable_s, 1)
     try:
       self._autocal_params_handle.put("FordAngleAutoCalState", json.dumps(d, separators=(",", ":")))
-    except Exception:
+    except Exception as e:
+      self._autocal_error(f"state save failed: {type(e).__name__}: {e}")
       return
     self._autocal_save_s = 0.0
     self._autocal_dirty = False

@@ -491,7 +491,20 @@ class TestClosedLoopConvergence:
 
 class _MockParams:
   """Duck-typed openpilot Params: just enough for update_angle_params. put() lands
-  immediately (readable on the next get), like a completed async write."""
+  immediately (readable on the next get), like a completed async write.
+
+  TYPE-CHECKED like the real fork's Params (params_pyx python2cpp): writing the wrong
+  python type raises TypeError. The real system silently ate a str-into-FLOAT nudge
+  write on-device because the old mock accepted anything — never again."""
+
+  _TYPES = {
+    "FordLowSpeedFactor_ang": float,
+    "FordHighSpeedFactor_ang": float,
+    "FordAngleAutoCal": bool,
+    "FordAngleAutoCalState": str,
+    "lane_change_factor_high_ang": float,
+  }
+
   def __init__(self, values):
     self.values = values
     self.written = {}
@@ -503,6 +516,9 @@ class _MockParams:
     return bool(self.values.get(key))
 
   def put(self, key, value):
+    expected = self._TYPES.get(key)
+    if expected is not None and not isinstance(value, expected):
+      raise TypeError(f"Type mismatch while writing param {key}: got {type(value)}, expected {expected}")
     self.values[key] = value
     self.written[key] = value
 
@@ -581,8 +597,9 @@ class TestOnboardGlue:
                      "FordLowSpeedFactor_ang": "1.00", "FordHighSpeedFactor_ang": "1.00"})
     ext.update_angle_params(p)
     ext._autocal_apply_nudge((1.02, 1.15))
-    assert p.written["FordLowSpeedFactor_ang"] == "1.02"
-    assert p.written["FordHighSpeedFactor_ang"] == "1.15"
+    # The fork's params are typed FLOAT — a string write raises and the nudge dies.
+    assert p.written["FordLowSpeedFactor_ang"] == 1.02 and isinstance(p.written["FordLowSpeedFactor_ang"], float)
+    assert p.written["FordHighSpeedFactor_ang"] == 1.15 and isinstance(p.written["FordHighSpeedFactor_ang"], float)
     st = json.loads(p.written["FordAngleAutoCalState"])
     assert st["phase"] == "collecting" and st["applied"] == {"low": 1.02, "high": 1.15}
     assert ext.low_speed_curv_factor == 1.02 and ext.high_speed_curv_factor == 1.15
