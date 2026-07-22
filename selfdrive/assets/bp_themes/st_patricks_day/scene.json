@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "sky": {
+    "camera_tint_alpha": 40
+  },
+  "layers": [
+    {
+      "type": "particles",
+      "sprite": "clover",
+      "mode": "fall",
+      "count": 34,
+      "camera_count_scale": 0.4,
+      "size_px": [
+        15,
+        32
+      ],
+      "fall_speed": [
+        0.04,
+        0.08
+      ],
+      "sway_amp": [
+        0.004,
+        0.015
+      ],
+      "sway_freq_hz": [
+        0.15,
+        0.5
+      ],
+      "spin_dps": [
+        -45,
+        45
+      ],
+      "tints": [
+        "#3CD26E",
+        "#5ADC78",
+        "#2AA050",
+        "#FFBE3C"
+      ],
+      "minimal_alpha": 225,
+      "camera_alpha": 110,
+      "speed_scale": 0.5,
+      "depth_split": 0.6,
+      "blend": "alpha"
+    }
+  ],
+  "foreground": {
+    "particles_over_hud": true,
+    "corner_accents": true,
+    "corner_alpha": 50
+  }
+}

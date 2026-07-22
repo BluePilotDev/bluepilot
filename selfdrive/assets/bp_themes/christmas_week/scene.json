@@ -1,0 +1,94 @@
+{
+  "version": 1,
+  "sky": {
+    "camera_tint_alpha": 40
+  },
+  "layers": [
+    {
+      "type": "particles",
+      "sprite": "snowflake",
+      "mode": "fall",
+      "count": 48,
+      "camera_count_scale": 0.4,
+      "size_px": [
+        13,
+        30
+      ],
+      "fall_speed": [
+        0.05,
+        0.11
+      ],
+      "sway_amp": [
+        0.004,
+        0.015
+      ],
+      "sway_freq_hz": [
+        0.15,
+        0.5
+      ],
+      "spin_dps": [
+        -30,
+        30
+      ],
+      "tints": [
+        "#FFFFFF",
+        "#DDE8FF",
+        "#BFD4E8"
+      ],
+      "minimal_alpha": 225,
+      "camera_alpha": 110,
+      "speed_scale": 0.5,
+      "depth_split": 0.6,
+      "blend": "alpha"
+    },
+    {
+      "type": "decor",
+      "sprite": "bulb",
+      "anchor": "top_edge",
+      "size_frac": 0.03,
+      "spacing_frac": 0.045,
+      "droop_frac": 0.03,
+      "tints": [
+        "#FF4040",
+        "#FFD24A",
+        "#39C25C",
+        "#3E7BFF"
+      ],
+      "alpha_minimal": 220,
+      "alpha_camera": 90,
+      "idle": "twinkle"
+    },
+    {
+      "type": "decor",
+      "sprite": "garland",
+      "anchor": "top_left",
+      "size_frac": 0.055,
+      "spacing_frac": 0.06,
+      "droop_frac": 0.025,
+      "tints": [
+        "#FFFFFF"
+      ],
+      "alpha_minimal": 220,
+      "alpha_camera": 90,
+      "idle": "none"
+    },
+    {
+      "type": "decor",
+      "sprite": "garland",
+      "anchor": "top_right",
+      "size_frac": 0.055,
+      "spacing_frac": 0.06,
+      "droop_frac": 0.025,
+      "tints": [
+        "#FFFFFF"
+      ],
+      "alpha_minimal": 220,
+      "alpha_camera": 90,
+      "idle": "none"
+    }
+  ],
+  "foreground": {
+    "particles_over_hud": true,
+    "corner_accents": false
+  }
+}

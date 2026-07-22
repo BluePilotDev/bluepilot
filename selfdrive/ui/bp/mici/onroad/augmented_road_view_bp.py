@@ -21,7 +21,7 @@ from openpilot.selfdrive.ui.bp.mici.onroad.lateral_debug_mici import LateralDebu
 from openpilot.selfdrive.ui.bp.mici.onroad.rad_racer_mici import RadRacerThemeMici
 from openpilot.system.ui.widgets import Widget
 # BluePilot: unified theme selector (BPThemePack param)
-from openpilot.selfdrive.ui.bp.lib import theme_pack
+from openpilot.selfdrive.ui.bp.lib import theme_pack, theme_scene
 
 # BluePilot: Margin to keep confidence ball inside the MICI rounded border
 MICI_BALL_BORDER_MARGIN = 25  # half of 50px MICI border thickness
@@ -94,8 +94,6 @@ class MiciAugmentedRoadViewBP(MiciCameraViewBP, AugmentedRoadView, BlindspotRend
 
     # BluePilot: Rad Racer 8-bit theme (MICI-scaled; no gauge cluster on the small screen)
     self._rad_racer_theme = RadRacerThemeMici()
-    self._rad_racer_active = theme_pack.rad_racer_active(self._bp_params)
-    self._rad_racer_param_counter = 0
 
   def _on_swipe_down(self):
     if not ui_state.is_onroad():
@@ -146,24 +144,22 @@ class MiciAugmentedRoadViewBP(MiciCameraViewBP, AugmentedRoadView, BlindspotRend
     # Render the base camera view. Minimal Driving View suppression lives in MiciCameraViewBP.
     MiciCameraViewBP._render(self, self._content_rect)
 
-    # BluePilot: Rad Racer theme — refresh cached param (~1s), then sky/skyline/signs behind the road
-    self._rad_racer_param_counter += 1
-    if self._rad_racer_param_counter >= 60:
-      self._rad_racer_param_counter = 0
-      self._rad_racer_active = theme_pack.rad_racer_active(self._bp_params)
-    if self._rad_racer_active:
+    # BluePilot: unified theme scene dispatch — Rad Racer draws inline on MICI (no full
+    # takeover: the normal HUD stays); pack scenes get background + foreground passes.
+    _scene = theme_scene.active_scene()
+    _rad_racer = _scene is not None and _scene.replaces_hud()
+    if _rad_racer:
       self._model_renderer.prepare_projection(self._content_rect)
       self._rad_racer_theme.render_background(self._content_rect, self._model_renderer)
-    else:
-      # BluePilot: theme pack sky — packs paint the background when the camera is hidden
-      theme_pack.draw_background(self._content_rect, getattr(self, "_bp_hide_camera_view", False))
+    elif _scene is not None:
+      _scene.draw_background(self._content_rect, getattr(self, "_bp_hide_camera_view", False))
 
     # Model overlays
     self._model_renderer.render(self._content_rect)
 
     # BluePilot: Rad Racer sprites (ego + leads) over the road; no gauge cluster on MICI,
     # so the ego car anchors to the bottom edge of the content rect instead.
-    if self._rad_racer_active:
+    if _rad_racer:
       self._rad_racer_theme.render_foreground(
         self._content_rect, self._model_renderer,
         self._content_rect.y + self._content_rect.height - 4)
@@ -187,6 +183,9 @@ class MiciAugmentedRoadViewBP(MiciCameraViewBP, AugmentedRoadView, BlindspotRend
     self._hud_renderer.set_can_draw_top_icons(alert_to_render is None)
     self._hud_renderer.set_wheel_critical_icon(alert_to_render is not None and not not_animating_out and
                                                alert_to_render.visual_alert == car.CarControl.HUDControl.VisualAlert.steerRequired)
+    # BluePilot: theme scene foreground — decor + near particles, always under alerts.
+    if _scene is not None and not _rad_racer:
+      _scene.draw_foreground(self._content_rect, getattr(self, "_bp_hide_camera_view", False))
     if ui_state.started:
       self._alert_renderer.render(self._content_rect)
     self._hud_renderer.render(self._content_rect)

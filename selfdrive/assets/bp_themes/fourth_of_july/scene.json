@@ -1,0 +1,93 @@
+{
+  "version": 1,
+  "sky": {
+    "camera_tint_alpha": 40
+  },
+  "layers": [
+    {
+      "type": "burst",
+      "period_s": [
+        1.2,
+        2.4
+      ],
+      "particles_per_burst": 28,
+      "radial_speed": [
+        0.12,
+        0.26
+      ],
+      "gravity": 0.12,
+      "fade_s": [
+        1.0,
+        1.6
+      ],
+      "region": [
+        0.1,
+        0.05,
+        0.8,
+        0.35
+      ],
+      "tints": [
+        "#CD2D3C",
+        "#FFFFFF",
+        "#648CEB"
+      ],
+      "blend": "additive"
+    },
+    {
+      "type": "particles",
+      "sprite": "spark",
+      "mode": "wander",
+      "count": 12,
+      "camera_count_scale": 0.4,
+      "size_px": [
+        5,
+        10
+      ],
+      "fall_speed": [
+        0.02,
+        0.05
+      ],
+      "sway_amp": [
+        0.004,
+        0.015
+      ],
+      "sway_freq_hz": [
+        0.15,
+        0.5
+      ],
+      "spin_dps": [
+        0,
+        0
+      ],
+      "tints": [
+        "#FFFFFF",
+        "#648CEB"
+      ],
+      "minimal_alpha": 190,
+      "camera_alpha": 85,
+      "speed_scale": 0.5,
+      "depth_split": 0.6,
+      "blend": "additive"
+    },
+    {
+      "type": "decor",
+      "sprite": "pennant",
+      "anchor": "top_edge",
+      "size_frac": 0.03,
+      "spacing_frac": 0.05,
+      "droop_frac": 0.028,
+      "tints": [
+        "#CD2D3C",
+        "#FFFFFF",
+        "#648CEB"
+      ],
+      "alpha_minimal": 220,
+      "alpha_camera": 90,
+      "idle": "none"
+    }
+  ],
+  "foreground": {
+    "particles_over_hud": true,
+    "corner_accents": false
+  }
+}

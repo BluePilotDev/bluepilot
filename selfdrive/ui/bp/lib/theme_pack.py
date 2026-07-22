@@ -30,7 +30,7 @@ _PARAM_POLL_S = 2.0
 # colors.json keys the renderers consume (unknown keys are loaded but ignored):
 # Path/PathEdge (path ribbon gradient), LaneLines, LeadMarker (vision lead chevron + info box),
 # RoadEdges (road boundary lines), Accent (torque bar fill, set-speed value),
-# Background (sky gradient when the camera view is hidden)
+# Background (sky treatment — rendered by theme_scene.PackScene)
 COLOR_KEYS = ("Path", "PathEdge", "LaneLines", "LeadMarker", "RoadEdges", "Accent", "Background")
 
 
@@ -147,25 +147,6 @@ def get_active_pack(force: bool = False) -> ThemePack | None:
 def active_pack_name() -> str:
   pack = get_active_pack()
   return pack.name if pack else ""
-
-
-def draw_background(rect, hide_camera: bool) -> None:
-  """Paint the pack's sky: a vertical gradient from Background down to near-black.
-
-  Only drawn when the camera view is hidden (Minimal Driving View) — over live camera
-  footage the background would obscure the road. UI processes only.
-  """
-  if not hide_camera:
-    return
-  pack = get_active_pack()
-  if pack is None:
-    return
-  bg = pack.rl_colors().get("Background")
-  if bg is None:
-    return
-  import pyray as rl
-  bottom = rl.Color(int(bg.r * 0.12), int(bg.g * 0.12), int(bg.b * 0.12), 255)
-  rl.draw_rectangle_gradient_v(int(rect.x), int(rect.y), int(rect.width), int(rect.height), bg, bottom)
 
 
 if __name__ == "__main__":

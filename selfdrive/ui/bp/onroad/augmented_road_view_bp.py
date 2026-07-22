@@ -24,7 +24,7 @@ from openpilot.selfdrive.ui.sunnypilot.onroad.developer_ui import DeveloperUiSta
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.selfdrive.ui.bp.lib.ui_debug_logger import bp_ui_log
 # BluePilot: unified theme selector (BPThemePack param)
-from openpilot.selfdrive.ui.bp.lib import theme_pack
+from openpilot.selfdrive.ui.bp.lib import theme_pack, theme_scene
 
 
 class GaugeStyle(IntEnum):
@@ -86,9 +86,8 @@ class AugmentedRoadViewBP(CameraViewBP, AugmentedRoadView, BlindspotRendererMixi
     except (TypeError, ValueError):
       self._cached_gauge_size = 2
 
-    # BluePilot: Rad Racer 8-bit theme
+    # BluePilot: Rad Racer 8-bit theme (drawing host; selection lives in theme_scene)
     self._rad_racer_theme = RadRacerTheme()
-    self._rad_racer_active = theme_pack.rad_racer_active(self._bp_params)
 
   def update_fade_out_bottom_overlay(self, _content_rect):
     """BluePilot: Skip MICI fade overlay on TICI — causes unwanted black gradient at bottom."""
@@ -111,8 +110,6 @@ class AugmentedRoadViewBP(CameraViewBP, AugmentedRoadView, BlindspotRendererMixi
       except (TypeError, ValueError):
         self._cached_gauge_size = 2
       self._hybrid_gauge_style = GaugeStyle(self._bp_params.get("FordPrefGaugeStyle", return_default=True) or 0)
-      # BluePilot: Rad Racer theme toggle
-      self._rad_racer_active = theme_pack.rad_racer_active(self._bp_params)
 
     self._switch_stream_if_needed(ui_state.sm)
     self._update_calibration()
@@ -147,13 +144,15 @@ class AugmentedRoadViewBP(CameraViewBP, AugmentedRoadView, BlindspotRendererMixi
     # Render the base camera view. Minimal Driving View suppression lives in CameraViewBP.
     CameraViewBP._render(self, rect)
 
-    # BluePilot: Rad Racer 8-bit theme takes over the whole scene (skips HUD/gauges/ball)
-    if self._rad_racer_active:
+    # BluePilot: unified theme scene dispatch. A scene that replaces the HUD (Rad Racer)
+    # takes over the whole render; pack scenes draw a background pass here and a
+    # foreground pass just before alerts.
+    _scene = theme_scene.active_scene()
+    if _scene is not None and _scene.replaces_hud():
       self._render_rad_racer_scene(rect)
       return
-
-    # BluePilot: theme pack sky — packs paint the background when the camera is hidden
-    theme_pack.draw_background(self._content_rect, getattr(self, "_bp_hide_camera_view", False))
+    if _scene is not None:
+      _scene.draw_background(self._content_rect, getattr(self, "_bp_hide_camera_view", False))
 
     # Render model (uses full content rect for camera-space overlays)
     self.model_renderer.render(self._content_rect)
@@ -216,6 +215,10 @@ class AugmentedRoadViewBP(CameraViewBP, AugmentedRoadView, BlindspotRendererMixi
       if ui_state.developer_ui in (DeveloperUiState.BOTTOM, DeveloperUiState.BOTH):
         torque_rect = rl.Rectangle(ui_rect.x, ui_rect.y, ui_rect.width, ui_rect.height - get_bottom_dev_ui_offset())
       self._torque_bar.render(torque_rect, gauge_height_offset=gauge_height_offset)
+
+    # BluePilot: theme scene foreground — decor + near particles over the HUD, under alerts.
+    if _scene is not None and not _scene.replaces_hud():
+      _scene.draw_foreground(self._content_rect, getattr(self, "_bp_hide_camera_view", False))
 
     # Alerts last so they are never covered by gauges or other overlays.
     # BluePilot: Full-screen alerts (e.g. reverse gear) must use content_rect so they cover

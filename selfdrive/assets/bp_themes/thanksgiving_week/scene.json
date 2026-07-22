@@ -1,0 +1,78 @@
+{
+  "version": 1,
+  "sky": {
+    "camera_tint_alpha": 40
+  },
+  "layers": [
+    {
+      "type": "particles",
+      "sprite": "leaf",
+      "mode": "fall",
+      "count": 34,
+      "camera_count_scale": 0.4,
+      "size_px": [
+        17,
+        36
+      ],
+      "fall_speed": [
+        0.05,
+        0.1
+      ],
+      "sway_amp": [
+        0.008,
+        0.02
+      ],
+      "sway_freq_hz": [
+        0.15,
+        0.5
+      ],
+      "spin_dps": [
+        -90,
+        90
+      ],
+      "tints": [
+        "#B95F23",
+        "#E69632",
+        "#D25A23",
+        "#F5D28C"
+      ],
+      "minimal_alpha": 225,
+      "camera_alpha": 110,
+      "speed_scale": 0.5,
+      "depth_split": 0.6,
+      "blend": "alpha"
+    },
+    {
+      "type": "decor",
+      "sprite": "garland",
+      "anchor": "top_left",
+      "size_frac": 0.055,
+      "spacing_frac": 0.06,
+      "droop_frac": 0.025,
+      "tints": [
+        "#FFFFFF"
+      ],
+      "alpha_minimal": 220,
+      "alpha_camera": 90,
+      "idle": "none"
+    },
+    {
+      "type": "decor",
+      "sprite": "garland",
+      "anchor": "top_right",
+      "size_frac": 0.055,
+      "spacing_frac": 0.06,
+      "droop_frac": 0.025,
+      "tints": [
+        "#FFFFFF"
+      ],
+      "alpha_minimal": 220,
+      "alpha_camera": 90,
+      "idle": "none"
+    }
+  ],
+  "foreground": {
+    "particles_over_hud": true,
+    "corner_accents": false
+  }
+}

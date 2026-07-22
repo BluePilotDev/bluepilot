@@ -1,0 +1,99 @@
+{
+  "version": 1,
+  "sky": {
+    "camera_tint_alpha": 40
+  },
+  "layers": [
+    {
+      "type": "particles",
+      "sprite": "leaf",
+      "mode": "fall",
+      "count": 28,
+      "camera_count_scale": 0.4,
+      "size_px": [
+        13,
+        26
+      ],
+      "fall_speed": [
+        0.06,
+        0.12
+      ],
+      "sway_amp": [
+        0.004,
+        0.015
+      ],
+      "sway_freq_hz": [
+        0.15,
+        0.5
+      ],
+      "spin_dps": [
+        -60,
+        60
+      ],
+      "tints": [
+        "#FF8214",
+        "#FFAA3C",
+        "#C85A0A"
+      ],
+      "minimal_alpha": 225,
+      "camera_alpha": 110,
+      "speed_scale": 0.5,
+      "depth_split": 0.6,
+      "blend": "alpha"
+    },
+    {
+      "type": "particles",
+      "sprite": "bat",
+      "mode": "flutter",
+      "count": 6,
+      "camera_count_scale": 0.4,
+      "size_px": [
+        26,
+        42
+      ],
+      "fall_speed": [
+        0.06,
+        0.1
+      ],
+      "sway_amp": [
+        0.01,
+        0.03
+      ],
+      "sway_freq_hz": [
+        0.5,
+        1.2
+      ],
+      "spin_dps": [
+        0,
+        0
+      ],
+      "tints": [
+        "#3C1E64",
+        "#8C3CDC"
+      ],
+      "minimal_alpha": 235,
+      "camera_alpha": 130,
+      "speed_scale": 0.5,
+      "depth_split": 0.6,
+      "blend": "alpha"
+    },
+    {
+      "type": "decor",
+      "sprite": "pumpkin",
+      "anchor": "bottom_left",
+      "size_frac": 0.075,
+      "spacing_frac": 0.06,
+      "droop_frac": 0.025,
+      "tints": [
+        "#FFFFFF"
+      ],
+      "alpha_minimal": 235,
+      "alpha_camera": 110,
+      "idle": "pulse"
+    }
+  ],
+  "foreground": {
+    "particles_over_hud": true,
+    "corner_accents": false
+  }
+}
