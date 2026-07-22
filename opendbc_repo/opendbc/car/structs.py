@@ -181,6 +181,7 @@ class ControllerStateBP:
   curvatureDeviationLimited: bool = False  # current_curvature error-clip constrained the command this frame
   humanTurnLateralPaused: bool = False  # angle mode: lateral forced inactive (mode 0) during a manual turn
   stallBlipActive: bool = False  # angle mode: brief mode-0 pulse resetting PSCM authority after a post-override stall
+  angleSaturated: bool = False  # angle mode: PSCM authority limit or DBC clamp modified this frame's command
 
   # BluePilot: full BluePilot-menu settings snapshot -- see custom.capnp ControllerStateBP for
   # field-by-field param-key mapping and the field-retirement convention.
@@ -224,6 +225,11 @@ class ControllerStateBP:
   bmsMinimumSpeedToPauseLaneChange: int = 20
   bmsShowLateralControlMode: bool = False
   # --- Angle Tuning ---
+  # NOTE: a field must be declared HERE to survive convert_to_capnp — the publisher's
+  # setattr on an undeclared name is silently dropped at conversion, publishing the capnp
+  # default instead. That gap muted the auto-cal telemetry on every build until 2026-07-22.
+  bmsAngleAutoCalibrate: bool = False
+  bmsAngleAutoCalState: str = ""
   bmsLowSpeedAdjustmentFactor: float = 1.0
   bmsHighSpeedAdjustmentFactor: float = 1.0
   bmsLaneChangeFactorHighAngle: float = 1.0
