@@ -879,6 +879,7 @@ class WebRoutesHandler(BaseHTTPRequestHandler):
                     '/api/logs',
                     '/api/manager-logs',
                     '/api/websocket_status',
+                    '/api/lateral',
                     '/api/drive-stats',
                     '/api/panels',
                 ]
@@ -901,6 +902,16 @@ class WebRoutesHandler(BaseHTTPRequestHandler):
             # Route handlers
             if path in SPA_ROUTES or path.startswith('/settings/'):
                 self.send_file_response(str(WEBAPP_DIR / 'index.html'), 'text/html')
+                return
+
+            # Live lateral debug graph for phones (self-contained page, works onroad —
+            # that is its purpose; see realtime/lateral_stream.py)
+            if path == '/lateral':
+                self.send_file_response(str(WEBAPP_DIR / 'lateral.html'), 'text/html')
+                return
+            if path == '/api/lateral/stream':
+                from bluepilot.backend.realtime.lateral_stream import serve_sse
+                serve_sse(self)
                 return
 
             # API routes - separate if/elif chain since SPA routes return early

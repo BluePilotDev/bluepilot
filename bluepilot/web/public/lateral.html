@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#0d0f14">
+<title>Steering — BluePilot</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; background: #0d0f14; color: #e8e9ec; overflow: hidden;
+               font: 14px/1.4 -apple-system, "Segoe UI", Roboto, sans-serif; }
+  #app { display: flex; flex-direction: column; height: 100%; }
+
+  header { display: flex; align-items: center; gap: 14px; padding: 8px 12px;
+           border-bottom: 1px solid #22262e; flex-wrap: wrap; }
+  .stat { display: flex; flex-direction: column; min-width: 58px; }
+  .stat .v { font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .stat .l { font-size: 10px; color: #8b8f98; text-transform: uppercase; letter-spacing: .06em; }
+  .stat .v.on  { color: #4cd07d; }
+  .stat .v.off { color: #8b8f98; }
+  #autocal { font-size: 11px; color: #8b8f98; margin-left: auto; text-align: right;
+             max-width: 46%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #conn { width: 9px; height: 9px; border-radius: 50%; background: #d64545; flex: none; }
+  #conn.ok { background: #4cd07d; }
+
+  #graphwrap { flex: 1; position: relative; min-height: 0; }
+  canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+
+  .legend { position: absolute; top: 6px; left: 10px; display: flex; gap: 14px; font-size: 12px; }
+  .legend span::before { content: ""; display: inline-block; width: 14px; height: 3px;
+                         border-radius: 2px; margin-right: 5px; vertical-align: middle; }
+  .legend .des::before { background: #4da3ff; }
+  .legend .act::before { background: #4cd07d; }
+  #pausedbadge { position: absolute; top: 6px; right: 10px; font-size: 12px; font-weight: 700;
+                 color: #ffb84d; display: none; letter-spacing: .05em; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div id="conn" title="stream status"></div>
+    <div class="stat"><div class="v" id="mph">--</div><div class="l">mph</div></div>
+    <div class="stat"><div class="v" id="lat">--</div><div class="l">lateral</div></div>
+    <div class="stat"><div class="v" id="err">--</div><div class="l">err °</div></div>
+    <div class="stat"><div class="v" id="factors" style="font-size:13px"></div>
+         <div class="l">low / high</div></div>
+    <div id="autocal">connecting…</div>
+  </header>
+
+  <div id="graphwrap">
+    <canvas id="graph"></canvas>
+    <div class="legend"><span class="des">Desired</span><span class="act">Actual</span></div>
+    <div id="pausedbadge">PAUSED — tap to resume</div>
+  </div>
+
+</div>
+
+<script>
+'use strict';
+// ---- state ------------------------------------------------------------------------------
+const WINDOW_S = 12;              // rolling window, mirrors the on-device feel but longer
+const buf = [];                   // {t, des, act}
+let paused = false;
+let lastFrameWall = 0;
+
+// ---- stream -----------------------------------------------------------------------------
+const conn = document.getElementById('conn');
+function connect() {
+  const es = new EventSource('/api/lateral/stream');
+  es.onopen  = () => conn.classList.add('ok');
+  es.onerror = () => { conn.classList.remove('ok'); es.close(); setTimeout(connect, 2000); };
+  es.onmessage = (ev) => {
+    const d = JSON.parse(ev.data);
+    lastFrameWall = performance.now();
+    if (!paused && Math.abs(d.desired_deg) < 600 && Math.abs(d.actual_deg) < 600) {
+      buf.push({ t: d.t, des: d.desired_deg, act: d.actual_deg });
+      const cut = d.t - WINDOW_S;
+      while (buf.length && buf[0].t < cut) buf.shift();
+    }
+    document.getElementById('mph').textContent = d.v_mph.toFixed(0);
+    const lat = document.getElementById('lat');
+    lat.textContent = d.lat_active ? 'ON' : 'off';
+    lat.className = 'v ' + (d.lat_active ? 'on' : 'off');
+    document.getElementById('err').textContent = (d.desired_deg - d.actual_deg).toFixed(1);
+    document.getElementById('autocal').textContent = d.autocal || 'autocal: —';
+    document.getElementById('factors').textContent =
+      (d.low_factor && d.high_factor)
+        ? `factors ${d.low_factor.toFixed(2)} / ${d.high_factor.toFixed(2)}`
+        : '';
+  };
+}
+connect();
+
+// ---- tap to pause/resume (whole graph is the control — no chrome) -----------------------
+document.getElementById('graphwrap').addEventListener('click', () => {
+  paused = !paused;
+  document.getElementById('pausedbadge').style.display = paused ? 'block' : 'none';
+});
+
+// ---- graph ------------------------------------------------------------------------------
+const cv = document.getElementById('graph');
+const ctx = cv.getContext('2d');
+function draw() {
+  const w = cv.clientWidth, h = cv.clientHeight, dpr = window.devicePixelRatio || 1;
+  if (cv.width !== w * dpr || cv.height !== h * dpr) {
+    cv.width = w * dpr; cv.height = h * dpr;
+  }
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+  const padL = 40, padR = 8, padT = 10, padB = 20;
+  const gw = w - padL - padR, gh = h - padT - padB;
+
+  // autoscale: symmetric about zero, min ±5°, headroom
+  let m = 5;
+  for (const p of buf) m = Math.max(m, Math.abs(p.des), Math.abs(p.act));
+  m *= 1.15;
+  const t1 = buf.length ? buf[buf.length - 1].t : 0;
+  const x = (t) => padL + gw * (1 - (t1 - t) / WINDOW_S);
+  const y = (v) => padT + gh * (0.5 - v / (2 * m));
+
+  // grid + labels
+  ctx.strokeStyle = '#1d222b'; ctx.fillStyle = '#666c78';
+  ctx.font = '11px sans-serif'; ctx.textAlign = 'right'; ctx.lineWidth = 1;
+  const rawStep = (2 * m) / 8;
+  const pow10 = Math.pow(10, Math.floor(Math.log10(rawStep)));
+  const step = [1, 2, 5, 10].map(k => k * pow10).find(s => s >= rawStep) || 10 * pow10;
+  for (let v = -Math.floor(m / step) * step; v <= m; v += step) {
+    ctx.beginPath(); ctx.moveTo(padL, y(v)); ctx.lineTo(w - padR, y(v)); ctx.stroke();
+    ctx.fillText(v + '°', padL - 5, y(v) + 4);
+  }
+  ctx.strokeStyle = '#2a3038';
+  ctx.beginPath(); ctx.moveTo(padL, y(0)); ctx.lineTo(w - padR, y(0)); ctx.stroke();
+
+  // time ticks every 2 s
+  ctx.textAlign = 'center';
+  for (let s = 0; s <= WINDOW_S; s += 2) {
+    const tx = x(t1 - s);
+    if (tx >= padL) ctx.fillText(s === 0 ? 'now' : '-' + s + 's', tx, h - 6);
+  }
+
+  const trace = (key, color) => {
+    ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.lineJoin = 'round'; ctx.beginPath();
+    let started = false;
+    for (const p of buf) {
+      const px = x(p.t), py = y(p[key]);
+      if (!started) { ctx.moveTo(px, py); started = true; } else ctx.lineTo(px, py);
+    }
+    ctx.stroke();
+  };
+  trace('des', '#4da3ff');
+  trace('act', '#4cd07d');
+
+  // stale-stream veil
+  if (performance.now() - lastFrameWall > 2000) {
+    ctx.fillStyle = 'rgba(13,15,20,0.55)'; ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = '#8b8f98'; ctx.textAlign = 'center'; ctx.font = '15px sans-serif';
+    ctx.fillText('waiting for data…', w / 2, h / 2);
+  }
+  requestAnimationFrame(draw);
+}
+requestAnimationFrame(draw);
+
+// keep the screen awake while watching, where supported
+if ('wakeLock' in navigator) {
+  let lock = null;
+  const acquire = () => navigator.wakeLock.request('screen').then(l => lock = l).catch(() => {});
+  acquire();
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') acquire();
+  });
+}
+</script>
+</body>
+</html>
