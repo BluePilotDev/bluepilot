@@ -558,6 +558,10 @@ struct ControllerStateBP @0xcd96dafb67a082d0 {
     curvature @1;
     angle @2;
   }
+
+  bmsAngleAutoCalibrate @55 :Bool;  # FordAngleAutoCal toggle state
+  bmsAngleAutoCalState @56 :Text;  # live controller status (bp_autocal_status): "off"/"locked"/"reset" or armed JSON
+  angleSaturated @57 :Bool;  # angle mode: PSCM authority limit or DBC clamp modified this frame's command
 }
 
 struct CarStateBP @0xb057204d7deadf3f {
