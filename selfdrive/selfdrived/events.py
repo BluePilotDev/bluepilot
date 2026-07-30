@@ -706,6 +706,11 @@ EVENTS: dict[int, dict[str, Alert | AlertCallbackType]] = {
     ET.NO_ENTRY: NoEntryAlert("Radar Temporarily Unavailable"),
   },
 
+  EventName.radarIsNotDetected: {
+    ET.PERMANENT: NormalPermanentAlert("Car may not have ACC"),
+    ET.NO_ENTRY: NoEntryAlert("Radar Is Not Detected"),
+  },
+
   # Every frame from the camera should be processed by the model. If modeld
   # is not processing frames fast enough they have to be dropped. This alert is
   # thrown when over 20% of frames are dropped.

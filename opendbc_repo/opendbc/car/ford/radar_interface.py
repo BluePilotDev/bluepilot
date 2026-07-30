@@ -25,6 +25,7 @@ DELPHI_MRR_MIN_LONG_RANGE_DIST = 30  # meters
 DELPHI_MRR_CLUSTER_THRESHOLD = 5  # meters, lateral distance and relative velocity are weighted
 
 STEER_ASSIST_DATA_MSGS = 0x3d7
+RADAR_ABSENT_ = 500 #Used to detect if the radar is absent for 5s and then set the radarUnavailablePermanent flag to True
 
 @dataclass
 class Cluster:
@@ -123,6 +124,8 @@ class RadarInterface(RadarInterfaceBase):
     self.radar = DBC[CP.carFingerprint].get(Bus.radar)
     self.scan_index_invalid_cnt = 0
     self.radar_unavailable_cnt = 0
+    self.radar_perm_cnt = 0
+    self.radar_working = False
     self.prev_headerScanIndex = 0
     if CP.radarUnavailable:
       self.rcp = None
@@ -151,8 +154,16 @@ class RadarInterface(RadarInterfaceBase):
     self.updated_messages.update(vls)
 
     if self.trigger_msg not in self.updated_messages:
+      if not self.radar_working:
+        self.radar_perm_cnt += 1
+        if self.radar_perm_cnt >= RADAR_ABSENT_:
+          ret = structs.RadarData()
+          ret.errors.radarUnavailablePermanent = True
+          return ret
       return None
     self.updated_messages.clear()
+    self.radar_working = True
+    self.radar_perm_cnt = 0
 
     ret = structs.RadarData()
     if not self.rcp.can_valid:
