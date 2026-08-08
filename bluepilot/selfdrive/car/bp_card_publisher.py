@@ -104,6 +104,9 @@ def _refresh_settings_cache() -> dict:
     "bmsMinimumSpeedToPauseLaneChange": _get_int(p, "BlinkerMinLateralControlSpeed", 20),
     "bmsShowLateralControlMode":       _get_bool(p, "BpShowLateralControl"),
     # --- Angle Tuning ---
+    # bmsAngleAutoCalibrate / bmsAngleAutoCalState are intentionally NOT here: they are
+    # ground truth from the live controller (set below from CI.CC every publish) — a
+    # param-snapshot copy would be a second source of truth that is silently overwritten.
     "bmsLowSpeedAdjustmentFactor":     _get_float(p, "FordLowSpeedFactor_ang", 1.0),
     "bmsHighSpeedAdjustmentFactor":    _get_float(p, "FordHighSpeedFactor_ang", 1.0),
     "bmsLaneChangeFactorHighAngle":    _get_float(p, "lane_change_factor_high_ang", 1.0),
@@ -131,6 +134,7 @@ def publish_controller_state_bp(CI, pm):
     cs_bp.curvatureDeviationLimited = getattr(CI.CC, "curvatureDeviationLimited", False)
     cs_bp.humanTurnLateralPaused = bool(getattr(CI.CC, "humanTurnLateralPaused", False))
     cs_bp.stallBlipActive = bool(getattr(CI.CC, "stallBlipActive", False))
+    cs_bp.angleSaturated = bool(getattr(CI.CC, "bp_angle_saturated", False))
     # BluePilot: mode the controller actually ran, straight off the car controller (not Params).
     if getattr(CI.CC, "disable_BP_lat_UI", True):
       cs_bp.activeLateralMode = structs.ControllerStateBP.LateralMode.openpilot
@@ -151,6 +155,17 @@ def publish_controller_state_bp(CI, pm):
     if _settings_cache:
       for field, value in _settings_cache.items():
         setattr(cs_bp, field, value)
+
+    # BluePilot: auto-cal fields are GROUND TRUTH from the live controller, not the param
+    # snapshot — a device once had params armed while the controller ran disarmed, and the
+    # param-sourced telemetry made that undiagnosable from logs. bp_autocal_status carries
+    # the controller's own view (armed/evidence/nudges, "off", "locked", or an error).
+    cc = CI.CC
+    if hasattr(cc, "autocal_enabled"):
+      cs_bp.bmsAngleAutoCalibrate = bool(cc.autocal_enabled)
+    status = getattr(cc, "bp_autocal_status", "")
+    if status:
+      cs_bp.bmsAngleAutoCalState = str(status)
 
     # BluePilot: fingerprint info -- plain attribute reads on CarParams, no Params round-trip
     # needed, so no caching required (fingerprint never changes after startup).

@@ -310,6 +310,13 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"FordLowSpeedFactor_ang", {PERSISTENT | BACKUP, FLOAT, "1.0"}},
     {"FordHighSpeedFactor_ang", {PERSISTENT | BACKUP, FLOAT, "1.0"}},
     {"FordHighSpeedDampening_ang", {PERSISTENT | BACKUP, FLOAT, "1.0"}},
+    {"FordAngleAutoCal", {PERSISTENT | BACKUP, BOOL, "0"}},           // one-time auto-calibration of the angle speed factors
+    {"FordAngleAutoCalState", {PERSISTENT | BACKUP, STRING, ""}},     // "" = collecting; JSON = evidence; "locked"/"done ..." = finished
+    {"FordAngleAutoCalError", {PERSISTENT, STRING, ""}},              // diagnostics only — separate channel so an error can never clobber evidence
+    {"FordAngleAutoCalReset", {PERSISTENT, BOOL, "0"}},               // erase calibration memory: controller wipes evidence + resets factors to 1.00, then clears this
+    {"FordAngleAutoCalLock", {PERSISTENT | BACKUP, BOOL, "1"}},       // on: calibration freezes when stable (default); off: never locks, keeps adapting — turning off an existing lock resumes it
+    {"FordAngleSmoothing", {PERSISTENT | BACKUP, BOOL, "1"}},         // anti-weave smoothing of the angle command path
+    {"FordAngleSmoothStrength", {PERSISTENT | BACKUP, FLOAT, "1.0"}}, // 0.0=minimal .. 1.0=tuned default .. 1.5=strong
     {"BPLateralSchemeParamsMigratedV1", {PERSISTENT | BACKUP, STRING, "0"}},
 
     {"disable_BP_lat_UI", {PERSISTENT | BACKUP, BOOL, "0"}},

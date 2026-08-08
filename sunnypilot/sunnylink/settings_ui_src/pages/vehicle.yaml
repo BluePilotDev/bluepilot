@@ -319,6 +319,33 @@ sections:
     - type: param
       key: FordPrefLateralControl
       equals: 1
+  - key: FordAngleAutoCal
+    widget: toggle
+    title: '[Lateral Tuning] Auto-Calibrate Adjustment Factors'
+    description: Learns the low/high speed factors by comparing requested and actual turn, nudging them live until locked. Manual +/- always wins. Toggle off and back on to recalibrate.
+    visibility:
+    - type: param
+      key: FordPrefLateralControl
+      equals: 1
+  - key: FordAngleSmoothing
+    widget: toggle
+    title: '[Lateral Tuning] Smooth Steering (Anti-Weave)'
+    description: Master enable for the anti-weave smoothing of the angle command path. Strength below sets how much; 1.0 strength = stock either way.
+    visibility:
+    - type: param
+      key: FordPrefLateralControl
+      equals: 1
+  - key: FordAngleSmoothStrength
+    widget: option
+    title: '[Lateral Tuning] Smoothing Strength'
+    description: 1.0 = stock steering (no smoothing). Step up for more damping of straight-road weave; 2.0 = log-tuned, 2.5 = strongest. Curves unaffected.
+    min: 1.0
+    max: 2.5
+    step: 0.1
+    visibility:
+    - type: param
+      key: FordPrefLateralControl
+      equals: 1
   - key: lane_change_factor_high_ang
     widget: option
     title: '[Lateral Tuning] Lane Change Factor High (Angle)'

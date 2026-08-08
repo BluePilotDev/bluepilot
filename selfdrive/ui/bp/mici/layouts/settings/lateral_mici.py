@@ -2,11 +2,30 @@
 
 from collections.abc import Callable
 
-from openpilot.selfdrive.ui.bp.mici.widgets.button_bp import BigParamControlBP
+from openpilot.selfdrive.ui.bp.mici.widgets.button_bp import BigButtonBP, BigParamControlBP
 from openpilot.selfdrive.ui.bp.mici.widgets.floatbutton import BigParamFloatControl, BigParamIntControl
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.system.ui.widgets.scroller import NavScroller
 from opendbc.sunnypilot.car.ford.lateral_curv_ext import PrimaryLateralControl
+
+
+class _EraseAutoCalButton(BigButtonBP):
+  """One-tap 'erase calibration memory': evidence, the error log and the factors
+  themselves go back to neutral so a calibration run can simply be retried. The params
+  are cleared here for immediate offroad visibility (the factor steppers show 1.00 on
+  next refresh); the onroad controller consumes FordAngleAutoCalReset to drop its
+  in-memory pipeline too, so a mid-drive erase takes effect within a second."""
+
+  def __init__(self):
+    super().__init__("Erase Calibration Memory")
+
+  def _handle_mouse_release(self, mouse_pos):
+    super()._handle_mouse_release(mouse_pos)
+    ui_state.params.put_bool("FordAngleAutoCalReset", True)
+    ui_state.params.put("FordAngleAutoCalState", "")
+    ui_state.params.put("FordAngleAutoCalError", "")
+    ui_state.params.put("FordLowSpeedFactor_ang", 1.0)
+    ui_state.params.put("FordHighSpeedFactor_ang", 1.0)
 
 
 class LateralLayoutMici(NavScroller):
@@ -24,6 +43,27 @@ class LateralLayoutMici(NavScroller):
     )
     self.high_speed_dampening = BigParamFloatControl(
       "High Speed Low Curve Adjustment Factor", "FordHighSpeedDampening_ang", min=0.75, max=1.25, step=0.01,
+    )
+    # One-time auto-calibration of the two factors above; toggling off clears the lock
+    # so re-enabling starts a fresh collection.
+    self.angle_autocal = BigParamControlBP(
+      "Auto-Calibrate Factors", "FordAngleAutoCal",
+      toggle_callback=self._on_autocal_toggled,
+    )
+    # Full retry: wipes evidence AND puts both factors back to 1.00 (the toggle above
+    # only clears the lock; it leaves the factors wherever the calibrator walked them).
+    self.angle_autocal_erase = _EraseAutoCalButton()
+    # On (default): calibration freezes once stable. Off: never locks — keeps adapting;
+    # turning it off on an already-locked car resumes from the saved evidence.
+    self.angle_autocal_lock = BigParamControlBP(
+      "Calibration Lock", "FordAngleAutoCalLock",
+    )
+    # Anti-weave smoothing of the angle command path (see lateral_angle_ext.py _SM_*).
+    self.angle_smoothing = BigParamControlBP(
+      "Smooth Steering (Anti-Weave)", "FordAngleSmoothing",
+    )
+    self.angle_smoothing_strength = BigParamFloatControl(
+      "Smoothing Strength", "FordAngleSmoothStrength", min=1.0, max=2.5, step=0.1,
     )
     self.lane_change_factor_high_ang = BigParamFloatControl(
       "Lane Change Factor High", "lane_change_factor_high_ang", min=0.85, max=1.50,
@@ -73,6 +113,11 @@ class LateralLayoutMici(NavScroller):
       self.low_speed_factor,
       self.high_speed_factor,
       self.high_speed_dampening,
+      self.angle_autocal,
+      self.angle_autocal_lock,
+      self.angle_autocal_erase,
+      self.angle_smoothing,
+      self.angle_smoothing_strength,
       self.lane_change_factor_high_ang,
       self.disable_lane_change_under_speed,
       self.blinker_min_speed,
@@ -90,6 +135,9 @@ class LateralLayoutMici(NavScroller):
     ])
 
     self._refresh_toggles = (
+      ("FordAngleAutoCal", self.angle_autocal),
+      ("FordAngleAutoCalLock", self.angle_autocal_lock),
+      ("FordAngleSmoothing", self.angle_smoothing),
       ("disable_BP_lat_UI", self.disable_BP_lat),
       ("BlinkerPauseLaneChange", self.disable_lane_change_under_speed),
       ("enable_human_turn_detection_curv", self.enable_human_turn_detection),
@@ -100,6 +148,11 @@ class LateralLayoutMici(NavScroller):
     )
 
     ui_state.add_offroad_transition_callback(self._update_toggles)
+
+  def _on_autocal_toggled(self, state: bool):
+    """Disarming clears a finished calibration's lock so re-enabling starts fresh."""
+    if not state:
+      ui_state.params.put("FordAngleAutoCalState", "")
 
   def show_event(self):
     super().show_event()
@@ -115,6 +168,11 @@ class LateralLayoutMici(NavScroller):
     self.low_speed_factor.set_visible(is_angle)
     self.high_speed_factor.set_visible(is_angle)
     self.high_speed_dampening.set_visible(is_angle)
+    self.angle_autocal.set_visible(is_angle)
+    self.angle_autocal_lock.set_visible(is_angle)
+    self.angle_autocal_erase.set_visible(is_angle)
+    self.angle_smoothing.set_visible(is_angle)
+    self.angle_smoothing_strength.set_visible(is_angle)
     self.lane_change_factor_high_ang.set_visible(is_angle)
     self.blinker_min_speed.set_enabled(ui_state.params.get_bool("BlinkerPauseLaneChange"))
     for item in (
