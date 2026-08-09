@@ -319,6 +319,14 @@ sections:
     - type: param
       key: FordPrefLateralControl
       equals: 1
+  - key: FordAngleAutoCal
+    widget: toggle
+    title: '[Lateral Tuning] Auto-Calibrate Adjustment Factors'
+    description: Learns the low/high speed factors by comparing requested and actual turn, nudging them live until locked. Manual +/- always wins. Toggle off and back on to recalibrate.
+    visibility:
+    - type: param
+      key: FordPrefLateralControl
+      equals: 1
   - key: lane_change_factor_high_ang
     widget: option
     title: '[Lateral Tuning] Lane Change Factor High (Angle)'
