@@ -11,6 +11,7 @@ from openpilot.selfdrive.ui.bp.lib.steering_wheel_style import (
   SteeringWheelIconStyle,
 )
 from openpilot.selfdrive.ui.bp.lib.ui_debug_logger import bp_ui_log
+from openpilot.selfdrive.ui.bp.lib.live_delay_indicator import LiveDelayIndicator
 from openpilot.system.ui.lib.text_measure import measure_text_cached
 from openpilot.system.ui.lib.application import gui_app
 from openpilot.bluepilot.ui.lib.bp_shaders import draw_shader_circle_gradient
@@ -27,6 +28,7 @@ class MiciHudRendererBP(HudRenderer):
     # BluePilot: HudRenderer initializes upstream TorqueBar; replace it with ours.
     self._torque_bar = TorqueBar()
     self._bp_params = Params()
+    self._live_delay = LiveDelayIndicator(width=44)
     self._brakes_on = False
     self._power_flow = MiciPowerflowGauge()
     self._txt_wheel_comma_3x = gui_app.texture("icons/chffr_wheel.png", self._txt_wheel.width, self._txt_wheel.height)
@@ -77,6 +79,9 @@ class MiciHudRendererBP(HudRenderer):
       self._draw_set_speed(rect)
 
     self._draw_steering_wheel(rect)
+
+    # Steering-lag calibration status, top-right corner
+    self._live_delay.render(rect.x + rect.width - self._live_delay.width - 14, rect.y + 14)
 
   def _draw_steering_wheel(self, rect: rl.Rectangle) -> None:
     """Override to add brake status coloring to wheel icon, powerflow gauge, and lateral control overlay."""

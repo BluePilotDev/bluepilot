@@ -52,7 +52,7 @@ class BluePilotLayoutMici(NavScroller):
     )
     self.preferred_network_btn.set_click_callback(self._select_preferred_network)
     self.show_web_routes_qr = BigButtonBP(
-      "QR code", "", "icons_mici/settings/network/wifi_strength_full.png", icon_size=80,
+      "qr code", "", "icons_mici/settings/network/wifi_strength_full.png", icon_size=80,
     )
     self.show_web_routes_qr.set_click_callback(self._show_qr_dialog)
     self.clear_model_cache = BigButtonBP(
@@ -72,7 +72,7 @@ class BluePilotLayoutMici(NavScroller):
 
     # Primary lateral control selector lives above the lat sub-panel
     self.primary_lateral_control = BigMultiParamToggleBP(
-      "Primary Control Variable", "FordPrefLateralControl", ["curvature", "angle"],
+      "primary control variable", "FordPrefLateralControl", ["curvature", "angle"],
     )
 
     # Sub-panels

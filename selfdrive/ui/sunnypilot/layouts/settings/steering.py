@@ -84,7 +84,7 @@ class SteeringLayout(Widget):
     self._torque_control_toggle = toggle_item_sp(
       param="EnforceTorqueControl",
       title=lambda: tr("Enforce Torque Lateral Control"),
-      description=lambda: tr("Enable this to enforce sunnypilot to steer with Torque lateral control."),
+      description=lambda: tr("Enable this to enforce bluepilot to steer with Torque lateral control."),
     )
     self._torque_customization_button = simple_button_item_sp(
       button_text=lambda: tr("Customize Torque Params"),

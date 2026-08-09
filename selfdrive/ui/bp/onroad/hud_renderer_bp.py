@@ -5,6 +5,7 @@ from openpilot.bluepilot.ui.lib.bp_shaders import draw_shader_circle_gradient
 from openpilot.selfdrive.ui.onroad.hud_renderer import UI_CONFIG, FONT_SIZES, COLORS
 from openpilot.selfdrive.ui.sunnypilot.onroad.hud_renderer import HudRendererSP
 from openpilot.selfdrive.ui.bp.onroad.exp_button_bp import ExpButtonBP
+from openpilot.selfdrive.ui.bp.lib.live_delay_indicator import LiveDelayIndicator
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.system.ui.lib.text_measure import measure_text_cached
 from openpilot.selfdrive.ui.bp.lib.ui_debug_logger import bp_ui_log
@@ -29,6 +30,7 @@ class HudRendererBP(HudRendererSP):
     # BluePilot: Restore the animated C3X wheel without modifying the upstream ExpButton.
     self._exp_button = ExpButtonBP(UI_CONFIG.button_size, UI_CONFIG.wheel_icon_size)
     self._bp_params = Params()
+    self._live_delay = LiveDelayIndicator(width=140)
     self._brakes_on = False
     self.speed_right = 0
     self._gradient_rect = None  # BluePilot: Full-width rect for header gradient
@@ -101,6 +103,12 @@ class HudRendererBP(HudRendererSP):
       button_x + UI_CONFIG.button_size / 2,
       button_y + UI_CONFIG.button_size / 2,
       UI_CONFIG.button_size,
+    )
+
+    # Steering-lag calibration status, left of the wheel button
+    self._live_delay.render(
+      button_x - self._live_delay.width - 24,
+      button_y + (UI_CONFIG.button_size - self._live_delay.height) / 2,
     )
 
     # SP additions (dev UI, road name, speed limit, SCC, turn signals, circular alerts, rocket fuel)

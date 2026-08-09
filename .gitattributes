@@ -54,3 +54,4 @@ third_party/bootstrap/bootstrap-icons.ttf -filter -diff -merge
 
 # BluePilot custom sounds: store directly in Git, not upstream GitLab LFS.
 selfdrive/assets/sounds/bluepilot/*.wav -filter -diff -merge
+selfdrive/assets/icons/liveDelay.png -filter -diff -merge

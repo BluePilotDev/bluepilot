@@ -17,56 +17,56 @@ class LateralLayoutMici(NavScroller):
 
     # --- Angle-mode-only items ---
     self.low_speed_factor = BigParamFloatControl(
-      "Low Speed Adjustment Factor", "FordLowSpeedFactor_ang", min=0.5, max=1.5, step=0.01,
+      "low speed adjustment factor", "FordLowSpeedFactor_ang", min=0.5, max=1.5, step=0.01,
     )
     self.high_speed_factor = BigParamFloatControl(
-      "High Speed Adjustment Factor", "FordHighSpeedFactor_ang", min=0.5, max=1.5, step=0.01,
+      "high speed adjustment factor", "FordHighSpeedFactor_ang", min=0.5, max=1.5, step=0.01,
     )
     self.high_speed_dampening = BigParamFloatControl(
-      "High Speed Low Curve Adjustment Factor", "FordHighSpeedDampening_ang", min=0.75, max=1.25, step=0.01,
+      "high speed low curve adjustment factor", "FordHighSpeedDampening_ang", min=0.75, max=1.25, step=0.01,
     )
     self.lane_change_factor_high_ang = BigParamFloatControl(
-      "Lane Change Factor High", "lane_change_factor_high_ang", min=0.85, max=1.50,
+      "lane change factor high", "lane_change_factor_high_ang", min=0.85, max=1.50,
     )
 
     # --- Always-visible items ---
-    self.disable_BP_lat = BigParamControlBP("Disable BP Lateral Control", "disable_BP_lat_UI")
+    self.disable_BP_lat = BigParamControlBP("disable bp lateral control", "disable_BP_lat_UI")
     self.disable_lane_change_under_speed = BigParamControlBP(
-      "Disable Auto Lane Change Under Speed", "BlinkerPauseLaneChange",
+      "disable auto lane change under speed", "BlinkerPauseLaneChange",
       toggle_callback=lambda state: self.blinker_min_speed.set_enabled(state),
     )
     self.blinker_min_speed = BigParamIntControl(
-      "Minimum Speed to Pause Lane Change", "BlinkerMinLateralControlSpeed", min=5, max=50, step=5,
+      "minimum speed to pause lane change", "BlinkerMinLateralControlSpeed", min=5, max=50, step=5,
     )
-    self.show_lateral_control = BigParamControlBP("Show Lateral Control Mode", "BpShowLateralControl")
+    self.show_lateral_control = BigParamControlBP("show lateral control mode", "BpShowLateralControl")
 
     # --- Curvature-mode-only items ---
     self.lane_change_factor_high_curv = BigParamFloatControl(
-      "Lane Change Factor High", "lane_change_factor_high_curv", min=0.5, max=1.0,
+      "lane change factor high", "lane_change_factor_high_curv", min=0.5, max=1.0,
     )
     self.custom_path_offset = BigParamFloatControl(
-      "In-Lane Offset", "custom_path_offset_curv", min=-0.5, max=0.5,
+      "in-lane offset", "custom_path_offset_curv", min=-0.5, max=0.5,
     )
     self.enable_human_turn_detection = BigParamControlBP(
-      "Enable Human Turn Detection", "enable_human_turn_detection_curv",
+      "enable human turn detection", "enable_human_turn_detection_curv",
     )
     self.enable_lane_positioning = BigParamControlBP(
-      "Enable Lane Positioning", "enable_lane_positioning_curv",
+      "enable lane positioning", "enable_lane_positioning_curv",
     )
     self.enable_lane_full_mode = BigParamControlBP(
-      "Enable Lanefull Mode", "enable_lane_full_mode_curv",
+      "enable lanefull mode", "enable_lane_full_mode_curv",
     )
     self.custom_profile = BigParamControlBP(
-      "Use Custom Tuning Profile", "custom_profile_curv",
+      "use custom tuning profile", "custom_profile_curv",
     )
     self.pc_blend_ratio_high_C = BigParamFloatControl(
-      "Predicted Curvature Blend Ratio High", "pc_blend_ratio_high_C_UI_curv", min=0.0, max=1.0, step=0.05,
+      "predicted curvature blend ratio high", "pc_blend_ratio_high_C_UI_curv", min=0.0, max=1.0, step=0.05,
     )
     self.pc_blend_ratio_low_C = BigParamFloatControl(
-      "Predicted Curvature Blend Ratio Low", "pc_blend_ratio_low_C_UI_curv", min=0.0, max=1.0, step=0.05,
+      "predicted curvature blend ratio low", "pc_blend_ratio_low_C_UI_curv", min=0.0, max=1.0, step=0.05,
     )
     self.lc_pid_gain = BigParamFloatControl(
-      "Centering PID Gain", "LC_PID_gain_UI_curv", min=0.0, max=50.0, step=0.5,
+      "centering pid gain", "LC_PID_gain_UI_curv", min=0.0, max=50.0, step=0.5,
     )
 
     self._scroller.add_widgets([

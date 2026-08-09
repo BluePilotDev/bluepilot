@@ -2262,6 +2262,12 @@
           ]
         },
         {
+          "key": "BPShowLiveDelayIndicator",
+          "widget": "toggle",
+          "title": "[Visuals] Show Steering Lag Calibration",
+          "description": "Display the steering lag calibration icon onroad until the estimate is done."
+        },
+        {
           "key": "BPAnimateSteeringWheel",
           "widget": "toggle",
           "title": "[Visuals] Animate Steering Wheel",

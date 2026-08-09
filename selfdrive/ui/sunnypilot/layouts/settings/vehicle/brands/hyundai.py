@@ -50,7 +50,7 @@ class HyundaiSettings(BrandSettings):
       if not ui_state.is_offroad():
         long_tuning_desc = tr("This feature is unavailable while the car is onroad.")
       elif not long_enabled:
-        long_tuning_desc = tr("This feature is unavailable because sunnypilot Longitudinal Control (Alpha) is not enabled.")
+        long_tuning_desc = tr("This feature is unavailable because openpilot Longitudinal Control (Alpha) is not enabled.")
 
     self.longitudinal_tuning_item.action_item.set_enabled(not longitudinal_tuning_disabled)
     self.longitudinal_tuning_item.set_description(long_tuning_desc)

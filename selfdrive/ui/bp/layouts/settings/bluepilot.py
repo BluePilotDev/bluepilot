@@ -86,6 +86,7 @@ class BluePilotLayout(Widget):
       ("ShowBrakeStatus", self._show_brake_status),
       ("BPHideOnroadBorder", self._hide_onroad_border),
       ("BPShowConfidenceBall", self._show_confidence_ball),
+      ("BPShowLiveDelayIndicator", self._show_live_delay),
       ("BPAnimateSteeringWheel", self._animate_steering_wheel),
       ("BPUseCustomSounds", self._use_custom_sounds),
       ("FordPrefShowRadarLeadOverlay", self._show_ford_radar_overlay),
@@ -199,6 +200,15 @@ class BluePilotLayout(Widget):
       lambda: tr("Display the confidence ball on the left side of the driving view."),
       initial_state=self._safe_get_bool(self._params, "BPShowConfidenceBall"),
       callback=lambda state: self._toggle_callback(state, "BPShowConfidenceBall"),
+      icon="warning.png"
+    )
+
+    # Live delay (steering lag calibration) indicator toggle
+    self._show_live_delay = toggle_item(
+      lambda: tr("Show Steering Lag Calibration"),
+      lambda: tr("Display the steering lag calibration icon onroad until the estimate is done."),
+      initial_state=self._safe_get_bool(self._params, "BPShowLiveDelayIndicator", True),
+      callback=lambda state: self._toggle_callback(state, "BPShowLiveDelayIndicator"),
       icon="warning.png"
     )
 
@@ -689,6 +699,7 @@ class BluePilotLayout(Widget):
         self._show_blindspot,
         self._show_brake_status,
         self._show_confidence_ball,
+        self._show_live_delay,
         self._animate_steering_wheel,
         self._wheel_icon_style_btn,
         self._dm_icon_style_btn,

@@ -16,14 +16,14 @@ class AudioLayoutMici(NavScroller):
       self.set_back_callback(back_callback)
 
     self.use_custom_sounds = BigParamControlBP(
-      "Use Custom Engage/Disengage Sounds",
+      "use custom engage/disengage sounds",
       "BPUseCustomSounds",
       toggle_callback=self._on_custom_sounds_toggled,
     )
     self.custom_sound_selection = BigMultiParamToggleBP(
-      "Engage/Disengage Sound",
+      "engage/disengage sound",
       "BPCustSoundsSelection",
-      ["Comma 4", "Comma 3x", "Tesla"],
+      ["comma 4", "comma 3x", "tesla"],
       select_callback=self._on_sound_selection_changed,
     )
 

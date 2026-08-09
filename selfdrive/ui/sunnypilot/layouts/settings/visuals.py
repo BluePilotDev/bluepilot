@@ -13,8 +13,8 @@ from openpilot.system.ui.widgets import Widget
 
 CHEVRON_INFO_DESCRIPTION = {
   "enabled": tr_noop("Display useful metrics below the chevron that tracks the lead car " +
-                     "only applicable to cars with sunnypilot longitudinal control."),
-  "disabled": tr_noop("This feature requires sunnypilot longitudinal control to be available.")
+                     "only applicable to cars with openpilot longitudinal control."),
+  "disabled": tr_noop("This feature requires openpilot longitudinal control to be available.")
 }
 
 

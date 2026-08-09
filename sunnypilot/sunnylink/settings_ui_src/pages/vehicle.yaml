@@ -127,6 +127,11 @@ sections:
     description: Display the confidence ball on the left side of the driving view.
     visibility:
     - $ref: '#/macros/hide_on_mici'
+  - key: BPShowLiveDelayIndicator
+    widget: toggle
+    title: '[Visuals] Show Steering Lag Calibration'
+    description: Display the steering lag calibration icon onroad until the estimate
+      is done.
   - key: BPAnimateSteeringWheel
     widget: toggle
     title: '[Visuals] Animate Steering Wheel'

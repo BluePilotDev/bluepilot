@@ -13,9 +13,9 @@ class LongitudinalLayoutMici(NavScroller):
     if back_callback is not None:
       self.set_back_callback(back_callback)
 
-    self.disable_BP_long = BigParamControlBP("Bypass BP Longitudinal Control", "disable_BP_long_UI")
-    self.disable_downhill_comp = BigParamControlBP("Disable Downhill Compensation", "disable_downhill_comp_UI")
-    self.disable_ford_radar = BigParamControlBP("Disable Ford Radar (Vision-Only Leads)", "disable_ford_radar_UI")
+    self.disable_BP_long = BigParamControlBP("bypass bp longitudinal control", "disable_BP_long_UI")
+    self.disable_downhill_comp = BigParamControlBP("disable downhill compensation", "disable_downhill_comp_UI")
+    self.disable_ford_radar = BigParamControlBP("disable ford radar (vision-only leads)", "disable_ford_radar_UI")
 
     self._scroller.add_widgets([
       self.disable_BP_long,
