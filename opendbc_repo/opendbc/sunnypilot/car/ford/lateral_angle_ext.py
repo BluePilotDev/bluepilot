@@ -21,40 +21,32 @@ resumed. Mode 0 is panda-clean by construction: every ford.h check has a legitim
 back in from zero through the soft ROC below (no jump seed) -- generous at human-turn speeds, and
 admitted by ford.h's path_angle ROC check (2% looser) without any bypass.
 """
+
 import numpy as np
 from numpy import clip, interp
 
 from opendbc.car import DT_CTRL
 from opendbc.car.lateral import apply_std_steer_angle_limits
-from opendbc.car.ford.values import CAR, CarControllerParams
+from opendbc.car.ford.values import CarControllerParams
+from opendbc.sunnypilot.car.ford.angle_autocal import Frame
+from opendbc.sunnypilot.car.ford.angle_autocal_controller import AutoCalController
+from opendbc.sunnypilot.car.ford.angle_smoothing import AngleSmoother
 from opendbc.sunnypilot.car.ford.lateral_curv_ext import LateralResult
 from opendbc.sunnypilot.car.ford.human_turn import HumanTurnDetector
-from opendbc.sunnypilot.car.ford.values_ext import BP_ANGLE_LIMITS
+from opendbc.sunnypilot.car.ford.values_ext import (BP_ANGLE_LIMITS, platform_gains,
+                                                    V_LOW, V_HIGH, LOW_ANCHOR_BASE)
 from selfdrive.modeld.constants import ModelConstants
-
-# Hard-coded per-platform gain defaults.
-# CAN vehicles (Escape MK4, Bronco Sport, Explorer, Maverick, Edge)
-_GAIN_CAN         = (1.00, 1.15)
-# CAN-FD body-on-frame trucks (F-150, Lightning, Expedition, Ranger)
-_GAIN_CANFD_BOF   = (0.95, 0.95)
-# CAN-FD unibody SUVs (Mustang Mach-E, Escape MK4.5)
-_GAIN_CANFD_SUV   = (1.00, 1.05)
-
-_CANFD_BOF_CARS = frozenset({
-  CAR.FORD_F_150_MK14,
-  CAR.FORD_F_150_LIGHTNING_MK1,
-  CAR.FORD_EXPEDITION_MK4,
-  CAR.FORD_RANGER_MK2,
-})
-_CANFD_SUV_CARS = frozenset({
-  CAR.FORD_MUSTANG_MACH_E_MK1,
-  CAR.FORD_ESCAPE_MK4_5,
-})
 
 
 # DBC ``LatCtlPath_An_Actl`` (rad) — panda safety uses the same in ``ford.h``; PSCM enforces in firmware.
 FORD_DBC_PATH_ANGLE_MIN = -0.5
 FORD_DBC_PATH_ANGLE_MAX = 0.5235
+
+# Auto-cal state persistence cadence: losing a save costs at most this much evidence.
+
+# --- Anti-weave smoothing (FordAngleSmoothing) -------------------------------------------
+# All constants, semantics, and filter math live in angle_smoothing.AngleSmoother (pure,
+# unit-tested). Menu 1.0 = stock/no smoothing, bit-identical to the toggle being off.
 
 
 # PSCM d_ref (m) vs speed (m/s) — 6 points; above ~55.6 m/s use plateau + optional cap to 5 m.
@@ -172,17 +164,41 @@ class LateralAngleExt:
     self.stall_blip_count = 0         # pulses fired this stall episode
     self.angle_stall_blip_active = False
     self.press_timer_s = 0.0          # continuous steeringPressed time, for the hand-off blip
+    # BluePilot: continuous auto-calibration of the speed factors. The pure estimator lives
+    # in angle_autocal.py; ALL lifecycle (arm/disarm, JSON persistence, user-edit debounce,
+    # nudge writes, save cadence, errors, telemetry status) lives in AutoCalController —
+    # this class only routes frames and adopts returned nudges.
+    self.autocal_ctl = AutoCalController(dt=_STEER_DT)
+    self._autocal_param_ctr = 100  # >= threshold so the very first call reads params (also gates smoothing reads)
+    # BluePilot: anti-weave smoothing (FordAngleSmoothing; see angle_smoothing.py).
+    self.smoother = AngleSmoother(dt=_STEER_DT)
+    # Telemetry + autocal gate: the command this frame was modified by PSCM authority
+    # limits or the DBC clamp — the car could not make the requested turn.
+    self.bp_angle_saturated = False
+
+
+  # -- smoothing compat surface (offline replay tooling sets these directly) ---------------
+  @property
+  def smoothing_enabled(self) -> bool:
+    return self.smoother.enabled
+
+  @smoothing_enabled.setter
+  def smoothing_enabled(self, v: bool):
+    self.smoother.enabled = bool(v)
+
+  @property
+  def smoothing_strength(self) -> float:
+    return self.smoother.strength
+
+  @smoothing_strength.setter
+  def smoothing_strength(self, v: float):
+    self.smoother.strength = float(v)
 
   def update_angle_params(self, params):
     """Sets per-platform gain defaults and reads user angle-tuning params."""
     self._ensure_lateral_curv_initialized(self.CP)
     fp = getattr(self.CP, 'carFingerprint', '')
-    if fp in _CANFD_BOF_CARS:
-      low, high = _GAIN_CANFD_BOF
-    elif fp in _CANFD_SUV_CARS:
-      low, high = _GAIN_CANFD_SUV
-    else:
-      low, high = _GAIN_CAN
+    low, high = platform_gains(fp)
     self.path_angle_gain_lowC_highV = low
     self.path_angle_gain_highC_highV = high
     if params is not None and hasattr(params, "get"):
@@ -205,6 +221,76 @@ class LateralAngleExt:
             float(raw.decode("utf-8", errors="replace") if isinstance(raw, bytes) else raw), 0.85, 1.50))
       except Exception:
         pass
+      # BluePilot: auto-calibration arm/disarm (checked ~1 Hz; this method runs at 100 Hz)
+      self._autocal_param_ctr += 1
+      if self._autocal_param_ctr >= 100:
+        self._autocal_param_ctr = 0
+        try:
+          _sm_enabled = bool(params.get_bool("FordAngleSmoothing"))
+          raw_strength = params.get("FordAngleSmoothStrength", return_default=True)
+          _menu = 1.0 + self.smoother.strength  # keep current on unreadable/empty
+          if raw_strength is not None and raw_strength != b"":
+            _menu = float(
+              raw_strength.decode("utf-8", errors="replace") if isinstance(raw_strength, bytes) else raw_strength)
+          self.smoother.configure(_sm_enabled, _menu)
+        except Exception:
+          pass  # keep the previous values; defaults are enabled / 1.0
+        self.autocal_ctl.poll_params(params, self.low_speed_curv_factor,
+                                     self.high_speed_curv_factor,
+                                     self.path_angle_gain_highC_highV)
+
+  # -- auto-cal telemetry surface (bp_card_publisher reads these off the carcontroller) ----
+  @property
+  def autocal_enabled(self) -> bool:
+    return self.autocal_ctl.enabled
+
+  @property
+  def bp_autocal_status(self) -> str:
+    return self.autocal_ctl.status
+
+  def _feed_autocal(self, CS, kappa_cmd: float, kappa_meas: float):
+    """Build one evidence Frame from the car signals + this frame's limiter flags and hand
+    it to the controller. Frame construction (and its signal reads) happens only while the
+    calibrator is armed — for everyone else this is one attribute check per frame."""
+    if not self.autocal_ctl.enabled:
+      return
+    ws = CS.out.wheelSpeeds
+    ws_vals = (float(ws.fl), float(ws.fr), float(ws.rl), float(ws.rr))
+    self.autocal_ctl.feed(
+      Frame(v_ego=float(CS.out.vEgoRaw), kappa_cmd=kappa_cmd, kappa_meas=kappa_meas,
+            steering_pressed=bool(CS.out.steeringPressed),
+            angle_rate_limited=self.bp_angle_rate_limited,
+            deviation_limited=self.bp_curvature_deviation_limited,
+            saturated=self.bp_angle_saturated,
+            driver_torque=float(CS.out.steeringTorque), a_ego=float(CS.out.aEgo),
+            ws_spread=max(ws_vals) - min(ws_vals),
+            low_factor=self.low_speed_curv_factor, high_factor=self.high_speed_curv_factor,
+            lateral_delay=float(self.sm['liveDelay'].lateralDelay)),
+      delay_estimated=str(self.sm['liveDelay'].status) == "estimated")
+
+  def _reset_angle_signals(self, CS):
+    """Clear wire/telemetry state and the calibration + smoothing filters. Shared by the
+    three branches that drop lateral to mode 0 (inactive, human-turn, stall-blip)."""
+    self.path_angle_last = 0.0
+    self.bp_path_angle_final = 0.0
+    self.apply_curvature_last = 0.0
+    self.bp_angle_rate_limited = False
+    self.bp_curvature_rate_limited = False
+    self.bp_curvature_deviation_limited = False
+    self.sim_curvature_last = 0.0
+    # Shadow tracks measured curvature while inactive: ford.h latches it from every LKA
+    # frame, so a stale zero would fail the deviation check on the first re-engage frame.
+    self.bp_kappa_cmd = self.get_current_curvature(CS)
+    self.precision_type = 1
+    self.bp_angle_saturated = False
+    self.autocal_ctl.idle()  # steady/staged evidence must not span a lateral discontinuity
+    self.smoother.reset()
+
+  @staticmethod
+  def _inactive_result() -> LateralResult:
+    """All-zero mode-0 result the three inactive branches return."""
+    return LateralResult(apply_curvature=0.0, curvature_rate=0.0, path_offset=0.0,
+                         path_angle=0.0, ramp_type=0, precision_type=1, lateralUncertainty=0.0)
 
   def update_angle_strategy(self, CC, CS, actuators, CP):
     """
@@ -225,22 +311,7 @@ class LateralAngleExt:
     precision = 1
 
     if not CC.latActive:
-      self.path_angle_last = 0.0
-      self.bp_path_angle_final = 0.0
-      self.apply_curvature_last = 0.0
-      self.bp_angle_rate_limited = False
-      self.bp_curvature_rate_limited = False
-      self.bp_curvature_deviation_limited = False
-      self.sim_curvature_last = 0.0
-      # Publish the shadow curvature from the measured curvature while inactive. LKA keeps
-      # carrying angle_mode_engaged whenever angle mode is configured (independent of
-      # latActive), and ford.h latches the shadow from every LKA frame -- so the latched
-      # value must track reality here, not sit at a stale zero. Otherwise the first enabled
-      # LMC frame after (re-)engage races LKA's 33Hz latch against LMC's 20Hz enable bit and
-      # ford.h's deviation check compares a zero shadow against real measured curvature.
-      # (ford.h skips the check while steer_control_enabled is 0, so the value is free to
-      # follow the measurement during the inactive period itself.)
-      self.bp_kappa_cmd = self.get_current_curvature(CS)
+      self._reset_angle_signals(CS)
       self.human_turn_detector.reset()
       self.angle_human_turn_active = False
       self.stall_blip_hold_s = 0.0
@@ -249,16 +320,7 @@ class LateralAngleExt:
       self.stall_blip_count = 0
       self.angle_stall_blip_active = False
       self.press_timer_s = 0.0
-      self.precision_type = 1
-      return LateralResult(
-        apply_curvature=0.0,
-        curvature_rate=0.0,
-        path_offset=0.0,
-        path_angle=0.0,
-        ramp_type=0,
-        precision_type=1,
-        lateralUncertainty=0.0,
-      )
+      return self._inactive_result()
 
     # Human-turn override: sustained driver press + large wheel angle → force lateral inactive
     # (carcontroller drops mode to 0; all signals are zero on the wire) so path_angle can't wind
@@ -270,38 +332,18 @@ class LateralAngleExt:
     self.angle_human_turn_active = self.human_turn_detector.update(
       True, CS.out.steeringPressed, CS.out.steeringAngleDeg)
     if self.angle_human_turn_active:
-      self.path_angle_last = 0.0
-      self.bp_path_angle_final = 0.0
-      self.apply_curvature_last = 0.0
-      self.bp_angle_rate_limited = False
-      self.bp_curvature_rate_limited = False
-      self.bp_curvature_deviation_limited = False
-      self.sim_curvature_last = 0.0
-      # Truthful shadow during the override (mirrors the inactive path -- see the comment
-      # there): the driver is steering, so the honest command is the car's actual curvature,
-      # and the panda-latched shadow stays current for the re-engage frame.
-      self.bp_kappa_cmd = self.get_current_curvature(CS)
+      self._reset_angle_signals(CS)
       # Keep exit detection current so resume doesn't compare against a stale pre-turn value.
       self._desired_curvature_last = float(actuators.curvature)
-      # A human turn ends any stall episode -- its own mode 0 does the PSCM reset job. That also
-      # covers the press so far: only press time accumulated AFTER the latch releases should earn
-      # a hand-off pulse.
+      # A human turn's own mode 0 does the PSCM reset job; only press time after the latch
+      # releases should earn a hand-off pulse, so clear the stall/press state here.
       self.stall_blip_hold_s = 0.0
       self.stall_blip_frames_left = 0
       self.stall_blip_cooldown_s = 0.0
       self.stall_blip_count = 0
       self.angle_stall_blip_active = False
       self.press_timer_s = 0.0
-      self.precision_type = 1
-      return LateralResult(
-        apply_curvature=0.0,
-        curvature_rate=0.0,
-        path_offset=0.0,
-        path_angle=0.0,
-        ramp_type=0,
-        precision_type=1,
-        lateralUncertainty=0.0,
-      )
+      return self._inactive_result()
 
     # Proactive hand-off blip: the falling edge of a sustained press earns an immediate mode-0
     # pulse (see _PRESS_BLIP_MIN_S) -- resets the PSCM's press-induced attenuation right at
@@ -323,28 +365,11 @@ class LateralAngleExt:
     if self.stall_blip_frames_left > 0:
       self.stall_blip_frames_left -= 1
       self.angle_stall_blip_active = True
-      self.path_angle_last = 0.0
-      self.bp_path_angle_final = 0.0
-      self.apply_curvature_last = 0.0
-      self.bp_angle_rate_limited = False
-      self.bp_curvature_rate_limited = False
-      self.bp_curvature_deviation_limited = False
-      self.sim_curvature_last = 0.0
-      # Truthful shadow during the blip (see the inactive-path comment).
-      self.bp_kappa_cmd = self.get_current_curvature(CS)
+      self._reset_angle_signals(CS)
       self._desired_curvature_last = float(actuators.curvature)
-      self.precision_type = 1
       if self.stall_blip_frames_left <= 0:
         self.stall_blip_cooldown_s = _STALL_COOLDOWN_S
-      return LateralResult(
-        apply_curvature=0.0,
-        curvature_rate=0.0,
-        path_offset=0.0,
-        path_angle=0.0,
-        ramp_type=0,
-        precision_type=1,
-        lateralUncertainty=0.0,
-      )
+      return self._inactive_result()
     self.angle_stall_blip_active = False
 
     self.precision_type = 1
@@ -352,21 +377,36 @@ class LateralAngleExt:
     LP = self.lp
     desired_curvature = float(actuators.curvature)
 
-    # Variable lookup time: t_base tracks planner pre-compensation; extra tapers on high speed and large curves.
-    # Cap liveDelay at 0.15s for VLT purposes. liveDelay can calibrate up to ~420ms on some runs, which inflates
-    # VLT to 0.6s and pushes the model lookahead 5m into the curve. At that depth the model sees full peak
-    # curvature, kappa_entering stays True, and the exit-biased blend is permanently disabled — causing the car
-    # to command max path_angle through the entire apex. 0.15s gives t_base ≤ 0.20s and VLT ≤ 0.33s, restoring
-    # the 2.8m lookahead that kept kappa_entering False at the apex in successful earlier runs.
-    _t_base = float(clip(self.sm['liveDelay'].lateralDelay, 0.1, 0.15)) + _DT_MDL
+    # Variable lookup time — delay compensation is SPLIT across two horizons (2026-07-23):
+    #  - _t_entering (liveDelay capped 0.15s): the horizon for the entering/exiting DECISION
+    #    only. The cap is load-bearing for apexes: a deeper decision horizon keeps
+    #    kappa_entering True through the apex — the 0.42s-liveDelay era pathology where the
+    #    exit-biased blend never engaged and the command flat-lined at max through the apex.
+    #    A replay regression across 308 real apexes (routes 0a/0b/12/1b) showed even a
+    #    0.25s decision horizon regresses 7.5% of them, so this horizon stays short and the
+    #    apex behavior stays identical by construction.
+    #  - _t_base (liveDelay capped 0.30s): the model-prediction LEAD in the blend. The true
+    #    actuation delay is ~0.29s (liveDelay median, confirmed by command/measurement
+    #    cross-correlation on three drives); compensating only 0.15s of it left ~0.14s of
+    #    known-but-ignored delay in the loop, driving a ~0.2 Hz closed-loop breathing
+    #    (±0.5° at the wheel, in curves and straights alike — measured desired-osc 0.15,
+    #    actual-osc 0.21 mrad/m, actual trailing desired by exactly the actuation delay).
+    #    Exits stay protected regardless of this deeper lead: the exit-biased blend
+    #    collapses the prediction weight to ~15% there.
+    _t_entering = float(clip(self.sm['liveDelay'].lateralDelay, 0.1, 0.15)) + _DT_MDL
+    _t_base = float(clip(self.sm['liveDelay'].lateralDelay, 0.1, 0.30)) + _DT_MDL
     _speed_factor = float(interp(v_ego, [_VLT_V_LOW_MS, _VLT_V_HIGH_MS], [1.0, 0.0]))
     # Direction-aware kappa factor: on curve ENTRY (model shows more curvature at t_base than planner now),
     # keep full lookahead so pre-steering begins early. On exit/apex, taper by magnitude to prevent unwind.
-    _kappa_at_t_base = 0.0
+    _kappa_at_entering = 0.0
     if self.model is not None and len(self.model.orientationRate.z) >= 17:
       _curvatures_ref = np.array(self.model.orientationRate.z) / max(0.01, v_ego)
-      _kappa_at_t_base = abs(float(interp(_t_base, ModelConstants.T_IDXS, _curvatures_ref)))
-    _kappa_entering = _kappa_at_t_base > abs(desired_curvature)
+      # Decision horizon (_t_entering, short by design) — NOT the blend lead horizon.
+      _kappa_at_entering = abs(float(interp(_t_entering, ModelConstants.T_IDXS, _curvatures_ref)))
+    # Anti-weave: hysteresis so noise straddling the entering/exiting boundary can't flip
+    # this boolean (and with it the exit-blend gate) frame to frame near zero curvature.
+    _kappa_entering = self.smoother.entering(_kappa_at_entering - abs(desired_curvature),
+                                             _kappa_at_entering > abs(desired_curvature))
     if _kappa_entering:
       _kappa_factor = 1.0  # curve deepening ahead: full extra lookahead for gradual entry
     else:
@@ -380,6 +420,9 @@ class LateralAngleExt:
       predicted_curvature = float(
         interp(curvature_lookup_time, ModelConstants.T_IDXS, curvatures)
       )
+    # Anti-weave: low-pass the model prediction to strip frame-to-frame jitter (details
+    # in angle_smoothing.prediction — inside the VLT's slack, so no curve-entry cost).
+    predicted_curvature = self.smoother.prediction(predicted_curvature)
 
     b = float(self.path_angle_blend_ratio)
     b = float(clip(b, 0.0, 1.0))
@@ -408,7 +451,9 @@ class LateralAngleExt:
     # Same bug class and fix as _PSCM_SAT_UNWIND_RATE and _soft_roc above.
     _desired_falling = abs(desired_curvature) < abs(self._desired_curvature_last) - 0.010
     _on_exit_near_limit = not _kappa_entering and (_pscm_lim >= 1 or _in_hard_sat or _desired_falling)
-    b_blend = float(clip(b * 0.25, 0.0, 1.0)) if _on_exit_near_limit else b
+    _b_target = float(clip(b * 0.25, 0.0, 1.0)) if _on_exit_near_limit else b
+    # Anti-weave: slew instead of stepping the exit blend (bounded ramps, no 4x steps).
+    b_blend = self.smoother.blend(_b_target)
     requested_curvature = predicted_curvature * b_blend + desired_curvature * (1.0 - b_blend)
     self._desired_curvature_last = desired_curvature
 
@@ -456,13 +501,18 @@ class LateralAngleExt:
 
 
     # Speed-interpolated gain: at low speed both curves use 1.0; at high speed the params take effect.
-    self.low_gain_calc = interp(
-      v_ego, [13.5, 26.82], [1.0, (self.path_angle_gain_lowC_highV * self.user_dampening_factor)]
-    )
-    self.high_gain_calc = interp(v_ego, [13.5, 26.82], [(1.30 * self.low_speed_curv_factor), (self.path_angle_gain_highC_highV * self.high_speed_curv_factor)])
+    self.low_gain_calc = interp(v_ego, [V_LOW, V_HIGH],
+                                [1.0, self.path_angle_gain_lowC_highV * self.user_dampening_factor])
+    self.high_gain_calc = interp(v_ego, [V_LOW, V_HIGH],
+                                 [(LOW_ANCHOR_BASE * self.low_speed_curv_factor),
+                                  (self.path_angle_gain_highC_highV * self.high_speed_curv_factor)])
 
-    # As the curve gets bigger, we will need a little boost to the signal to to not understeer
-    self.curvature_factor = interp(abs(kappa_cmd), [0.0007, 0.001], [self.low_gain_calc, self.high_gain_calc])
+    # As the curve grows the signal needs a boost to not understeer. The smoother's
+    # asymmetric filter on |kappa| is the PRIMARY anti-weave fix (see angle_smoothing.py).
+    # COUPLING: the interp knee top (0.001) is auto-cal's MIN_KAPPA — the calibrator only
+    # samples fully inside the high branch. If this band moves, MIN_KAPPA moves with it.
+    _kappa_for_gain = self.smoother.kappa_schedule(abs(kappa_cmd))
+    self.curvature_factor = interp(_kappa_for_gain, [0.0007, 0.001], [self.low_gain_calc, self.high_gain_calc])
 
     path_angle_calc = kappa_cmd * v_ego * self.curvature_factor
     path_angle = path_angle_calc
@@ -487,7 +537,11 @@ class LateralAngleExt:
     elif _pscm_lim >= 1:  # LimitClose (F150/non-angle-mode only): block increases only
       path_angle = float(clip(path_angle, -abs(self.path_angle_last), abs(self.path_angle_last)))
 
+    _pre_dbc_clamp = path_angle
     path_angle = min(FORD_DBC_PATH_ANGLE_MAX, max(FORD_DBC_PATH_ANGLE_MIN, path_angle))
+    # BluePilot: the car cannot make the requested turn this frame — PSCM authority limit
+    # active or the DBC clamp bit. Telemetry + a hard no-sample gate for the auto-calibration.
+    self.bp_angle_saturated = bool(_in_hard_sat or _pscm_lim >= 1 or path_angle != _pre_dbc_clamp)
 
     # Soft ROC limit — unconditional, slightly tighter than ford.h, applied before the
     # hardware bypass in ford.h is re-enabled.  Lets us observe whether the limit would
@@ -505,6 +559,10 @@ class LateralAngleExt:
                             self.path_angle_last + _soft_roc))
     # BluePilot: did the soft ROC clip actually limit the path_angle we wanted to send this frame?
     self.bp_angle_rate_limited = bool(abs(path_angle - _path_angle_pre_roc) > 1e-9)
+
+    # Anti-weave: 1-LSB wire hold on the outgoing path_angle (kills LSB dither; held
+    # frames are zero-ROC and cannot trip panda — details in angle_smoothing.wire).
+    path_angle = self.smoother.wire(path_angle)
 
 
     # c0 always zero -- no centering trim in angle mode.
@@ -561,6 +619,10 @@ class LateralAngleExt:
 
     ramp_type = 2
 
+    # Continuous auto-calibration of the speed factors (armed-only; a no-op otherwise).
+    # Nudges are written to the factor params — update_angle_params reads them back, so the
+    # factors have a single owner here. Human-turn/stall-blip frames never reach this point.
+    self._feed_autocal(CS, kappa_cmd, current_curvature)
 
     return LateralResult(
       apply_curvature=0.0,
@@ -571,3 +633,4 @@ class LateralAngleExt:
       precision_type=self.precision_type,
       lateralUncertainty=lateral_uncertainty,
     )
+

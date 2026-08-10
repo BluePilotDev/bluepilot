@@ -15,6 +15,7 @@ from openpilot.selfdrive.ui.ui_state import device, ui_state
 from bluepilot.ui.widgets.debug.debug_colors import DebugColors
 from bluepilot.ui.widgets.debug.debug_graph import TimeSeriesGraph, GraphConfig, GraphSeries
 from bluepilot.ui.widgets.debug.angle_factor_adjuster import AngleFactorAdjuster
+from bluepilot.ui.widgets.debug.autocal_bars import AutoCalBars, poll_status
 
 _ADJUSTER_WIDTH = 110
 _ADJUSTER_MARGIN_TOP = 5
@@ -27,6 +28,7 @@ _DEBUG_TIMEOUT_S = 300
 # Match TICI debug panel update rate
 _DATA_PUSH_INTERVAL = 0.05  # 20 Hz
 _MAX_DATA_POINTS = 100
+_CAL_POLL_INTERVAL = 1.0    # auto-cal status changes at ~1 Hz; polling faster is waste
 
 
 class LateralDebugMici(Widget):
@@ -64,6 +66,10 @@ class LateralDebugMici(Widget):
       ]
     )
     self._last_push_time = 0.0
+    # Auto-cal band gauges (blue = low band, red = high band); on-device mirror of the
+    # phone dashboard, hidden when auto-cal is off.
+    self._cal_bars = AutoCalBars()
+    self._last_cal_poll = 0.0
 
   def show_event(self):
     super().show_event()
@@ -91,6 +97,9 @@ class LateralDebugMici(Widget):
       self._last_push_time = now
     except (KeyError, AttributeError, ValueError):
       pass
+    if now - self._last_cal_poll >= _CAL_POLL_INTERVAL:
+      self._last_cal_poll = now
+      self._cal_bars.update_status(poll_status())
 
   def _handle_mouse_release(self, mouse_pos):
     if rl.check_collision_point_rec(mouse_pos, self._adjuster_rect):
@@ -105,6 +114,11 @@ class LateralDebugMici(Widget):
     # Graph fills the whole screen — title, axes, legend are all drawn inside.
     # The legend is lifted via legend_y_offset so it doesn't overlap "tap to close" below.
     self._graph.render(rect)
+
+    # Gauges sit in the strip between the y-axis labels and the plot; armed-only.
+    if self._cal_bars.active:
+      self._cal_bars.render(rl.Rectangle(rect.x + 52, rect.y + 36,
+                                         AutoCalBars.WIDTH, AutoCalBars.HEIGHT))
 
     # Angle-factor adjuster overlaps the graph's right edge (angle mode only)
     adjuster_w = _ADJUSTER_WIDTH if self._adjuster.is_visible else 0

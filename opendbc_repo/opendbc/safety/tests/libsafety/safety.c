@@ -259,6 +259,10 @@ uint16_t get_current_safety_param_sp(void){
 }
 
 // BluePilot: debug getters for the Ford pinion geometry table (ALLOW_DEBUG builds only).
+// NOTE: idx <= COUNT is NOT an off-by-one. The table is declared
+// ford_pinion_geometry[FORD_PINION_GEOMETRY_COUNT + 1U]: slot 0 is the disabled/sentinel
+// row and real rows are 1..COUNT (the index rides bits 1-4 of the safety param, where 0
+// means "no row"). ford.h's own bounds check is (index == 0 || index > COUNT).
 // Consumed by test_ford.py's geometry-consistency test, which compares every firmware row
 // against CarSpecs + calc_slip_factor(VehicleModel(CP)) so the table cannot rot as
 // platforms change -- without fragile header parsing.
