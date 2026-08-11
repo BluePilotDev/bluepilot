@@ -102,6 +102,11 @@ _PSCM_SAT_UNWIND_RATE = 0.02        # rad/call (0.02 * 20Hz = 0.40 rad/s)
 _STEER_DT = CarControllerParams.STEER_STEP * DT_CTRL  # 20 Hz lateral tick (matches human_turn.py)
 _STALL_GAP_MIN = 2.0 * CarControllerParams.CURVATURE_ERROR  # desired must lead measured by 2x the clip tolerance
 _STALL_HOLD_S = 0.5          # accumulated clip-binding time before a pulse fires
+_DEVIATION_CLIP_GATE_MS = 9.0  # m/s; below this the deviation clip (and stall detection on yaw) is inert
+# With the pinion measurement the geometric source is trustworthy at low speed (best there, in
+# fact), so stall detection can extend to the path-offset check's low-speed floor (5 m/s,
+# ford.h FORD_PATH_OFFSET_LIMITS.angle_error_min_speed). On yaw the 9 m/s distrust stands.
+_STALL_GATE_PINION_MS = 5.0
 _STALL_BLIP_FRAMES = 6       # mode-0 pulse length (6 frames @ 20 Hz = 300 ms; PSCM acked mode 0 in ~150 ms on-road)
 _STALL_COOLDOWN_S = 2.0      # re-arm delay after a pulse (release ramp + PSCM response time)
 _STALL_MAX_BLIPS = 3         # give up on a stuck episode; devLim telemetry keeps recording the stall
@@ -435,9 +440,9 @@ class LateralAngleExt:
     # Use planner / predicted κ directly for the κ → path_angle map; we are not sending κ on CAN.
     kappa_cmd = float(requested_curvature)
 
-    # BluePilot: clip kappa_cmd to current_curvature (measured, from yaw rate) +- CURVATURE_ERROR,
+    # BluePilot: clip kappa_cmd to current_curvature (measured, via get_current_curvature) +- CURVATURE_ERROR,
     # mirroring lateral_curv_ext.py's apply_ford_curvature_limits_ext exactly (same formula, same
-    # v_ego > 9 gate, same CarControllerParams.CURVATURE_ERROR tolerance). Without this, kappa_cmd
+    # _DEVIATION_CLIP_GATE_MS gate, same CarControllerParams.CURVATURE_ERROR tolerance). Without this, kappa_cmd
     # (and therefore path_angle, and the shadow_curvature sent to ford.h) can legitimately lead the
     # measured curvature by more than ford.h's angle-error tolerance during normal curve entry/exit
     # -- the shadow-curvature deviation check (ford_shadow_curvature_error_check) would then block
@@ -446,7 +451,7 @@ class LateralAngleExt:
     # than only clipping the value reported to panda (which would make the check a no-op).
     current_curvature = self.get_current_curvature(CS)
     self.bp_curvature_deviation_limited = False
-    if v_ego > 9:
+    if v_ego > _DEVIATION_CLIP_GATE_MS:
       _kappa_cmd_pre_error_clip = kappa_cmd
       kappa_cmd = float(clip(kappa_cmd, current_curvature - CarControllerParams.CURVATURE_ERROR,
                             current_curvature + CarControllerParams.CURVATURE_ERROR))
@@ -545,13 +550,20 @@ class LateralAngleExt:
     # clip's tolerance while the clip was actually binding for _STALL_HOLD_S accumulated seconds.
     # devLim flickers mid-stall (~63% duty on the diagnosis route), so off frames hold the
     # accumulator rather than resetting it; a closed gap or driver press ends the episode.
+    # With the pinion measurement, detection extends below the deviation clip's own gate
+    # (see _STALL_GATE_PINION_MS): there the clip can never bind, so the accumulator charges on
+    # the raw gap instead -- observed on-road as a post-override PSCM stall through an entire
+    # ~60 m-radius turn at 19 mph that the current gating could never rescue.
     self.stall_blip_cooldown_s = max(0.0, self.stall_blip_cooldown_s - _STEER_DT)
+    _stall_gate_ms = _STALL_GATE_PINION_MS if self.bp_pinion_curvature_enabled else _DEVIATION_CLIP_GATE_MS
     _stall_gap = desired_curvature - current_curvature
-    _stalled = (not CS.out.steeringPressed and not self.lane_change and v_ego > 9.0
+    _stalled = (not CS.out.steeringPressed and not self.lane_change and v_ego > _stall_gate_ms
                 and abs(_stall_gap) > _STALL_GAP_MIN
                 and abs(desired_curvature) > abs(current_curvature))
     if _stalled:
-      if self.bp_curvature_deviation_limited and self.stall_blip_cooldown_s <= 0.0:
+      _clip_can_bind = v_ego > _DEVIATION_CLIP_GATE_MS
+      _charging = self.bp_curvature_deviation_limited or (self.bp_pinion_curvature_enabled and not _clip_can_bind)
+      if _charging and self.stall_blip_cooldown_s <= 0.0:
         self.stall_blip_hold_s += _STEER_DT
       if (self.stall_blip_hold_s >= _STALL_HOLD_S and self.stall_blip_count < _STALL_MAX_BLIPS
           and abs(self.path_angle_last) < _BLIP_MAX_PATH_ANGLE):
