@@ -11,6 +11,7 @@ import time
 import pyray as rl
 from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.lib.application import gui_app, FontWeight
+from openpilot.system.ui.lib.text_measure import measure_text_cached
 from openpilot.selfdrive.ui.ui_state import device, ui_state
 from bluepilot.ui.widgets.debug.debug_colors import DebugColors
 from bluepilot.ui.widgets.debug.debug_graph import TimeSeriesGraph, GraphConfig, GraphSeries
@@ -63,7 +64,21 @@ class LateralDebugMici(Widget):
         GraphSeries("Actual",  DebugColors.ACTUAL_YELLOW,  fill_alpha=25, beaded=True),
       ]
     )
+    self._steer_delay = 0.0
     self._last_push_time = 0.0
+    self._graph._config.title = "Steering Angle"
+
+  def _get_steer_delay(self):
+    try:
+      if ui_state.sm.valid.get('carParams', False):
+        return ui_state.sm['carParams'].steerActuatorDelay
+    except (KeyError, AttributeError, ValueError):
+      pass
+
+    cp = getattr(ui_state, 'CP', None)
+    if cp is not None:
+      return cp.steerActuatorDelay
+    return 0.0
 
   def show_event(self):
     super().show_event()
@@ -87,6 +102,11 @@ class LateralDebugMici(Widget):
         desired = sm['carControl'].actuators.steeringAngleDeg
       if sm.valid.get('carState', False):
         actual = sm['carState'].steeringAngleDeg
+      self._steer_delay = self._get_steer_delay()
+      if self._steer_delay > 0.0:
+        self._graph._config.title = f"Steering Angle • SD: {self._steer_delay:.3f}s"
+      else:
+        self._graph._config.title = "Steering Angle"
       self._graph.push_data([desired, actual])
       self._last_push_time = now
     except (KeyError, AttributeError, ValueError):
