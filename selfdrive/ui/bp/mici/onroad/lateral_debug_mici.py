@@ -69,12 +69,46 @@ class LateralDebugMici(Widget):
     self._graph._config.title = "Steering Angle"
 
   def _get_steer_delay(self):
+    """Return the most accurate steering delay available:
+    1. liveDelay from SubMaster (if present and valid)
+    2. persisted LAGD value cache (params key 'LagdValueCache')
+    3. carParams steerActuatorDelay
+    4. ui_state.CP fallback
+    """
+    # 1) liveDelay topic (if UI SubMaster is providing it)
+    try:
+      if ui_state.sm.valid.get('liveDelay', False):
+        ld = ui_state.sm['liveDelay']
+        # prefer the computed lateralDelay when present
+        val = getattr(ld, 'lateralDelay', None)
+        if val is not None and val > 0:
+          return float(val)
+    except Exception:
+      pass
+
+    # 2) persisted SunnyPilot live-delay cache (set by LagdToggle)
+    try:
+      from openpilot.common.params import Params
+      params = Params()
+      v = params.get('LagdValueCache')
+      if v is not None:
+        try:
+          fv = float(v)
+          if fv > 0:
+            return fv
+        except Exception:
+          pass
+    except Exception:
+      pass
+
+    # 3) direct carParams from SubMaster
     try:
       if ui_state.sm.valid.get('carParams', False):
         return ui_state.sm['carParams'].steerActuatorDelay
     except (KeyError, AttributeError, ValueError):
       pass
 
+    # 4) fallback to loaded CP (CarParamsPersistent)
     cp = getattr(ui_state, 'CP', None)
     if cp is not None:
       return cp.steerActuatorDelay
