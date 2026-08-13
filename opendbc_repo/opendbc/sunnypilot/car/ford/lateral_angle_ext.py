@@ -189,7 +189,7 @@ class LateralAngleExt:
       for attr, key, min_value, max_value in (
         ("low_speed_curv_factor", "FordLowSpeedFactor_ang", 0.5, 1.5),
         ("high_speed_curv_factor", "FordHighSpeedFactor_ang", 0.5, 1.5),
-        ("user_dampening_factor", "FordHighSpeedDampening_ang", 0.75, 1.25),
+        ("user_dampening_factor", "FordHighSpeedDampening_ang", 0.25, 1.25),
       ):
         try:
           raw = params.get(key, return_default=True)
