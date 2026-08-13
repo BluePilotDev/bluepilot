@@ -64,6 +64,8 @@ _LOOKAHEAD_MAX_M = 35.0
 # treatment as _PSCM_SAT_UNWIND_RATE / _soft_roc in lateral_angle_ext.py.
 _MAX_RAW_CORRECTION = 0.004
 
+_MAX_APPLIED_CORRECTION = 0.0015 #Stops a fake stuck steering rack from happening, because it is under the curvature error and stall gap
+
 # First-order smoothing time constant (s) -- avoids abrupt jumps in the trim.
 _SMOOTH_TAU_S = 0.4
 
@@ -106,6 +108,7 @@ class LaneCenterTrim:
       return kappa_cmd
 
     target = float(np.clip(raw, -_MAX_RAW_CORRECTION, _MAX_RAW_CORRECTION)) * float(np.clip(gain, 0.0, 1.0)) * speed_factor
+    target = float(np.clip(target, -_MAX_APPLIED_CORRECTION, _MAX_APPLIED_CORRECTION))
     alpha = 1.0 - np.exp(-0.05 / _SMOOTH_TAU_S)  # BluePilot lateral tick is 20 Hz (dt=0.05s)
     self._correction = float(alpha * target + (1.0 - alpha) * self._correction)
     return kappa_cmd + self._correction

@@ -107,7 +107,7 @@ class TestLaneCenterTrim(unittest.TestCase):
     # speed authority means the filtered correction converges to that ceiling.
     model = _good_model()
     self._run(model, offset=5.0, gain=1.0, iterations=500)
-    self.assertAlmostEqual(self.trim.correction, 0.004, places=4)
+    self.assertAlmostEqual(self.trim.correction, 0.0015, places=4)
 
   def test_gain_scales_correction_linearly(self):
     model = _good_model()
@@ -117,7 +117,7 @@ class TestLaneCenterTrim(unittest.TestCase):
   def test_negative_offset_flips_sign(self):
     model = _good_model()
     self._run(model, offset=-5.0, gain=0.5, iterations=500)
-    self.assertAlmostEqual(self.trim.correction, -0.002, places=4)
+    self.assertAlmostEqual(self.trim.correction, -0.0015, places=4)
 
   def test_speed_ramp_zero_below_9ms(self):
     model = _good_model()
@@ -133,7 +133,7 @@ class TestLaneCenterTrim(unittest.TestCase):
   def test_added_to_kappa_cmd(self):
     model = _good_model()
     result = self._run(model, kappa_cmd=0.01, offset=5.0, gain=1.0, iterations=500)
-    self.assertAlmostEqual(result, 0.01 + 0.004, places=4)
+    self.assertAlmostEqual(result, 0.01 + 0.0015, places=4)
 
   def test_reset_zeroes_filter(self):
     model = _good_model()
@@ -157,14 +157,14 @@ class TestLaneCenterTrim(unittest.TestCase):
     # the model's own path, exactly as if lane lines were centered and confident.
     no_lines = _no_lanelines_model()
     self._run(no_lines, offset=5.0, gain=1.0, iterations=500)
-    self.assertAlmostEqual(self.trim.correction, 0.004, places=4)  # same ceiling as good lanelines
+    self.assertAlmostEqual(self.trim.correction, 0.0015, places=4)  # same ceiling as good lanelines
 
   def test_one_sided_laneline_still_applies_offset(self):
     # Only one ego line confidently detected -- min(probL, probR, width_tol) is dragged down by
     # the missing side, same as fully-missing lines.
     one_sided = _one_sided_model()
     self._run(one_sided, offset=5.0, gain=1.0, iterations=500)
-    self.assertAlmostEqual(self.trim.correction, 0.004, places=4)
+    self.assertAlmostEqual(self.trim.correction, 0.0015, places=4)
 
   def test_no_lanelines_zero_offset_no_correction(self):
     # No lanelines AND no user bias: target collapses to the model's own path, so there's truly
@@ -193,7 +193,7 @@ class TestLaneCenterTrim(unittest.TestCase):
     # smoothly (not a crash / hard reject) and the offset-only fallback still applies.
     weird_width = _good_model(width=15.0)
     self._run(weird_width, offset=5.0, gain=1.0, iterations=500)
-    self.assertAlmostEqual(self.trim.correction, 0.004, places=4)
+    self.assertAlmostEqual(self.trim.correction, 0.0015, places=4)
 
   def test_no_model_position_hard_resets(self):
     # Unlike laneline-only failures, a missing/invalid model.position leaves no baseline to
