@@ -256,6 +256,25 @@ class TestAngleParams(unittest.TestCase):
     self.assertAlmostEqual(ext.path_angle_gain_lowC_highV, 0.95)
     self.assertAlmostEqual(ext.user_dampening_factor, 1.12)
 
+  def test_expedition_gets_its_own_base_gain_not_bof_canfd(self):
+    """BluePilotDev/bluepilot: Expedition wasn't in the beta fleet and was lumped into the BOF
+    CANFD group (F-150/Lightning/Ranger) sight-unseen. A real user maxed out the
+    FordHighSpeedFactor_ang UI ceiling (1.5) and still wanted more -- rather than raise the UI
+    ceiling, Expedition gets its own base gain (1.5x the BOF CANFD value) so the UI factor can
+    reset to 1.0. Provisional pending a confirmed real-world value; see bp-dev-expedition."""
+    CP = _explorer_cp()
+    CP.carFingerprint = CAR.FORD_EXPEDITION_MK4
+    ext = _Harness(CP)
+    ext.update_angle_params(_FakeParams({}))
+    self.assertAlmostEqual(ext.path_angle_gain_lowC_highV, 0.95 * 1.5)
+    self.assertAlmostEqual(ext.path_angle_gain_highC_highV, 0.95 * 1.5)
+    # And the other BOF CANFD trucks must be unaffected by pulling Expedition out of that group.
+    CP.carFingerprint = CAR.FORD_F_150_LIGHTNING_MK1
+    ext = _Harness(CP)
+    ext.update_angle_params(_FakeParams({}))
+    self.assertAlmostEqual(ext.path_angle_gain_lowC_highV, 0.95)
+    self.assertAlmostEqual(ext.path_angle_gain_highC_highV, 0.95)
+
   def test_high_speed_dampening_multiplies_low_curvature_high_speed_gain(self):
     self.ext.update_angle_params(_FakeParams({"FordHighSpeedDampening_ang": b"1.12"}))
     cs = _CS(vEgoRaw=26.82, vEgo=26.82)

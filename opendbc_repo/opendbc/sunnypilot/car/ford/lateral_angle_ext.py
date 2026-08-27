@@ -47,20 +47,29 @@ from selfdrive.modeld.constants import ModelConstants
 # Hard-coded per-platform gain defaults.
 # CAN vehicles (Escape MK4, Bronco Sport, Explorer, Maverick, Edge)
 _GAIN_CAN         = (1.00, 1.15)
-# CAN-FD body-on-frame trucks (F-150, Lightning, Expedition, Ranger)
+# CAN-FD body-on-frame trucks (F-150, Lightning, Ranger)
 _GAIN_CANFD_BOF   = (0.95, 0.95)
 # CAN-FD unibody SUVs (Mustang Mach-E, Escape MK4.5)
 _GAIN_CANFD_SUV   = (1.00, 1.05)
+# BluePilot: Expedition MK4 was not in the beta fleet and got lumped into the BOF CANFD group
+# (F-150/Lightning/Ranger) sight-unseen; a real user reported maxing out the FordHighSpeedFactor_ang
+# UI multiplier at its 1.5 ceiling and still wanting more. Rather than raise the UI ceiling, give
+# Expedition its own base -- 1.5x the BOF CANFD values -- as a placeholder default so this user can
+# reset his UI factor to 1.0 and get us a clean read on the real base tune this platform needs.
+# Provisional until confirmed; see bp-dev-expedition.
+_GAIN_EXPEDITION  = (_GAIN_CANFD_BOF[0] * 1.5, _GAIN_CANFD_BOF[1] * 1.5)
 
 _CANFD_BOF_CARS = frozenset({
   CAR.FORD_F_150_MK14,
   CAR.FORD_F_150_LIGHTNING_MK1,
-  CAR.FORD_EXPEDITION_MK4,
   CAR.FORD_RANGER_MK2,
 })
 _CANFD_SUV_CARS = frozenset({
   CAR.FORD_MUSTANG_MACH_E_MK1,
   CAR.FORD_ESCAPE_MK4_5,
+})
+_EXPEDITION_CARS = frozenset({
+  CAR.FORD_EXPEDITION_MK4,
 })
 
 
@@ -197,7 +206,9 @@ class LateralAngleExt:
     """Sets per-platform gain defaults and reads user angle-tuning params."""
     self._ensure_lateral_curv_initialized(self.CP)
     fp = getattr(self.CP, 'carFingerprint', '')
-    if fp in _CANFD_BOF_CARS:
+    if fp in _EXPEDITION_CARS:
+      low, high = _GAIN_EXPEDITION
+    elif fp in _CANFD_BOF_CARS:
       low, high = _GAIN_CANFD_BOF
     elif fp in _CANFD_SUV_CARS:
       low, high = _GAIN_CANFD_SUV
