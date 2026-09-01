@@ -525,10 +525,9 @@ class LateralAngleExt:
     )
 
     # Speed-interpolated curve-radius: at low speed, dont need full gain until a much tighter curve
-    high_gain_boundary = interp(v_ego, [11.18, 31.29], [0.02, 0.0045])
+    high_gain_boundary = interp(v_ego, [11.18, 31.29], [0.015, 0.0035])
 
     # As the curve gets bigger, we will need a little boost to the signal to to not understeer
-    #self.curvature_factor = interp(abs(self.kappa_gain_filt), [0.0005, high_gain_boundary], [self.low_gain_calc, self.high_gain_calc])
     self.curvature_factor = interp(abs(kappa_cmd), [0.0005, high_gain_boundary], [self.low_gain_calc, self.high_gain_calc])
 
     path_angle_calc = kappa_cmd * v_ego * self.curvature_factor
