@@ -128,6 +128,20 @@ _PRESS_BLIP_MIN_S = 0.5      # press must last this long before its release earn
 _BLIP_MAX_PATH_ANGLE = 0.10  # rad
 # steeringPressed chatters: a 30 ms dip inside a 1.7 s hold fired a pulse (route 00000399 t=172.04).
 _PRESS_RELEASE_S = 0.3       # release must persist this long to count as one
+# The pulse also leaves path_angle to ramp back in through the soft ROC. The fixed
+# _BLIP_MAX_PATH_ANGLE cap above doesn't scale with speed: at 25 m/s, 0.10 rad is a R~250 m
+# curve and the ramp adds ~0.6 s of unassisted steering (~15 m). Cap the ramp-recovery
+# distance so a hand-off pulse never fires where the recovery would understeer the curve.
+_BLIP_MAX_RAMP_M = 10.0
+# path_angle soft-ROC breakpoints (rad per 20 Hz call) -- shared by the limiter below and the
+# hand-off blip's ramp-recovery distance guard above.
+_SOFT_ROC_V_NODES = [9., 10., 15., 25.]
+_SOFT_ROC_RAD_PER_CALL = [0.055, 0.055, 0.0425, 0.009]
+
+
+def _soft_roc_rad_per_s(v_ego_ms: float) -> float:
+  return float(interp(v_ego_ms, _SOFT_ROC_V_NODES, _SOFT_ROC_RAD_PER_CALL)) / _STEER_DT
+
 
 
 def pscm_d_ref_m(v_ego_ms: float) -> float:
@@ -193,6 +207,7 @@ class LateralAngleExt:
     self.stall_blip_cooldown_s = 0.0  # re-arm delay after a pulse
     self.stall_blip_count = 0         # pulses fired this stall episode
     self.angle_stall_blip_active = False
+    self.angle_stall_blip_source = 0  # 0=none, 1=hand-off pulse, 2=reactive stall pulse
     self.press_timer_s = 0.0          # continuous steeringPressed time, for the hand-off blip
     self.release_timer_s = 0.0        # !steeringPressed time, debounces the hand-off blip
 
@@ -289,6 +304,7 @@ class LateralAngleExt:
       self.stall_blip_cooldown_s = 0.0
       self.stall_blip_count = 0
       self.angle_stall_blip_active = False
+      self.angle_stall_blip_source = 0
       self.press_timer_s = 0.0
       self.release_timer_s = 0.0
       self.precision_type = 1
@@ -334,6 +350,7 @@ class LateralAngleExt:
       self.stall_blip_cooldown_s = 0.0
       self.stall_blip_count = 0
       self.angle_stall_blip_active = False
+      self.angle_stall_blip_source = 0
       self.press_timer_s = 0.0
       self.release_timer_s = 0.0
       self.precision_type = 1
@@ -360,8 +377,12 @@ class LateralAngleExt:
       if self.press_timer_s > 0.0 and self.release_timer_s >= _PRESS_RELEASE_S:
         if (self.press_timer_s >= _PRESS_BLIP_MIN_S and self.stall_blip_cooldown_s <= 0.0
             and self.stall_blip_frames_left <= 0
-            and abs(self.path_angle_last) < _BLIP_MAX_PATH_ANGLE):
+            and abs(self.path_angle_last) < _BLIP_MAX_PATH_ANGLE
+            # ramp-recovery distance guard: straight (path_angle ~0) always passes; curves
+            # scale with speed through the soft ROC
+            and (abs(self.path_angle_last) / _soft_roc_rad_per_s(v_ego)) * v_ego < _BLIP_MAX_RAMP_M):
           self.stall_blip_frames_left = _STALL_BLIP_FRAMES
+          self.angle_stall_blip_source = 1
         self.press_timer_s = 0.0
 
     # Stall-blip pulse in progress: hold lateral inactive (mode 0, all-zero signals -- the same
@@ -386,6 +407,7 @@ class LateralAngleExt:
       self.precision_type = 1
       if self.stall_blip_frames_left <= 0:
         self.stall_blip_cooldown_s = _STALL_COOLDOWN_S
+        self.angle_stall_blip_source = 0
       return LateralResult(
         apply_curvature=0.0,
         curvature_rate=0.0,
@@ -566,7 +588,7 @@ class LateralAngleExt:
     # scaled x5 from the original [0.011, 0.011, 0.0085, 0.0018] to restore the same real-world rate
     # (63/63/49/10 deg/s at v=9-10/15/25) on this branch's actual 20Hz cadence. See ford.h's
     # FORD_PATH_ANGLE_LIMITS, which must mirror this scaling (x1.02 looser) to stay a true backstop.
-    _soft_roc = float(interp(v_ego, [9., 10., 15., 25.], [0.055, 0.055, 0.0425, 0.009]))
+    _soft_roc = float(interp(v_ego, _SOFT_ROC_V_NODES, _SOFT_ROC_RAD_PER_CALL))
     _path_angle_pre_roc = path_angle
     path_angle = float(clip(path_angle,
                             self.path_angle_last - _soft_roc,
@@ -615,7 +637,11 @@ class LateralAngleExt:
     _stall_gap_min = _STALL_GAP_RATIO * self.bp_curvature_error
     _stalled = (not CS.out.steeringPressed and not self.lane_change and v_ego > 9.0
                 and abs(_stall_gap) > _stall_gap_min
-                # curve entry from straight satisfies the gap test by construction; require a real curve
+                # curve entry from straight satisfies the gap test by construction; require a real
+                # curve. Coverage boundary: deliberate trade -- below this floor (R ~ 1/gap_min,
+                # ~250 m) the stall signature is smaller than the entry transient, so a
+                # post-override stall on gentler curves is only covered by the proactive hand-off
+                # blip above, never detected here. Do not "fix" this back into firing at entry.
                 and abs(current_curvature) > _stall_gap_min
                 and abs(desired_curvature) > abs(current_curvature))
     if _stalled:
@@ -626,6 +652,7 @@ class LateralAngleExt:
         self.stall_blip_frames_left = _STALL_BLIP_FRAMES
         self.stall_blip_hold_s = 0.0
         self.stall_blip_count += 1
+        self.angle_stall_blip_source = 2
     else:
       self.stall_blip_hold_s = 0.0
       if CS.out.steeringPressed or abs(_stall_gap) < 0.5 * _stall_gap_min:

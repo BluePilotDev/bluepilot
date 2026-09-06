@@ -181,6 +181,8 @@ class ControllerStateBP:
   curvatureDeviationLimited: bool = False  # current_curvature error-clip constrained the command this frame
   humanTurnLateralPaused: bool = False  # angle mode: lateral forced inactive (mode 0) during a manual turn
   stallBlipActive: bool = False  # angle mode: brief mode-0 pulse resetting PSCM authority after a post-override stall
+  stallBlipSource: int = 0  # angle mode: which path armed the pulse (0=none, 1=hand-off, 2=reactive stall)
+  stallBlipEpisodeCount: int = 0  # angle mode: pulses fired this stall episode (0-3; 3 = detector gave up)
 
   # BluePilot: full BluePilot-menu settings snapshot -- see custom.capnp ControllerStateBP for
   # field-by-field param-key mapping and the field-retirement convention.

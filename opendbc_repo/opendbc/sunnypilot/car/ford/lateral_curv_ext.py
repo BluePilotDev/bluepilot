@@ -28,7 +28,8 @@ from opendbc.car import ACCELERATION_DUE_TO_GRAVITY, DT_CTRL
 from opendbc.car.lateral import ISO_LATERAL_ACCEL, apply_std_steer_angle_limits
 from opendbc.car.vehicle_model import VehicleModel
 from opendbc.car.ford.values import CarControllerParams, FordFlags
-from opendbc.sunnypilot.car.ford.values_ext import BP_ANGLE_LIMITS, CURVATURE_MAX, FordSafetyFlagsSP
+from opendbc.sunnypilot.car.ford.values_ext import (
+  BP_ANGLE_LIMITS, CURVATURE_MAX, PINION_CURVATURE_ERROR, FordSafetyFlagsSP)
 from opendbc.sunnypilot.car.ford.human_turn import HumanTurnDetector
 from selfdrive.modeld.constants import ModelConstants
 
@@ -131,8 +132,10 @@ class LateralCurvExt:
     self.bp_pinion_curvature_enabled = bool(
       CP_SP is not None and (CP_SP.safetyParam & FordSafetyFlagsSP.STEER_ANGLE_CURVATURE))
 
-    # Track ford.h's per-source band (FORD_STEERING_LIMITS_PINION widens to 0.003); stays under panda's +1 unit.
-    self.bp_curvature_error = 0.003 if self.bp_pinion_curvature_enabled else CarControllerParams.CURVATURE_ERROR
+    # Track ford.h's per-source band (FORD_STEERING_LIMITS_PINION widens to the
+    # PINION_CURVATURE_ERROR band); stays under panda's +1 unit.
+    self.bp_curvature_error = (PINION_CURVATURE_ERROR if self.bp_pinion_curvature_enabled
+                               else CarControllerParams.CURVATURE_ERROR)
 
     # Toggles (updated from Params each frame)
     self.enable_human_turn_detection_curv = True
