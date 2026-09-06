@@ -103,6 +103,7 @@ class BluePilotLayout(Widget):
       ("disable_downhill_comp_UI", self._disable_dowhill_comp),
       ("disable_ford_radar_UI", self._disable_ford_radar),
       ("BpShowLateralControl", self._show_lateral_control),
+      ("enable_nudge_lane_offset", self._enable_nudge_lane_offset),
       ("BPUIDebugLog", self._ui_debug_log),
     )
 
@@ -590,6 +591,26 @@ class BluePilotLayout(Widget):
       icon="chffr_wheel.png"
     )
 
+    # Wheel-nudge temporary in-lane offset -- mode-agnostic, applies to whichever lateral mode
+    # runs (see opendbc/sunnypilot/car/ford/lane_offset_nudge.py).
+    self._enable_nudge_lane_offset = toggle_item(
+      lambda: tr("Nudge to Set In-Lane Offset"),
+      lambda: tr("Push the wheel while tracking a straight to bias the car in the lane. Held as a percent of lane width until the next turn."),
+      initial_state=self._safe_get_bool(self._params, "enable_nudge_lane_offset"),
+      callback=lambda state: self._toggle_callback(state, "enable_nudge_lane_offset"),
+      icon="chffr_wheel.png"
+    )
+    self._nudge_lane_offset_max_pct = float_control_item(
+      lambda: tr("Max Nudge Offset (% of lane)"),
+      lambda: tr("How far a nudge can move the car, as a percent of the detected lane width."),
+      param="nudge_lane_offset_max_pct",
+      min_value=0.0,
+      max_value=12.0,
+      step=0.5,
+      enabled=lambda: self._safe_get_bool(self._params, "enable_nudge_lane_offset"),
+      icon="chffr_wheel.png"
+    )
+
     # Disable BP lateral control toggle
     self._disable_BP_lat = toggle_item(
       lambda: tr("Disable BP Lateral Control"),
@@ -705,6 +726,8 @@ class BluePilotLayout(Widget):
       self._primary_lateral_control_btn,
       self._disable_lane_change_under_speed,
       self._blinker_min_speed,
+      self._enable_nudge_lane_offset,
+      self._nudge_lane_offset_max_pct,
       self._show_lateral_control,
     ]
     lateral_header = CollapsibleSectionHeader(tr("Lateral Tuning"))
@@ -922,6 +945,8 @@ class BluePilotLayout(Widget):
     is_curv = not is_angle
     # Conditional on BlinkerPauseLaneChange
     self._blinker_min_speed.action_item.set_enabled(pause_lc)
+    nudge_on = fresh.get("enable_nudge_lane_offset") if "enable_nudge_lane_offset" in fresh else self._safe_get_bool(ui_state.params, "enable_nudge_lane_offset")
+    self._nudge_lane_offset_max_pct.action_item.set_enabled(nudge_on)
     # Angle-mode items: always visible (Angle Tuning section), greyed out when curvature mode is active
     self._low_speed_curv_factor.action_item.set_enabled(is_angle)
     self._high_speed_curv_factor.action_item.set_enabled(is_angle)

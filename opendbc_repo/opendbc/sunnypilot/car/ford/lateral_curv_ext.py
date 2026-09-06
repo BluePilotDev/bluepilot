@@ -31,6 +31,7 @@ from opendbc.car.ford.values import CarControllerParams, FordFlags
 from opendbc.sunnypilot.car.ford.values_ext import (
   BP_ANGLE_LIMITS, CURVATURE_MAX, PINION_CURVATURE_ERROR, FordSafetyFlagsSP)
 from opendbc.sunnypilot.car.ford.human_turn import HumanTurnDetector
+from opendbc.sunnypilot.car.ford.lane_offset_nudge import LaneOffsetNudge
 from selfdrive.modeld.constants import ModelConstants
 
 
@@ -178,6 +179,13 @@ class LateralCurvExt:
     # Human turn detection (shared with angle mode — see human_turn.HumanTurnDetector)
     self.human_turn_detector = HumanTurnDetector()
     self.human_turn = False
+    # BluePilot: temporary wheel-nudge in-lane offset, shared with angle mode the same way
+    # (one mixin instance per CarController). See lane_offset_nudge.py.
+    self.lane_offset_nudge = LaneOffsetNudge()
+    self.enable_nudge_lane_offset = False
+    self.nudge_lane_offset_max_pct = 12.0
+    self.bp_nudge_offset_pct = 0.0  # telemetry (controllerStateBP)
+    self.bp_nudge_offset_m = 0.0
     self.post_reset_ramp_active = False
     self.reset_steering_last = False
 
@@ -238,6 +246,8 @@ class LateralCurvExt:
     self.enable_lane_full_mode_curv = params.get_bool("enable_lane_full_mode_curv")
     self.custom_profile_curv = int(params.get("custom_profile_curv", return_default=True))
     self.LC_PID_gain_UI_curv = float(params.get("LC_PID_gain_UI_curv", return_default=True))
+    self.enable_nudge_lane_offset = params.get_bool("enable_nudge_lane_offset")
+    self.nudge_lane_offset_max_pct = float(params.get("nudge_lane_offset_max_pct", return_default=True))
 
     self.primary_lateral_control = PrimaryLateralControl(params.get("FordPrefLateralControl", return_default=True) or 0)
 
@@ -436,6 +446,16 @@ class LateralCurvExt:
       if self.lane_change:
         desired_curvature_rate = 0.0
 
+      # BluePilot: temporary wheel-nudge offset on top of the menu offset. Evaluated against the
+      # planner's curvature (the straight-road test) and cleared by the human turn above -- see
+      # lane_offset_nudge.py.
+      self.lane_offset_nudge.update(
+        self.enable_nudge_lane_offset, CC.latActive, CS.out.vEgoRaw, steeringPressed,
+        steeringAngleDeg_PV, float(requested_curvature), self.model, self.human_turn,
+        self.nudge_lane_offset_max_pct)
+      self.bp_nudge_offset_pct = self.lane_offset_nudge.percent
+      self.bp_nudge_offset_m = self.lane_offset_nudge.offset_m
+
       # Path offset: blend model position with laneline data
       if self.model is not None:
         path_offset_position = interp(self.path_offset_lookup_time, ModelConstants.T_IDXS, self.model.position.y)
@@ -452,7 +472,8 @@ class LateralCurvExt:
 
         laneline_path_offset_scale = interp(laneline_confidence, self.min_laneline_confidence_bp, [0.0, 1.0])
         path_offset = ((path_offset_position * (1 - laneline_path_offset_scale)) +
-                       (path_offset_lanelines * laneline_path_offset_scale)) + self.custom_path_offset_curv
+                       (path_offset_lanelines * laneline_path_offset_scale)) + \
+                      self.lane_offset_nudge.total_offset(self.custom_path_offset_curv)
 
       # No path offset during lane changes
       if self.lane_change:
@@ -522,6 +543,9 @@ class LateralCurvExt:
       self.LC_PID_controller.reset()
       ramp_type = 0
       lateralUncertainty = 0.0
+      self.lane_offset_nudge.reset()
+      self.bp_nudge_offset_pct = 0.0
+      self.bp_nudge_offset_m = 0.0
 
     # Update state for next frame
     self.lateralUncertainty = lateralUncertainty

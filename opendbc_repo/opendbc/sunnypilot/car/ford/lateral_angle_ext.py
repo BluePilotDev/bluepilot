@@ -41,6 +41,7 @@ from opendbc.car.ford.values import CAR, CarControllerParams
 from opendbc.sunnypilot.car.ford.lateral_curv_ext import LateralResult
 from opendbc.sunnypilot.car.ford.human_turn import HumanTurnDetector
 from opendbc.sunnypilot.car.ford.lane_center_trim import LaneCenterTrim
+from opendbc.sunnypilot.car.ford.lane_offset_nudge import LaneOffsetNudge
 from opendbc.sunnypilot.car.ford.values_ext import BP_ANGLE_LIMITS
 from selfdrive.modeld.constants import ModelConstants
 
@@ -181,6 +182,14 @@ class LateralAngleExt:
     self.enable_lane_positioning_ang = False
     self.custom_path_offset_ang = 0.0
     self.lane_centering_strength_ang = 0.25
+    # BluePilot: temporary in-lane offset from a wheel nudge on a straight -- rides on top of
+    # custom_path_offset_ang and clears on a navigational turn. See lane_offset_nudge.py.
+    # Shared with LateralCurvExt the same way human_turn_detector is (one mixin instance).
+    self.lane_offset_nudge = LaneOffsetNudge()
+    self.enable_nudge_lane_offset = False
+    self.nudge_lane_offset_max_pct = 12.0
+    self.bp_nudge_offset_pct = 0.0  # telemetry (controllerStateBP)
+    self.bp_nudge_offset_m = 0.0
     # Telemetry: variable curvature lookup time used this frame (s)
     self.bp_curvature_lookup_time = _VLT_T_EXTRA_MAX + 0.3725  # warm start at ~0.5s
     # BluePilot: error-clipped kappa path_angle was derived from -- carcontroller.py reads this as
@@ -248,9 +257,15 @@ class LateralAngleExt:
         self.enable_lane_positioning_ang = bool(params.get_bool("enable_lane_positioning_ang"))
       except Exception:
         pass
+      # BluePilot: wheel-nudge temporary offset (shared by both lateral modes).
+      try:
+        self.enable_nudge_lane_offset = bool(params.get_bool("enable_nudge_lane_offset"))
+      except Exception:
+        pass
       for attr, key, min_value, max_value in (
         ("custom_path_offset_ang", "custom_path_offset_ang", -0.5, 0.5),
         ("lane_centering_strength_ang", "lane_centering_strength_ang", 0.0, 1.0),
+        ("nudge_lane_offset_max_pct", "nudge_lane_offset_max_pct", 0.0, 12.0),
       ):
         try:
           raw = params.get(key, return_default=True)
@@ -299,6 +314,9 @@ class LateralAngleExt:
       self.human_turn_detector.reset()
       self.angle_human_turn_active = False
       self.lane_center_trim.reset()
+      self.lane_offset_nudge.reset()
+      self.bp_nudge_offset_pct = 0.0
+      self.bp_nudge_offset_m = 0.0
       self.stall_blip_hold_s = 0.0
       self.stall_blip_frames_left = 0
       self.stall_blip_cooldown_s = 0.0
@@ -342,6 +360,10 @@ class LateralAngleExt:
       # Keep exit detection current so resume doesn't compare against a stale pre-turn value.
       self._desired_curvature_last = float(actuators.curvature)
       self.lane_center_trim.reset()
+      # A human turn is the navigational turn that clears the nudge offset (lane_offset_nudge.py).
+      self.lane_offset_nudge.reset()
+      self.bp_nudge_offset_pct = 0.0
+      self.bp_nudge_offset_m = 0.0
       # A human turn ends any stall episode -- its own mode 0 does the PSCM reset job. That also
       # covers the press so far: only press time accumulated AFTER the latch releases should earn
       # a hand-off pulse.
@@ -404,6 +426,10 @@ class LateralAngleExt:
       self.bp_kappa_cmd = self.get_current_curvature(CS)
       self._desired_curvature_last = float(actuators.curvature)
       self.lane_center_trim.reset()
+      # The nudge offset deliberately survives the pulse. A nudge is a sustained press, so its own
+      # release arms the hand-off blip (_PRESS_BLIP_MIN_S) ~0.3 s later -- clearing here would wipe
+      # the offset the driver just set, every time. The pulse is a 300 ms PSCM reset, not a
+      # navigational turn; only the human-turn path and disengage clear the offset.
       self.precision_type = 1
       if self.stall_blip_frames_left <= 0:
         self.stall_blip_cooldown_s = _STALL_COOLDOWN_S
@@ -511,10 +537,19 @@ class LateralAngleExt:
     # bypassing them.
     current_curvature = self.get_current_curvature(CS)
     _kappa_planner = kappa_cmd
+    # BluePilot: temporary wheel-nudge offset, evaluated against the pre-trim kappa (that is what
+    # says the road is straight) and added to the menu offset -- see lane_offset_nudge.py.
+    self.lane_offset_nudge.update(
+      self.enable_nudge_lane_offset, CC.latActive, v_ego, CS.out.steeringPressed,
+      CS.out.steeringAngleDeg, _kappa_planner, self.model, self.angle_human_turn_active,
+      self.nudge_lane_offset_max_pct)
+    self.bp_nudge_offset_pct = self.lane_offset_nudge.percent
+    self.bp_nudge_offset_m = self.lane_offset_nudge.offset_m
+
     kappa_cmd = self.lane_center_trim.update(
       kappa_cmd, self.model, v_ego, self.enable_lane_positioning_ang,
-      self.custom_path_offset_ang, self.lane_centering_strength_ang,
-      CC.latActive, self.lane_change)
+      self.lane_offset_nudge.total_offset(self.custom_path_offset_ang),
+      self.lane_centering_strength_ang, CC.latActive, self.lane_change)
 
     # BluePilot: the planner has first claim on the deviation budget clipped below; the trim takes
     # what is left. Symmetric -- a one-sided form lets the trim subtract authority while the planner

@@ -4,9 +4,10 @@ planned path.
 
 The marker is the *target* the lane positioning code aims for -- not the raw laneline midpoint --
 so it carries every term that feeds the controller: the model-position / laneline-center
-confidence blend, the user's in-lane offset, and (in the readout) the gain and speed ramp that
-scale the resulting correction. Both control modes are covered, each mirroring its own
-controller:
+confidence blend, the user's in-lane offset, and the temporary wheel-nudge offset riding on top of
+it (``lane_offset_nudge.py``, read live off ``controllerStateBP``). It draws solid only when the
+trim can actually act on that target -- lateral engaged, gain and speed ramp non-zero -- and faded
+otherwise. Both control modes are covered, each mirroring its own controller:
 
 - angle mode: ``lane_center_trim.py`` (curvature-domain trim). Its confidence blend is reused
   directly from that module rather than re-derived here, so the marker can't drift away from what
@@ -22,8 +23,11 @@ import numpy as np
 import pyray as rl
 from numpy import interp
 
+from openpilot.system.ui.lib.shader_polygon import draw_polygon, Gradient
+
 from opendbc.sunnypilot.car.ford.lateral_curv_ext import PrimaryLateralControl
 from opendbc.sunnypilot.car.ford.lane_center_trim import LaneCenterTrim, _SPEED_RAMP_BP, _SPEED_RAMP_V
+from opendbc.sunnypilot.car.ford.lane_offset_nudge import _TOTAL_OFFSET_MAX_M
 from openpilot.selfdrive.modeld.constants import ModelConstants
 
 # Curvature-mode blend constants, mirrored from lateral_curv_ext.py (see module docstring).
@@ -41,6 +45,14 @@ _CURV_SPEED_V = (0.0, 0.0, 1.0)
 # hence the farther set, which puts the marker above them.
 _MARKER_DISTANCES_M = (10.0, 14.0, 20.0, 28.0)
 _MARKER_DISTANCES_COMPACT_M = (20.0, 26.0, 34.0, 44.0)
+
+# The nudge shadow: a translucent strip laid down the road at the nudged center, fading out with
+# distance so it reads as a shadow on the lane rather than a second path.
+_SHADOW_HALF_W_M = 0.22
+_SHADOW_NEAR_M = 5.0  # starts under the bottom overlays so the strip has no visible cut edge
+_SHADOW_FAR_M = 40.0
+_SHADOW_SAMPLES = 9
+_SHADOW_MIN_M = 0.02  # below this there is no nudge worth drawing
 
 _TARGET_COLOR = rl.Color(0, 220, 255, 235)
 _TARGET_GLOW = rl.Color(0, 220, 255, 70)
@@ -69,6 +81,7 @@ class LaneCenterIndicatorMixin:
     self._lc_enabled = False
     self._lc_is_angle = True
     self._lc_offset = 0.0
+    self._lc_nudge_m = 0.0  # live wheel-nudge offset from controllerStateBP
     self._lc_gain = 0.0
     self._lc_lane_full = False
     self._refresh_lane_center_params()
@@ -104,6 +117,9 @@ class LaneCenterIndicatorMixin:
 
     model = sm['modelV2']
     v_ego = sm['carState'].vEgo if sm.valid['carState'] else 0.0
+    # The wheel-nudge offset is runtime state in the car process, not a param -- without it the
+    # marker would ignore an offset the driver just set (lane_offset_nudge.py).
+    self._lc_nudge_m = float(sm['controllerStateBP'].nudgeLaneOffsetMeters) if sm.valid['controllerStateBP'] else 0.0
 
     # Distance first: the target is evaluated at whatever distance the marker ends up drawn at,
     # so a curving lane can't put the marker beside a different piece of road than it describes.
@@ -115,7 +131,7 @@ class LaneCenterIndicatorMixin:
     solution = self._lane_center_solution(model, float(v_ego), marker_x)
     if solution is None:
       return
-    target_y, authority = solution
+    target_y, model_y, authority = solution
 
     # The marker is only a live command when the trim can actually act: lateral engaged, and the
     # gain and speed ramp both non-zero. Otherwise it fades to a preview of where the target is.
@@ -129,14 +145,18 @@ class LaneCenterIndicatorMixin:
     target_pt = (target_pt[0] + off_x, target_pt[1] + off_y)
     path_pt = (path_pt[0] + off_x, path_pt[1] + off_y)
 
+    # Shadow first so the marker sits on top of it.
+    if abs(self._lc_nudge_m) >= _SHADOW_MIN_M:
+      self._draw_nudge_shadow(target_y - model_y, active)
     self._draw_marker(target_pt, path_pt, active)
 
   def _lane_center_solution(self, model, v_ego: float, marker_x: float):
-    """Returns (target_y, authority) or None.
+    """Returns (target_y, model_y, authority) or None.
 
-    ``target_y`` is model frame (positive right, camera offset not yet applied) at the marker's own
-    distance -- what the trim steers toward. ``authority`` is the gain x speed-ramp product: zero
-    means the trim is computing a target it cannot act on yet.
+    ``target_y`` and ``model_y`` are model frame (positive right, camera offset not yet applied) at
+    the marker's own distance -- what the trim steers toward, and where the model's own path runs.
+    Their difference is the lateral shift the shadow is drawn at. ``authority`` is the gain x
+    speed-ramp product: zero means the trim is computing a target it cannot act on yet.
     """
     try:
       pos_x = np.asarray(model.position.x, dtype=float)
@@ -148,8 +168,11 @@ class LaneCenterIndicatorMixin:
     except (AttributeError, TypeError, ValueError):
       return None
 
-    if not (np.isfinite(self._lc_offset) and np.isfinite(self._lc_gain)):
+    if not (np.isfinite(self._lc_offset) and np.isfinite(self._lc_gain) and np.isfinite(self._lc_nudge_m)):
       return None
+
+    # Menu offset + wheel nudge, clipped the same way the controller clips the pair.
+    offset = float(np.clip(self._lc_offset + self._lc_nudge_m, -_TOTAL_OFFSET_MAX_M, _TOTAL_OFFSET_MAX_M))
 
     if self._lc_is_angle:
       # Angle mode: the confidence blend comes straight from the controller's own module, but is
@@ -158,18 +181,19 @@ class LaneCenterIndicatorMixin:
       speed_factor = float(interp(v_ego, _SPEED_RAMP_BP, _SPEED_RAMP_V))
       scale, center_near = self._lc_trim._laneline_blend(model, marker_x)
       model_y_near = float(np.interp(marker_x, pos_x, pos_y))
-      target_y = model_y_near * (1.0 - scale) + center_near * scale + self._lc_offset
-      return target_y, float(np.clip(self._lc_gain, 0.0, 1.0)) * speed_factor
+      target_y = model_y_near * (1.0 - scale) + center_near * scale + offset
+      return target_y, model_y_near, float(np.clip(self._lc_gain, 0.0, 1.0)) * speed_factor
 
     # Curvature mode: path_offset is already a near-field lateral position, so it *is* the target.
-    blend = self._curv_blend(model)
+    blend = self._curv_blend(model, offset)
     if blend is None:
       return None
     _, path_offset = blend
     speed_factor = float(interp(v_ego, _CURV_SPEED_BP, _CURV_SPEED_V))
-    return path_offset, float(np.clip(self._lc_gain, 0.0, 10.0)) * speed_factor
+    model_y = float(np.interp(marker_x, pos_x, pos_y))
+    return path_offset, model_y, float(np.clip(self._lc_gain, 0.0, 10.0)) * speed_factor
 
-  def _curv_blend(self, model):
+  def _curv_blend(self, model, offset: float):
     """Curvature mode's path_offset: (confidence_scale, path_offset_m). Mirrors lateral_curv_ext."""
     try:
       position_y = interp(_CURV_LOOKUP_TIME_S, ModelConstants.T_IDXS, model.position.y)
@@ -182,7 +206,7 @@ class LaneCenterIndicatorMixin:
       if not self._lc_lane_full:
         confidence = 0.0
       scale = float(np.clip(interp(confidence, _CURV_CONFIDENCE_BP, (0.0, 1.0)), 0.0, 1.0))
-      path_offset = float(position_y) * (1 - scale) + lanelines_y * scale + self._lc_offset
+      path_offset = float(position_y) * (1 - scale) + lanelines_y * scale + offset
       return scale, path_offset
     except (AttributeError, IndexError, TypeError, ValueError):
       return None
@@ -204,6 +228,42 @@ class LaneCenterIndicatorMixin:
       if path_pt is not None:
         return x, path_pt, z
     return None
+
+  def _draw_nudge_shadow(self, delta_y: float, active: bool) -> None:
+    """Translucent strip down the road at the nudged center, so the offset the driver just set is
+    visible as a position on the lane and not only as a marker."""
+    path_x = self._path.raw_points[:, 0]
+    path_y = self._path.raw_points[:, 1]
+    path_z = self._path.raw_points[:, 2]
+    off_x, off_y = self._lc_screen_offset()
+
+    left, right = [], []
+    for x in np.linspace(_SHADOW_NEAR_M, _SHADOW_FAR_M, _SHADOW_SAMPLES):
+      x = float(x)
+      y = float(np.interp(x, path_x, path_y)) + delta_y + self._camera_offset
+      z = float(np.interp(x, path_x, path_z)) + self._path_offset_z
+      pl = self._map_to_screen(x, y - _SHADOW_HALF_W_M, z)
+      pr = self._map_to_screen(x, y + _SHADOW_HALF_W_M, z)
+      if pl is None or pr is None:
+        continue
+      left.append((pl[0] + off_x, pl[1] + off_y))
+      right.append((pr[0] + off_x, pr[1] + off_y))
+
+    if len(left) < 2:
+      return
+
+    # draw_polygon wants the ribbon as [L0..Lk, Rk..R0]
+    poly = np.array(left + right[::-1], dtype=np.float32)
+    alpha = 1.0 if active else _INACTIVE_ALPHA
+    gradient = Gradient(
+      start=(0.0, 1.0),  # near end of the strip
+      end=(0.0, 0.0),    # far end, faded out
+      colors=[rl.Color(0, 220, 255, int(105 * alpha)),
+              rl.Color(0, 220, 255, int(60 * alpha)),
+              rl.Color(0, 220, 255, 0)],
+      stops=[0.0, 0.5, 1.0],
+    )
+    draw_polygon(self._rect, poly, gradient=gradient)
 
   @staticmethod
   def _fade(color: rl.Color, active: bool) -> rl.Color:
