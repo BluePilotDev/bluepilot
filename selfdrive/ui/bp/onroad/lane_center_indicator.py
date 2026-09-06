@@ -16,8 +16,9 @@ otherwise. Both control modes are covered, each mirroring its own controller:
   controller's update loop with no reusable entry point, so it is restated here -- keep the two in
   sync if the controller's blend changes.
 
-Nothing here feeds control; it is display only. It renders whenever lane positioning is enabled
-for the active mode, so there is no separate toggle to forget.
+Nothing here feeds control; it is display only. It draws when the BluePilot Visuals toggle
+(``BPShowLaneCenterIndicator``) is on AND lane positioning is enabled for the active mode -- there
+is nothing to mark when the lane positioning it describes is switched off.
 """
 import numpy as np
 import pyray as rl
@@ -94,13 +95,14 @@ class LaneCenterIndicatorMixin:
       mode = PrimaryLateralControl.curvature
     self._lc_is_angle = mode == PrimaryLateralControl.angle
 
+    show = p.get_bool("BPShowLaneCenterIndicator")
     try:
       if self._lc_is_angle:
-        self._lc_enabled = p.get_bool("enable_lane_positioning_ang")
+        self._lc_enabled = show and p.get_bool("enable_lane_positioning_ang")
         self._lc_offset = float(p.get("custom_path_offset_ang", return_default=True))
         self._lc_gain = float(p.get("lane_centering_strength_ang", return_default=True))
       else:
-        self._lc_enabled = p.get_bool("enable_lane_positioning_curv")
+        self._lc_enabled = show and p.get_bool("enable_lane_positioning_curv")
         self._lc_offset = float(p.get("custom_path_offset_curv", return_default=True))
         self._lc_gain = float(p.get("LC_PID_gain_UI_curv", return_default=True)) / 100.0
         self._lc_lane_full = p.get_bool("enable_lane_full_mode_curv")

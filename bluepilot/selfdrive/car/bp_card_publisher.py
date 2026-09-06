@@ -117,6 +117,7 @@ def _refresh_settings_cache() -> dict:
     "bmsPredictedCurvatureBlendRatioHigh": _get_float(p, "pc_blend_ratio_high_C_UI_curv", 0.4),
     "bmsPredictedCurvatureBlendRatioLow":  _get_float(p, "pc_blend_ratio_low_C_UI_curv", 0.4),
     "bmsCenteringPidGain":             _get_float(p, "LC_PID_gain_UI_curv", 3.0),
+    "bmsShowLaneCenterIndicator":      _get_bool(p, "BPShowLaneCenterIndicator"),
     "bmsEnableNudgeLaneOffset":        _get_bool(p, "enable_nudge_lane_offset"),
     "bmsNudgeLaneOffsetMaxPercent":    _get_float(p, "nudge_lane_offset_max_pct", 8.0),
   }

@@ -243,6 +243,7 @@ class ControllerStateBP:
   bmsPredictedCurvatureBlendRatioHigh: float = 0.4
   bmsPredictedCurvatureBlendRatioLow: float = 0.4
   bmsCenteringPidGain: float = 3.0
+  bmsShowLaneCenterIndicator: bool = False
   bmsEnableNudgeLaneOffset: bool = False
   bmsNudgeLaneOffsetMaxPercent: float = 8.0
   # --- Fingerprint ---

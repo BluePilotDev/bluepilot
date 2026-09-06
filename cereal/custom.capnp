@@ -510,6 +510,7 @@ struct ControllerStateBP @0xcd96dafb67a082d0 {
   bmsShowBrakeStatus @18 :Bool;  # ShowBrakeStatus
   bmsShowConfidenceBall @19 :Bool;  # BPShowConfidenceBall (TICI only)
   bmsAnimateSteeringWheel @20 :Bool;  # BPAnimateSteeringWheel
+  bmsShowLaneCenterIndicator @62 :Bool;  # BPShowLaneCenterIndicator
   bmsWheelIconStyle @21 :UInt8;  # BPSteeringWheelIconStyle: 0=Comma 4, 1=Comma 3x
   bmsShowRadarLeadOverlay @22 :Bool;  # FordPrefShowRadarLeadOverlay
   bmsRadarOverlaySize @23 :UInt8;  # FordPrefRadarOverlaySize: 0=small, 1=medium, 2=large
