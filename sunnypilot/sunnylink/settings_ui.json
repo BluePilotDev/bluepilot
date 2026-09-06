@@ -2215,7 +2215,7 @@
           "key": "BPThemePack",
           "widget": "multiple_button",
           "title": "[Visuals] Theme",
-          "description": "Choose 8-Bit Racer, Tesla, or a seasonal theme pack. Tesla automatically changes between Light and Dark after three seconds of sustained ambient light and temporarily hides conflicting scene overlays; HUD, alerts, driver monitoring, gauges, and safety warnings remain.",
+          "description": "Choose 8-Bit Racer, Tesla, or a seasonal theme pack.",
           "options": [
             {
               "value": "",
