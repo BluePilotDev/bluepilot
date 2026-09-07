@@ -61,6 +61,8 @@ _PATH_TICK_COLOR = rl.Color(255, 255, 255, 170)
 _STEM_H = 44.0  # px from the anchor point up to the diamond
 _REF_VIEW_H = 790.0  # road view height the pixel sizes above were tuned against (TICI)
 _COMPACT_VIEW_H = 400.0  # below this the view is a MICI-sized screen
+# MICI's screen is small enough that a proportionally scaled marker is hard to pick out at a glance.
+_COMPACT_MARKER_SCALE = 2.0
 
 _PARAM_REFRESH_FRAMES = 60
 
@@ -275,7 +277,10 @@ class LaneCenterIndicatorMixin:
 
   def _scale(self) -> float:
     """Marker/readout sizes are in TICI pixels; the MICI road view is much smaller."""
-    return float(np.clip(self._rect.height / _REF_VIEW_H, 0.4, 1.0))
+    sc = float(np.clip(self._rect.height / _REF_VIEW_H, 0.4, 1.0))
+    if self._rect.height < _COMPACT_VIEW_H:
+      sc *= _COMPACT_MARKER_SCALE
+    return sc
 
   def _draw_marker(self, target_pt, path_pt, active: bool) -> None:
     target_color = self._fade(_TARGET_COLOR, active)
