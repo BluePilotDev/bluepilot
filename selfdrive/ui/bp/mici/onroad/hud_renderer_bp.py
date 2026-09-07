@@ -16,6 +16,8 @@ from openpilot.selfdrive.ui.bp.lib.steering_wheel_style import (
 from openpilot.selfdrive.ui.bp.lib.ui_debug_logger import bp_ui_log
 # BluePilot: seasonal theme packs (steering wheel icon override)
 from openpilot.selfdrive.ui.bp.lib import theme_pack
+from openpilot.selfdrive.ui.bp.lib.longitudinal_visuals import longitudinal_control_active
+from openpilot.selfdrive.ui.bp.lib.tesla_palette import tesla_wheel_color
 from openpilot.system.ui.lib.text_measure import measure_text_cached
 from openpilot.system.ui.lib.application import gui_app
 from openpilot.bluepilot.ui.lib.bp_shaders import draw_shader_circle_gradient
@@ -38,6 +40,7 @@ class MiciHudRendererBP(HudRenderer):
     self._animate_steering_wheel = self._bp_params.get_bool("BPAnimateSteeringWheel")
     self._wheel_icon_style = ensure_steering_wheel_icon_style_initialized(self._bp_params, SteeringWheelIconStyle.COMMA_4)
     self._theme_pack = theme_pack.get_active_pack(force=True)
+    self._tesla_style = theme_pack.tesla_active(self._bp_params)
     self._animate_wheel_param_counter = 0
     self.show_lateral_control = False
     # BluePilot: actual mode from controllerStateBP (None = not published, e.g. non-Ford)
@@ -57,6 +60,7 @@ class MiciHudRendererBP(HudRenderer):
       self._animate_steering_wheel = self._bp_params.get_bool("BPAnimateSteeringWheel")
       self._wheel_icon_style = get_steering_wheel_icon_style(self._bp_params, SteeringWheelIconStyle.COMMA_4)
       self._theme_pack = theme_pack.get_active_pack()
+      self._tesla_style = theme_pack.tesla_active(self._bp_params)
 
     if self._bp_params.get_bool("ShowBrakeStatus"):
       sm = ui_state.sm
@@ -132,14 +136,23 @@ class MiciHudRendererBP(HudRenderer):
     if self._brakes_on:
       color = rl.Color(255, 60, 60, int(self._wheel_alpha_filter.x))
     else:
-      color = rl.Color(255, 255, 255, int(self._wheel_alpha_filter.x))
+      color = tesla_wheel_color(
+        self._tesla_style and not self._show_wheel_critical,
+        longitudinal_control_active(ui_state.sm, ui_state.status),
+        ui_state.tesla_dark_fraction,
+        int(self._wheel_alpha_filter.x),
+      )
     rl.draw_texture_pro(wheel_txt, src_rect, dest_rect, origin, rotation, color)
 
     if self._show_wheel_critical:
       EXCLAMATION_POINT_SPACING = 10
       exclamation_pos_x = pos_x - self._txt_exclamation_point.width / 2 + wheel_txt.width / 2 + EXCLAMATION_POINT_SPACING
       exclamation_pos_y = pos_y - self._txt_exclamation_point.height / 2
-      rl.draw_texture(self._txt_exclamation_point, int(exclamation_pos_x), int(exclamation_pos_y), rl.WHITE)
+      rl.draw_texture_ex(
+        self._txt_exclamation_point,
+        rl.Vector2(exclamation_pos_x, exclamation_pos_y),
+        0.0, 1.0, rl.WHITE,
+      )
 
     if show_lateral:
       self._draw_lateral_control_overlay(pos_x, pos_y, wheel_txt.width)

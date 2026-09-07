@@ -31,7 +31,7 @@ class HudRendererSP(HudRenderer):
     self.developer_ui = DeveloperUiRenderer()
     self.road_name_renderer = RoadNameRenderer()
     self.rocket_fuel = RocketFuel()
-    self.speed_limit_renderer = SpeedLimitRenderer()
+    self.speed_limit_renderer = self._make_speed_limit_renderer()
     self.smart_cruise_control_renderer = SmartCruiseControlRenderer()
     self.turn_signal_controller = TurnSignalController()
     self.circular_alerts_renderer = CircularAlertsRenderer()
@@ -43,6 +43,10 @@ class HudRendererSP(HudRenderer):
     self.icbm_active_counter: int = 0
     self.speed_cluster: float = 0.0
     self.speed_conv: float = CV.MS_TO_KPH if ui_state.is_metric else CV.MS_TO_MPH
+
+  def _make_speed_limit_renderer(self) -> SpeedLimitRenderer:
+    """Factory hook for downstream HUDs that preserve the stock renderer contract."""
+    return SpeedLimitRenderer()
 
   def _update_state(self) -> None:
     if ui_state.sm.recv_frame["carState"] < ui_state.started_frame:

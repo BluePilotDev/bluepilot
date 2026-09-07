@@ -36,7 +36,7 @@ class VisualsLayoutMici(NavScroller):
       ["off", "lead car speed", "speed", "lead car distance", "time to lead car"],
     )
     self.rainbow_mode = BigParamControlBP("Rainbow Mode", "RainbowMode")
-    # BluePilot: one theme selector for everything (8-Bit Racer + seasonal packs),
+    # BluePilot: one theme selector for everything (code themes + seasonal packs),
     # same entries and param as the C3X page — see theme_pack.selector_entries().
     _theme_entries = theme_pack.selector_entries()
     self.theme_pack_sel = BigMultiParamToggleStrBP(
