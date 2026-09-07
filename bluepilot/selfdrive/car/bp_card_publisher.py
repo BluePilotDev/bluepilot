@@ -117,6 +117,9 @@ def _refresh_settings_cache() -> dict:
     "bmsPredictedCurvatureBlendRatioHigh": _get_float(p, "pc_blend_ratio_high_C_UI_curv", 0.4),
     "bmsPredictedCurvatureBlendRatioLow":  _get_float(p, "pc_blend_ratio_low_C_UI_curv", 0.4),
     "bmsCenteringPidGain":             _get_float(p, "LC_PID_gain_UI_curv", 3.0),
+    "bmsShowLaneCenterIndicator":      _get_bool(p, "BPShowLaneCenterIndicator"),
+    "bmsEnableNudgeLaneOffset":        _get_bool(p, "enable_nudge_lane_offset"),
+    "bmsNudgeLaneOffsetMaxPercent":    _get_float(p, "nudge_lane_offset_max_pct", 8.0),
   }
 
 
@@ -131,6 +134,13 @@ def publish_controller_state_bp(CI, pm):
     cs_bp.curvatureDeviationLimited = getattr(CI.CC, "curvatureDeviationLimited", False)
     cs_bp.humanTurnLateralPaused = bool(getattr(CI.CC, "humanTurnLateralPaused", False))
     cs_bp.stallBlipActive = bool(getattr(CI.CC, "stallBlipActive", False))
+    cs_bp.stallBlipSource = int(getattr(CI.CC, "stallBlipSource", 0))
+    cs_bp.stallBlipEpisodeCount = int(getattr(CI.CC, "stallBlipEpisodeCount", 0))
+    # BluePilot: wheel-nudge temporary in-lane offset (lane_offset_nudge.py). Runtime state, so it
+    # is read every frame off the car controller -- not through the cached settings snapshot below.
+    cs_bp.nudgeLaneOffsetPercent = float(getattr(CI.CC, "nudgeLaneOffsetPercent", 0.0))
+    cs_bp.nudgeLaneOffsetMeters = float(getattr(CI.CC, "nudgeLaneOffsetMeters", 0.0))
+    cs_bp.nudgeActive = bool(getattr(CI.CC, "nudgeActive", False))
     # BluePilot: mode the controller actually ran, straight off the car controller (not Params).
     if getattr(CI.CC, "disable_BP_lat_UI", True):
       cs_bp.activeLateralMode = structs.ControllerStateBP.LateralMode.openpilot

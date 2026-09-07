@@ -477,6 +477,11 @@ struct ControllerStateBP @0xcd96dafb67a082d0 {
   curvatureDeviationLimited @3 :Bool;
   humanTurnLateralPaused @4 :Bool;  # angle mode: lateral forced inactive (mode 0) during a manual turn
   stallBlipActive @5 :Bool;  # angle mode: brief mode-0 pulse resetting PSCM authority after a post-override stall
+  # BluePilot: which path armed the mode-0 pulse (0 = none, 1 = hand-off after a sustained
+  # press/release, 2 = reactive stall detector) -- distinguishes the two blip paths in rlogs.
+  stallBlipSource @55 :UInt8;
+  # BluePilot: pulses fired in the current stall episode (0-3); 3 = the detector gave up.
+  stallBlipEpisodeCount @56 :UInt8;
 
   # BluePilot: full BluePilot-menu settings snapshot, for PlotJuggler/route analysis without
   # reading logs. "bms" = BluePilot Menu Setting. One field per on-device menu item (TICI + MICI
@@ -505,6 +510,7 @@ struct ControllerStateBP @0xcd96dafb67a082d0 {
   bmsShowBrakeStatus @18 :Bool;  # ShowBrakeStatus
   bmsShowConfidenceBall @19 :Bool;  # BPShowConfidenceBall (TICI only)
   bmsAnimateSteeringWheel @20 :Bool;  # BPAnimateSteeringWheel
+  bmsShowLaneCenterIndicator @62 :Bool;  # BPShowLaneCenterIndicator
   bmsWheelIconStyle @21 :UInt8;  # BPSteeringWheelIconStyle: 0=Comma 4, 1=Comma 3x
   bmsShowRadarLeadOverlay @22 :Bool;  # FordPrefShowRadarLeadOverlay
   bmsRadarOverlaySize @23 :UInt8;  # FordPrefRadarOverlaySize: 0=small, 1=medium, 2=large
@@ -552,6 +558,17 @@ struct ControllerStateBP @0xcd96dafb67a082d0 {
   # BluePilot: lateral mode the car controller actually ran this frame (not the param).
   # Only published by Ford BP, so other cars show nothing.
   activeLateralMode @54 :LateralMode;
+
+  # BluePilot: temporary in-lane offset set by nudging the wheel on a straight -- runtime state,
+  # not a setting (see lane_offset_nudge.py). Percent is of the detected lane width, signed
+  # positive = right; meters is that percent against the live lane width, and is what actually
+  # rides on top of the menu offset. nudgeActive marks the frames a nudge is accumulating.
+  nudgeLaneOffsetPercent @57 :Float32;
+  nudgeLaneOffsetMeters @58 :Float32;
+  nudgeActive @59 :Bool;
+  # --- Lateral Tuning (menu settings, see the convention note above) ---
+  bmsEnableNudgeLaneOffset @60 :Bool;  # enable_nudge_lane_offset
+  bmsNudgeLaneOffsetMaxPercent @61 :Float32;  # nudge_lane_offset_max_pct
 
   enum LateralMode {
     openpilot @0;  # BP lateral bypassed (disable_BP_lat_UI)

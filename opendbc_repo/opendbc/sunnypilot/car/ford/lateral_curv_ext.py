@@ -28,8 +28,10 @@ from opendbc.car import ACCELERATION_DUE_TO_GRAVITY, DT_CTRL
 from opendbc.car.lateral import ISO_LATERAL_ACCEL, apply_std_steer_angle_limits
 from opendbc.car.vehicle_model import VehicleModel
 from opendbc.car.ford.values import CarControllerParams, FordFlags
-from opendbc.sunnypilot.car.ford.values_ext import BP_ANGLE_LIMITS, CURVATURE_MAX, FordSafetyFlagsSP
+from opendbc.sunnypilot.car.ford.values_ext import (
+  BP_ANGLE_LIMITS, CURVATURE_MAX, PINION_CURVATURE_ERROR, FordSafetyFlagsSP)
 from opendbc.sunnypilot.car.ford.human_turn import HumanTurnDetector
+from opendbc.sunnypilot.car.ford.lane_offset_nudge import LaneOffsetNudge
 from selfdrive.modeld.constants import ModelConstants
 
 
@@ -56,7 +58,8 @@ LateralResult = namedtuple('LateralResult', [
 
 
 def apply_ford_curvature_limits_ext(apply_curvature, apply_curvature_last, current_curvature,
-                                     v_ego_raw, steering_angle, lat_active, CP):
+                                     v_ego_raw, steering_angle, lat_active, CP,
+                                     curvature_error=CarControllerParams.CURVATURE_ERROR):
   """Extended version of apply_ford_curvature_limits that returns
   (apply_curvature, max_curvature, curvature_deviation_limited).
 
@@ -74,10 +77,10 @@ def apply_ford_curvature_limits_ext(apply_curvature, apply_curvature_last, curre
   # No blending at low speed due to lack of torque wind-up and inaccurate current curvature
   if v_ego_raw > 9:
     apply_curvature_pre_error_clip = apply_curvature
-    apply_curvature = np.clip(apply_curvature, current_curvature - CarControllerParams.CURVATURE_ERROR,
-                              current_curvature + CarControllerParams.CURVATURE_ERROR)
+    apply_curvature = np.clip(apply_curvature, current_curvature - curvature_error,
+                              current_curvature + curvature_error)
     curvature_deviation_limited = bool(abs(apply_curvature - apply_curvature_pre_error_clip) > 1e-9)
-    max_curvature = abs(current_curvature) + CarControllerParams.CURVATURE_ERROR
+    max_curvature = abs(current_curvature) + curvature_error
 
   # Curvature rate limit after driver torque limit (same inputs/order as apply_ford_curvature_limits)
   apply_curvature_before_std = apply_curvature
@@ -130,6 +133,11 @@ class LateralCurvExt:
     self.bp_pinion_curvature_enabled = bool(
       CP_SP is not None and (CP_SP.safetyParam & FordSafetyFlagsSP.STEER_ANGLE_CURVATURE))
 
+    # Track ford.h's per-source band (FORD_STEERING_LIMITS_PINION widens to the
+    # PINION_CURVATURE_ERROR band); stays under panda's +1 unit.
+    self.bp_curvature_error = (PINION_CURVATURE_ERROR if self.bp_pinion_curvature_enabled
+                               else CarControllerParams.CURVATURE_ERROR)
+
     # Toggles (updated from Params each frame)
     self.enable_human_turn_detection_curv = True
     self.enable_lane_positioning_curv = False
@@ -171,6 +179,13 @@ class LateralCurvExt:
     # Human turn detection (shared with angle mode — see human_turn.HumanTurnDetector)
     self.human_turn_detector = HumanTurnDetector()
     self.human_turn = False
+    # BluePilot: temporary wheel-nudge in-lane offset, shared with angle mode the same way
+    # (one mixin instance per CarController). See lane_offset_nudge.py.
+    self.lane_offset_nudge = LaneOffsetNudge()
+    self.enable_nudge_lane_offset = False
+    self.nudge_lane_offset_max_pct = 12.0
+    self.bp_nudge_offset_pct = 0.0  # telemetry (controllerStateBP)
+    self.bp_nudge_offset_m = 0.0
     self.post_reset_ramp_active = False
     self.reset_steering_last = False
 
@@ -231,6 +246,8 @@ class LateralCurvExt:
     self.enable_lane_full_mode_curv = params.get_bool("enable_lane_full_mode_curv")
     self.custom_profile_curv = int(params.get("custom_profile_curv", return_default=True))
     self.LC_PID_gain_UI_curv = float(params.get("LC_PID_gain_UI_curv", return_default=True))
+    self.enable_nudge_lane_offset = params.get_bool("enable_nudge_lane_offset")
+    self.nudge_lane_offset_max_pct = float(params.get("nudge_lane_offset_max_pct", return_default=True))
 
     self.primary_lateral_control = PrimaryLateralControl(params.get("FordPrefLateralControl", return_default=True) or 0)
 
@@ -369,7 +386,7 @@ class LateralCurvExt:
       # Apply curvature limits (extended version returning max_curvature)
       apply_curvature, max_curvature, curvature_deviation_limited = apply_ford_curvature_limits_ext(
         requested_curvature, apply_curvature_last, current_curvature,
-        CS.out.vEgoRaw, 0, CC.latActive, CP)
+        CS.out.vEgoRaw, 0, CC.latActive, CP, self.bp_curvature_error)
 
       # Lateral uncertainty for torque bar visualization
       lateralUncertainty = self._calculate_lateral_uncertainty(requested_curvature, apply_curvature, max_curvature)
@@ -429,6 +446,16 @@ class LateralCurvExt:
       if self.lane_change:
         desired_curvature_rate = 0.0
 
+      # BluePilot: temporary wheel-nudge offset on top of the menu offset. Evaluated against the
+      # planner's curvature (the straight-road test) and cleared by the human turn above -- see
+      # lane_offset_nudge.py.
+      self.lane_offset_nudge.update(
+        self.enable_nudge_lane_offset, CC.latActive, CS.out.vEgoRaw, steeringPressed,
+        steeringAngleDeg_PV, float(requested_curvature), self.model, self.human_turn,
+        self.nudge_lane_offset_max_pct)
+      self.bp_nudge_offset_pct = self.lane_offset_nudge.percent
+      self.bp_nudge_offset_m = self.lane_offset_nudge.offset_m
+
       # Path offset: blend model position with laneline data
       if self.model is not None:
         path_offset_position = interp(self.path_offset_lookup_time, ModelConstants.T_IDXS, self.model.position.y)
@@ -445,7 +472,8 @@ class LateralCurvExt:
 
         laneline_path_offset_scale = interp(laneline_confidence, self.min_laneline_confidence_bp, [0.0, 1.0])
         path_offset = ((path_offset_position * (1 - laneline_path_offset_scale)) +
-                       (path_offset_lanelines * laneline_path_offset_scale)) + self.custom_path_offset_curv
+                       (path_offset_lanelines * laneline_path_offset_scale)) + \
+                      self.lane_offset_nudge.total_offset(self.custom_path_offset_curv)
 
       # No path offset during lane changes
       if self.lane_change:
@@ -515,6 +543,9 @@ class LateralCurvExt:
       self.LC_PID_controller.reset()
       ramp_type = 0
       lateralUncertainty = 0.0
+      self.lane_offset_nudge.reset()
+      self.bp_nudge_offset_pct = 0.0
+      self.bp_nudge_offset_m = 0.0
 
     # Update state for next frame
     self.lateralUncertainty = lateralUncertainty

@@ -155,6 +155,11 @@ sections:
     widget: toggle
     title: '[Visuals] Show Lateral Control Mode'
     description: Display the lateral control mode overlay on the steering wheel icon.
+  - key: BPShowLaneCenterIndicator
+    widget: toggle
+    title: '[Visuals] Show Lane Center Indicator'
+    description: Mark the lane centering target on the driving path, including the in-lane offset and any wheel nudge. Only
+      drawn while lane positioning is enabled for the active control mode.
   - key: mici_complication
     widget: multiple_button
     title: '[Visuals] Lower Right Display (C4)'
@@ -285,6 +290,24 @@ sections:
     - type: param
       key: BlinkerPauseLaneChange
       equals: true
+  - key: enable_nudge_lane_offset
+    widget: toggle
+    title: '[Lateral Tuning] Nudge to Set In-Lane Offset'
+    description: Nudge the wheel while driving straight to shift the lane centering target sideways. The offset is temporary
+      and clears on the next human turn. In angle mode it acts through Lane Positioning, which must also be enabled.
+  - key: nudge_lane_offset_max_pct
+    widget: option
+    title: '[Lateral Tuning] Max Nudge Offset'
+    description: Largest offset a nudge can build, as a percent of the full lane width (line to line). 8% is about 0.30 m
+      in a 3.7 m lane.
+    min: 0.0
+    max: 12.0
+    step: 0.5
+    unit: '%'
+    enablement:
+    - type: param
+      key: enable_nudge_lane_offset
+      equals: true
   # Angle-mode tuning (hidden unless Primary Control Variable = Angle)
   - key: FordLowSpeedFactor_ang
     widget: option
@@ -330,6 +353,47 @@ sections:
     - type: param
       key: FordPrefLateralControl
       equals: 1
+  - key: enable_lane_positioning_ang
+    widget: toggle
+    title: '[Lateral Tuning] Enable Lane Positioning (Angle)'
+    description: Enable the angle-mode lane centering trim. Required for the in-lane offset, the wheel nudge, and the lane
+      center indicator to have any effect.
+    visibility:
+    - type: param
+      key: FordPrefLateralControl
+      equals: 1
+  - key: custom_path_offset_ang
+    widget: option
+    title: '[Lateral Tuning] In-Lane Offset (Angle)'
+    description: Adjust the in-lane offset (-0.5 to 0.5 m). Positive is right.
+    min: -0.5
+    max: 0.5
+    step: 0.01
+    unit: m
+    visibility:
+    - type: param
+      key: FordPrefLateralControl
+      equals: 1
+    enablement:
+    - type: param
+      key: enable_lane_positioning_ang
+      equals: true
+  - key: lane_centering_strength_ang
+    widget: option
+    title: '[Lateral Tuning] Lane Centering Strength (Angle)'
+    description: How hard the trim pulls toward the target (0.0-1.0). Zero disables the correction without turning off lane
+      positioning.
+    min: 0.0
+    max: 1.0
+    step: 0.05
+    visibility:
+    - type: param
+      key: FordPrefLateralControl
+      equals: 1
+    enablement:
+    - type: param
+      key: enable_lane_positioning_ang
+      equals: true
   # Curvature-mode tuning (hidden unless Primary Control Variable = Curvature)
   - key: enable_human_turn_detection_curv
     widget: toggle

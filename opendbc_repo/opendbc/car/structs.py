@@ -181,6 +181,12 @@ class ControllerStateBP:
   curvatureDeviationLimited: bool = False  # current_curvature error-clip constrained the command this frame
   humanTurnLateralPaused: bool = False  # angle mode: lateral forced inactive (mode 0) during a manual turn
   stallBlipActive: bool = False  # angle mode: brief mode-0 pulse resetting PSCM authority after a post-override stall
+  stallBlipSource: int = 0  # angle mode: which path armed the pulse (0=none, 1=hand-off, 2=reactive stall)
+  stallBlipEpisodeCount: int = 0  # angle mode: pulses fired this stall episode (0-3; 3 = detector gave up)
+  # BluePilot: wheel-nudge temporary in-lane offset (runtime state, not a setting)
+  nudgeLaneOffsetPercent: float = 0.0  # percent of lane width, positive = right
+  nudgeLaneOffsetMeters: float = 0.0   # that percent against the live lane width
+  nudgeActive: bool = False            # a nudge is accumulating this frame
 
   # BluePilot: full BluePilot-menu settings snapshot -- see custom.capnp ControllerStateBP for
   # field-by-field param-key mapping and the field-retirement convention.
@@ -237,6 +243,9 @@ class ControllerStateBP:
   bmsPredictedCurvatureBlendRatioHigh: float = 0.4
   bmsPredictedCurvatureBlendRatioLow: float = 0.4
   bmsCenteringPidGain: float = 3.0
+  bmsShowLaneCenterIndicator: bool = False
+  bmsEnableNudgeLaneOffset: bool = False
+  bmsNudgeLaneOffsetMaxPercent: float = 8.0
   # --- Fingerprint ---
   bmsFingerprintForced: bool = False
   bmsFingerprint: str = ""

@@ -41,9 +41,11 @@ MINIMAL_VIEW_NEUTRAL_LANE_COLOR = rl.Color(185, 205, 225, 255)
 from openpilot.selfdrive.ui.bp.onroad.rad_racer_road import (  # noqa: E402
   RadRacerRoadMixin, RAD_RACER_ROAD_EDGE_WIDTH, RAD_RACER_DASH_LEN_M, RAD_RACER_GAP_LEN_M,
 )
+# BluePilot: lane-centering target marker at the bottom of the path
+from openpilot.selfdrive.ui.bp.onroad.lane_center_indicator import LaneCenterIndicatorMixin  # noqa: E402
 
 
-class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
+class ModelRendererBP(LaneCenterIndicatorMixin, RadRacerRoadMixin, ModelRenderer):
   """BluePilot ModelRenderer with enhanced lane lines, path smoothing, and radar overlay."""
 
   def __init__(self):
@@ -85,6 +87,8 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
     self._lead_v_filters = [FirstOrderFilter(0, 0.3, dt, initialized=False),
                             FirstOrderFilter(0, 0.3, dt, initialized=False)]
     self._lead_was_active = [False, False]
+
+    self._init_lane_center_indicator()
 
   def prepare_projection(self, rect: rl.Rectangle) -> None:
     """Set clip region so _map_to_screen works before render().
@@ -186,6 +190,7 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
 
     self._draw_lane_lines()
     self._draw_path(sm)
+    self._draw_lane_center_indicator(sm)
 
     # BluePilot: In Rad Racer theme, leads are drawn as sprites by RadRacerTheme
     if render_lead_indicator and radar_state and not self._rad_racer:
