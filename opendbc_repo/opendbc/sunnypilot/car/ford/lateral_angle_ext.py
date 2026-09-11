@@ -141,6 +141,9 @@ class LateralAngleExt:
   def __init__(self, CP=None, CP_SP=None):
     # Predicted-curvature blend for path_angle: pred * b + desired * (1-b); b from ``FordPathAngleBlendRatio``
     self.path_angle_blend_ratio = _FORD_PATH_ANGLE_BLEND_RATIO_DEFAULT
+    # Low pass filter values
+    self.b_blend = None  #initialize as None, assign raw value on first cycle then filter
+    self.kappa_gain_filt = None
     # Max extra VLT above t_base; from ``FordVLTExtraMax`` param
     self.vlt_extra_max = _VLT_T_EXTRA_MAX
     # Telemetry: final path_angle (rad) after limits (see bp_card_publisher)
@@ -252,7 +255,7 @@ class LateralAngleExt:
     self._ensure_lateral_curv_initialized(CP)
 
     v_ego = float(CS.out.vEgoRaw)
-    d_ref = pscm_d_ref_m(v_ego)
+    d_ref = pscm_d_ref_m(v_ego)   #deprecated
 
     curvature_rate = 0.0
     path_offset = 0.0
@@ -412,6 +415,7 @@ class LateralAngleExt:
       _kappa_factor = 1.0  # curve deepening ahead: full extra lookahead for gradual entry
     else:
       _kappa_factor = float(interp(abs(desired_curvature), [_VLT_KAPPA_FULL, _VLT_KAPPA_TAPER], [1.0, 0.0]))
+    
     curvature_lookup_time = _t_base + self.vlt_extra_max * _speed_factor * _kappa_factor
     self.bp_curvature_lookup_time = curvature_lookup_time
 
@@ -422,8 +426,9 @@ class LateralAngleExt:
         interp(curvature_lookup_time, ModelConstants.T_IDXS, curvatures)
       )
 
-    b = float(self.path_angle_blend_ratio)
-    b = float(clip(b, 0.0, 1.0))
+    b = float(clip(self.path_angle_blend_ratio, 0.0, 1.0))
+    #fade b to 0 from 55mph to 60mph to transition to no predicted_curvature
+    b = interp(v_ego, [24.59, 26.82], [b, 0.0])
 
     # Exit-biased blend: near the PSCM authority limit or while the planner is actively
     # reducing curvature (exit detected), drop model prediction weight from 60% → ~15%.
@@ -447,9 +452,19 @@ class LateralAngleExt:
     # that same real-world trigger rate on this branch's actual 20Hz cadence; unscaled it fired at
     # 0.04 (1/m)/s, collapsing the model blend on mild straightening instead of genuine exits.
     # Same bug class and fix as _PSCM_SAT_UNWIND_RATE and _soft_roc above.
-    _desired_falling = abs(desired_curvature) < abs(self._desired_curvature_last) - 0.010
+    _desired_falling = (
+      abs(desired_curvature) < abs(self._desired_curvature_last) * 0.80
+    )
     _on_exit_near_limit = not _kappa_entering and (_pscm_lim >= 1 or _in_hard_sat or _desired_falling)
-    b_blend = float(clip(b * 0.25, 0.0, 1.0)) if _on_exit_near_limit else b
+
+    # Low pass filter for b_blend. Prevents instant jumps between .5 and .125 predicted_curvature weight
+    target_b_blend = b * 0.25 if _on_exit_near_limit else b
+    if self.b_blend is None:
+      self.b_blend = target_b_blend
+    else:
+      self.b_blend = 0.70 * self.b_blend + 0.30 * target_b_blend
+    b_blend = float(clip(self.b_blend, 0.0, 1.0))
+    
     requested_curvature = predicted_curvature * b_blend + desired_curvature * (1.0 - b_blend)
     self._desired_curvature_last = desired_curvature
 
@@ -508,12 +523,20 @@ class LateralAngleExt:
 
     # Speed-interpolated gain: at low speed both curves use 1.0; at high speed the params take effect.
     self.low_gain_calc = interp(
-      v_ego, [13.5, 26.82], [1.0, (self.path_angle_gain_lowC_highV * self.user_dampening_factor)]
+      v_ego, [13.41, 26.82], [1.00, (self.path_angle_gain_lowC_highV * self.user_dampening_factor)]
     )
-    self.high_gain_calc = interp(v_ego, [13.5, 26.82], [(1.30 * self.low_speed_curv_factor), (self.path_angle_gain_highC_highV * self.high_speed_curv_factor)])
+    self.high_gain_calc = interp(
+      v_ego, [13.41, 26.82], [(1.30 * self.low_speed_curv_factor), (1.10 * self.path_angle_gain_highC_highV * self.high_speed_curv_factor)]
+    )
 
+    #Low pass filtered kappa_cmd used only for gain calc. Helps dampen oscillations if they start
+    if self.kappa_gain_filt is None:
+      self.kappa_gain_filt = kappa_cmd
+    else:
+      self.kappa_gain_filt = 0.70 * self.kappa_gain_filt + 0.30 * kappa_cmd
+      
     # As the curve gets bigger, we will need a little boost to the signal to to not understeer
-    self.curvature_factor = interp(abs(kappa_cmd), [0.0007, 0.001], [self.low_gain_calc, self.high_gain_calc])
+    self.curvature_factor = interp(abs(self.kappa_gain_filt), [0.0005, 0.002], [self.low_gain_calc, self.high_gain_calc])
 
     path_angle_calc = kappa_cmd * v_ego * self.curvature_factor
     path_angle = path_angle_calc
