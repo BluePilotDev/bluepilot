@@ -155,6 +155,11 @@ sections:
     widget: toggle
     title: '[Visuals] Show Lateral Control Mode'
     description: Display the lateral control mode overlay on the steering wheel icon.
+  - key: BPShowLaneCenterIndicator
+    widget: toggle
+    title: '[Visuals] Show Lane Center Indicator'
+    description: Mark the lane centering target on the driving path, including the in-lane offset and any wheel nudge. Only
+      drawn while lane positioning is enabled for the active control mode.
   - key: mici_complication
     widget: multiple_button
     title: '[Visuals] Lower Right Display (C4)'

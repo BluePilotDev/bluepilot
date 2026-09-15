@@ -87,6 +87,7 @@ class BluePilotLayout(Widget):
       ("ShowBrakeStatus", self._show_brake_status),
       ("BPHideOnroadBorder", self._hide_onroad_border),
       ("BPShowConfidenceBall", self._show_confidence_ball),
+      ("BPShowLaneCenterIndicator", self._show_lane_center_indicator),
       ("BPAnimateSteeringWheel", self._animate_steering_wheel),
       ("BPUseCustomSounds", self._use_custom_sounds),
       ("FordPrefShowRadarLeadOverlay", self._show_ford_radar_overlay),
@@ -194,6 +195,17 @@ class BluePilotLayout(Widget):
       initial_state=self._safe_get_bool(self._params, "BPShowConfidenceBall"),
       callback=lambda state: self._toggle_callback(state, "BPShowConfidenceBall"),
       icon="warning.png"
+    )
+
+    # Lane center indicator: marker (plus nudge shadow) at the lane centering target -- see
+    # selfdrive/ui/bp/onroad/lane_center_indicator.py. Only draws when lane positioning is on for
+    # the active lateral mode, so the toggle is the second half of that condition.
+    self._show_lane_center_indicator = toggle_item(
+      lambda: tr("Show Lane Center Indicator"),
+      lambda: tr("Mark where lane centering is aiming on the path, including the in-lane offset and any wheel-nudge offset. Needs Lane Positioning enabled for the active lateral mode."),
+      initial_state=self._safe_get_bool(self._params, "BPShowLaneCenterIndicator"),
+      callback=lambda state: self._toggle_callback(state, "BPShowLaneCenterIndicator"),
+      icon="monitoring.png"
     )
 
     # Animate steering wheel toggle
@@ -765,6 +777,7 @@ class BluePilotLayout(Widget):
         self._show_blindspot,
         self._show_brake_status,
         self._show_confidence_ball,
+        self._show_lane_center_indicator,
         self._animate_steering_wheel,
         self._wheel_icon_style_btn,
         self._dm_icon_style_btn,
