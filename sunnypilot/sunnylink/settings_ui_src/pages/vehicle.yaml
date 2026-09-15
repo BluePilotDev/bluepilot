@@ -285,6 +285,24 @@ sections:
     - type: param
       key: BlinkerPauseLaneChange
       equals: true
+  - key: enable_nudge_lane_offset
+    widget: toggle
+    title: '[Lateral Tuning] Nudge to Set In-Lane Offset'
+    description: Nudge the wheel while driving straight to shift the lane centering target sideways. The offset is temporary
+      and clears on the next human turn. In angle mode it acts through Lane Positioning, which must also be enabled.
+  - key: nudge_lane_offset_max_pct
+    widget: option
+    title: '[Lateral Tuning] Max Nudge Offset'
+    description: Largest offset a nudge can build, as a percent of the full lane width (line to line). 8% is about 0.30 m
+      in a 3.7 m lane.
+    min: 0.0
+    max: 12.0
+    step: 0.5
+    unit: '%'
+    enablement:
+    - type: param
+      key: enable_nudge_lane_offset
+      equals: true
   # Angle-mode tuning (hidden unless Primary Control Variable = Angle)
   - key: FordLowSpeedFactor_ang
     widget: option

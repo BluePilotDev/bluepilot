@@ -317,6 +317,8 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"enable_lane_positioning_ang", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"custom_path_offset_ang", {PERSISTENT | BACKUP, FLOAT, "0.0"}},
     {"lane_centering_strength_ang", {PERSISTENT | BACKUP, FLOAT, "0.25"}},
+    {"enable_nudge_lane_offset", {PERSISTENT | BACKUP, BOOL, "0"}},
+    {"nudge_lane_offset_max_pct", {PERSISTENT | BACKUP, FLOAT, "8.0"}},
 
     {"disable_BP_lat_UI", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"disable_BP_long_UI", {PERSISTENT | BACKUP, BOOL, "0"}},

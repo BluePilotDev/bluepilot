@@ -184,6 +184,11 @@ class CarController(CarControllerBase, LateralCurvExt, LateralAngleExt, Longitud
         self.curvatureDeviationLimited = getattr(self, 'bp_curvature_deviation_limited', False)
         self.humanTurnLateralPaused = self.angle_human_turn_active if _angle_mode else False
         self.stallBlipActive = self.angle_stall_blip_active if _angle_mode else False
+        # BluePilot: wheel-nudge temporary in-lane offset -- both strategies set bp_nudge_*, so
+        # this is not gated on the mode (see lane_offset_nudge.py).
+        self.nudgeLaneOffsetPercent = getattr(self, 'bp_nudge_offset_pct', 0.0)
+        self.nudgeLaneOffsetMeters = getattr(self, 'bp_nudge_offset_m', 0.0)
+        self.nudgeActive = getattr(getattr(self, 'lane_offset_nudge', None), 'nudging', False)
 
         # BluePilot: angle-mode human-turn override -- send lateral inactive (mode 0) while the
         # driver manually turns, so the PSCM releases cleanly instead of stalling 2-3 s on
