@@ -41,6 +41,15 @@ class LateralLayoutMici(NavScroller):
     )
 
     # --- Always-visible items ---
+    # Wheel-nudge temporary in-lane offset -- applies to whichever lateral mode is active
+    # (opendbc/sunnypilot/car/ford/lane_offset_nudge.py).
+    self.enable_nudge_lane_offset = BigParamControlBP(
+      "Nudge to Set In-Lane Offset", "enable_nudge_lane_offset",
+      toggle_callback=lambda state: self.nudge_lane_offset_max_pct.set_enabled(state),
+    )
+    self.nudge_lane_offset_max_pct = BigParamFloatControl(
+      "Max Nudge Offset (% of lane)", "nudge_lane_offset_max_pct", min=0.0, max=12.0, step=0.5,
+    )
     self.disable_BP_lat = BigParamControlBP("Disable BP Lateral Control", "disable_BP_lat_UI")
     self.disable_lane_change_under_speed = BigParamControlBP(
       "Disable Auto Lane Change Under Speed", "BlinkerPauseLaneChange",
@@ -90,6 +99,8 @@ class LateralLayoutMici(NavScroller):
       self.lane_centering_strength_ang,
       self.disable_lane_change_under_speed,
       self.blinker_min_speed,
+      self.enable_nudge_lane_offset,
+      self.nudge_lane_offset_max_pct,
       self.lane_change_factor_high_curv,
       self.enable_human_turn_detection,
       self.custom_path_offset,
@@ -112,6 +123,7 @@ class LateralLayoutMici(NavScroller):
       ("custom_profile_curv", self.custom_profile),
       ("enable_lane_positioning_ang", self.enable_lane_positioning_ang),
       ("BpShowLateralControl", self.show_lateral_control),
+      ("enable_nudge_lane_offset", self.enable_nudge_lane_offset),
     )
 
     ui_state.add_offroad_transition_callback(self._update_toggles)
@@ -138,6 +150,7 @@ class LateralLayoutMici(NavScroller):
     self.lane_centering_strength_ang.set_visible(is_angle)
     self.lane_centering_strength_ang.set_enabled(lane_pos_ang)
     self.blinker_min_speed.set_enabled(ui_state.params.get_bool("BlinkerPauseLaneChange"))
+    self.nudge_lane_offset_max_pct.set_enabled(ui_state.params.get_bool("enable_nudge_lane_offset"))
     for item in (
       self.lane_change_factor_high_curv,
       self.enable_human_turn_detection,

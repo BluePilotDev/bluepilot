@@ -505,6 +505,7 @@ struct ControllerStateBP @0xcd96dafb67a082d0 {
   bmsShowBrakeStatus @18 :Bool;  # ShowBrakeStatus
   bmsShowConfidenceBall @19 :Bool;  # BPShowConfidenceBall (TICI only)
   bmsAnimateSteeringWheel @20 :Bool;  # BPAnimateSteeringWheel
+  bmsShowLaneCenterIndicator @60 :Bool;  # BPShowLaneCenterIndicator
   bmsWheelIconStyle @21 :UInt8;  # BPSteeringWheelIconStyle: 0=Comma 4, 1=Comma 3x
   bmsShowRadarLeadOverlay @22 :Bool;  # FordPrefShowRadarLeadOverlay
   bmsRadarOverlaySize @23 :UInt8;  # FordPrefRadarOverlaySize: 0=small, 1=medium, 2=large
@@ -552,6 +553,17 @@ struct ControllerStateBP @0xcd96dafb67a082d0 {
   # BluePilot: lateral mode the car controller actually ran this frame (not the param).
   # Only published by Ford BP, so other cars show nothing.
   activeLateralMode @54 :LateralMode;
+
+  # BluePilot: temporary in-lane offset set by nudging the wheel on a straight -- runtime state,
+  # not a setting (see lane_offset_nudge.py). Percent is of the detected lane width, signed
+  # positive = right; meters is that percent against the live lane width, and is what actually
+  # rides on top of the menu offset. nudgeActive marks the frames a nudge is accumulating.
+  nudgeLaneOffsetPercent @55 :Float32;
+  nudgeLaneOffsetMeters @56 :Float32;
+  nudgeActive @57 :Bool;
+  # --- Lateral Tuning (menu settings, see the convention note above) ---
+  bmsEnableNudgeLaneOffset @58 :Bool;  # enable_nudge_lane_offset
+  bmsNudgeLaneOffsetMaxPercent @59 :Float32;  # nudge_lane_offset_max_pct
 
   enum LateralMode {
     openpilot @0;  # BP lateral bypassed (disable_BP_lat_UI)

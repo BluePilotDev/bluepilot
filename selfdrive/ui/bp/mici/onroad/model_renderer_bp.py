@@ -9,10 +9,12 @@ from openpilot.system.ui.lib.shader_polygon import draw_polygon, Gradient
 from openpilot.bluepilot.ui.lib.bp_shaders import draw_rainbow_polygon
 # BluePilot: Rad Racer 8-bit road, shared with the TICI renderer
 from openpilot.selfdrive.ui.bp.onroad.rad_racer_road import RadRacerRoadMixin, RAD_RACER_DASH_LEN_M, RAD_RACER_GAP_LEN_M
+# BluePilot: lane-centering target marker at the bottom of the path
+from openpilot.selfdrive.ui.bp.onroad.lane_center_indicator import LaneCenterIndicatorMixin
 # BluePilot: seasonal theme packs (colors.json overrides for road colors)
 from openpilot.selfdrive.ui.bp.lib import theme_pack
 
-class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
+class ModelRendererBP(LaneCenterIndicatorMixin, RadRacerRoadMixin, ModelRenderer):
   def __init__(self):
     super().__init__()
     self._bp_params = Params()
@@ -24,6 +26,8 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
     self._dash_phase = 0.0
     # BluePilot: seasonal theme pack (None when disabled)
     self._theme_pack = theme_pack.get_active_pack(force=True)
+
+    self._init_lane_center_indicator()
 
   def prepare_projection(self, rect: rl.Rectangle) -> None:
     """Set clip region so _map_to_screen works before render().
@@ -55,6 +59,10 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
       self._dash_phase = (self._dash_phase + max(0.0, sm['carState'].vEgo) / gui_app.target_fps) % period
 
   def _draw_path(self, sm):
+    self._draw_path_ribbon(sm)
+    self._draw_lane_center_indicator(sm)
+
+  def _draw_path_ribbon(self, sm):
     # BluePilot: Rad Racer theme draws the path ribbon in _draw_rad_racer_road
     if self._rad_racer:
       return
@@ -71,6 +79,10 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
         draw_polygon(self._rect, path_pts, gradient=themed_gradient)
     else:
       super()._draw_path(sm)
+
+  def _lc_screen_offset(self) -> tuple[float, float]:
+    """MICI projects rect-relative, so the marker needs the rect origin added back."""
+    return float(self._rect.x), float(self._rect.y)
 
   def _themed_path_gradient(self) -> Gradient | None:
     """Bottom-to-top path gradient from the active theme pack, or None.
