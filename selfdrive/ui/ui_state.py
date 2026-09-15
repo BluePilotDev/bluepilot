@@ -15,6 +15,7 @@ from openpilot.system.hardware import HARDWARE, PC
 
 from openpilot.common.bluepilot import is_bluepilot
 from openpilot.selfdrive.ui.sunnypilot.ui_state import UIStateSP, DeviceSP
+from openpilot.selfdrive.ui.bp.lib.tesla_palette import TeslaAutoPaletteState
 
 BACKLIGHT_OFFROAD = 65 if HARDWARE.get_device_type() == "mici" else 50
 PARAM_UPDATE_TIME = 1 / 5.0
@@ -93,6 +94,8 @@ class UIState(UIStateSP):
     self.is_body: bool | None = None
     self.CP: car.CarParams | None = None
     self.light_sensor: float = -1.0
+    self._tesla_auto_palette = TeslaAutoPaletteState()
+    self.tesla_dark_fraction: float = 0.0
 
     self._params_thread: threading.Thread | None = None
 
@@ -161,6 +164,11 @@ class UIState(UIStateSP):
 
     # Update started state
     self.started = self.sm["deviceState"].started and self.ignition
+    if self.started:
+      self.tesla_dark_fraction = self._tesla_auto_palette.update(self.light_sensor)
+    else:
+      self._tesla_auto_palette.reset()
+      self.tesla_dark_fraction = 0.0
 
     # Update body state
     if self.CP is not None and self.is_body != self.CP.notCar:

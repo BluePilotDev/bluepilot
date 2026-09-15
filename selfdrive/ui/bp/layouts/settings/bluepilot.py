@@ -204,7 +204,7 @@ class BluePilotLayout(Widget):
       icon="chffr_wheel.png"
     )
 
-    # BluePilot: one theme selector for everything (8-Bit Racer + seasonal packs),
+    # BluePilot: one theme selector for everything (code themes + seasonal packs),
     # same entries and param as the MICI page — see theme_pack.selector_entries().
     # A dialog (not a button row) so any number of packs stays inside the item box.
     self._theme_entries = theme_pack.selector_entries()
@@ -213,7 +213,7 @@ class BluePilotLayout(Widget):
     self._theme_action.set_value(lambda: self._get_theme_display())
     self._theme_pack_btn = ListItem(
       lambda: tr("Theme"),
-      description=lambda: tr("8-Bit Racer game view, or a seasonal theme pack (recolors the road and the wheel icon)."),
+      description=lambda: tr("Choose 8-Bit Racer, Tesla, or a seasonal theme pack."),
       action_item=self._theme_action,
       callback=self._select_theme,
     )
@@ -1077,6 +1077,7 @@ class BluePilotLayout(Widget):
     stored = self._safe_get(self._params, theme_pack.PARAM_KEY) or ""
     if isinstance(stored, bytes):
       stored = stored.decode("utf-8", errors="replace")
+    stored = theme_pack.normalize_selector_value(stored)
     return next((label for label, v in self._theme_entries if v and v.lower() == stored.lower()), tr("Off"))
 
   def _select_theme(self):

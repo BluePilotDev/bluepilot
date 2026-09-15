@@ -1,4 +1,3 @@
-import time
 import pyray as rl
 from cereal import car
 from openpilot.common.filter_simple import FirstOrderFilter
@@ -10,15 +9,18 @@ from openpilot.selfdrive.ui.bp.mici.onroad.cameraview_bp import MiciCameraViewBP
 from openpilot.selfdrive.ui.bp.mici.onroad.model_renderer_bp import ModelRendererBP
 from openpilot.selfdrive.ui.bp.onroad.blindspot_renderer import BlindspotRendererMixin
 from openpilot.selfdrive.ui.bp.mici.onroad.hud_renderer_bp import MiciHudRendererBP
+from openpilot.selfdrive.ui.bp.mici.onroad.alert_renderer_bp import AlertRendererBP
 from openpilot.selfdrive.ui.bp.onroad.driver_state_bp import DriverStateRendererBP
 from openpilot.selfdrive.ui.bp.lib.dm_icon_style import DMIconStyle
 from openpilot.selfdrive.ui.bp.mici.onroad.complication import MiciComplication
 from openpilot.selfdrive.ui.bp.mici.onroad.confidence_ball_bp import ConfidenceBallMiciBP
 from openpilot.selfdrive.ui.ui_state import ui_state, UIStatus
+from openpilot.selfdrive.ui.bp.lib.tesla_status import tesla_mads_active
 from openpilot.selfdrive.ui.bp.lib.ui_debug_logger import bp_ui_log
 # BluePilot: swipe-down shortcut to lateral debug screen
 from openpilot.selfdrive.ui.bp.mici.onroad.lateral_debug_mici import LateralDebugMici
 from openpilot.selfdrive.ui.bp.mici.onroad.rad_racer_mici import RadRacerThemeMici
+from openpilot.selfdrive.ui.bp.onroad.tesla_style_renderer_bp import TeslaStyleRendererBP
 from openpilot.system.ui.widgets import Widget
 # BluePilot: unified theme selector (BPThemePack param)
 from openpilot.selfdrive.ui.bp.lib import theme_pack, theme_scene
@@ -80,6 +82,7 @@ class MiciAugmentedRoadViewBP(MiciCameraViewBP, AugmentedRoadView, BlindspotRend
 
     # BluePilot: Replace HUD renderer with BP version (brake coloring + powerflow)
     self._hud_renderer = MiciHudRendererBP()
+    self._alert_renderer = AlertRendererBP()
     self._driver_state_renderer = DriverStateRendererBP(DMIconStyle.COMMA_4)
 
     # BluePilot: Replace confidence ball with BP version on the left (MADS beam + enhanced coloring)
@@ -94,6 +97,20 @@ class MiciAugmentedRoadViewBP(MiciCameraViewBP, AugmentedRoadView, BlindspotRend
 
     # BluePilot: Rad Racer 8-bit theme (MICI-scaled; no gauge cluster on the small screen)
     self._rad_racer_theme = RadRacerThemeMici()
+
+    # BluePilot: MICI uses the shared display-only environment renderer with a
+    # content-relative projection. Keep the compact stock lead/radar UI instead
+    # of layering Tesla actor silhouettes onto the comma 4's smaller canvas.
+    self._tesla_style_renderer = TeslaStyleRendererBP(
+      relative_projection=True,
+      show_lead_vehicle=False,
+      dark_fraction=ui_state.tesla_dark_fraction,
+    )
+    self._tesla_style_enabled = theme_pack.tesla_active(self._bp_params)
+    self._tesla_style_renderer.set_enabled(self._tesla_style_enabled)
+    self._show_confidence_ball = self._bp_params.get_bool("BPShowConfidenceBall")
+
+    self._theme_param_counter = 0
 
   def _on_swipe_down(self):
     if not ui_state.is_onroad():
@@ -119,7 +136,6 @@ class MiciAugmentedRoadViewBP(MiciCameraViewBP, AugmentedRoadView, BlindspotRend
   def _render(self, _):
     """Override render to place confidence ball on left, offset driver state, and conditionally hide border."""
     bp_ui_log.tick()  # refresh BPUIDebugLog enabled state (mirrors TICI; MICI had no tick, so the toggle was inert)
-    start_draw = time.monotonic()
     self._switch_stream_if_needed(ui_state.sm)
     self._update_calibration()
 
@@ -141,12 +157,32 @@ class MiciAugmentedRoadViewBP(MiciCameraViewBP, AugmentedRoadView, BlindspotRend
       int(self._content_rect.height)
     )
 
-    # Render the base camera view. Minimal Driving View suppression lives in MiciCameraViewBP.
-    MiciCameraViewBP._render(self, self._content_rect)
+    # Keep the code-theme selector responsive without per-frame Params I/O.
+    self._theme_param_counter += 1
+    if self._theme_param_counter >= 60:
+      self._theme_param_counter = 0
+      self._tesla_style_enabled = theme_pack.tesla_active(self._bp_params)
+      self._tesla_style_renderer.set_enabled(self._tesla_style_enabled)
+      self._show_confidence_ball = self._bp_params.get_bool("BPShowConfidenceBall")
+
+    self._tesla_style_renderer.set_dark_fraction(ui_state.tesla_dark_fraction)
+    self._model_renderer.set_tesla_style(self._tesla_style_enabled, ui_state.tesla_dark_fraction)
+    self._alert_renderer.set_tesla_style(self._tesla_style_enabled, ui_state.tesla_dark_fraction)
+
+    # BluePilot: Tesla-style mode owns only the environment layer. The normal
+    # camera and all existing scene modes remain untouched when the flag is off.
+    if self._tesla_style_enabled:
+      # CameraView normally initializes the car-space projection as part of its
+      # render pass. Tesla mode intentionally skips that pass, so initialize the
+      # same cached transform explicitly before projecting road geometry/tracks.
+      self._calc_frame_matrix(self._content_rect)
+      self._tesla_style_renderer.render_background(self._content_rect, self._model_renderer)
+    else:
+      MiciCameraViewBP._render(self, self._content_rect)
 
     # BluePilot: unified theme scene dispatch — Rad Racer draws inline on MICI (no full
     # takeover: the normal HUD stays); pack scenes get background + foreground passes.
-    _scene = theme_scene.active_scene()
+    _scene = None if self._tesla_style_enabled else theme_scene.active_scene()
     _rad_racer = _scene is not None and _scene.replaces_hud()
     if _rad_racer:
       self._model_renderer.prepare_projection(self._content_rect)
@@ -157,6 +193,8 @@ class MiciAugmentedRoadViewBP(MiciCameraViewBP, AugmentedRoadView, BlindspotRend
     # Model overlays
     self._model_renderer.render(self._content_rect)
 
+    if self._tesla_style_enabled:
+      self._tesla_style_renderer.render_traffic(self._content_rect, self._model_renderer)
     # BluePilot: Rad Racer sprites (ego + leads) over the road; no gauge cluster on MICI,
     # so the ego car anchors to the bottom edge of the content rect instead.
     if _rad_racer:
@@ -210,6 +248,12 @@ class MiciAugmentedRoadViewBP(MiciCameraViewBP, AugmentedRoadView, BlindspotRend
       self._content_rect.y,
       SIDE_PANEL_WIDTH,
       self._content_rect.height,
+    )
+    self._confidence_ball.set_tesla_status(
+      self._tesla_style_enabled,
+      self._show_confidence_ball,
+      tesla_mads_active(ui_state.sm),
+      ui_state.tesla_dark_fraction,
     )
     self._confidence_ball.render(ball_rect)
 

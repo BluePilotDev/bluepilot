@@ -3,8 +3,14 @@ import pyray as rl
 from cereal import log
 
 from openpilot.selfdrive.ui.onroad.alert_renderer import AlertRenderer, ALERT_PADDING
-from openpilot.system.ui.lib.application import gui_app
+from openpilot.system.ui.lib.application import gui_app, FontWeight
 from openpilot.system.ui.lib.text_measure import measure_text_cached
+from openpilot.system.ui.lib.wrap_text import wrap_text
+from openpilot.selfdrive.ui.bp.lib.tesla_alerts import (
+  draw_tesla_alert_glyph,
+  tesla_alert_colors,
+  tesla_alert_panel_rect,
+)
 from openpilot.selfdrive.ui.bp.lib.ui_debug_logger import bp_ui_log
 
 AlertSize = log.SelfdriveState.AlertSize
@@ -28,6 +34,16 @@ PILL_BACKGROUND_COLOR = rl.Color(45, 45, 45, 255)
 class AlertRendererBP(AlertRenderer):
   """BluePilot AlertRenderer with pill-shaped notifications below speed display."""
 
+  def __init__(self):
+    super().__init__()
+    self._tesla_style = False
+    self._tesla_dark_fraction = 0.0
+    self._tesla_font_medium = gui_app.font(FontWeight.MEDIUM)
+
+  def set_tesla_style(self, enabled: bool, dark_fraction: float) -> None:
+    self._tesla_style = bool(enabled)
+    self._tesla_dark_fraction = float(dark_fraction)
+
   def _render(self, rect: rl.Rectangle):
     from openpilot.selfdrive.ui.ui_state import ui_state
     alert = self.get_alert(ui_state.sm)
@@ -43,6 +59,10 @@ class AlertRendererBP(AlertRenderer):
       ui_state.onroad_brightness_handle_alerts(ui_state, alert)
 
     if not alert:
+      return
+
+    if self._tesla_style:
+      self._draw_tesla_alert(rect, alert)
       return
 
     is_informational = (alert.status == AlertStatus.normal and alert.size != AlertSize.full)
@@ -67,6 +87,65 @@ class AlertRendererBP(AlertRenderer):
         alert_rect.height - 2 * ALERT_PADDING
       )
       self._draw_text(text_rect, alert)
+
+  def _draw_tesla_alert(self, rect: rl.Rectangle, alert) -> None:
+    panel = tesla_alert_panel_rect(rect, alert.size)
+    colors = tesla_alert_colors(alert.status, self._tesla_dark_fraction)
+    if alert.size == AlertSize.full:
+      rl.draw_rectangle_rec(panel, colors.background)
+    else:
+      shadow_rect = rl.Rectangle(panel.x + 6, panel.y + 7, panel.width, panel.height)
+      rl.draw_rectangle_rounded(shadow_rect, 0.20, 10, rl.Color(0, 0, 0, 48))
+      rl.draw_rectangle_rounded(panel, 0.20, 10, colors.background)
+      border = rl.Color(colors.accent.r, colors.accent.g, colors.accent.b, 105)
+      rl.draw_rectangle_rounded_lines_ex(panel, 0.20, 10, 2.0, border)
+
+    if alert.size == AlertSize.small:
+      text_rect = rl.Rectangle(panel.x + 42, panel.y + 18, panel.width - 84, panel.height - 36)
+      self._draw_tesla_text_block(text_rect, alert, 56, 42, colors)
+      return
+
+    if alert.size == AlertSize.mid:
+      glyph_center = rl.Vector2(panel.x + panel.width / 2.0, panel.y + 74)
+      draw_tesla_alert_glyph(glyph_center, 38, alert.status, self._tesla_dark_fraction)
+      text_rect = rl.Rectangle(panel.x + 60, panel.y + 124, panel.width - 120, panel.height - 142)
+      self._draw_tesla_text_block(text_rect, alert, 64, 46, colors)
+      return
+
+    glyph_center = rl.Vector2(panel.x + panel.width / 2.0, panel.y + panel.height * 0.33)
+    draw_tesla_alert_glyph(glyph_center, 58, alert.status, self._tesla_dark_fraction)
+    text_rect = rl.Rectangle(
+      panel.x + 150, panel.y + panel.height * 0.42,
+      panel.width - 300, panel.height * 0.30,
+    )
+    self._draw_tesla_text_block(text_rect, alert, 78, 52, colors)
+
+  def _draw_tesla_text_block(self, rect: rl.Rectangle, alert, title_size: int,
+                              subtitle_size: int, colors) -> None:
+    title_color = colors.accent if alert.status != AlertStatus.normal else colors.text
+    title_lines = wrap_text(self._tesla_font_medium, alert.text1 or "", title_size, int(rect.width))
+    subtitle_lines = wrap_text(self.font_regular, alert.text2 or "", subtitle_size, int(rect.width))
+    title_height = measure_text_cached(self._tesla_font_medium, "Ag", title_size).y
+    subtitle_height = measure_text_cached(self.font_regular, "Ag", subtitle_size).y
+    gap = 18.0 if title_lines and subtitle_lines else 0.0
+    total_height = len(title_lines) * title_height + gap + len(subtitle_lines) * subtitle_height
+    current_y = rect.y + max(0.0, (rect.height - total_height) / 2.0)
+
+    for line in title_lines:
+      self._draw_tesla_centered_line(line, rect.x, current_y, rect.width,
+                                     self._tesla_font_medium, title_size, title_color)
+      current_y += title_height
+    current_y += gap
+    for line in subtitle_lines:
+      self._draw_tesla_centered_line(line, rect.x, current_y, rect.width,
+                                     self.font_regular, subtitle_size, colors.secondary)
+      current_y += subtitle_height
+
+  @staticmethod
+  def _draw_tesla_centered_line(text: str, x: float, y: float, width: float,
+                                 font: rl.Font, font_size: int, color: rl.Color) -> None:
+    text_width = measure_text_cached(font, text, font_size).x
+    rl.draw_text_ex(font, text, rl.Vector2(x + (width - text_width) / 2.0, y), font_size, 0, color)
 
   def _get_pill_rect(self, rect: rl.Rectangle, alert) -> Optional[rl.Rectangle]:
     """Calculate pill-shaped notification rectangle at bottom of display, centered."""

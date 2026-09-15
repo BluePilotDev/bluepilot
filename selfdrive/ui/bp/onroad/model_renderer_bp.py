@@ -10,6 +10,18 @@ from openpilot.system.ui.lib.shader_polygon import draw_polygon, Gradient
 # BluePilot: Rainbow shader moved to BP module after upstream removal
 from openpilot.bluepilot.ui.lib.bp_shaders import draw_rainbow_polygon
 from openpilot.selfdrive.ui.bp.lib.ui_debug_logger import bp_ui_log
+from openpilot.selfdrive.ui.bp.lib.longitudinal_visuals import (
+  approach_tesla_geometry_alpha,
+  advance_tesla_blue_phase,
+  legacy_rainbow_cycle_rate,
+  longitudinal_control_active,
+  rainbow_cycle_rate,
+  tesla_geometry_reliable,
+  tesla_path_mode,
+)
+from openpilot.selfdrive.ui.bp.lib.blindspot_visuals import tesla_blindspot_lane_active
+from openpilot.selfdrive.ui.bp.lib.lane_change_visuals import tesla_lane_change_lane_active
+from openpilot.selfdrive.ui.bp.lib.tesla_palette import palette_for_dark_fraction, tesla_path_gradient_colors
 # BluePilot: seasonal theme packs (colors.json overrides for road colors)
 from openpilot.selfdrive.ui.bp.lib import theme_pack
 
@@ -38,9 +50,31 @@ MINIMAL_VIEW_NEUTRAL_LANE_COLOR = rl.Color(185, 205, 225, 255)
 # BluePilot: Rad Racer 8-bit theme road styling
 # BluePilot: Rad Racer road constants + drawing methods moved to rad_racer_road.py so the
 # comma four (MICI) renderer can share them; values unchanged.
-from openpilot.selfdrive.ui.bp.onroad.rad_racer_road import (  # noqa: E402
+from openpilot.selfdrive.ui.bp.onroad.rad_racer_road import (
   RadRacerRoadMixin, RAD_RACER_ROAD_EDGE_WIDTH, RAD_RACER_DASH_LEN_M, RAD_RACER_GAP_LEN_M,
 )
+
+
+def lead_values_indicate_handoff(previous_values: tuple[float, float, float] | None,
+                                 current_values: tuple[float, float, float],
+                                 previous_track_id: int, current_track_id: int) -> bool:
+  """Detect a fused leadOne identity change without reacting to ordinary radar jitter."""
+  if previous_values is None:
+    return False
+
+  previous_radar = previous_track_id >= 0
+  current_radar = current_track_id >= 0
+  if previous_radar and current_radar and previous_track_id != current_track_id:
+    return True
+
+  d_jump = abs(current_values[0] - previous_values[0])
+  y_jump = abs(current_values[1] - previous_values[1])
+  v_jump = abs(current_values[2] - previous_values[2])
+
+  # A fused lead cannot physically move this far between 20 Hz radarState
+  # updates. Treat any one-axis discontinuity as an unreliable/new target so a
+  # visible actor fades away instead of following a noisy vision depth jump.
+  return d_jump > 6.0 or y_jump > 0.65 or v_jump > 3.0
 
 
 class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
@@ -49,7 +83,9 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
   def __init__(self):
     super().__init__()
     self._bp_params = Params()
-    self._rainbow_v = 1.0
+    self._rainbow_v = 0.0
+    self._tesla_blue_phase = 0.0
+    self._tesla_path_visibility = 0.0
 
     # BluePilot: Replace SP chevron metrics with BP version (horizontal boxed layout)
     self.chevron_metrics = ChevronMetricsBP()
@@ -69,6 +105,8 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
     self._disable_lane_line_status_color = self._bp_params.get_bool("BPDisableLaneLineStatusColor")
     self._hide_camera_view = self._bp_params.get_bool("BPHideCameraView")
     self._rainbow_lane_lines = self._bp_params.get_bool("BPRainbowLines")
+    self._tesla_style = theme_pack.tesla_active(self._bp_params)
+    self._tesla_dark_fraction = ui_state.tesla_dark_fraction
     # BluePilot: Rad Racer 8-bit theme (green game road, dash scroll animation state)
     self._rad_racer = theme_pack.rad_racer_active(self._bp_params)
     self._dash_phase = 0.0
@@ -85,6 +123,9 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
     self._lead_v_filters = [FirstOrderFilter(0, 0.3, dt, initialized=False),
                             FirstOrderFilter(0, 0.3, dt, initialized=False)]
     self._lead_was_active = [False, False]
+    self._lead_track_ids = [-1, -1]
+    self._lead_raw_values: list[tuple[float, float, float] | None] = [None, None]
+    self._lead_generations = [0, 0]
 
   def prepare_projection(self, rect: rl.Rectangle) -> None:
     """Set clip region so _map_to_screen works before render().
@@ -96,12 +137,25 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
       rect.x - CLIP_MARGIN, rect.y - CLIP_MARGIN, rect.width + 2 * CLIP_MARGIN, rect.height + 2 * CLIP_MARGIN
     )
 
+  def set_tesla_style(self, enabled: bool, dark_fraction: float = 0.0) -> None:
+    if enabled != self._tesla_style:
+      self._transform_dirty = True
+      self._tesla_path_visibility = 0.0
+    if enabled and not self._tesla_style:
+      self._lead_was_active = [False, False]
+      self._lead_track_ids = [-1, -1]
+      self._lead_raw_values = [None, None]
+    self._tesla_style = enabled
+    self._tesla_dark_fraction = dark_fraction
+
   def _refresh_bp_params(self) -> None:
     """Refresh cached BluePilot params and invalidate model geometry when visual widths change."""
     hide_camera_view = self._bp_params.get_bool("BPHideCameraView")
     if hide_camera_view != self._hide_camera_view:
       self._transform_dirty = True
     self._hide_camera_view = hide_camera_view
+
+    self.set_tesla_style(theme_pack.tesla_active(self._bp_params), ui_state.tesla_dark_fraction)
 
     rad_racer = theme_pack.rad_racer_active(self._bp_params)
     if rad_racer != self._rad_racer:
@@ -118,13 +172,22 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
 
   def _render(self, rect: rl.Rectangle):
     sm = ui_state.sm
+    self._tesla_dark_fraction = ui_state.tesla_dark_fraction
 
-    if ui_state.rainbow_path or self._rainbow_lane_lines:
-      self._rainbow_v = np.clip(sm['carState'].vEgo, 2.5, 35) / 30
+    if self._tesla_style:
+      self._rainbow_v = rainbow_cycle_rate(sm)
+      self._tesla_blue_phase = advance_tesla_blue_phase(
+        self._tesla_blue_phase, self._rainbow_v, gui_app.target_fps,
+      )
+    elif ui_state.rainbow_path or self._rainbow_lane_lines:
+      self._rainbow_v = legacy_rainbow_cycle_rate(sm)
 
     if (sm.recv_frame["liveCalibration"] < ui_state.started_frame or
         sm.recv_frame["modelV2"] < ui_state.started_frame):
-      bp_ui_log.visibility("ModelRenderer", False, reason=f"stale calib={sm.recv_frame['liveCalibration']} model={sm.recv_frame['modelV2']} started={ui_state.started_frame}")
+      calib_frame = sm.recv_frame["liveCalibration"]
+      model_frame = sm.recv_frame["modelV2"]
+      reason = f"stale calib={calib_frame} model={model_frame} started={ui_state.started_frame}"
+      bp_ui_log.visibility("ModelRenderer", False, reason=reason)
       return
 
     bp_ui_log.state("ModelRenderer", "render_active", True)
@@ -154,12 +217,20 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
       self._longitudinal_control = sm['carParams'].openpilotLongitudinalControl
 
     model = sm['modelV2']
-    radar_state = sm['radarState'] if sm.valid['radarState'] else None
+    radar_state = sm['radarState'] if sm.alive['radarState'] and sm.valid['radarState'] else None
     lead_one = radar_state.leadOne if radar_state else None
+    if radar_state is None:
+      self._lead_was_active = [False, False]
+      self._lead_track_ids = [-1, -1]
+      self._lead_raw_values = [None, None]
+      self._lead_vehicles = [LeadVehicle(), LeadVehicle()]
 
-    # BluePilot: Ford radar overlay feature - show leads even without longitudinal control
-    render_lead_indicator = (self._longitudinal_control or self.ford_overlay_enabled) and radar_state is not None
-    bp_ui_log.state("ModelRenderer", "render_lead", render_lead_indicator)
+    # BluePilot: Ford radar overlay and Tesla's single fused actor both reuse
+    # the existing filtered lead geometry even without openpilot longitudinal.
+    prepare_lead_visuals = (
+      self._longitudinal_control or self.ford_overlay_enabled or self._tesla_style
+    ) and radar_state is not None
+    bp_ui_log.state("ModelRenderer", "render_lead", prepare_lead_visuals)
 
     model_updated = sm.updated['modelV2']
     if model_updated or sm.updated['radarState'] or self._transform_dirty:
@@ -171,7 +242,7 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
         return
 
       self._update_model(lead_one, path_x_array)
-      if render_lead_indicator:
+      if prepare_lead_visuals:
         self._update_leads(radar_state, path_x_array)
         # BluePilot: Track radar vs vision status for lead coloring
         self._update_lead_radar_status(radar_state)
@@ -188,13 +259,27 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
     self._draw_path(sm)
 
     # BluePilot: In Rad Racer theme, leads are drawn as sprites by RadRacerTheme
-    if render_lead_indicator and radar_state and not self._rad_racer:
+    if prepare_lead_visuals and radar_state and not self._rad_racer and not self._tesla_style:
       self._draw_lead_indicator()
       # BluePilot: Pass radar/overlay state to BP chevron metrics for boxed layout
       self.chevron_metrics.ford_overlay_enabled = self.ford_overlay_enabled
       self.chevron_metrics.lead_is_radar = self._lead_is_radar
       self.chevron_metrics.overlay_scale = self._overlay_scale
       self.chevron_metrics.draw_lead_status(sm, radar_state, self._rect, self._lead_vehicles)
+
+  def smoothed_primary_lead(self) -> tuple[float, float, float] | None:
+    """Return BluePilot's filtered leadOne state while that fused lead is active."""
+    if not self._lead_was_active[0]:
+      return None
+    return (
+      float(self._lead_d_filters[0].x),
+      float(self._lead_y_filters[0].x),
+      float(self._lead_v_filters[0].x),
+    )
+
+  def primary_lead_generation(self) -> int:
+    """Return a token that changes whenever leadOne becomes a different vehicle."""
+    return self._lead_generations[0]
 
   def _update_lead_radar_status(self, radar_state):
     """Track whether each lead is radar-sourced for coloring."""
@@ -213,13 +298,26 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
     dt = 1 / gui_app.target_fps
     for i, lead_data in enumerate(leads):
       if lead_data and lead_data.status:
+        values = np.asarray((lead_data.dRel, lead_data.yRel, lead_data.vRel), dtype=np.float64)
+        if not np.all(np.isfinite(values)) or values[0] <= 0.0:
+          self._lead_was_active[i] = False
+          self._lead_track_ids[i] = -1
+          self._lead_raw_values[i] = None
+          continue
+
+        track_id = int(getattr(lead_data, 'radarTrackId', -1))
+        current_values = (float(values[0]), float(values[1]), float(values[2]))
+        lead_changed = lead_values_indicate_handoff(
+          self._lead_raw_values[i], current_values, self._lead_track_ids[i], track_id,
+        )
         # Reset filters when a lead first appears so we don't lerp from stale data
-        if not self._lead_was_active[i]:
+        if not self._lead_was_active[i] or lead_changed:
           self._lead_d_filters[i] = FirstOrderFilter(lead_data.dRel, 0.4, dt)
           self._lead_y_filters[i] = FirstOrderFilter(lead_data.yRel, 0.5, dt)
           self._lead_v_filters[i] = FirstOrderFilter(lead_data.vRel, 0.3, dt)
+          self._lead_generations[i] += 1
 
-        # Smooth the raw radar values
+        # Smooth radarState's fused lead values.
         d_rel = self._lead_d_filters[i].update(lead_data.dRel)
         y_rel = self._lead_y_filters[i].update(lead_data.yRel)
         v_rel = self._lead_v_filters[i].update(lead_data.vRel)
@@ -231,8 +329,12 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
           self._lead_vehicles[i] = self._update_lead_vehicle(d_rel, v_rel, point, self._rect)
 
         self._lead_was_active[i] = True
+        self._lead_track_ids[i] = track_id
+        self._lead_raw_values[i] = current_values
       else:
         self._lead_was_active[i] = False
+        self._lead_track_ids[i] = -1
+        self._lead_raw_values[i] = None
 
   def _update_lead_vehicle(self, d_rel, v_rel, point, rect):
     """Override to apply overlay size scale factor to chevron geometry."""
@@ -269,7 +371,7 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
     for i, lane_line in enumerate(self._lane_lines):
       is_current_lane = (i == 1 or i == 2)
       lane_line_width = LANE_LINE_WIDTH
-      if self._hide_camera_view or self._rad_racer or self._theme_pack is not None:
+      if self._hide_camera_view or self._rad_racer or self._theme_pack is not None or self._tesla_style:
         lane_line_width = MINIMAL_VIEW_LANE_LINE_WIDTH if is_current_lane else MINIMAL_VIEW_OUTER_LANE_LINE_WIDTH
       lane_line.projected_points = self._map_line_to_polygon(
         lane_line.raw_points, lane_line_width * self._lane_line_probs[i], 0.0, max_idx, max_distance
@@ -278,7 +380,7 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
     # BluePilot: Rad Racer solid outer lines are thicker than minimal view
     if self._rad_racer:
       road_edge_width = RAD_RACER_ROAD_EDGE_WIDTH
-    elif self._hide_camera_view or self._theme_pack is not None:
+    elif self._hide_camera_view or self._theme_pack is not None or self._tesla_style:
       road_edge_width = MINIMAL_VIEW_ROAD_EDGE_WIDTH
     else:
       road_edge_width = ROAD_EDGE_WIDTH
@@ -325,11 +427,53 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
 
   def _draw_lane_lines(self):
     """Draw lane lines with enhanced rendering and glow effects."""
+    if self._tesla_style:
+      self._draw_tesla_lane_lines()
+      return
     # BluePilot: Rad Racer theme replaces all road rendering with green game lines
     if self._rad_racer:
       self._draw_rad_racer_road()
       return
     self._draw_enhanced_lane_lines()
+
+  def _draw_tesla_lane_lines(self):
+    """Draw quiet, confidence-weighted geometry for the gray environment view."""
+    palette = palette_for_dark_fraction(self._tesla_dark_fraction)
+    for i, lane_line in enumerate(self._lane_lines):
+      blindspot_active = tesla_blindspot_lane_active(ui_state.sm, i)
+      lane_change_active = tesla_lane_change_lane_active(ui_state.sm, i)
+      if (lane_line.projected_points.size == 0 or
+          (not blindspot_active and not lane_change_active and self._lane_line_probs[i] < 0.25)):
+        continue
+      if blindspot_active:
+        glow = self._expand_polygon(lane_line.projected_points, 4.0)
+        if glow.size:
+          draw_polygon(self._rect, glow, rl.Color(palette.blindspot.r, palette.blindspot.g, palette.blindspot.b, 70))
+        draw_polygon(self._rect, lane_line.projected_points, palette.blindspot)
+      elif lane_change_active:
+        glow = self._expand_polygon(lane_line.projected_points, 7.0)
+        if glow.size:
+          draw_polygon(
+            self._rect, glow,
+            rl.Color(palette.lane_change.r, palette.lane_change.g, palette.lane_change.b, 58),
+          )
+        draw_polygon(self._rect, lane_line.projected_points, palette.lane_change)
+      else:
+        is_current_lane = i in (1, 2)
+        base = palette.lane_inner if is_current_lane else palette.lane_outer
+        confidence = float(np.clip(self._lane_line_probs[i], 0.20, 1.0))
+        draw_polygon(self._rect, lane_line.projected_points,
+                     rl.Color(base.r, base.g, base.b, int(base.a * confidence)))
+
+    for i, road_edge in enumerate(self._road_edges):
+      if road_edge.projected_points.size == 0:
+        continue
+      confidence = float(np.clip(1.0 - self._road_edge_stds[i], 0.0, 1.0))
+      if confidence < 0.18:
+        continue
+      draw_polygon(self._rect, road_edge.projected_points,
+                   rl.Color(palette.road_edge.r, palette.road_edge.g,
+                            palette.road_edge.b, int(palette.road_edge.a * confidence)))
 
   # BluePilot: _rad_racer_road_color / _draw_rad_racer_road / _draw_curbed_line /
   # _draw_road_ribbon_quad / _draw_dashed_line moved verbatim to RadRacerRoadMixin
@@ -430,10 +574,7 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
     if not self._rainbow_lane_lines or self._disable_lane_line_status_color:
       return False
 
-    if sm.valid.get('carControl', False) and sm['carControl'].longActive:
-      return True
-
-    return ui_state.status in (UIStatus.ENGAGED, UIStatus.LONG_ONLY)
+    return longitudinal_control_active(sm, ui_state.status)
 
   def _draw_road_edge_glow_effects(self):
     """Draw single glow layer around road edges.
@@ -511,6 +652,42 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
 
   def _draw_path(self, sm):
     """Draw path with status-colored edges."""
+    if self._tesla_style:
+      palette = palette_for_dark_fraction(self._tesla_dark_fraction)
+      if not self._path.projected_points.size:
+        return
+      self._tesla_path_visibility = approach_tesla_geometry_alpha(
+        self._tesla_path_visibility,
+        tesla_geometry_reliable(self._path.raw_points, sm),
+        gui_app.target_fps,
+      )
+      if self._tesla_path_visibility <= 0.01:
+        return
+      mode = tesla_path_mode(
+        ui_state.rainbow_path,
+        longitudinal_control_active(sm, ui_state.status),
+      )
+      if mode == "rainbow":
+        draw_rainbow_polygon(
+          self._rect,
+          self._path.projected_points,
+          rainbow_v=self._rainbow_v,
+          alpha=0.6 * self._tesla_path_visibility,
+        )
+      else:
+        phase = self._tesla_blue_phase if mode == "blue_cycle" else None
+        colors = tesla_path_gradient_colors(palette, phase, self._tesla_path_visibility)
+        draw_polygon(
+          self._rect,
+          self._path.projected_points,
+          gradient=Gradient(
+            start=(0.0, 1.0),
+            end=(0.0, 0.0),
+            colors=colors,
+            stops=[0.0, 0.32, 0.68, 1.0] if phase is not None else [0.0, 0.55, 1.0],
+          ),
+        )
+      return
     # BluePilot: Rad Racer theme draws the path as a dashed center line in _draw_rad_racer_road
     if self._rad_racer:
       return

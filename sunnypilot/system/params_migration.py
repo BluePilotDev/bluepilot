@@ -93,6 +93,16 @@ def _migrate_bp_lateral_scheme_params(_params):
     cloudlog.exception(f"Error migrating BP lateral scheme params: {e}")
 
 
+def _migrate_bp_tesla_theme(_params):
+  """Retire the separate Tesla Dark selector without disabling existing devices."""
+  value = _params.get("BPThemePack")
+  if isinstance(value, bytes):
+    value = value.decode("utf-8", errors="replace")
+  if isinstance(value, str) and value.strip().lower() == "tesla_dark":
+    _params.put("BPThemePack", "tesla", block=True)
+    cloudlog.info("params_migration: merged Tesla Dark into automatic Tesla theme")
+
+
 def run_migration(_params):
   # migrate OnroadScreenOffBrightness
   if _params.get("OnroadScreenOffBrightnessMigrated") != ONROAD_BRIGHTNESS_MIGRATION_VERSION:
@@ -129,3 +139,6 @@ def run_migration(_params):
 
   # BluePilot: split lateral-tuning params by control scheme (curvature vs angle)
   _migrate_bp_lateral_scheme_params(_params)
+
+  # BluePilot: Tesla now selects Light/Dark automatically from camera exposure.
+  _migrate_bp_tesla_theme(_params)
