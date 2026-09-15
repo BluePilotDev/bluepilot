@@ -94,6 +94,7 @@ build/
 
 # agents
 .claude/
+AGENT_INFO/
 .context/
 PLAN.md
 TASK.md

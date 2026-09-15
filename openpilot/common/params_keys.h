@@ -295,4 +295,27 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"TorqueParamsOverrideEnabled", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"TorqueParamsOverrideFriction", {PERSISTENT | BACKUP, FLOAT, "0.1"}},
     {"TorqueParamsOverrideLatAccelFactor", {PERSISTENT | BACKUP, FLOAT, "2.5"}},
+
+    // BluePilot Ford lateral control (proof of concept; no UI yet)
+    {"FordPrefLateralControl", {PERSISTENT | BACKUP, INT, "0"}},
+    {"FordPrefSteerAngleCurvature", {PERSISTENT | BACKUP, BOOL, "0"}},
+    {"disable_BP_lat_UI", {PERSISTENT | BACKUP, BOOL, "0"}},
+    // curvature-primary mode
+    {"enable_human_turn_detection_curv", {PERSISTENT | BACKUP, BOOL, "1"}},
+    {"lane_change_factor_high_curv", {PERSISTENT | BACKUP, FLOAT, "0.85"}},
+    {"pc_blend_ratio_high_C_UI_curv", {PERSISTENT | BACKUP, FLOAT, "0.4"}},
+    {"pc_blend_ratio_low_C_UI_curv", {PERSISTENT | BACKUP, FLOAT, "0.4"}},
+    {"enable_lane_positioning_curv", {PERSISTENT | BACKUP, BOOL, "0"}},
+    {"custom_path_offset_curv", {PERSISTENT | BACKUP, FLOAT, "0.0"}},
+    {"enable_lane_full_mode_curv", {PERSISTENT | BACKUP, BOOL, "0"}},
+    {"custom_profile_curv", {PERSISTENT | BACKUP, INT, "0"}},
+    {"LC_PID_gain_UI_curv", {PERSISTENT | BACKUP, FLOAT, "3.0"}},
+    // angle-primary mode
+    {"FordLowSpeedFactor_ang", {PERSISTENT | BACKUP, FLOAT, "1.0"}},
+    {"FordHighSpeedFactor_ang", {PERSISTENT | BACKUP, FLOAT, "1.0"}},
+    {"FordHighSpeedDampening_ang", {PERSISTENT | BACKUP, FLOAT, "1.0"}},
+    {"lane_change_factor_high_ang", {PERSISTENT | BACKUP, FLOAT, "1.0"}},
+    {"enable_lane_positioning_ang", {PERSISTENT | BACKUP, BOOL, "0"}},
+    {"custom_path_offset_ang", {PERSISTENT | BACKUP, FLOAT, "0.0"}},
+    {"lane_centering_strength_ang", {PERSISTENT | BACKUP, FLOAT, "0.25"}},
 };
