@@ -109,6 +109,41 @@ sections:
       all metrics into a gauge cluster at the bottom of the screen.'
     visibility:
     - $ref: '#/macros/hide_on_mici'
+  - key: BPThemePack
+    widget: multiple_button
+    title: '[Visuals] Theme'
+    description: "8-Bit Racer game view, or a seasonal theme pack (recolors the road and the wheel icon, adds the pack's scene)."
+    options:
+    - value: ''
+      label: 'Off'
+    - value: 'rad_racer'
+      label: '8-Bit Racer'
+    - value: 'april_fools'
+      label: 'April Fools'
+    - value: 'christmas_week'
+      label: 'Christmas'
+    - value: 'cinco_de_mayo'
+      label: 'Cinco de Mayo'
+    - value: 'easter_week'
+      label: 'Easter'
+    - value: 'fourth_of_july'
+      label: 'Fourth of July'
+    - value: 'halloween_week'
+      label: 'Halloween'
+    - value: 'new_years'
+      label: "New Year's"
+    - value: 'st_patricks_day'
+      label: "St. Patrick's"
+    - value: 'thanksgiving_week'
+      label: 'Thanksgiving'
+    - value: 'valentines_day'
+      label: "Valentine's"
+    - value: 'veterans_day'
+      label: 'Veterans Day'
+  - key: BPThemeAutoSeasonal
+    widget: toggle
+    title: '[Visuals] Auto Seasonal Theme'
+    description: 'During a holiday week, switch to that seasonal theme pack automatically. Outside holiday weeks the Theme selection applies.'
   - key: BPRainbowLines
     widget: toggle
     title: '[Visuals] Rainbow Lane Lines'
