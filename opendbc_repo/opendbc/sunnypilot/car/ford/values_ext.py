@@ -83,6 +83,12 @@ FORD_PINION_GEOMETRY_INDEX = {
 # BluePilot: Max curvature for steering command (m^-1), from DBC file limits
 CURVATURE_MAX = 0.02
 
+# BluePilot: deviation tolerance for the pinion-sourced curvature measurement. Must match
+# safety/modes/ford.h's FORD_STEERING_LIMITS_PINION band (max_angle_error 150 CAN units at
+# angle_deg_to_can 50000 units/rad = 0.003 rad); the yaw source's band stays
+# CarControllerParams.CURVATURE_ERROR (100 units = 0.002 rad).
+PINION_CURVATURE_ERROR = 0.003
+
 # BluePilot: Curvature rate limits — 3-point breakpoints for smoother lateral control.
 # Upstream opendbc uses 2-point ([5, 25]) with more conservative values.
 # These allow higher rates at low speed for responsiveness, lower rates at mid-speed
