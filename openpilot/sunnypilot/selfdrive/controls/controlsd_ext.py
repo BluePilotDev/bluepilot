@@ -10,9 +10,7 @@ import openpilot.cereal.messaging as messaging
 from openpilot.cereal import log, custom
 
 from opendbc.car import structs
-from openpilot.common.params import Params
-# BluePilot: the lateral's UI params live in opendbc (single source of truth for the key list)
-from opendbc.car.bluepilot.ford.values_ext import BP_LATERAL_PARAMS
+from openpilot.common.params import Params, UnknownKeyName
 from openpilot.common.swaglog import cloudlog
 from openpilot.sunnypilot import PARAMS_UPDATE_PERIOD
 from openpilot.sunnypilot.livedelay.helpers import get_lat_delay
@@ -28,7 +26,12 @@ class ControlsExt(ModelStateBase):
     self.params = params
     self._param_update_time: float = 0.0
     self._bp_lateral_params: list[dict] = []  # BluePilot: refreshed in get_params_sp, published every frame
+    self._bp_unknown_keys_logged: set[str] = set()
     self.blinker_pause_lateral = BlinkerPauseLateral()
+    # BluePilot: read once here so the very first carControlSP already carries the UI params
+    # (disable_BP_lat_UI in particular); get_params_sp refreshes them on PARAMS_UPDATE_PERIOD
+    if self.CP.brand == 'ford':
+      self._bp_lateral_params = self.read_lateral_params()
 
     cloudlog.info("controlsd_ext is waiting for CarParamsSP")
     self.CP_SP = messaging.log_from_bytes(params.get("CarParamsSP", block=True), custom.CarParamsSP)
@@ -110,9 +113,10 @@ class ControlsExt(ModelStateBase):
     CC_SP.intelligentCruiseButtonManagement.sendButton = icbm_src.sendButton
     CC_SP.intelligentCruiseButtonManagement.vTarget = icbm_src.vTarget
 
-    # BluePilot: per-frame inputs for the Ford 4-signal lateral in opendbc
-    self.fill_lateral_inputs(CC_SP.lateralInputs, sm)
-    CC_SP.params = self._bp_lateral_params
+    # BluePilot: per-frame inputs for the Ford 4-signal lateral in opendbc (other brands: left empty)
+    if self.CP.brand == 'ford':
+      self.fill_lateral_inputs(CC_SP.lateralInputs, sm)
+      CC_SP.params = self._bp_lateral_params
 
     return CC_SP
 
@@ -120,19 +124,24 @@ class ControlsExt(ModelStateBase):
     """BluePilot: UI-tunable lateral params for the opendbc lateral, as CarControlSP.params entries.
     Only keys that are set on the device are published; the lateral applies its own defaults for
     the rest, exactly as it did reading Params directly. Refreshed on the PARAMS_UPDATE_PERIOD
-    throttle above, not every frame."""
+    throttle, not every frame, so a UI change reaches the lateral within that period."""
+    # imported here, not at module level: the key list lives in the opendbc submodule and only
+    # Ford needs it, so a submodule on another layout must not break controlsd for other brands
+    from opendbc.car.bluepilot.ford.values_ext import BP_LATERAL_PARAMS
     entries = []
     for key in BP_LATERAL_PARAMS:
-      value = self.params.get(key)
+      try:
+        value = self.params.get(key)
+      except UnknownKeyName:
+        # key list (submodule) and params_keys.h (this repo) drifted; skip rather than kill controlsd
+        if key not in self._bp_unknown_keys_logged:
+          cloudlog.warning(f"BluePilot lateral param {key} not registered in params_keys.h; skipping")
+          self._bp_unknown_keys_logged.add(key)
+        continue
       if value is None:
         continue
-      # same wire format Params uses on disk: bools as "1"/"0", numbers via str()
-      if isinstance(value, bool):
-        encoded = b"1" if value else b"0"
-      elif isinstance(value, bytes):
-        encoded = value
-      else:
-        encoded = str(value).encode()
+      # same wire format Params writes: bools as "1"/"0" (checked first: bool is an int subclass)
+      encoded = (b"1" if value else b"0") if isinstance(value, bool) else str(value).encode()
       entries.append({"key": key, "value": encoded})
     return entries
 
@@ -140,9 +149,10 @@ class ControlsExt(ModelStateBase):
   def fill_lateral_inputs(li, sm: messaging.SubMaster) -> None:
     md = sm['modelV2']
     lp = sm['vehicleParameters']
-    # valid only when every field the lateral indexes into is present; the lateral reads
-    # laneLines[1].y[0] unguarded, so a partial fill must never be marked valid. On an invalid
-    # frame the lateral keeps its previous inputs, as it did when a SubMaster message was stale.
+    # valid = both sources seen AND every field below filled from a full-shape modelV2 (33-point
+    # arrays, 3+ lane lines/probs/stds). On an invalid frame nothing is written and the lateral
+    # keeps its previous inputs, as it did when a SubMaster message was stale. The opendbc side
+    # re-checks array lengths before use (lateral_inputs_complete), so valid is a hint, not a promise.
     li.valid = bool(sm.seen['modelV2'] and sm.seen['vehicleParameters']
                     and len(md.laneLines) >= 3 and len(md.laneLineProbs) >= 3 and len(md.laneLineStds) >= 3)
     if not li.valid:

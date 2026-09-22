@@ -48,7 +48,7 @@ struct IntelligentCruiseButtonManagement {
 # BluePilot: what the Ford 4-signal lateral in opendbc needs from modelV2 / vehicleParameters /
 # lateralDelay each frame. Filled in controlsd_ext so opendbc never subscribes to messaging.
 struct LateralInputs {
-  valid @0 :Bool;                    # model and vehicle params seen at least once
+  valid @0 :Bool;                    # producer saw model + vehicle params and filled every field below
   pathYawRate @1 :List(Float32);     # modelV2.orientationRate.z
   pathX @2 :List(Float32);           # modelV2.position.x
   pathY @3 :List(Float32);           # modelV2.position.y
