@@ -104,7 +104,33 @@ class ControlsExt(ModelStateBase):
     CC_SP.intelligentCruiseButtonManagement.sendButton = icbm_src.sendButton
     CC_SP.intelligentCruiseButtonManagement.vTarget = icbm_src.vTarget
 
+    # BluePilot: per-frame inputs for the Ford 4-signal lateral in opendbc
+    self.fill_lateral_inputs(CC_SP.lateralInputs, sm)
+
     return CC_SP
+
+  @staticmethod
+  def fill_lateral_inputs(li, sm: messaging.SubMaster) -> None:
+    md = sm['modelV2']
+    lp = sm['vehicleParameters']
+    li.valid = bool(sm.recv_frame['modelV2'] > 0 and sm.recv_frame['vehicleParameters'] > 0)
+    li.pathYawRate = list(md.orientationRate.z)
+    li.pathX = list(md.position.x)
+    li.pathY = list(md.position.y)
+    if len(md.laneLines) >= 3:
+      li.laneLineLeftX = list(md.laneLines[1].x)
+      li.laneLineLeftY = list(md.laneLines[1].y)
+      li.laneLineRightX = list(md.laneLines[2].x)
+      li.laneLineRightY = list(md.laneLines[2].y)
+    li.laneLineProbs = list(md.laneLineProbs)
+    li.laneLineStds = list(md.laneLineStds)
+    li.laneChangeState = int(md.meta.laneChangeState.raw)
+    li.laneChangeDirection = int(md.meta.laneChangeDirection.raw)
+    li.steerRatio = lp.steerRatio
+    li.stiffnessFactor = lp.stiffnessFactor
+    li.roll = lp.roll
+    li.angleOffsetDeg = lp.angleOffsetDeg
+    li.lateralDelay = sm['lateralDelay'].lateralDelay
 
   @staticmethod
   def publish_ext(CC_SP: custom.CarControlSP, sm: messaging.SubMaster, pm: messaging.PubMaster) -> None:

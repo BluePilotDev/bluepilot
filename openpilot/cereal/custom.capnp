@@ -46,6 +46,28 @@ struct IntelligentCruiseButtonManagement {
 }
 
 # Same struct as Log.RadarState.LeadData
+# BluePilot: what the Ford 4-signal lateral in opendbc needs from modelV2 / vehicleParameters /
+# lateralDelay each frame. Filled in controlsd_ext so opendbc never subscribes to messaging.
+struct LateralInputs {
+  valid @0 :Bool;                    # model and vehicle params seen at least once
+  pathYawRate @1 :List(Float32);     # modelV2.orientationRate.z
+  pathX @2 :List(Float32);           # modelV2.position.x
+  pathY @3 :List(Float32);           # modelV2.position.y
+  laneLineLeftX @4 :List(Float32);   # modelV2.laneLines[1]
+  laneLineLeftY @5 :List(Float32);
+  laneLineRightX @6 :List(Float32);  # modelV2.laneLines[2]
+  laneLineRightY @7 :List(Float32);
+  laneLineProbs @8 :List(Float32);
+  laneLineStds @9 :List(Float32);
+  laneChangeState @10 :UInt8;        # modelV2.meta.laneChangeState
+  laneChangeDirection @11 :UInt8;    # modelV2.meta.laneChangeDirection
+  steerRatio @12 :Float32;           # vehicleParameters
+  stiffnessFactor @13 :Float32;
+  roll @14 :Float32;
+  angleOffsetDeg @15 :Float32;
+  lateralDelay @16 :Float32;         # lateralDelay.lateralDelay
+}
+
 struct LeadData {
   dRel @0 :Float32;
   yRel @1 :Float32;
@@ -383,6 +405,7 @@ struct CarControlSP @0xa5cd762cd951a455 {
   leadOne @2 :LeadData;
   leadTwo @3 :LeadData;
   intelligentCruiseButtonManagement @4 :IntelligentCruiseButtonManagement;
+  lateralInputs @5 :LateralInputs;  # BluePilot: per-frame inputs for the Ford 4-signal lateral
 
   struct Param {
     key @0 :Text;
