@@ -25,13 +25,8 @@ class ControlsExt(ModelStateBase):
     self.CP = CP
     self.params = params
     self._param_update_time: float = 0.0
-    self._bp_lateral_params: list[dict] = []  # BluePilot: refreshed in get_params_sp, published every frame
-    self._bp_unknown_keys_logged: set[str] = set()
+    self._bp_unknown_keys_logged: set[str] = set()  # BluePilot: see read_lateral_params
     self.blinker_pause_lateral = BlinkerPauseLateral()
-    # BluePilot: read once here so the very first carControlSP already carries the UI params
-    # (disable_BP_lat_UI in particular); get_params_sp refreshes them on PARAMS_UPDATE_PERIOD
-    if self.CP.brand == 'ford':
-      self._bp_lateral_params = self.read_lateral_params()
 
     cloudlog.info("controlsd_ext is waiting for CarParamsSP")
     self.CP_SP = messaging.log_from_bytes(params.get("CarParamsSP", block=True), custom.CarParamsSP)
@@ -59,9 +54,6 @@ class ControlsExt(ModelStateBase):
 
       if self.CP.lateralTuning.which() == 'torque':
         self.lat_delay = get_lat_delay(self.params, sm["lateralDelay"].lateralDelay)
-
-      if self.CP.brand == 'ford':
-        self._bp_lateral_params = self.read_lateral_params()
 
       self._param_update_time = time.monotonic()
 
@@ -116,15 +108,17 @@ class ControlsExt(ModelStateBase):
     # BluePilot: per-frame inputs for the Ford 4-signal lateral in opendbc (other brands: left empty)
     if self.CP.brand == 'ford':
       self.fill_lateral_inputs(CC_SP.lateralInputs, sm)
-      CC_SP.params = self._bp_lateral_params
+      CC_SP.params = self.read_lateral_params()
 
     return CC_SP
 
   def read_lateral_params(self) -> list[dict]:
     """BluePilot: UI-tunable lateral params for the opendbc lateral, as CarControlSP.params entries.
     Only keys that are set on the device are published; the lateral applies its own defaults for
-    the rest, exactly as it did reading Params directly. Refreshed on the PARAMS_UPDATE_PERIOD
-    throttle, not every frame, so a UI change reaches the lateral within that period."""
+    the rest, exactly as it did reading Params directly. Read every frame, as carcontroller did
+    before, so a UI change (disable_BP_lat_UI in particular) still lands on the next frame.
+    ponytail: ~18 Params reads per 10 ms, the same cost card paid; throttle here if it ever
+    shows in controlsd timing."""
     # imported here, not at module level: the key list lives in the opendbc submodule and only
     # Ford needs it, so a submodule on another layout must not break controlsd for other brands
     from opendbc.car.bluepilot.ford.values_ext import BP_LATERAL_PARAMS
