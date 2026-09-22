@@ -11,6 +11,8 @@ from openpilot.cereal import log, custom
 
 from opendbc.car import structs
 from openpilot.common.params import Params
+# BluePilot: the lateral's UI params live in opendbc (single source of truth for the key list)
+from opendbc.car.bluepilot.ford.values_ext import BP_LATERAL_PARAMS, BP_LATERAL_BOOL_PARAMS, BP_LATERAL_INT_PARAMS
 from openpilot.common.swaglog import cloudlog
 from openpilot.sunnypilot import PARAMS_UPDATE_PERIOD
 from openpilot.sunnypilot.livedelay.helpers import get_lat_delay
@@ -18,6 +20,9 @@ from openpilot.sunnypilot.modeld_v2.modeld_base import ModelStateBase
 from openpilot.sunnypilot.selfdrive.controls.lib.blinker_pause_lateral import BlinkerPauseLateral
 from openpilot.sunnypilot.selfdrive.controls.lib.latcontrol_torque_v0 import LatControlTorque as LatControlTorqueV0
 
+
+_BP_PARAM_TYPE = {**{k: "bool" for k in BP_LATERAL_BOOL_PARAMS}, **{k: "int" for k in BP_LATERAL_INT_PARAMS}}
+_BP_PARAM_TYPE.update({k: "float" for k in BP_LATERAL_PARAMS if k not in _BP_PARAM_TYPE})
 
 class ControlsExt(ModelStateBase):
   def __init__(self, CP: structs.CarParams, params: Params):
@@ -106,8 +111,22 @@ class ControlsExt(ModelStateBase):
 
     # BluePilot: per-frame inputs for the Ford 4-signal lateral in opendbc
     self.fill_lateral_inputs(CC_SP.lateralInputs, sm)
+    self.fill_lateral_params(CC_SP)
 
     return CC_SP
+
+  def fill_lateral_params(self, CC_SP: custom.CarControlSP) -> None:
+    """BluePilot: UI-tunable lateral params, republished every frame so the lateral in opendbc
+    never touches Params itself. ponytail: ~20 Params reads at 100 Hz, same cost carcontroller
+    paid before; refresh every N frames if it ever shows in controlsd timing."""
+    entries = []
+    for key in BP_LATERAL_PARAMS:
+      value = self.params.get(key)
+      if value is None:
+        continue
+      entries.append({"key": key, "value": value if isinstance(value, bytes) else str(value).encode(),
+                      "type": _BP_PARAM_TYPE[key]})
+    CC_SP.params = entries
 
   @staticmethod
   def fill_lateral_inputs(li, sm: messaging.SubMaster) -> None:
