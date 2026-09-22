@@ -12,7 +12,7 @@ from openpilot.cereal import log, custom
 from opendbc.car import structs
 from openpilot.common.params import Params
 # BluePilot: the lateral's UI params live in opendbc (single source of truth for the key list)
-from opendbc.car.bluepilot.ford.values_ext import BP_LATERAL_PARAMS, BP_LATERAL_BOOL_PARAMS, BP_LATERAL_INT_PARAMS
+from opendbc.car.bluepilot.ford.values_ext import BP_LATERAL_PARAMS
 from openpilot.common.swaglog import cloudlog
 from openpilot.sunnypilot import PARAMS_UPDATE_PERIOD
 from openpilot.sunnypilot.livedelay.helpers import get_lat_delay
@@ -21,15 +21,13 @@ from openpilot.sunnypilot.selfdrive.controls.lib.blinker_pause_lateral import Bl
 from openpilot.sunnypilot.selfdrive.controls.lib.latcontrol_torque_v0 import LatControlTorque as LatControlTorqueV0
 
 
-_BP_PARAM_TYPE = {**{k: "bool" for k in BP_LATERAL_BOOL_PARAMS}, **{k: "int" for k in BP_LATERAL_INT_PARAMS}}
-_BP_PARAM_TYPE.update({k: "float" for k in BP_LATERAL_PARAMS if k not in _BP_PARAM_TYPE})
-
 class ControlsExt(ModelStateBase):
   def __init__(self, CP: structs.CarParams, params: Params):
     ModelStateBase.__init__(self)
     self.CP = CP
     self.params = params
     self._param_update_time: float = 0.0
+    self._bp_lateral_params: list[dict] = []  # BluePilot: refreshed in get_params_sp, published every frame
     self.blinker_pause_lateral = BlinkerPauseLateral()
 
     cloudlog.info("controlsd_ext is waiting for CarParamsSP")
@@ -58,6 +56,9 @@ class ControlsExt(ModelStateBase):
 
       if self.CP.lateralTuning.which() == 'torque':
         self.lat_delay = get_lat_delay(self.params, sm["lateralDelay"].lateralDelay)
+
+      if self.CP.brand == 'ford':
+        self._bp_lateral_params = self.read_lateral_params()
 
       self._param_update_time = time.monotonic()
 
@@ -111,14 +112,15 @@ class ControlsExt(ModelStateBase):
 
     # BluePilot: per-frame inputs for the Ford 4-signal lateral in opendbc
     self.fill_lateral_inputs(CC_SP.lateralInputs, sm)
-    self.fill_lateral_params(CC_SP)
+    CC_SP.params = self._bp_lateral_params
 
     return CC_SP
 
-  def fill_lateral_params(self, CC_SP: custom.CarControlSP) -> None:
-    """BluePilot: UI-tunable lateral params, republished every frame so the lateral in opendbc
-    never touches Params itself. ponytail: ~20 Params reads at 100 Hz, same cost carcontroller
-    paid before; refresh every N frames if it ever shows in controlsd timing."""
+  def read_lateral_params(self) -> list[dict]:
+    """BluePilot: UI-tunable lateral params for the opendbc lateral, as CarControlSP.params entries.
+    Only keys that are set on the device are published; the lateral applies its own defaults for
+    the rest, exactly as it did reading Params directly. Refreshed on the PARAMS_UPDATE_PERIOD
+    throttle above, not every frame."""
     entries = []
     for key in BP_LATERAL_PARAMS:
       value = self.params.get(key)
@@ -131,8 +133,8 @@ class ControlsExt(ModelStateBase):
         encoded = value
       else:
         encoded = str(value).encode()
-      entries.append({"key": key, "value": encoded, "type": _BP_PARAM_TYPE[key]})
-    CC_SP.params = entries
+      entries.append({"key": key, "value": encoded})
+    return entries
 
   @staticmethod
   def fill_lateral_inputs(li, sm: messaging.SubMaster) -> None:
@@ -141,7 +143,7 @@ class ControlsExt(ModelStateBase):
     # valid only when every field the lateral indexes into is present; the lateral reads
     # laneLines[1].y[0] unguarded, so a partial fill must never be marked valid. On an invalid
     # frame the lateral keeps its previous inputs, as it did when a SubMaster message was stale.
-    li.valid = bool(sm.recv_frame['modelV2'] > 0 and sm.recv_frame['vehicleParameters'] > 0
+    li.valid = bool(sm.seen['modelV2'] and sm.seen['vehicleParameters']
                     and len(md.laneLines) >= 3 and len(md.laneLineProbs) >= 3 and len(md.laneLineStds) >= 3)
     if not li.valid:
       return

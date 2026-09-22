@@ -45,7 +45,6 @@ struct IntelligentCruiseButtonManagement {
   }
 }
 
-# Same struct as Log.RadarState.LeadData
 # BluePilot: what the Ford 4-signal lateral in opendbc needs from modelV2 / vehicleParameters /
 # lateralDelay each frame. Filled in controlsd_ext so opendbc never subscribes to messaging.
 struct LateralInputs {
@@ -68,6 +67,7 @@ struct LateralInputs {
   lateralDelay @16 :Float32;         # lateralDelay.lateralDelay
 }
 
+# Same struct as Log.RadarState.LeadData
 struct LeadData {
   dRel @0 :Float32;
   yRel @1 :Float32;
