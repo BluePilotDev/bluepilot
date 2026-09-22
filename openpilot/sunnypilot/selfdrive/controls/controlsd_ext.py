@@ -124,23 +124,34 @@ class ControlsExt(ModelStateBase):
       value = self.params.get(key)
       if value is None:
         continue
-      entries.append({"key": key, "value": value if isinstance(value, bytes) else str(value).encode(),
-                      "type": _BP_PARAM_TYPE[key]})
+      # same wire format Params uses on disk: bools as "1"/"0", numbers via str()
+      if isinstance(value, bool):
+        encoded = b"1" if value else b"0"
+      elif isinstance(value, bytes):
+        encoded = value
+      else:
+        encoded = str(value).encode()
+      entries.append({"key": key, "value": encoded, "type": _BP_PARAM_TYPE[key]})
     CC_SP.params = entries
 
   @staticmethod
   def fill_lateral_inputs(li, sm: messaging.SubMaster) -> None:
     md = sm['modelV2']
     lp = sm['vehicleParameters']
-    li.valid = bool(sm.recv_frame['modelV2'] > 0 and sm.recv_frame['vehicleParameters'] > 0)
+    # valid only when every field the lateral indexes into is present; the lateral reads
+    # laneLines[1].y[0] unguarded, so a partial fill must never be marked valid. On an invalid
+    # frame the lateral keeps its previous inputs, as it did when a SubMaster message was stale.
+    li.valid = bool(sm.recv_frame['modelV2'] > 0 and sm.recv_frame['vehicleParameters'] > 0
+                    and len(md.laneLines) >= 3 and len(md.laneLineProbs) >= 3 and len(md.laneLineStds) >= 3)
+    if not li.valid:
+      return
     li.pathYawRate = list(md.orientationRate.z)
     li.pathX = list(md.position.x)
     li.pathY = list(md.position.y)
-    if len(md.laneLines) >= 3:
-      li.laneLineLeftX = list(md.laneLines[1].x)
-      li.laneLineLeftY = list(md.laneLines[1].y)
-      li.laneLineRightX = list(md.laneLines[2].x)
-      li.laneLineRightY = list(md.laneLines[2].y)
+    li.laneLineLeftX = list(md.laneLines[1].x)
+    li.laneLineLeftY = list(md.laneLines[1].y)
+    li.laneLineRightX = list(md.laneLines[2].x)
+    li.laneLineRightY = list(md.laneLines[2].y)
     li.laneLineProbs = list(md.laneLineProbs)
     li.laneLineStds = list(md.laneLineStds)
     li.laneChangeState = int(md.meta.laneChangeState.raw)
