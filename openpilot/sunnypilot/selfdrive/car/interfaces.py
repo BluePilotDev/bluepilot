@@ -118,6 +118,7 @@ def initialize_params(params) -> list[dict[str, Any]]:
   # ford
   keys.extend([
     "FordPrefSteerAngleCurvature",
+    "disable_BP_lat_UI",  # BluePilot: _initialize_ford sets the BP_LATERAL safety-param bit unless this is set
   ])
 
   # hyundai
