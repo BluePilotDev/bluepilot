@@ -10,7 +10,7 @@ import openpilot.cereal.messaging as messaging
 from openpilot.cereal import log, custom
 
 from opendbc.car import structs
-from openpilot.common.params import Params
+from openpilot.common.params import Params, UnknownKeyName
 from openpilot.common.swaglog import cloudlog
 from openpilot.sunnypilot import PARAMS_UPDATE_PERIOD
 from openpilot.sunnypilot.livedelay.helpers import get_lat_delay
@@ -25,6 +25,7 @@ class ControlsExt(ModelStateBase):
     self.CP = CP
     self.params = params
     self._param_update_time: float = 0.0
+    self._bp_unknown_keys_logged: set[str] = set()  # BluePilot: see read_lateral_params
     self.blinker_pause_lateral = BlinkerPauseLateral()
 
     cloudlog.info("controlsd_ext is waiting for CarParamsSP")
@@ -104,7 +105,68 @@ class ControlsExt(ModelStateBase):
     CC_SP.intelligentCruiseButtonManagement.sendButton = icbm_src.sendButton
     CC_SP.intelligentCruiseButtonManagement.vTarget = icbm_src.vTarget
 
+    # BluePilot: per-frame inputs for the Ford 4-signal lateral in opendbc (other brands: left empty)
+    if self.CP.brand == 'ford':
+      self.fill_lateral_inputs(CC_SP.lateralInputs, sm)
+      CC_SP.params = self.read_lateral_params()
+
     return CC_SP
+
+  def read_lateral_params(self) -> list[dict]:
+    """BluePilot: UI-tunable lateral params for the opendbc lateral, as CarControlSP.params entries.
+    Only keys that are set on the device are published; the lateral applies its own defaults for
+    the rest, exactly as it did reading Params directly. Read every frame, as carcontroller did
+    before, so a UI change (disable_BP_lat_UI in particular) still lands on the next frame.
+    ponytail: ~18 Params reads per 10 ms, the same cost card paid; throttle here if it ever
+    shows in controlsd timing."""
+    # imported here, not at module level: the key list lives in the opendbc submodule and only
+    # Ford needs it, so a submodule on another layout must not break controlsd for other brands
+    from opendbc.car.bluepilot.ford.values_ext import BP_LATERAL_PARAMS
+    entries = []
+    for key in BP_LATERAL_PARAMS:
+      try:
+        value = self.params.get(key)
+      except UnknownKeyName:
+        # key list (submodule) and params_keys.h (this repo) drifted; skip rather than kill controlsd
+        if key not in self._bp_unknown_keys_logged:
+          cloudlog.warning(f"BluePilot lateral param {key} not registered in params_keys.h; skipping")
+          self._bp_unknown_keys_logged.add(key)
+        continue
+      if value is None:
+        continue
+      # same wire format Params writes: bools as "1"/"0" (checked first: bool is an int subclass)
+      encoded = (b"1" if value else b"0") if isinstance(value, bool) else str(value).encode()
+      entries.append({"key": key, "value": encoded})
+    return entries
+
+  @staticmethod
+  def fill_lateral_inputs(li, sm: messaging.SubMaster) -> None:
+    md = sm['modelV2']
+    lp = sm['vehicleParameters']
+    # valid = both sources seen AND every field below filled from a full-shape modelV2 (33-point
+    # arrays, 3+ lane lines/probs/stds). On an invalid frame nothing is written and the lateral
+    # keeps its previous inputs, as it did when a SubMaster message was stale. The opendbc side
+    # re-checks array lengths before use (lateral_inputs_complete), so valid is a hint, not a promise.
+    li.valid = bool(sm.seen['modelV2'] and sm.seen['vehicleParameters']
+                    and len(md.laneLines) >= 3 and len(md.laneLineProbs) >= 3 and len(md.laneLineStds) >= 3)
+    if not li.valid:
+      return
+    li.pathYawRate = list(md.orientationRate.z)
+    li.pathX = list(md.position.x)
+    li.pathY = list(md.position.y)
+    li.laneLineLeftX = list(md.laneLines[1].x)
+    li.laneLineLeftY = list(md.laneLines[1].y)
+    li.laneLineRightX = list(md.laneLines[2].x)
+    li.laneLineRightY = list(md.laneLines[2].y)
+    li.laneLineProbs = list(md.laneLineProbs)
+    li.laneLineStds = list(md.laneLineStds)
+    li.laneChangeState = int(md.meta.laneChangeState.raw)
+    li.laneChangeDirection = int(md.meta.laneChangeDirection.raw)
+    li.steerRatio = lp.steerRatio
+    li.stiffnessFactor = lp.stiffnessFactor
+    li.roll = lp.roll
+    li.angleOffsetDeg = lp.angleOffsetDeg
+    li.lateralDelay = sm['lateralDelay'].lateralDelay
 
   @staticmethod
   def publish_ext(CC_SP: custom.CarControlSP, sm: messaging.SubMaster, pm: messaging.PubMaster) -> None:
