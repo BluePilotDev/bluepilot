@@ -309,7 +309,7 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"custom_path_offset_curv", {PERSISTENT | BACKUP, FLOAT, "0.0"}},
     {"enable_lane_full_mode_curv", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"custom_profile_curv", {PERSISTENT | BACKUP, INT, "0"}},
-    {"LC_PID_gain_UI_curv", {PERSISTENT | BACKUP, FLOAT, "3.0"}},
+    {"LC_PID_gain_UI_curv", {PERSISTENT | BACKUP, FLOAT, "1.0"}},
     // angle-primary mode
     {"FordLowSpeedFactor_ang", {PERSISTENT | BACKUP, FLOAT, "1.0"}},
     {"FordHighSpeedFactor_ang", {PERSISTENT | BACKUP, FLOAT, "1.0"}},

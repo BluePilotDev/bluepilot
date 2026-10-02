@@ -114,8 +114,8 @@ class ControlsExt(ModelStateBase):
 
   def read_lateral_params(self) -> list[dict]:
     """BluePilot: UI-tunable lateral params for the opendbc lateral, as CarControlSP.params entries.
-    Only keys that are set on the device are published; the lateral applies its own defaults for
-    the rest, exactly as it did reading Params directly. Read every frame, as carcontroller did
+    A key never written on the device publishes its params_keys.h default, so the lateral runs
+    the value the settings UI shows (#6 in ford-op/bg-opendbc). Read every frame, as carcontroller did
     before, so a UI change (disable_BP_lat_UI in particular) still lands on the next frame.
     ponytail: ~18 Params reads per 10 ms, the same cost card paid; throttle here if it ever
     shows in controlsd timing."""
@@ -125,7 +125,7 @@ class ControlsExt(ModelStateBase):
     entries = []
     for key in BP_LATERAL_PARAMS:
       try:
-        value = self.params.get(key)
+        value = self.params.get(key, return_default=True)
       except UnknownKeyName:
         # key list (submodule) and params_keys.h (this repo) drifted; skip rather than kill controlsd
         if key not in self._bp_unknown_keys_logged:
