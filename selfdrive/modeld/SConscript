@@ -80,9 +80,10 @@ def prebuilt(pkl_path):
 for usbgpu in [False, True] if USBGPU else [False]:
   target_pkl_path = File(modeld_pkl_path(usbgpu)).abspath
   file_prefix, cmd_flags = ('big_', usbgpu_tg_flags) if usbgpu else ('', tg_flags)
-  driving_onnx_deps = get_existing_chunks(File(f"models/{file_prefix}driving_supercombo.onnx").abspath)
-  if not driving_onnx_deps and prebuilt(target_pkl_path):
+  onnx_path = File(f"models/{file_prefix}driving_supercombo.onnx").abspath
+  if not (os.path.isfile(onnx_path) or os.path.isfile(get_manifest_path(onnx_path))) and prebuilt(target_pkl_path):
     continue
+  driving_onnx_deps = get_existing_chunks(onnx_path)
   camera_res_args = ' '.join(f'{cw}x{ch}' for cw, ch in CAMERA_CONFIGS)
   cmd = (f'{cmd_flags} {mac_brew_string} python3 {modeld_dir}/compile_modeld.py '
         f'--model-size {model_w}x{model_h} '
