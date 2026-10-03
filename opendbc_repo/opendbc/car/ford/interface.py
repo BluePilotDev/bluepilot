@@ -6,7 +6,7 @@ from opendbc.car.ford.carcontroller import CarController
 from opendbc.car.ford.carstate import CarState
 from opendbc.car.ford.fordcan import CanBus
 from opendbc.car.ford.radar_interface import RadarInterface
-from opendbc.car.ford.values import CarControllerParams, DBC, Ecu, FordFlags, RADAR, FordSafetyFlags
+from opendbc.car.ford.values import CAR, CarControllerParams, DBC, Ecu, FordFlags, RADAR, FordSafetyFlags
 from opendbc.car.interfaces import CarInterfaceBase
 from opendbc.sunnypilot.car.ford.interfaces_ext import apply_ford_ext_params, apply_ford_ext_params_sp
 
@@ -36,6 +36,10 @@ class CarInterface(CarInterfaceBase):
 
     ret.steerControlType = structs.CarParams.SteerControlType.angle
     ret.steerActuatorDelay = 0.2
+    if candidate in (CAR.FORD_F_150_LIGHTNING_MK1, CAR.FORD_MUSTANG_MACH_E_MK1):
+      # EVs with the regen/brake handoff in LongitudinalExt respond ~0.2 s after the accel request
+      # (measured on a 2025 F-150 Lightning); the 0.15 s default under-compensates.
+      ret.longitudinalActuatorDelay = 0.25
     ret.steerLimitTimer = 1.0
     ret.steerAtStandstill = True
 
