@@ -12,6 +12,8 @@ See the LICENSE.md file in the root directory for more details.
 
 import unittest
 
+import numpy as np
+
 from opendbc.sunnypilot.car.ford.lane_center_trim import LaneCenterTrim, _CORRECTION_ROC_PER_TICK
 
 
@@ -231,6 +233,40 @@ class TestLaneCenterTrim(unittest.TestCase):
     result = self._run(_good_model(), kappa_cmd=0.01, offset=0.3, gain=float("nan"), iterations=10)
     self.assertEqual(self.trim.correction, 0.0)
     self.assertEqual(result, 0.01)
+
+  def test_nan_laneline_probability_does_not_poison_correction(self):
+    # A single NaN laneline sample (e.g. a corrupt model frame) must not leak into min()/
+    # np.interp() -- unlike the structural array checks above, NaN doesn't raise, so without an
+    # explicit finiteness guard it silently corrupts confidence (and therefore the correction)
+    # with a NaN that survives every later frame until a hard reset. Treat it the same as any
+    # other untrustworthy laneline sample: fall back to the model-position blend, not NaN.
+    nan_prob = _good_model(probs=(0.9, float("nan"), 0.9, 0.9))
+    result = self._run(nan_prob, kappa_cmd=0.01, offset=0.3, iterations=10)
+    self.assertFalse(np.isnan(self.trim.correction))
+    self.assertFalse(np.isnan(result))
+
+  def test_nan_laneline_std_does_not_poison_correction(self):
+    nan_std = _good_model(stds=(0.1, float("nan"), 0.1, 0.1))
+    result = self._run(nan_std, kappa_cmd=0.01, offset=0.3, iterations=10)
+    self.assertFalse(np.isnan(self.trim.correction))
+    self.assertFalse(np.isnan(result))
+
+  def test_nan_laneline_probability_recovers_without_reset(self):
+    # Converge under confident lanelines, take one NaN-probability frame, then confirm later
+    # good frames recover on their own -- the fallback for a bad sample should behave like any
+    # other low-confidence frame (self-healing), not latch like the pre-fix NaN corruption did
+    # (which required a hard reset: lane change / disengage / human-turn).
+    good = _good_model(lane_center_y=2.0, model_y=0.0)
+    self._run(good, offset=0.0, gain=1.0, iterations=500)
+    self.assertAlmostEqual(self.trim.correction, 0.004, places=3)
+
+    nan_prob = _good_model(lane_center_y=2.0, model_y=0.0, probs=(0.9, float("nan"), 0.9, 0.9))
+    self._run(nan_prob, offset=0.0, gain=1.0, iterations=1)
+    self.assertFalse(np.isnan(self.trim.correction))
+
+    self._run(good, offset=0.0, gain=1.0, iterations=500)
+    self.assertFalse(np.isnan(self.trim.correction))
+    self.assertAlmostEqual(self.trim.correction, 0.004, places=3)
 
   # --- Rate-of-change limit: smooths confidence transitions (merge lanes, lines dropping out) ---
 
