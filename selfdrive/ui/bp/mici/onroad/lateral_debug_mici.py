@@ -11,6 +11,7 @@ import time
 import pyray as rl
 from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.lib.application import gui_app, FontWeight
+from openpilot.system.ui.lib.text_measure import measure_text_cached
 from openpilot.selfdrive.ui.ui_state import device, ui_state
 from bluepilot.ui.widgets.debug.debug_colors import DebugColors
 from bluepilot.ui.widgets.debug.debug_graph import TimeSeriesGraph, GraphConfig, GraphSeries
@@ -63,7 +64,55 @@ class LateralDebugMici(Widget):
         GraphSeries("Actual",  DebugColors.ACTUAL_YELLOW,  fill_alpha=25, beaded=True),
       ]
     )
+    self._steer_delay = 0.0
     self._last_push_time = 0.0
+    self._graph._config.title = "Steering Angle"
+
+  def _get_steer_delay(self):
+    """Return the most accurate steering delay available:
+    1. liveDelay from SubMaster (if present and valid)
+    2. persisted LAGD value cache (params key 'LagdValueCache')
+    3. carParams steerActuatorDelay
+    4. ui_state.CP fallback
+    """
+    # 1) liveDelay topic (if UI SubMaster is providing it)
+    try:
+      if ui_state.sm.valid.get('liveDelay', False):
+        ld = ui_state.sm['liveDelay']
+        # prefer the computed lateralDelay when present
+        val = getattr(ld, 'lateralDelay', None)
+        if val is not None and val > 0:
+          return float(val)
+    except Exception:
+      pass
+
+    # 2) persisted SunnyPilot live-delay cache (set by LagdToggle)
+    try:
+      from openpilot.common.params import Params
+      params = Params()
+      v = params.get('LagdValueCache')
+      if v is not None:
+        try:
+          fv = float(v)
+          if fv > 0:
+            return fv
+        except Exception:
+          pass
+    except Exception:
+      pass
+
+    # 3) direct carParams from SubMaster
+    try:
+      if ui_state.sm.valid.get('carParams', False):
+        return ui_state.sm['carParams'].steerActuatorDelay
+    except (KeyError, AttributeError, ValueError):
+      pass
+
+    # 4) fallback to loaded CP (CarParamsPersistent)
+    cp = getattr(ui_state, 'CP', None)
+    if cp is not None:
+      return cp.steerActuatorDelay
+    return 0.0
 
   def show_event(self):
     super().show_event()
@@ -87,6 +136,11 @@ class LateralDebugMici(Widget):
         desired = sm['carControl'].actuators.steeringAngleDeg
       if sm.valid.get('carState', False):
         actual = sm['carState'].steeringAngleDeg
+      self._steer_delay = self._get_steer_delay()
+      if self._steer_delay > 0.0:
+        self._graph._config.title = f"Steering Angle • SD: {self._steer_delay:.3f}s"
+      else:
+        self._graph._config.title = "Steering Angle"
       self._graph.push_data([desired, actual])
       self._last_push_time = now
     except (KeyError, AttributeError, ValueError):
