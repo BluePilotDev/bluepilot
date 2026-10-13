@@ -71,6 +71,17 @@ class TestDeleter(UploaderTestCase):
       self.make_file_with_data(self.seg_format2.format(0), self.f_type),
     ])
 
+  # BluePilot: legacy routes from later years must be deleted before new-format routes.
+  def test_delete_mixed_legacy_order(self):
+    self.assertDeleteOrder([
+      self.make_file_with_data("2025-12-31--23-59-59--0", self.f_type),
+      self.make_file_with_data("2026-10-04--20-28-40--9", self.f_type),
+      self.make_file_with_data("2026-10-04--20-28-40--10", self.f_type),
+      self.make_file_with_data(self.seg_format.format(0), self.f_type),
+      self.make_file_with_data(self.seg_format2.format(0), self.f_type),
+    ])
+  # End BluePilot
+
   def test_delete_many_preserved(self):
     self.assertDeleteOrder([
       self.make_file_with_data(self.seg_format.format(0), self.f_type),
