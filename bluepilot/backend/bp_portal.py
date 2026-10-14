@@ -3909,7 +3909,7 @@ def main():
     def monitor_status():
         try:
             # Check if we should restore power save mode
-            check_and_restore_power_save()
+            check_and_restore_power_save(is_onroad)
 
             # Check for onroad status changes and broadcast via WebSocket
             current_onroad = is_onroad()
