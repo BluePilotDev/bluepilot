@@ -9,6 +9,7 @@ venv/
 .idea
 .overlay_init
 .overlay_consistent
+.quickboot_commit
 .sconsign.dblite
 a.out
 .hypothesis

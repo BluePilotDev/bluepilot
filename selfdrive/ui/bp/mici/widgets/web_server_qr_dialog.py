@@ -15,11 +15,12 @@ from openpilot.selfdrive.ui.mici.widgets.button import BigParamControl
 class WebServerQRDialog(NavWidget):
   """Dialog showing QR code for webserver access and toggle to disable."""
 
-  def __init__(self, back_callback: Callable):
+  def __init__(self, back_callback: Callable, path: str = "", title: str = "web routes server"):
     super().__init__()
     self.set_back_callback(back_callback)
     self.set_rect(rl.Rectangle(0, 0, gui_app.width, gui_app.height))
     self._params = Params()
+    self._path = path if not path or path.startswith("/") else f"/{path}"
     self._qr_texture: rl.Texture | None = None
     self._last_url = ""
     
@@ -30,7 +31,7 @@ class WebServerQRDialog(NavWidget):
     self._disable_toggle.refresh()
     
     # Labels (BluePilot: migrated from MiciLabel to UnifiedLabel after upstream removal)
-    self._title_label = UnifiedLabel("web routes server", font_size=56, font_weight=FontWeight.BOLD,
+    self._title_label = UnifiedLabel(title, font_size=56, font_weight=FontWeight.BOLD,
                                      text_color=rl.Color(255, 255, 255, int(255 * 0.9)))
     self._url_label = UnifiedLabel("", font_size=36, font_weight=FontWeight.MEDIUM,
                                    text_color=rl.Color(200, 200, 200, int(255 * 0.8)))
@@ -85,7 +86,7 @@ class WebServerQRDialog(NavWidget):
       port = port_raw.decode("utf-8") if isinstance(port_raw, bytes) else str(port_raw)
     except Exception:
       port = "8088"
-    return f"http://{wifi_ip}:{port}"
+    return f"http://{wifi_ip}:{port}{self._path}"
 
   def _generate_qr_code(self) -> None:
     """Generate QR code texture from server URL."""

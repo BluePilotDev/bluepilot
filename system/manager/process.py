@@ -168,7 +168,7 @@ class NativeProcess(ManagerProcess):
 
 
 class PythonProcess(ManagerProcess):
-  def __init__(self, name, module, should_run, enabled=True, sigkill=False, restart_if_crash=False):
+  def __init__(self, name, module, should_run, enabled=True, sigkill=False, restart_if_crash=False, preimport=True):
     self.name = name
     self.module = module
     self.should_run = should_run
@@ -176,9 +176,10 @@ class PythonProcess(ManagerProcess):
     self.sigkill = sigkill
     self.launcher = launcher
     self.restart_if_crash = restart_if_crash
+    self.preimport = preimport
 
   def prepare(self) -> None:
-    if self.enabled:
+    if self.enabled and self.preimport:
       cloudlog.info(f"preimporting {self.module}")
       importlib.import_module(self.module)
 

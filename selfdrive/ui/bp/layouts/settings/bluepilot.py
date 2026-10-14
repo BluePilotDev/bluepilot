@@ -14,6 +14,8 @@ from openpilot.system.ui.lib.wifi_manager import WifiManager, Network
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.selfdrive.ui.bp.widgets.float_control_item import float_control_item, int_control_item
 from openpilot.selfdrive.ui.bp.widgets.section_header import CollapsibleSectionHeader
+from openpilot.selfdrive.ui.bp.widgets.web_server_qr_dialog_tici import WebServerQRDialogTici
+from openpilot.bluepilot.vasm.config import normalize_annotation_config
 from openpilot.selfdrive.ui.bp.lib.steering_wheel_style import (
   ensure_steering_wheel_icon_style_initialized,
   get_steering_wheel_icon_style,
@@ -79,6 +81,7 @@ class BluePilotLayout(Widget):
     # Toggle refresh list
     self._refresh_toggles = (
       ("send_hands_free_cluster_msg", self._show_hands_free_ui),
+      ("VASMEnabled", self._vasm_enabled),
       ("FordPrefSteerAngleCurvature", self._steer_angle_curvature),
       ("BPDisableLaneLineStatusColor", self._disable_lane_line_status_color),
       ("BPHideCameraView", self._hide_camera_view),
@@ -204,7 +207,7 @@ class BluePilotLayout(Widget):
       icon="chffr_wheel.png"
     )
 
-    # BluePilot: one theme selector for everything (8-Bit Racer + seasonal packs),
+    # BluePilot: one theme selector for everything (code themes + seasonal packs),
     # same entries and param as the MICI page — see theme_pack.selector_entries().
     # A dialog (not a button row) so any number of packs stays inside the item box.
     self._theme_entries = theme_pack.selector_entries()
@@ -213,7 +216,7 @@ class BluePilotLayout(Widget):
     self._theme_action.set_value(lambda: self._get_theme_display())
     self._theme_pack_btn = ListItem(
       lambda: tr("Theme"),
-      description=lambda: tr("8-Bit Racer game view, or a seasonal theme pack (recolors the road and the wheel icon)."),
+      description=lambda: tr("Choose 8-Bit Racer, Tesla, or a seasonal theme pack."),
       action_item=self._theme_action,
       callback=self._select_theme,
     )
@@ -488,6 +491,44 @@ class BluePilotLayout(Widget):
       icon="warning.png"
     )
 
+    # BluePilot: StarPilot-derived driver-camera adjacent-spot monitoring.
+    self._vasm_enabled = toggle_item(
+      lambda: tr("Vision-Adjacent Spot Monitoring"),
+      lambda: tr("Use the driver camera to supplement the vehicle's blind-spot sensors. Configure the monitored window regions before enabling."),
+      initial_state=self._safe_get_bool(self._params, "VASMEnabled"),
+      callback=lambda state: self._toggle_callback(state, "VASMEnabled"),
+      enabled=self._has_vasm_config,
+      icon="warning.png",
+    )
+    self._vasm_configure_btn = button_item(
+      lambda: tr("V-ASM Camera Regions"),
+      lambda: tr("CONFIGURE"),
+      lambda: tr("Open BluePilot Portal on your phone to mark the left and right window regions."),
+      callback=self._configure_vasm,
+    )
+    self._vasm_confidence = float_control_item(
+      lambda: tr("V-ASM Confidence Threshold"),
+      lambda: tr("Minimum vehicle-detection confidence. Higher values reduce false alerts."),
+      param="VASMConfidenceThreshold",
+      min_value=0.25,
+      max_value=1.0,
+      step=0.05,
+      enabled=lambda: self._safe_get_bool(self._params, "VASMEnabled"),
+      icon="warning.png",
+    )
+    self._vasm_smoothing = float_control_item(
+      lambda: tr("V-ASM Smoothing"),
+      lambda: tr("Time used to stabilize vision detections."),
+      param="VASMSmoothSeconds",
+      min_value=0.1,
+      max_value=0.5,
+      step=0.1,
+      suffix="s",
+      enabled=lambda: self._safe_get_bool(self._params, "VASMEnabled"),
+      icon="warning.png",
+    )
+    # End BluePilot
+
     # UI Debug Logging toggle
     self._ui_debug_log = toggle_item(
       lambda: tr("UI Debug Logging"),
@@ -726,6 +767,10 @@ class BluePilotLayout(Widget):
       _section(tr("Vehicle"), [
         self._show_hands_free_ui,
         self._steer_angle_curvature,
+        self._vasm_enabled,
+        self._vasm_configure_btn,
+        self._vasm_confidence,
+        self._vasm_smoothing,
         self._vbatt_pause_charging,
       ]) +
       _section(tr("Audio"), [
@@ -767,6 +812,17 @@ class BluePilotLayout(Widget):
       return float(self._params.get(param, return_default=True))
     except (TypeError, ValueError):
       return default
+
+  def _has_vasm_config(self) -> bool:
+    try:
+      normalize_annotation_config(self._params.get("VASMAnnotationConfig", return_default=True) or {})
+      return True
+    except (TypeError, ValueError, UnknownKeyName):
+      return False
+
+  def _configure_vasm(self) -> None:
+    self._params.put_bool("EnableWebRoutesServer", True)
+    gui_app.push_widget(WebServerQRDialogTici(path="/vasm", title=tr("Configure V-ASM")))
 
   def _toggle_callback(self, state: bool, param: str):
     """Handle toggle state changes."""
@@ -1077,6 +1133,7 @@ class BluePilotLayout(Widget):
     stored = self._safe_get(self._params, theme_pack.PARAM_KEY) or ""
     if isinstance(stored, bytes):
       stored = stored.decode("utf-8", errors="replace")
+    stored = theme_pack.normalize_selector_value(stored)
     return next((label for label, v in self._theme_entries if v and v.lower() == stored.lower()), tr("Off"))
 
   def _select_theme(self):

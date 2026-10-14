@@ -10,6 +10,8 @@ from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.system.ui.lib.application import gui_app
 # BluePilot: seasonal theme packs (steering wheel icon override)
 from openpilot.selfdrive.ui.bp.lib import theme_pack
+from openpilot.selfdrive.ui.bp.lib.longitudinal_visuals import longitudinal_control_active
+from openpilot.selfdrive.ui.bp.lib.tesla_palette import tesla_wheel_color
 
 
 class ExpButtonBP(ExpButton):
@@ -22,6 +24,7 @@ class ExpButtonBP(ExpButton):
     self._animate_steering_wheel = self._params.get_bool("BPAnimateSteeringWheel")
     self._wheel_icon_style = ensure_steering_wheel_icon_style_initialized(self._params, SteeringWheelIconStyle.COMMA_3X)
     self._theme_pack = theme_pack.get_active_pack(force=True)
+    self._tesla_style = theme_pack.tesla_active(self._params)
     self._param_counter = 0
 
   def _update_state(self) -> None:
@@ -34,6 +37,7 @@ class ExpButtonBP(ExpButton):
       self._animate_steering_wheel = self._params.get_bool("BPAnimateSteeringWheel")
       self._wheel_icon_style = get_steering_wheel_icon_style(self._params, SteeringWheelIconStyle.COMMA_3X)
       self._theme_pack = theme_pack.get_active_pack()
+      self._tesla_style = theme_pack.tesla_active(self._params)
 
   def _render(self, rect: rl.Rectangle) -> None:
     center_x = int(self._rect.x + self._rect.width // 2)
@@ -49,12 +53,18 @@ class ExpButtonBP(ExpButton):
       if pack_wheel is not None:
         wheel_texture = pack_wheel
     texture = self._txt_exp if experimental_mode else wheel_texture
+    texture_color = tesla_wheel_color(
+      self._tesla_style and not experimental_mode,
+      longitudinal_control_active(ui_state.sm, ui_state.status),
+      ui_state.tesla_dark_fraction,
+      self._white_color.a,
+    )
 
     rl.draw_circle(center_x, center_y, self._rect.width / 2, self._black_bg)
 
     if experimental_mode or not self._animate_steering_wheel:
       position = rl.Vector2(center_x - texture.width / 2, center_y - texture.height / 2)
-      rl.draw_texture_ex(texture, position, 0.0, 1.0, self._white_color)
+      rl.draw_texture_ex(texture, position, 0.0, 1.0, texture_color)
     else:
       rotation = -ui_state.sm['carState'].steeringAngleDeg
       rl.draw_texture_pro(
@@ -63,5 +73,5 @@ class ExpButtonBP(ExpButton):
         rl.Rectangle(center_x, center_y, texture.width, texture.height),
         rl.Vector2(texture.width / 2, texture.height / 2),
         rotation,
-        self._white_color,
+        texture_color,
       )

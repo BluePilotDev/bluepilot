@@ -145,6 +145,9 @@ from bluepilot.backend.params.params_manager import (
     set_param_value, search_params, READONLY_PARAMS, CRITICAL_PARAMS
 )
 from bluepilot.backend.params.params_watcher import ParamsWatcher
+from bluepilot.vasm.config import normalize_annotation_config
+from bluepilot.vasm.snapshot import SnapshotUnavailable, capture_parked_driver_snapshot
+from bluepilot.vasm.state import get_memory_params, get_vasm_blindspots
 
 # Cache management
 from bluepilot.backend.cache import (
@@ -186,6 +189,46 @@ from bluepilot.backend.handlers.log_downloads import (
 # Params - import from params_manager to get fallback support
 from bluepilot.backend.params.params_manager import Params
 params = Params()
+vasm_params_memory = get_memory_params(params)
+
+
+def get_vasm_snapshot():
+    """Return a fresh parked driver-camera JPEG, with recorded footage as fallback."""
+    live_error = None
+    try:
+        return capture_parked_driver_snapshot(params)
+    except SnapshotUnavailable as exc:
+        live_error = exc
+        logger.warning(f"Live V-ASM driver-camera snapshot unavailable: {exc}")
+
+    if not FFMPEG_BINARY or not os.path.isdir(ROUTES_DIR):
+        raise live_error or SnapshotUnavailable("No driver-camera snapshot is available.")
+
+    # Never fall back to a road-facing camera: its coordinates would make the
+    # driver-window polygons invalid and silently defeat the monitor.
+    candidates = list(Path(ROUTES_DIR).glob("*/dcamera.hevc"))
+    candidates.sort(key=lambda path: path.stat().st_mtime if path.exists() else 0, reverse=True)
+    fallback_deadline = time.monotonic() + 10.0
+
+    for camera_path in candidates[:6]:
+        for seek_seconds in (5, 2, None):
+            remaining = fallback_deadline - time.monotonic()
+            if remaining <= 0:
+                raise live_error or SnapshotUnavailable("No driver-camera snapshot is available.")
+            command = [
+                FFMPEG_BINARY, "-hide_banner", "-loglevel", "error", "-nostdin",
+                "-i", str(camera_path),
+            ]
+            if seek_seconds is not None:
+                command.extend(["-ss", str(seek_seconds)])
+            command.extend(["-frames:v", "1", "-q:v", "2", "-f", "image2pipe", "-vcodec", "mjpeg", "-"])
+            try:
+                result = subprocess.run(command, capture_output=True, check=True, timeout=min(4.0, remaining), stdin=subprocess.DEVNULL)
+                if result.stdout:
+                    return result.stdout
+            except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired, OSError):
+                continue
+    raise live_error or SnapshotUnavailable("No driver-camera snapshot is available.")
 
 
 def restart_ui_process():
@@ -520,6 +563,15 @@ class WebRoutesHandler(BaseHTTPRequestHandler):
                 data['success'] = True
 
         self.wfile.write(json.dumps(data).encode())
+
+    def send_bytes_response(self, data, mime_type, status=200):
+        self.send_response(status)
+        self.send_header('Content-Type', mime_type)
+        self.send_header('Content-Length', str(len(data)))
+        self.send_header('Cache-Control', 'no-store')
+        self.send_cors_headers()
+        self.end_headers()
+        self.wfile.write(data)
 
     def send_file_response(self, filepath, mime_type=None, download_filename=None):
         """Send file response with optional byte-range support"""
@@ -896,7 +948,7 @@ class WebRoutesHandler(BaseHTTPRequestHandler):
 
             # SPA routes - serve index.html for frontend routes
             # This allows direct navigation and page refresh to work
-            SPA_ROUTES = {'/', '/index.html', '/settings', '/parameters', '/routes', '/logs'}
+            SPA_ROUTES = {'/', '/index.html', '/settings', '/parameters', '/routes', '/logs', '/vasm'}
 
             # Route handlers
             if path in SPA_ROUTES or path.startswith('/settings/'):
@@ -904,7 +956,33 @@ class WebRoutesHandler(BaseHTTPRequestHandler):
                 return
 
             # API routes - separate if/elif chain since SPA routes return early
-            if path == '/api/health':
+            if path == '/api/vasm/config':
+                config = params.get("VASMAnnotationConfig", return_default=True) or {}
+                self.send_json_response(dict(config) if isinstance(config, dict) else {})
+
+            elif path == '/api/vasm/status':
+                left_active, right_active = get_vasm_blindspots(vasm_params_memory)
+                try:
+                    left_confidence = float(vasm_params_memory.get("VASMLeftConfidence") or 0.0)
+                    right_confidence = float(vasm_params_memory.get("VASMRightConfidence") or 0.0)
+                except (TypeError, ValueError):
+                    left_confidence = right_confidence = 0.0
+                self.send_json_response({
+                    'enabled': params.get_bool("VASMEnabled"),
+                    'left_active': left_active,
+                    'right_active': right_active,
+                    'left_confidence': left_confidence,
+                    'right_confidence': right_confidence,
+                })
+
+            elif path == '/api/vasm/snapshot':
+                try:
+                    snapshot = get_vasm_snapshot()
+                    self.send_bytes_response(snapshot, 'image/jpeg')
+                except SnapshotUnavailable as exc:
+                    self.send_json_response({'error': str(exc)}, 503)
+
+            elif path == '/api/health':
                 # Health check endpoint for monitoring
                 try:
                     onroad = is_onroad()
@@ -2895,6 +2973,25 @@ class WebRoutesHandler(BaseHTTPRequestHandler):
                     }, 503)
                     return
 
+            # BluePilot: parked V-ASM camera-region setup, ported from StarPilot's Galaxy tool.
+            if path == '/api/vasm/config':
+                try:
+                    content_length = int(self.headers.get('Content-Length', 0))
+                    if content_length <= 0 or content_length > 64 * 1024:
+                        raise ValueError('Invalid configuration size')
+                    payload = json.loads(self.rfile.read(content_length).decode('utf-8'))
+                    config = normalize_annotation_config(payload)
+                    params.put("VASMAnnotationConfig", config, block=True)
+                    params.put_bool("VASMEnabled", True, block=True)
+                    self.send_json_response({
+                        'message': 'Camera regions saved; V-ASM is enabled',
+                        'config': config,
+                    })
+                except (json.JSONDecodeError, UnicodeDecodeError, ValueError) as exc:
+                    self.send_json_response({'error': str(exc)}, 400)
+                return
+            # End BluePilot
+
             # Cancel export operations
             if path.startswith('/api/route-export/') and path.endswith('/cancel'):
                 parts = path.split('/')[3:]
@@ -3607,6 +3704,14 @@ class WebRoutesHandler(BaseHTTPRequestHandler):
                     'reason': 'safety'
                 }, 503)
                 return
+
+            # BluePilot: clear V-ASM setup separately from route deletion.
+            if path == '/api/vasm/config':
+                params.put("VASMAnnotationConfig", {}, block=True)
+                params.put_bool("VASMEnabled", False, block=True)
+                self.send_json_response({'message': 'Camera regions cleared; V-ASM is disabled'})
+                return
+            # End BluePilot
 
             if path.startswith('/api/delete/'):
                 import shutil

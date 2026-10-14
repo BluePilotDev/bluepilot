@@ -357,6 +357,19 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"Blindspot", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"BlinkerPauseLaneChange", {PERSISTENT | BACKUP, BOOL, "0"}},
 
+    // BluePilot: Vision-Adjacent Spot Monitoring (ported from StarPilot PR #75)
+    {"VASMEnabled", {PERSISTENT | BACKUP, BOOL, "0"}},
+    {"VASMConfidenceThreshold", {PERSISTENT | BACKUP, FLOAT, "0.85"}},
+    {"VASMSmoothSeconds", {PERSISTENT | BACKUP, FLOAT, "0.2"}},
+    {"VASMAnnotationConfig", {PERSISTENT | BACKUP, JSON, "{}"}},
+    {"VASMLeftActive", {CLEAR_ON_MANAGER_START | CLEAR_ON_ONROAD_TRANSITION | CLEAR_ON_OFFROAD_TRANSITION, BOOL, "0"}},
+    {"VASMRightActive", {CLEAR_ON_MANAGER_START | CLEAR_ON_ONROAD_TRANSITION | CLEAR_ON_OFFROAD_TRANSITION, BOOL, "0"}},
+    {"VASMLeftConfidence", {CLEAR_ON_MANAGER_START | CLEAR_ON_ONROAD_TRANSITION | CLEAR_ON_OFFROAD_TRANSITION, FLOAT, "0.0"}},
+    {"VASMRightConfidence", {CLEAR_ON_MANAGER_START | CLEAR_ON_ONROAD_TRANSITION | CLEAR_ON_OFFROAD_TRANSITION, FLOAT, "0.0"}},
+    {"VASMHeartbeat", {CLEAR_ON_MANAGER_START | CLEAR_ON_ONROAD_TRANSITION | CLEAR_ON_OFFROAD_TRANSITION, FLOAT, "0.0"}},
+    {"VASMTimestampEof", {CLEAR_ON_MANAGER_START | CLEAR_ON_ONROAD_TRANSITION | CLEAR_ON_OFFROAD_TRANSITION, INT, "0"}},
+    // End BluePilot
+
     // BluePilot: Portal (Web Routes Server)
     {"EnableWebRoutesServer", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"BPPortalPort", {PERSISTENT | BACKUP, INT, "8088"}},

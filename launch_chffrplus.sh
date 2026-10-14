@@ -89,6 +89,22 @@ function launch {
   ln -sfn $(pwd) /data/pythonpath
   export PYTHONPATH="$PWD"
 
+  # BluePilot: Quickboot's untracked prebuilt marker is only valid for the commit that
+  # created it. Source updates can add dependencies or change compiled Params; reusing the
+  # marker would skip both uv sync and SCons and can prevent manager from starting. Tracked
+  # release prebuilts remain authoritative and are never invalidated here.
+  QUICKBOOT_COMMIT_FILE="$DIR/.quickboot_commit"
+  if [ -f "$DIR/prebuilt" ] && git -C "$DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1 && \
+     ! git -C "$DIR" ls-files --error-unmatch prebuilt >/dev/null 2>&1; then
+    CURRENT_COMMIT="$(git -C "$DIR" rev-parse HEAD)"
+    QUICKBOOT_COMMIT="$(cat "$QUICKBOOT_COMMIT_FILE" 2>/dev/null || true)"
+    if [ "$QUICKBOOT_COMMIT" != "$CURRENT_COMMIT" ]; then
+      echo "Quickboot build is stale; rebuilding for the current commit"
+      rm -f "$DIR/prebuilt"
+    fi
+  fi
+  # End BluePilot
+
   # hardware specific init
   if [ -f /AGNOS ]; then
     agnos_init

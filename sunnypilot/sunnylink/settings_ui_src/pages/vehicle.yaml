@@ -58,6 +58,35 @@ sections:
     enablement:
     - $ref: '#/macros/offroad'
     - $ref: '#/macros/not_ford_edge_mk2'
+  # BluePilot: StarPilot-derived driver-camera adjacent-spot monitoring.
+  - key: VASMEnabled
+    widget: toggle
+    title: '[Vehicle] Vision-Adjacent Spot Monitoring'
+    description: Use the driver camera to supplement the vehicle blind-spot sensors. First mark the left and right window regions from the BluePilot on-device Vehicle menu.
+  - key: VASMConfidenceThreshold
+    widget: option
+    title: '[Vehicle] V-ASM Confidence Threshold'
+    description: Minimum vehicle-detection confidence. Higher values reduce false alerts.
+    min: 0.25
+    max: 1.0
+    step: 0.05
+    enablement:
+    - type: param
+      key: VASMEnabled
+      equals: true
+  - key: VASMSmoothSeconds
+    widget: option
+    title: '[Vehicle] V-ASM Smoothing'
+    description: Time used to stabilize vision detections.
+    min: 0.1
+    max: 0.5
+    step: 0.1
+    unit: s
+    enablement:
+    - type: param
+      key: VASMEnabled
+      equals: true
+  # End BluePilot
   # --- Audio ---
   - key: BPUseCustomSounds
     widget: toggle
@@ -102,13 +131,43 @@ sections:
     widget: toggle
     title: '[Visuals] Minimal Driving View'
     description: Disable camera feed & only show lane lines and model path.
-  - key: BPRadRacerTheme
+  - key: BPThemePack
+    widget: multiple_button
+    title: '[Visuals] Theme'
+    description: Choose 8-Bit Racer, Tesla, or a seasonal theme pack.
+    options:
+    - value: ''
+      label: 'Off'
+    - value: rad_racer
+      label: 8-Bit Racer
+    - value: tesla
+      label: Tesla
+    - value: april_fools
+      label: April Fools
+    - value: christmas_week
+      label: Christmas
+    - value: cinco_de_mayo
+      label: Cinco de Mayo
+    - value: easter_week
+      label: Easter
+    - value: fourth_of_july
+      label: Fourth of July
+    - value: halloween_week
+      label: Halloween
+    - value: new_years
+      label: New Year's
+    - value: st_patricks_day
+      label: St. Patrick's
+    - value: thanksgiving_week
+      label: Thanksgiving
+    - value: valentines_day
+      label: Valentine's
+    - value: veterans_day
+      label: Veterans Day
+  - key: BPThemeAutoSeasonal
     widget: toggle
-    title: '[Visuals] 8-Bit Racer Theme (C3X)'
-    description: 'Retro 8-bit racing game onroad view: hides the camera feed, draws the road as green game lines, and moves
-      all metrics into a gauge cluster at the bottom of the screen.'
-    visibility:
-    - $ref: '#/macros/hide_on_mici'
+    title: '[Visuals] Auto Seasonal Theme'
+    description: During a holiday week, switch to that seasonal theme pack automatically. Outside holiday weeks the Theme selection applies.
   - key: BPRainbowLines
     widget: toggle
     title: '[Visuals] Rainbow Lane Lines'

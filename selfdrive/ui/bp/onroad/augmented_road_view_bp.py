@@ -1,7 +1,6 @@
-import time
 from enum import IntEnum
 import pyray as rl
-from cereal import log, messaging
+from cereal import log
 from openpilot.common.params import Params
 from openpilot.selfdrive.ui import UI_BORDER_SIZE
 from openpilot.selfdrive.ui.onroad.augmented_road_view import AugmentedRoadView
@@ -18,6 +17,7 @@ from openpilot.selfdrive.ui.bp.onroad.power_flow_gauge import PowerFlowGauge
 from openpilot.selfdrive.ui.bp.onroad.powerflow_gauge_arched import PowerflowGaugeArched, POWERFLOW_ANGLE_SPAN
 from openpilot.selfdrive.ui.bp.onroad.torque_bar_renderer_bp import TorqueBarRendererBP
 from openpilot.selfdrive.ui.bp.onroad.rad_racer_theme import RadRacerTheme
+from openpilot.selfdrive.ui.bp.onroad.tesla_style_renderer_bp import TeslaStyleRendererBP
 from openpilot.selfdrive.ui.bp.mici.onroad.confidence_ball_bp import ConfidenceBallTiciBP
 from openpilot.selfdrive.ui.onroad.driver_state import BTN_SIZE
 from openpilot.selfdrive.ui.sunnypilot.onroad.developer_ui import DeveloperUiState, get_bottom_dev_ui_offset
@@ -25,6 +25,7 @@ from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.selfdrive.ui.bp.lib.ui_debug_logger import bp_ui_log
 # BluePilot: unified theme selector (BPThemePack param)
 from openpilot.selfdrive.ui.bp.lib import theme_pack, theme_scene
+from openpilot.selfdrive.ui.bp.lib.tesla_status import tesla_mads_active
 
 
 class GaugeStyle(IntEnum):
@@ -49,6 +50,11 @@ TORQUE_STRIP_GAP = 3       # Gap between strip bottom and gauge content top
 
 # Full screen reference for sidebar detection
 FULL_CONTENT_WIDTH = 2100.0
+
+
+def confidence_ball_presentation(enabled: bool, tesla_style: bool) -> tuple[bool, bool]:
+  """Choose exactly one confidence-ball presentation for the active scene."""
+  return enabled and not tesla_style, enabled and tesla_style
 
 
 class AugmentedRoadViewBP(CameraViewBP, AugmentedRoadView, BlindspotRendererMixin):
@@ -89,9 +95,19 @@ class AugmentedRoadViewBP(CameraViewBP, AugmentedRoadView, BlindspotRendererMixi
     # BluePilot: Rad Racer 8-bit theme (drawing host; selection lives in theme_scene)
     self._rad_racer_theme = RadRacerTheme()
 
+    # BluePilot: display-only Tesla-style environment layer. It replaces the
+    # camera/model scene, while the normal HUD and safety overlays remain above it.
+    self._tesla_style_renderer = TeslaStyleRendererBP(dark_fraction=ui_state.tesla_dark_fraction)
+    self._tesla_style_enabled = theme_pack.tesla_active(self._bp_params)
+    self._tesla_style_renderer.set_enabled(self._tesla_style_enabled)
+    self.alert_renderer.set_tesla_style(self._tesla_style_enabled, ui_state.tesla_dark_fraction)
+
   def update_fade_out_bottom_overlay(self, _content_rect):
     """BluePilot: Skip MICI fade overlay on TICI — causes unwanted black gradient at bottom."""
-    pass
+
+  def show_event(self):
+    super().show_event()
+    self._hud_renderer.reset_tesla_lead_fade()
 
   def _render(self, rect):
     """Override render to add blindspot, gauges, confidence ball on left."""
@@ -110,6 +126,13 @@ class AugmentedRoadViewBP(CameraViewBP, AugmentedRoadView, BlindspotRendererMixi
       except (TypeError, ValueError):
         self._cached_gauge_size = 2
       self._hybrid_gauge_style = GaugeStyle(self._bp_params.get("FordPrefGaugeStyle", return_default=True) or 0)
+      self._tesla_style_enabled = theme_pack.tesla_active(self._bp_params)
+      self._tesla_style_renderer.set_enabled(self._tesla_style_enabled)
+
+    # Ambient palette changes are frame-driven; Params selection remains polled.
+    self._tesla_style_renderer.set_dark_fraction(ui_state.tesla_dark_fraction)
+    self.model_renderer.set_tesla_style(self._tesla_style_enabled, ui_state.tesla_dark_fraction)
+    self.alert_renderer.set_tesla_style(self._tesla_style_enabled, ui_state.tesla_dark_fraction)
 
     self._switch_stream_if_needed(ui_state.sm)
     self._update_calibration()
@@ -123,7 +146,10 @@ class AugmentedRoadViewBP(CameraViewBP, AugmentedRoadView, BlindspotRendererMixi
     )
 
     # BluePilot: Offset rect pushes HUD/driver state/alerts right of the confidence ball
-    ball_offset = (ConfidenceBallTiciBP.BALL_WIDTH + BALL_BORDER_MARGIN) if self._show_confidence_ball else 0
+    show_edge_confidence_ball, show_tesla_confidence = confidence_ball_presentation(
+      self._show_confidence_ball, self._tesla_style_enabled,
+    )
+    ball_offset = (ConfidenceBallTiciBP.BALL_WIDTH + BALL_BORDER_MARGIN) if show_edge_confidence_ball else 0
     ui_rect = rl.Rectangle(
       self._content_rect.x + ball_offset,
       self._content_rect.y,
@@ -141,13 +167,21 @@ class AugmentedRoadViewBP(CameraViewBP, AugmentedRoadView, BlindspotRendererMixi
       int(self._content_rect.height)
     )
 
-    # Render the base camera view. Minimal Driving View suppression lives in CameraViewBP.
-    CameraViewBP._render(self, rect)
+    # BluePilot: Tesla-style mode owns only the environment layer. The normal
+    # camera and all existing scene modes remain untouched when the flag is off.
+    if self._tesla_style_enabled:
+      # CameraView normally initializes the car-space projection as part of its
+      # render pass. Tesla mode intentionally skips that pass, so initialize the
+      # same cached transform explicitly before projecting road geometry/tracks.
+      self._calc_frame_matrix(self._content_rect)
+      self._tesla_style_renderer.render_background(self._content_rect, self.model_renderer)
+    else:
+      CameraViewBP._render(self, rect)
 
     # BluePilot: unified theme scene dispatch. A scene that replaces the HUD (Rad Racer)
     # takes over the whole render; pack scenes draw a background pass here and a
     # foreground pass just before alerts.
-    _scene = theme_scene.active_scene()
+    _scene = None if self._tesla_style_enabled else theme_scene.active_scene()
     if _scene is not None and _scene.replaces_hud():
       self._render_rad_racer_scene(rect)
       return
@@ -157,11 +191,18 @@ class AugmentedRoadViewBP(CameraViewBP, AugmentedRoadView, BlindspotRendererMixi
     # Render model (uses full content rect for camera-space overlays)
     self.model_renderer.render(self._content_rect)
 
+    self._hud_renderer.set_tesla_lead_generation(
+      self.model_renderer.primary_lead_generation() if self._tesla_style_enabled else None,
+    )
+
+    if self._tesla_style_enabled:
+      self._tesla_style_renderer.render_traffic(self._content_rect, self.model_renderer)
     # SP fade overlay
     self.update_fade_out_bottom_overlay(self._content_rect)
 
     # BluePilot: Render confidence ball on left side (narrow rect = ball strip only, not full width)
-    if self._show_confidence_ball:
+    confidence_ball_rect = None
+    if show_edge_confidence_ball:
       ball_strip_width = ConfidenceBallTiciBP.BALL_WIDTH + BALL_BORDER_MARGIN
       # Semi-transparent dark backdrop so ball is visible against bright camera feed
       rl.draw_rectangle_gradient_h(
@@ -172,17 +213,22 @@ class AugmentedRoadViewBP(CameraViewBP, AugmentedRoadView, BlindspotRendererMixi
         rl.Color(20, 20, 20, 120),  # darker at left edge
         rl.Color(20, 20, 20, 0),    # fade to transparent at right edge
       )
-      ball_rect = rl.Rectangle(
+      confidence_ball_rect = rl.Rectangle(
         self._content_rect.x + BALL_BORDER_MARGIN,
         self._content_rect.y,
         ball_strip_width,
         self._content_rect.height,
       )
-      self._confidence_ball.render(ball_rect)
 
-    # BluePilot: Draw blindspot screen edge indicators ON TOP of confidence ball backdrop
-    # so the red safety warning is never obscured
-    self._draw_blindspot_screen_edges(self._content_rect, self.BLIND_SPOT_WIDTH)
+    mads_active = tesla_mads_active(ui_state.sm)
+    if show_tesla_confidence:
+      self._confidence_ball.update_state_only()
+      confidence_top, confidence_bottom = self._confidence_ball.current_colors()
+      self._hud_renderer.set_tesla_confidence_status(
+        True, confidence_top, confidence_bottom, mads_active,
+      )
+    else:
+      self._hud_renderer.set_tesla_confidence_status(False, mads_active=mads_active)
 
     # BluePilot: Render HUD, driver state before gauges and alerts
     self._hud_renderer.set_gradient_rect(self._content_rect)
@@ -199,6 +245,16 @@ class AugmentedRoadViewBP(CameraViewBP, AugmentedRoadView, BlindspotRendererMixi
       int(self._content_rect.width),
       int(self._content_rect.height)
     )
+
+    # The HUD header spans the full content rect and used to cover a high-
+    # confidence ball near the top of its strip. Render the ball after the HUD,
+    # matching MICI's overlay ordering, while keeping its faded backdrop below.
+    if confidence_ball_rect is not None:
+      self._confidence_ball.render(confidence_ball_rect)
+
+    # Safety warnings remain above both the confidence ball and HUD.
+    self._draw_blindspot_screen_edges(self._content_rect, self.BLIND_SPOT_WIDTH)
+
     self.driver_state_renderer.render(ui_rect)
 
     # BluePilot: Update torque bar filter state (once per frame, before _render_gauges uses it)
@@ -226,7 +282,7 @@ class AugmentedRoadViewBP(CameraViewBP, AugmentedRoadView, BlindspotRendererMixi
     alert = self.alert_renderer.get_alert(ui_state.sm)
     alert_rect = (
       self._content_rect
-      if (alert and alert.size == log.SelfdriveState.AlertSize.full and self._show_confidence_ball)
+      if (alert and alert.size == log.SelfdriveState.AlertSize.full and show_edge_confidence_ball)
       else ui_rect
     )
     self.alert_renderer.render(alert_rect)
@@ -333,7 +389,7 @@ class AugmentedRoadViewBP(CameraViewBP, AugmentedRoadView, BlindspotRendererMixi
     if battery_rect is not None and pf_visible:
       # Both gauges visible: horizontally center the combined container
       pf_rect = self._power_flow_gauge.get_gauge_rect(
-        content_rect, sidebar_visible, self._show_confidence_ball,
+        content_rect, sidebar_visible, ball_offset > 0,
       )
 
       total_inner_width = battery_rect.width + SHARED_INNER_GAP + pf_rect.width
@@ -389,7 +445,7 @@ class AugmentedRoadViewBP(CameraViewBP, AugmentedRoadView, BlindspotRendererMixi
     elif pf_visible:
       # Only power flow visible: shared container with optional strip
       pf_rect = self._power_flow_gauge.get_gauge_rect(
-        content_rect, sidebar_visible, self._show_confidence_ball,
+        content_rect, sidebar_visible, ball_offset > 0,
       )
 
       total_height = pf_rect.height + strip_allocation
