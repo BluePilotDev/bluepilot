@@ -146,7 +146,8 @@ class ControlsExt(ModelStateBase):
     # valid = both sources seen AND every field below filled from a full-shape modelV2 (33-point
     # arrays, 3+ lane lines/probs/stds). On an invalid frame nothing is written and the lateral
     # keeps its previous inputs, as it did when a SubMaster message was stale. The opendbc side
-    # re-checks array lengths before use (lateral_inputs_complete), so valid is a hint, not a promise.
+    # re-checks array lengths and that every value is finite before use (lateral_inputs_complete),
+    # so valid is a hint, not a promise.
     li.valid = bool(sm.seen['modelV2'] and sm.seen['vehicleParameters']
                     and len(md.laneLines) >= 3 and len(md.laneLineProbs) >= 3 and len(md.laneLineStds) >= 3)
     if not li.valid:
