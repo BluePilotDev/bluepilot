@@ -14,6 +14,8 @@ from openpilot.system.ui.lib.wifi_manager import WifiManager, Network
 from openpilot.system.ui.widgets import DialogResult
 from openpilot.system.ui.widgets.confirm_dialog import ConfirmDialog
 from openpilot.selfdrive.ui.bp.mici.widgets.preferred_network_select import PreferredNetworkSelectMici
+from openpilot.selfdrive.ui.bp.mici.widgets.connect_backend_select import ConnectBackendSelectMici
+from bluepilot.backend_switch import BACKEND_LABELS, BACKENDS
 
 class BluePilotLayoutMici(NavWidget):
   def __init__(self, back_callback: Callable):
@@ -72,6 +74,11 @@ class BluePilotLayoutMici(NavWidget):
     self.clear_model_cache = BigButtonBP("clear crashed model", "", "icons_mici/settings/device/reboot.png")
     self.clear_model_cache.set_click_callback(self._clear_model_cache)
     self.ui_debug_log = BigParamControlBP("ui debug logging", "BPUIDebugLog")
+    self.connect_backend_btn = BigButtonBP("connect backend", "", "icons_mici/settings/device/reboot.png")
+    self.connect_backend_btn.set_click_callback(self._select_connect_backend)
+    self.restore_dongle_btn = BigButtonBP("restore dongle id", "", "icons_mici/settings/device/reboot.png")
+    self.restore_dongle_btn.set_click_callback(self._restore_dongle_id)
+    self.restore_dongle_btn.set_enabled(self._has_recoverable_dongle_id)
     self.vbatt_pause_charging = BigParamFloatControl("12V battery limit", "vbatt_pause_charging", min=11.0, max=14.0, step=0.1)
 
     # Hybrid/EV power flow: enable toggle (like C3X) + style dropdown Flat/Round (C4), same pattern as Lower Right Display
@@ -118,6 +125,8 @@ class BluePilotLayoutMici(NavWidget):
       self.disable_dowhill_comp,
       self.clear_model_cache,
       self.ui_debug_log,
+      self.connect_backend_btn,
+      self.restore_dongle_btn,
     ])
 
     # Toggle lists
@@ -189,6 +198,81 @@ class BluePilotLayoutMici(NavWidget):
     )
     gui_app.push_widget(dialog)
 
+  def _get_connect_backend_display(self) -> str:
+    try:
+      raw = self._params.get("BPConnectBackend")
+      idx = int(raw) if raw not in (None, "") else 0
+      if 0 <= idx < len(BACKENDS):
+        return BACKEND_LABELS[BACKENDS[idx]]
+    except Exception:
+      pass
+    return BACKEND_LABELS[BACKENDS[0]]
+
+  def _select_connect_backend(self):
+    prev_idx = 0
+    try:
+      raw = self._params.get("BPConnectBackend")
+      prev_idx = int(raw) if raw not in (None, "") else 0
+    except (TypeError, ValueError):
+      prev_idx = 0
+
+    def on_selected(idx: int):
+      self.connect_backend_btn.set_value(self._get_connect_backend_display())
+      if idx == prev_idx:
+        return
+      # Backend switch takes effect at launch, so offer a reboot right away.
+      gui_app.push_widget(ConfirmDialog(tr("Server change requires a reboot to take effect. Reboot now?"),
+                                        tr("Reboot"), callback=self._handle_reboot_confirm))
+
+    panel = ConnectBackendSelectMici(
+      on_selected=on_selected,
+      on_dismiss=lambda: self.connect_backend_btn.set_value(self._get_connect_backend_display()),
+    )
+    gui_app.push_widget(panel)
+
+  def _handle_reboot_confirm(self, result):
+    if result == DialogResult.CONFIRM:
+      self._params.put_bool_nonblocking("DoReboot", True)
+
+  def _get_recoverable_dongle_id(self) -> str | None:
+    try:
+      from bluepilot.backend_switch import find_recoverable_dongle_id
+      return find_recoverable_dongle_id(self._params)
+    except Exception:
+      return None
+
+  def _has_recoverable_dongle_id(self) -> bool:
+    return self._get_recoverable_dongle_id() is not None
+
+  def _get_recoverable_dongle_id_preview(self) -> str:
+    candidate = self._get_recoverable_dongle_id()
+    if candidate is None:
+      return ""
+    return f"{candidate[:6]}…{candidate[-4:]}" if len(candidate) > 12 else candidate
+
+  def _restore_dongle_id(self):
+    candidate = self._get_recoverable_dongle_id()
+    if candidate is None:
+      return
+
+    def handle_confirm(result: DialogResult):
+      if result == DialogResult.CONFIRM:
+        try:
+          from bluepilot.backend_switch import restore_cached_dongle_id
+          restore_cached_dongle_id(self._params, candidate)
+        except Exception:
+          cloudlog.exception("bp_dongle_id_recovery_ui failed")
+          return
+        self.restore_dongle_btn.set_value(self._get_recoverable_dongle_id_preview())
+        self.restore_dongle_btn.set_enabled(self._has_recoverable_dongle_id)
+        gui_app.push_widget(ConfirmDialog(tr("Dongle ID restored. Reboot now to apply?"),
+                                          tr("Reboot"), callback=self._handle_reboot_confirm))
+
+    preview = self._get_recoverable_dongle_id_preview()
+    gui_app.push_widget(ConfirmDialog(
+      tr("Restore cached dongle ID {preview}? This overwrites the current (unregistered) device ID.").format(preview=preview),
+      tr("Restore"), callback=handle_confirm))
+
   def _show_qr_dialog(self):
     """Show QR code dialog for webserver access. MICI uses push_widget/pop_widget (no set_modal_overlay)."""
     if not self._params.get_bool("EnableWebRoutesServer"):
@@ -236,6 +320,11 @@ class BluePilotLayoutMici(NavWidget):
     # Preferred WiFi Network: enable when saved networks exist, refresh display value
     self.preferred_network_btn.set_enabled(len(self._saved_networks) > 0)
     self.preferred_network_btn.set_value(self._get_preferred_network_display())
+
+    # Connect backend / dongle ID recovery
+    self.connect_backend_btn.set_value(self._get_connect_backend_display())
+    self.restore_dongle_btn.set_value(self._get_recoverable_dongle_id_preview())
+    self.restore_dongle_btn.set_enabled(self._has_recoverable_dongle_id)
 
   def _on_network_updated(self, networks: list[Network]):
     """Update saved networks list when WiFi networks are updated (callback from WifiManager)."""

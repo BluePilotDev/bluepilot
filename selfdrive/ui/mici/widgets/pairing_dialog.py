@@ -24,8 +24,25 @@ class PairingDialog(NavWidget):
     self._last_qr_generation = float("-inf")
 
     self._txt_pair = gui_app.texture("icons_mici/settings/device/pair.png", 33, 60)
-    self._pair_label = MiciLabel("pair with comma connect", 48, font_weight=FontWeight.BOLD,
+    # BluePilot: pair with the selected connect backend (comma / Konik / offline)
+    self._pair_label = MiciLabel(f"pair with {self._pair_with_label()}", 48, font_weight=FontWeight.BOLD,
                                  color=rl.Color(255, 255, 255, int(255 * 0.9)), line_height=40, wrap_text=True)
+
+  # BluePilot: connect backend helpers
+  def _connect_backend(self) -> str:
+    try:
+      from bluepilot.backend_switch import get_connect_backend
+      return get_connect_backend(self._params)
+    except Exception:
+      return "comma"
+
+  def _pair_with_label(self) -> str:
+    try:
+      from bluepilot.backend_switch import backend_label
+      return backend_label(self._connect_backend())
+    except Exception:
+      return "comma connect"
+  # End BluePilot
 
   def _get_pairing_url(self) -> str:
     try:
@@ -34,7 +51,14 @@ class PairingDialog(NavWidget):
     except Exception as e:
       cloudlog.warning(f"Failed to get pairing token: {e}")
       token = ""
-    return f"https://connect.comma.ai/?pair={token}"
+    # BluePilot: pair on the host for the selected connect backend
+    try:
+      from bluepilot.backend_switch import pairing_host
+      host = pairing_host(self._connect_backend())
+    except Exception:
+      host = "connect.comma.ai"
+    return f"https://{host}/?pair={token}"
+    # End BluePilot
 
   def _generate_qr_code(self) -> None:
     try:
