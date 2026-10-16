@@ -144,6 +144,13 @@ def reconcile_backend(params) -> str:
     target = get_connect_backend(params)
     active_raw = params.get("BPActiveBackend")
     dongle_id = params.get("DongleId")
+    # A saved "UnregisteredDevice" is a failed registration (no keys at the time, a 402/403, ...),
+    # not an identity. Left in place it makes register() skip the network on every later boot, so
+    # the device can never recover. Clear it so registration retries. Offline keeps it by design.
+    if dongle_id == UNREGISTERED_DONGLE_ID and target != BACKEND_OFFLINE:
+      params.remove("DongleId")
+      cloudlog.event("bp_unregistered_cleared", backend=target)
+      dongle_id = None
     registered = dongle_id is not None and dongle_id != UNREGISTERED_DONGLE_ID
     persist_comma_id = None
     first_run = active_raw is None

@@ -63,6 +63,7 @@ def register(show_spinner=False) -> str | None:
   if not public_key:
     dongle_id = UNREGISTERED_DONGLE_ID
     cloudlog.warning("missing public key")
+    cloudlog.event("bp_register_no_keys", backend=backend)  # BluePilot: diagnostic -- no network attempt is made
   elif dongle_id is None:
     cloudlog.event("bp_register_network_attempt", backend=backend)  # BluePilot: diagnostic
     if show_spinner:
@@ -99,6 +100,7 @@ def register(show_spinner=False) -> str | None:
 
         if resp.status_code in (402, 403):
           cloudlog.info(f"Unable to register device, got {resp.status_code}")
+          cloudlog.event("bp_register_refused", backend=backend, status=resp.status_code, serial=serial)  # BluePilot: diagnostic
           dongle_id = UNREGISTERED_DONGLE_ID
         else:
           dongleauth = json.loads(resp.text)
