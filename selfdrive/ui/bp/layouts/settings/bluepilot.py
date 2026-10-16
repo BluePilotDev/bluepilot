@@ -389,6 +389,28 @@ class BluePilotLayout(Widget):
       callback=self._select_preferred_network
     )
 
+    # Connect backend selector (Comma Connect / Konik Stable / Offline Mode)
+    self._connect_backend_dialog: MultiOptionDialog | None = None
+    self._connect_backend_action = ButtonAction(lambda: tr("SELECT"))
+    self._connect_backend_action.set_value(lambda: self._get_connect_backend_display())
+    self._connect_backend_btn = ListItem(
+      lambda: tr("Connect Backend"),
+      description=lambda: tr("Comma Connect uses stock servers. Konik Stable sends routes to stable.konik.ai (dongle ID switches automatically). Offline Mode points at unreachable hosts so uploads never succeed. Reboot to apply."),
+      action_item=self._connect_backend_action,
+      callback=self._select_connect_backend
+    )
+
+    # Restore cached dongle ID — recovery for a device left unregistered by a backend
+    # switch (e.g. a pre-existing Konik registration from before this menu existed).
+    self._restore_dongle_action = ButtonAction(lambda: tr("RESTORE"), enabled=self._has_recoverable_dongle_id)
+    self._restore_dongle_action.set_value(lambda: self._get_recoverable_dongle_id_preview())
+    self._restore_dongle_btn = ListItem(
+      lambda: tr("Restore Cached Dongle ID"),
+      description=lambda: tr("If switching backends left this device unregistered, restore a previously registered ID found cached here. Only enabled when one is found."),
+      action_item=self._restore_dongle_action,
+      callback=self._restore_dongle_id
+    )
+
     # Clear model runner cache (ModelRunnerTypeCache + ModelManager_ActiveBundle) and reboot
     self._clear_model_cache_btn = button_item(
       lambda: tr("Clear Crashed Model"),
@@ -403,6 +425,8 @@ class BluePilotLayout(Widget):
       self._preferred_network_btn,
       self._clear_model_cache_btn,
       self._ui_debug_log,
+      self._connect_backend_btn,
+      self._restore_dongle_btn,
       SectionHeader(tr("Vehicle")),
       self._show_hands_free_ui,
       self._vbatt_pause_charging,
@@ -597,6 +621,93 @@ class BluePilotLayout(Widget):
       callback=handle_selection
     )
     gui_app.push_widget(self._preferred_network_dialog)
+
+  def _get_connect_backend_display(self) -> str:
+    try:
+      from bluepilot.backend_switch import backend_label, get_connect_backend
+      return backend_label(get_connect_backend(self._params))
+    except Exception:
+      return tr("Comma Connect")
+
+  def _select_connect_backend(self):
+    from bluepilot.backend_switch import BACKEND_LABELS, BACKENDS, get_connect_backend
+
+    options = [BACKEND_LABELS[b] for b in BACKENDS]
+    current = self._get_connect_backend_display()
+    try:
+      prev_idx = BACKENDS.index(get_connect_backend(self._params))
+    except ValueError:
+      prev_idx = 0
+
+    def handle_selection(result):
+      if result == DialogResult.CONFIRM and self._connect_backend_dialog is not None:
+        selection = self._connect_backend_dialog.selection
+        try:
+          idx = options.index(selection)
+        except ValueError:
+          idx = 0
+        if idx != prev_idx:
+          try:
+            self._params.put("BPConnectBackend", idx)
+          except UnknownKeyName:
+            pass
+          self._connect_backend_action.set_value(self._get_connect_backend_display())
+          dialog = ConfirmDialog(tr("Server change requires a reboot to take effect. Reboot now?"),
+                                 tr("Reboot"), callback=self._handle_connect_backend_reboot)
+          gui_app.push_widget(dialog)
+        else:
+          self._connect_backend_action.set_value(self._get_connect_backend_display())
+      self._connect_backend_dialog = None
+
+    self._connect_backend_dialog = MultiOptionDialog(
+      tr("Select Connect Backend"),
+      options,
+      current,
+      callback=handle_selection
+    )
+    gui_app.push_widget(self._connect_backend_dialog)
+
+  def _handle_connect_backend_reboot(self, result):
+    if result == DialogResult.CONFIRM:
+      self._params.put_bool_nonblocking("DoReboot", True)
+
+  def _get_recoverable_dongle_id(self) -> str | None:
+    try:
+      from bluepilot.backend_switch import find_recoverable_dongle_id
+      return find_recoverable_dongle_id(self._params)
+    except Exception:
+      return None
+
+  def _has_recoverable_dongle_id(self) -> bool:
+    return self._get_recoverable_dongle_id() is not None
+
+  def _get_recoverable_dongle_id_preview(self) -> str:
+    candidate = self._get_recoverable_dongle_id()
+    if candidate is None:
+      return ""
+    return f"{candidate[:6]}…{candidate[-4:]}" if len(candidate) > 12 else candidate
+
+  def _restore_dongle_id(self):
+    candidate = self._get_recoverable_dongle_id()
+    if candidate is None:
+      return
+
+    def handle_confirm(result: DialogResult):
+      if result == DialogResult.CONFIRM:
+        try:
+          from bluepilot.backend_switch import restore_cached_dongle_id
+          restore_cached_dongle_id(self._params, candidate)
+        except Exception:
+          cloudlog.exception("bp_dongle_id_recovery_ui failed")
+          return
+        dialog = ConfirmDialog(tr("Dongle ID restored. Reboot now to apply?"),
+                               tr("Reboot"), callback=self._handle_connect_backend_reboot)
+        gui_app.push_widget(dialog)
+
+    preview = self._get_recoverable_dongle_id_preview()
+    dialog = ConfirmDialog(tr("Restore cached dongle ID {preview}? This overwrites the current (unregistered) device ID.").format(preview=preview),
+                           tr("Restore"), callback=handle_confirm)
+    gui_app.push_widget(dialog)
 
   def _clear_model_cache(self):
     """Clear ModelRunnerTypeCache and ModelManager_ActiveBundle, then reboot."""

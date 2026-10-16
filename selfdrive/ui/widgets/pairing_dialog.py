@@ -28,6 +28,14 @@ class PairingDialog(Widget):
     self._close_btn = IconButton(gui_app.texture("icons/close.png", 80, 80))
     self._close_btn.set_click_callback(gui_app.pop_widget)
 
+  def _pairing_host(self) -> str:
+    # BluePilot: pair on the host for the selected connect backend
+    try:
+      from bluepilot.backend_switch import get_connect_backend, pairing_host
+      return pairing_host(get_connect_backend(self.params))
+    except Exception:
+      return "connect.comma.ai"
+
   def _get_pairing_url(self) -> str:
     try:
       dongle_id = self.params.get("DongleId") or ""
@@ -35,7 +43,7 @@ class PairingDialog(Widget):
     except Exception:
       cloudlog.exception("Failed to get pairing token")
       token = ""
-    return f"https://connect.comma.ai/?pair={token}"
+    return f"https://{self._pairing_host()}/?pair={token}"
 
   def _generate_qr_code(self) -> None:
     try:
@@ -113,10 +121,11 @@ class PairingDialog(Widget):
     return -1
 
   def _render_instructions(self, rect: rl.Rectangle) -> None:
+    host = self._pairing_host()
     instructions = [
-      tr("Go to https://connect.comma.ai on your phone"),
+      tr("Go to https://connect.comma.ai on your phone").replace("connect.comma.ai", host),
       tr("Click \"add new device\" and scan the QR code on the right"),
-      tr("Bookmark connect.comma.ai to your home screen to use it like an app"),
+      tr("Bookmark connect.comma.ai to your home screen to use it like an app").replace("connect.comma.ai", host),
     ]
 
     font = gui_app.font(FontWeight.BOLD)
