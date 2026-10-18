@@ -7,7 +7,7 @@ See the LICENSE.md file in the root directory for more details.
 from openpilot.common.params import Params
 from openpilot.common.test import OpenpilotTestCase
 from openpilot.sunnypilot.selfdrive.controls.controlsd_ext import ControlsExt
-from opendbc.car.bluepilot.ford.values_ext import BP_LATERAL_PARAMS
+from opendbc.bluepilot_lateral.core.values_ext import BP_LATERAL_PARAMS
 
 
 def _published(params) -> dict[str, bytes]:

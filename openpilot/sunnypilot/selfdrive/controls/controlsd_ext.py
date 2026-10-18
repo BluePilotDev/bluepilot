@@ -121,7 +121,7 @@ class ControlsExt(ModelStateBase):
     shows in controlsd timing."""
     # imported here, not at module level: the key list lives in the opendbc submodule and only
     # Ford needs it, so a submodule on another layout must not break controlsd for other brands
-    from opendbc.car.bluepilot.ford.values_ext import BP_LATERAL_PARAMS
+    from opendbc.bluepilot_lateral.core.values_ext import BP_LATERAL_PARAMS
     entries = []
     for key in BP_LATERAL_PARAMS:
       try:
