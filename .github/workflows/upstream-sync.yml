@@ -28,7 +28,7 @@ jobs:
         app-id: ${{ secrets.SYNC_APP_ID }}
         private-key: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
     # History only: no LFS, and the working tree is just .github.
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v7
       with:
         fetch-depth: 0
         token: ${{ steps.app.outputs.token }}
