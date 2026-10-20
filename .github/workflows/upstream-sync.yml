@@ -1,0 +1,131 @@
+# BluePilot: weekly upstream sync (spec: #6). Fast-forwards `sunnypilot-clean` to sunnypilot
+# `master` and keeps one PR open from it into `master-local-lateral`. It never merges, never
+# force-pushes and never moves `opendbc_repo`: if `sunnypilot-clean` is not a fast-forward of
+# upstream it stops and opens an issue.
+name: upstream sync
+
+on:
+  schedule:
+    - cron: '17 7 * * 1'  # weekly, Monday 07:17 UTC
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: upstream-sync
+
+jobs:
+  sync:
+    if: github.repository == 'ford-op/bp-sunnypilot'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+    # GITHUB_TOKEN can't be used: pushes and PRs made with it don't start CI. The ford-op-sync
+    # App's PRs run CI normally.
+    - uses: actions/create-github-app-token@v2
+      id: app
+      with:
+        app-id: ${{ secrets.SYNC_APP_ID }}
+        private-key: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
+    # History only: no LFS, and the working tree is just .github.
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        token: ${{ steps.app.outputs.token }}
+        sparse-checkout: .github
+    - name: Sync
+      env:
+        GH_TOKEN: ${{ steps.app.outputs.token }}
+        REPO: ${{ github.repository }}
+        UPSTREAM_URL: https://github.com/sunnypilot/sunnypilot.git
+        MIRROR: sunnypilot-clean
+        INTEGRATION: master-local-lateral
+        OPENDBC: ford-op/bg-opendbc
+        OPENDBC_BRANCH: bg-clean
+      run: |
+        set -euo pipefail
+        git fetch --no-tags origin "$INTEGRATION"
+        integration=$(git rev-parse "origin/$INTEGRATION")
+        mirror=$(git rev-parse -q --verify "refs/remotes/origin/$MIRROR" || true)  # empty on the first run; the checkout fetched every branch
+        git fetch --no-tags "$UPSTREAM_URL" master
+        up=$(git rev-parse FETCH_HEAD)
+
+        # 1. Fast-forward the mirror (creating it on the first run), or stop and say why.
+        if [ "$mirror" != "$up" ]; then
+          if [ -n "$mirror" ] && ! git merge-base --is-ancestor "$mirror" "$up"; then
+            title="$MIRROR is not a mirror"
+            {
+              echo "The weekly sync stopped: \`$MIRROR\` is not a fast-forward of sunnypilot \`master\` ($up)."
+              echo
+              echo "Commits on \`$MIRROR\` that upstream doesn't have:"
+              echo '```'
+              git log --format='%h %ad %an | %s' --date=short "$up..$mirror"
+              echo '```'
+              echo "Fix \`$MIRROR\` by hand (it may only ever equal upstream), then re-run the job. The job never force-pushes."
+            } > issue.md
+            num=$(gh issue list -R "$REPO" --state open --search "in:title \"$title\"" --json number,title \
+                  -q "map(select(.title == \"$title\")) | .[0].number // empty")
+            if [ -n "$num" ]; then gh issue edit "$num" -R "$REPO" --body-file issue.md; else gh issue create -R "$REPO" --title "$title" --body-file issue.md; fi
+            echo "::error::$MIRROR is not a fast-forward of upstream; see the issue"
+            exit 1
+          fi
+          git push origin "$up:refs/heads/$MIRROR"
+        fi
+
+        # 2. Nothing to do if the integration branch already has upstream.
+        if git merge-base --is-ancestor "$up" "$integration"; then
+          echo "$INTEGRATION already contains upstream $up"
+          exit 0
+        fi
+
+        # 3. Open or refresh the one sync PR (head = the mirror itself).
+        base=$(git merge-base "$up" "$integration")
+        out=$(git merge-tree --write-tree --name-only --no-messages "$integration" "$up") || true
+        # exit 1 means conflicts or an error; only a real result starts with the merged tree's ID
+        grep -qE '^[0-9a-f]{40}$' <<<"$(head -n1 <<<"$out")" || { echo "::error::merge-tree failed"; exit 1; }
+        conflicts=$(tail -n +2 <<<"$out" | sed 's/^/- /')
+        upstream_opendbc=$(git rev-parse "$up:opendbc_repo")
+        our_opendbc=$(git rev-parse "$integration:opendbc_repo")
+        # bg-clean contains sunnypilot's opendbc when the compare from it to bg-clean is "ahead" or "identical";
+        # a 404 means bg-opendbc doesn't have the commit at all yet
+        if status=$(gh api "repos/$OPENDBC/compare/$upstream_opendbc...$OPENDBC_BRANCH" -q .status 2>compare.err); then
+          case "$status" in ahead|identical) ready=yes ;; *) ready=no ;; esac
+        elif grep -q "HTTP 404" compare.err; then
+          ready=no
+        else
+          cat compare.err >&2
+          ready="unknown (the compare API failed; see the job log)"
+        fi
+        {
+          echo "Automated weekly sync of sunnypilot \`master\` into \`$INTEGRATION\` (#6). Upstream \`${base:0:8}..${up:0:8}\`."
+          echo
+          echo "**Merge with a merge commit, not squash, and don't delete the branch.** The head is \`$MIRROR\` itself; a squash leaves upstream's commits out of \`$INTEGRATION\` and the job reopens this PR every week."
+          echo
+          echo "### opendbc"
+          echo "sunnypilot pins opendbc \`${upstream_opendbc:0:8}\`; $OPENDBC \`$OPENDBC_BRANCH\` contains it: **$ready**. \`$INTEGRATION\` points at \`${our_opendbc:0:8}\`."
+          if [ "$ready" = no ]; then
+            echo "The $OPENDBC sync that brings in \`${upstream_opendbc:0:8}\` lands first."
+          fi
+          echo
+          echo "### Upstream commits"
+          git log -n 200 --format='- %h %s' "$integration..$up"
+          more=$(( $(git rev-list --count "$integration..$up") - 200 ))
+          if [ "$more" -gt 0 ]; then echo "- …and $more more"; fi
+          echo
+          echo "### Files upstream changed that BluePilot also changes"
+          overlap=$(comm -12 <(git diff --name-only "$base" "$up" | sort) <(git diff --name-only "$base" "$integration" | sort) | sed 's/^/- /')
+          echo "${overlap:-None.}"
+          echo
+          if [ -n "$conflicts" ]; then
+            echo "### Conflicts"
+            echo "$conflicts"
+          else
+            echo "No conflicts."
+          fi
+        } > pr.md
+        pr=$(gh pr list -R "$REPO" --head "$MIRROR" --base "$INTEGRATION" --state open --json number -q '.[0].number // empty')
+        if [ -n "$pr" ]; then
+          gh pr edit "$pr" -R "$REPO" --body-file pr.md
+        else
+          gh pr create -R "$REPO" --head "$MIRROR" --base "$INTEGRATION" --title "sync: sunnypilot master → $INTEGRATION" --body-file pr.md
+        fi
