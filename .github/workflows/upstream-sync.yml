@@ -1,4 +1,4 @@
-# BluePilot: weekly upstream sync (spec: #6). Fast-forwards `sunnypilot-clean` to sunnypilot
+# BluePilot: nightly upstream sync (spec: #6). Fast-forwards `sunnypilot-clean` to sunnypilot
 # `master` and keeps one PR open from it into `master-local-lateral`. It never merges, never
 # force-pushes and never moves `opendbc_repo`: if `sunnypilot-clean` is not a fast-forward of
 # upstream it stops and opens an issue.
@@ -6,7 +6,7 @@ name: upstream sync
 
 on:
   schedule:
-    - cron: '17 7 * * 1'  # weekly, Monday 07:17 UTC
+    - cron: '17 7 * * *'  # nightly, 07:17 UTC
   workflow_dispatch:
 
 permissions: {}
@@ -55,7 +55,7 @@ jobs:
           if [ -n "$mirror" ] && ! git merge-base --is-ancestor "$mirror" "$up"; then
             title="$MIRROR is not a mirror"
             {
-              echo "The weekly sync stopped: \`$MIRROR\` is not a fast-forward of sunnypilot \`master\` ($up)."
+              echo "The nightly sync stopped: \`$MIRROR\` is not a fast-forward of sunnypilot \`master\` ($up)."
               echo
               echo "Commits on \`$MIRROR\` that upstream doesn't have:"
               echo '```'
@@ -97,9 +97,9 @@ jobs:
           ready="unknown (the compare API failed; see the job log)"
         fi
         {
-          echo "Automated weekly sync of sunnypilot \`master\` into \`$INTEGRATION\` (#6). Upstream \`${base:0:8}..${up:0:8}\`."
+          echo "Automated nightly sync of sunnypilot \`master\` into \`$INTEGRATION\` (#6). Upstream \`${base:0:8}..${up:0:8}\`."
           echo
-          echo "**Merge with a merge commit, not squash, and don't delete the branch.** The head is \`$MIRROR\` itself; a squash leaves upstream's commits out of \`$INTEGRATION\` and the job reopens this PR every week."
+          echo "**Merge with a merge commit, not squash, and don't delete the branch.** The head is \`$MIRROR\` itself; a squash leaves upstream's commits out of \`$INTEGRATION\` and the job reopens this PR every night."
           echo
           echo "### opendbc"
           echo "sunnypilot pins opendbc \`${upstream_opendbc:0:8}\`; $OPENDBC \`$OPENDBC_BRANCH\` contains it: **$ready**. \`$INTEGRATION\` points at \`${our_opendbc:0:8}\`."
