@@ -388,6 +388,7 @@ struct CarParamsSP @0x80ae746ee2596b11 {
   pcmCruiseSpeed @3 :Bool;
   intelligentCruiseButtonManagementAvailable @4 :Bool;
   enableGasInterceptor @5 :Bool;
+  lateralInputsRequired @6 :Bool;  # BluePilot: the host fills CarControlSP.lateralInputs and params
 
   neuralNetworkLateralControl @2 :NeuralNetworkLateralControl;
 

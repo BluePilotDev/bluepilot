@@ -105,8 +105,9 @@ class ControlsExt(ModelStateBase):
     CC_SP.intelligentCruiseButtonManagement.sendButton = icbm_src.sendButton
     CC_SP.intelligentCruiseButtonManagement.vTarget = icbm_src.vTarget
 
-    # BluePilot: per-frame inputs for the Ford 4-signal lateral in opendbc (other brands: left empty)
-    if self.CP.brand == 'ford':
+    # BluePilot: per-frame inputs and settings for a car that asks for them (the library sets
+    # lateralInputsRequired for every Ford); other cars leave them empty
+    if self.CP_SP.lateralInputsRequired:
       self.fill_lateral_inputs(CC_SP.lateralInputs, sm)
       CC_SP.params = self.read_lateral_params()
 
