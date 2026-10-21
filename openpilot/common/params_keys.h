@@ -302,7 +302,8 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"TorqueParamsOverrideFriction", {PERSISTENT | BACKUP, FLOAT, "0.1"}},
     {"TorqueParamsOverrideLatAccelFactor", {PERSISTENT | BACKUP, FLOAT, "2.5"}},
 
-    // BluePilot Ford lateral control (proof of concept; no UI yet)
+    // BluePilot Ford lateral control: the lines `python -m opendbc.bluepilot_lateral.params.manifest` prints
+    // (test_lateral_params.py checks them)
     {"FordPrefLateralControl", {PERSISTENT | BACKUP, INT, "0"}},
     {"FordPrefSteerAngleCurvature", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"disable_BP_lat_UI", {PERSISTENT | BACKUP, BOOL, "0"}},
