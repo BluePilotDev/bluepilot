@@ -16,7 +16,7 @@ from openpilot.selfdrive.test.process_replay.process_replay import CONFIGS, PROC
                                                                    check_most_messages_valid
 from openpilot.tools.lib.filereader import FileReader
 from openpilot.tools.lib.logreader import LogReader, save_log
-from openpilot.tools.lib.url_file import URLFile
+from openpilot.tools.lib.url_file import URLFile, URLFileException
 
 source_segments = [
   ("HYUNDAI", "02c45f73a2e5c6e9|2021-01-01--19-08-22--1"),     # HYUNDAI.HYUNDAI_SONATA
@@ -68,6 +68,10 @@ excluded_interfaces = {brand for brand, platforms in interface_names.items()
                        if all(interfaces[platform].get_non_essential_params(platform).dashcamOnly for platform in platforms)} | {"body"}
 
 BASE_URL = "https://raw.githubusercontent.com/sunnypilot/ci-artifacts/refs/heads/process-replay/"
+# BluePilot: these brands run BluePilot lateral, so they compare against bp-sunnypilot's own output from its
+# last merge (tests.yaml publishes it), not stock sunnypilot's
+BP_BASE_URL = "https://raw.githubusercontent.com/ford-op/bp-sunnypilot/refs/heads/process-replay/"
+BP_REF_CARS = {"FORD"}
 REF_COMMIT_FN = os.path.join(PROC_REPLAY_DIR, "ref_commit")
 EXCLUDED_PROCS = {"modeld", "dmonitoringmodeld"}
 
@@ -168,6 +172,15 @@ if __name__ == "__main__":
   except FileNotFoundError:
     ref_commit = URLFile(BASE_URL + "ref_commit", cache=False).read().decode().strip()
 
+  # BluePilot: local refs (--update-refs) stay local for every brand
+  bp_ref_commit = ref_commit
+  if not os.path.exists(REF_COMMIT_FN):
+    try:
+      bp_ref_commit = URLFile(BP_BASE_URL + "ref_commit", cache=False).read().decode().strip()
+    except URLFileException:
+      bp_ref_commit = "none-published"  # their references then fail to load, so the test fails
+    print(f"***** testing {', '.join(sorted(BP_REF_CARS))} against bp-sunnypilot commit {bp_ref_commit} *****")
+
   cur_commit = get_commit()
   if not cur_commit:
     raise Exception("Couldn't get current commit")
@@ -205,8 +218,9 @@ if __name__ == "__main__":
           route, seg_num = segment.rsplit("--", 1)
           ref_log_path = get_url(route, seg_num, "rlog.zst")
         else:
-          ref_log_fn = os.path.join(FAKEDATA, f"{segment}_{cfg.proc_name}_{ref_commit}.zst".replace("|", "_"))
-          ref_log_path = ref_log_fn if os.path.exists(ref_log_fn) else BASE_URL + os.path.basename(ref_log_fn)
+          seg_ref_commit, base_url = (bp_ref_commit, BP_BASE_URL) if car_brand in BP_REF_CARS else (ref_commit, BASE_URL)  # BluePilot
+          ref_log_fn = os.path.join(FAKEDATA, f"{segment}_{cfg.proc_name}_{seg_ref_commit}.zst".replace("|", "_"))
+          ref_log_path = ref_log_fn if os.path.exists(ref_log_fn) else base_url + os.path.basename(ref_log_fn)
 
         pool_args.append((segment, cfg, args, cur_log_fn, ref_log_path, log_data[segment]))
 
