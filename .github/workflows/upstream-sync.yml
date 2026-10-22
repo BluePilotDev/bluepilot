@@ -34,6 +34,7 @@ jobs:
         token: ${{ steps.app.outputs.token }}
         sparse-checkout: .github
     - name: Sync
+      id: sync
       env:
         GH_TOKEN: ${{ steps.app.outputs.token }}
         REPO: ${{ github.repository }}
@@ -171,5 +172,52 @@ jobs:
         if [ -n "$pr" ]; then
           gh pr edit "$pr" -R "$REPO" --body-file pr.md
         else
-          gh pr create -R "$REPO" --head "$MIRROR" --base "$INTEGRATION" --title "sync: sunnypilot master → $INTEGRATION" --body-file pr.md
+          pr=$(gh pr create -R "$REPO" --head "$MIRROR" --base "$INTEGRATION" --title "sync: sunnypilot master → $INTEGRATION" --body-file pr.md)
+          pr=${pr##*/}
         fi
+
+        # the review step below runs when anything conflicts or overlaps
+        {
+          echo "pr=$pr"; echo "base=$base"; echo "up=$up"; echo "integration=$integration"
+          if [ -n "$conflicts$overlap" ]; then echo "review=yes"; fi
+          echo "files<<EOF"; sort -u <<<"$(printf '%s\n%s\n' "$conflicts" "$overlap")" | sed '/^$/d'; echo "EOF"
+          echo "conflicts<<EOF"; echo "$conflicts"; echo "EOF"
+        } >> "$GITHUB_OUTPUT"
+    # BluePilot: a plain-English review of the conflicting and overlapping files, posted once per upstream
+    # commit on the sync PR. Read-only: git diff/log/show only. The prompt is .github/sync-review-prompt.md.
+    - name: Review conflicts and overlap
+      if: steps.sync.outputs.review == 'yes'
+      env:
+        GH_TOKEN: ${{ steps.app.outputs.token }}
+        CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        REPO: ${{ github.repository }}
+        PR: ${{ steps.sync.outputs.pr }}
+        BASE: ${{ steps.sync.outputs.base }}
+        UP: ${{ steps.sync.outputs.up }}
+        INTEGRATION: ${{ steps.sync.outputs.integration }}
+        FILES: ${{ steps.sync.outputs.files }}
+        CONFLICTS: ${{ steps.sync.outputs.conflicts }}
+      run: |
+        set -euo pipefail
+        marker="<!-- sync-review $UP -->"
+        if gh api "repos/$REPO/issues/$PR/comments" --paginate -q '.[].body' | grep -qF "$marker"; then
+          echo "#$PR already has a review for $UP"
+          exit 0
+        fi
+        npm install -g --silent @anthropic-ai/claude-code
+        {
+          cat .github/sync-review-prompt.md
+          echo
+          echo "## Inputs"
+          echo "- BASE: $BASE"
+          echo "- UPSTREAM: $UP"
+          echo "- INTEGRATION: $INTEGRATION"
+          echo "- Files that conflict: ${CONFLICTS:-none}"
+          echo "- Files to review (conflicts and overlap):"
+          awk '{print "  - " $0}' <<<"$FILES"
+        } > prompt.md
+        claude -p "$(cat prompt.md)" --max-turns 40 \
+          --allowedTools "Bash(git diff:*),Bash(git log:*),Bash(git show:*)" < /dev/null > review.md
+        [ -s review.md ] || { echo "::error::the review came back empty"; exit 1; }
+        { echo "$marker"; cat review.md; } > comment.md
+        gh pr comment "$PR" -R "$REPO" --body-file comment.md
