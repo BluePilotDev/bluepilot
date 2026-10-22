@@ -42,6 +42,7 @@ jobs:
         INTEGRATION: master-local-lateral
         OPENDBC: ford-op/bg-opendbc
         OPENDBC_BRANCH: bg-clean
+        LIBRARY: ford-op/bluepilot-lateral
       run: |
         set -euo pipefail
         git fetch --no-tags origin "$INTEGRATION"
@@ -83,44 +84,87 @@ jobs:
         out=$(git merge-tree --write-tree --name-only --no-messages "$integration" "$up") || true
         # exit 1 means conflicts or an error; only a real result starts with the merged tree's ID
         grep -qE '^[0-9a-f]{40}$' <<<"$(head -n1 <<<"$out")" || { echo "::error::merge-tree failed"; exit 1; }
-        conflicts=$(tail -n +2 <<<"$out" | sed 's/^/- /')
+        tree=$(head -n1 <<<"$out")
+        conflicts=$(tail -n +2 <<<"$out")
         upstream_opendbc=$(git rev-parse "$up:opendbc_repo")
         our_opendbc=$(git rev-parse "$integration:opendbc_repo")
-        # bg-clean contains sunnypilot's opendbc when the compare from it to bg-clean is "ahead" or "identical";
-        # a 404 means bg-opendbc doesn't have the commit at all yet
+        overlap=$(comm -12 <(git diff --name-only "$base" "$up" | sort) <(git diff --name-only "$base" "$integration" | sort))
+        files() { n=$(wc -l <<<"$1" | tr -d ' '); [ "$n" = 1 ] && echo "1 file" || echo "$n files"; }  # $1 is non-empty
+
+        # opendbc: bg-clean contains sunnypilot's opendbc when the compare from it to bg-clean is "ahead" or
+        # "identical"; a 404 means bg-opendbc doesn't have the commit at all yet
         if status=$(gh api "repos/$OPENDBC/compare/$upstream_opendbc...$OPENDBC_BRANCH" -q .status 2>compare.err); then
           case "$status" in ahead|identical) ready=yes ;; *) ready=no ;; esac
         elif grep -q "HTTP 404" compare.err; then
           ready=no
         else
           cat compare.err >&2
-          ready="unknown (the compare API failed; see the job log)"
+          ready=unknown
         fi
+        case "$ready" in
+          yes) opendbc_row="| ✅ | opendbc | $OPENDBC \`$OPENDBC_BRANCH\` contains sunnypilot's pin \`${upstream_opendbc:0:8}\` |" ;;
+          no) opendbc_row="| ❌ | opendbc | $OPENDBC \`$OPENDBC_BRANCH\` doesn't contain sunnypilot's pin \`${upstream_opendbc:0:8}\` yet: the $OPENDBC sync that brings it in lands first |" ;;
+          *) opendbc_row="| ⚠️ | opendbc | unknown: the compare API failed (see the job log) |" ;;
+        esac
+
+        # bp-lateral: the opendbc_repo the merged result points at, and the library that carries. Git takes
+        # upstream's pointer without a conflict when only upstream moved it, which would drop the library.
+        merged_opendbc=$(git rev-parse -q --verify "$tree:opendbc_repo" || true)
+        if grep -qx opendbc_repo <<<"$conflicts"; then
+          lateral_row="| ❌ | bp-lateral | \`opendbc_repo\` conflicts: keep \`${our_opendbc:0:8}\` in the resolve PR |"
+        elif [ "$merged_opendbc" != "$our_opendbc" ]; then
+          lateral_row="| ❌ | bp-lateral | the merge takes \`opendbc_repo\` \`${merged_opendbc:0:8}\` instead of \`${our_opendbc:0:8}\`: BluePilot's library would drop out; keep \`${our_opendbc:0:8}\` in a resolve PR |"
+        elif ! lib=$(gh api "repos/$OPENDBC/contents/opendbc/bluepilot_lateral?ref=$our_opendbc" -q .sha 2>lib.err); then
+          if grep -q "HTTP 404" lib.err; then
+            lateral_row="| ❌ | bp-lateral | \`opendbc_repo\` \`${our_opendbc:0:8}\` has no library at \`opendbc/bluepilot_lateral\` |"
+          else
+            cat lib.err >&2
+            lateral_row="| ⚠️ | bp-lateral | unknown: reading the library pointer failed (see the job log) |"
+          fi
+        elif ! release=$(gh api "repos/$LIBRARY/branches/release" -q .commit.sha) || ! tag=$(gh api "repos/$LIBRARY/releases/latest" -q .tag_name); then
+          lateral_row="| ⚠️ | bp-lateral | the merge keeps \`opendbc_repo\` at \`${our_opendbc:0:8}\` (library \`${lib:0:8}\`); reading the latest release failed (see the job log) |"
+        elif [ "$lib" = "$release" ]; then
+          lateral_row="| ✅ | bp-lateral | the merge keeps \`opendbc_repo\` at \`${our_opendbc:0:8}\`, with the library at \`$tag\`, the latest release |"
+        else
+          lateral_row="| ⚠️ | bp-lateral | the merge keeps \`opendbc_repo\` at \`${our_opendbc:0:8}\`, but its library \`${lib:0:8}\` isn't the latest release \`$tag\` (\`${release:0:8}\`): the release job's bump PR brings it, not this sync |"
+        fi
+
+        if [ -n "$conflicts" ]; then
+          conflicts_row="| ❌ | Conflicts | $(files "$conflicts"), listed below: resolve them in a PR that merges this branch |"
+        else
+          conflicts_row="| ✅ | Conflicts | none |"
+        fi
+        if [ -n "$overlap" ]; then
+          overlap_row="| ⚠️ | Overlap | $(files "$overlap") upstream changed that BluePilot also changes, listed below: look at each before merging |"
+        else
+          overlap_row="| ✅ | Overlap | none |"
+        fi
+
         {
-          echo "Automated nightly sync of sunnypilot \`master\` into \`$INTEGRATION\` (#6). Upstream \`${base:0:8}..${up:0:8}\`."
+          echo "Automated nightly sync of sunnypilot \`master\` into \`$INTEGRATION\` (#6). Upstream \`${base:0:8}..${up:0:8}\`, $(git rev-list --count "$integration..$up") commits."
+          echo
+          echo "| | Check | Result |"
+          echo "|---|---|---|"
+          echo "$opendbc_row"
+          echo "$lateral_row"
+          echo "$conflicts_row"
+          echo "$overlap_row"
           echo
           echo "**Merge with a merge commit, not squash, and don't delete the branch.** The head is \`$MIRROR\` itself; a squash leaves upstream's commits out of \`$INTEGRATION\` and the job reopens this PR every night."
-          echo
-          echo "### opendbc"
-          echo "sunnypilot pins opendbc \`${upstream_opendbc:0:8}\`; $OPENDBC \`$OPENDBC_BRANCH\` contains it: **$ready**. \`$INTEGRATION\` points at \`${our_opendbc:0:8}\`."
-          if [ "$ready" = no ]; then
-            echo "The $OPENDBC sync that brings in \`${upstream_opendbc:0:8}\` lands first."
-          fi
           echo
           echo "### Upstream commits"
           git log -n 200 --format='- %h %s' "$integration..$up"
           more=$(( $(git rev-list --count "$integration..$up") - 200 ))
           if [ "$more" -gt 0 ]; then echo "- …and $more more"; fi
-          echo
-          echo "### Files upstream changed that BluePilot also changes"
-          overlap=$(comm -12 <(git diff --name-only "$base" "$up" | sort) <(git diff --name-only "$base" "$integration" | sort) | sed 's/^/- /')
-          echo "${overlap:-None.}"
-          echo
           if [ -n "$conflicts" ]; then
+            echo
             echo "### Conflicts"
-            echo "$conflicts"
-          else
-            echo "No conflicts."
+            awk '{print "- " $0}' <<<"$conflicts"
+          fi
+          if [ -n "$overlap" ]; then
+            echo
+            echo "### Files upstream changed that BluePilot also changes"
+            awk '{print "- " $0}' <<<"$overlap"
           fi
         } > pr.md
         pr=$(gh pr list -R "$REPO" --head "$MIRROR" --base "$INTEGRATION" --state open --json number -q '.[0].number // empty')

@@ -13,6 +13,7 @@ jobs:
       contents: read
       pull-requests: write
       actions: read
+      checks: read  # BluePilot: the wait step lists the PR's check runs
     steps:
     - name: Wait for process replay
       id: wait
