@@ -1,0 +1,45 @@
+# BluePilot: a sync PR (head sunnypilot-clean) has to land as a merge commit; a squash or rebase
+# leaves upstream's commits out of master-local-lateral. GitHub can't allow merge methods per PR,
+# so this catches it right after the merge and opens an issue.
+name: sync merge check
+
+on:
+  push:
+    branches:
+      - master-local-lateral
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+
+jobs:
+  check:
+    if: github.repository == 'ford-op/bp-sunnypilot'
+    runs-on: ubuntu-24.04
+    steps:
+    - name: Check how sync PRs landed
+      env:
+        GH_TOKEN: ${{ github.token }}
+        REPO: ${{ github.repository }}
+        SHA: ${{ github.sha }}
+      run: |
+        set -euo pipefail
+        prs=$(gh api "repos/$REPO/commits/$SHA/pulls" -q '.[] | select(.head.ref == "sunnypilot-clean" and .merged_at != null) | "\(.number) \(.head.sha)"')
+        while read -r pr head; do
+          [ -n "$pr" ] || continue
+          # a merge commit keeps the PR's head in the branch's history: the compare from it is "ahead" or "identical"
+          status=$(gh api "repos/$REPO/compare/$head...$SHA" -q .status)
+          if [ "$status" = ahead ] || [ "$status" = identical ]; then
+            echo "#$pr landed as a merge commit"
+            continue
+          fi
+          {
+            echo "Sync PR #$pr landed on \`master-local-lateral\` as \`${SHA:0:8}\`, a squash or rebase, so upstream's commits up to \`${head:0:8}\` aren't in its history."
+            echo
+            echo "Nothing to undo: the changes are in. The next nightly sync opens a PR with the same upstream commits; merge that one with a merge commit and close this issue."
+          } > issue.md
+          gh issue create -R "$REPO" --title "sync PR #$pr was not merged with a merge commit" --body-file issue.md
+          echo "::error::sync PR #$pr was squashed or rebased; see the issue"
+          exit 1
+        done <<<"$prs"

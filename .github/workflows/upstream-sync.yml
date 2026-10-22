@@ -142,6 +142,8 @@ jobs:
         fi
 
         {
+          echo "❌ **Merge commit only: never squash or rebase, and don't delete the branch.** The head is \`$MIRROR\` itself; a squash or rebase leaves upstream's commits out of \`$INTEGRATION\` (the sync merge check opens an issue if that happens)."
+          echo
           echo "Automated nightly sync of sunnypilot \`master\` into \`$INTEGRATION\` (#6). Upstream \`${base:0:8}..${up:0:8}\`, $(git rev-list --count "$integration..$up") commits."
           echo
           echo "| | Check | Result |"
@@ -150,8 +152,6 @@ jobs:
           echo "$lateral_row"
           echo "$conflicts_row"
           echo "$overlap_row"
-          echo
-          echo "**Merge with a merge commit, not squash, and don't delete the branch.** The head is \`$MIRROR\` itself; a squash leaves upstream's commits out of \`$INTEGRATION\` and the job reopens this PR every night."
           echo
           echo "### Upstream commits"
           git log -n 200 --format='- %h %s' "$integration..$up"
