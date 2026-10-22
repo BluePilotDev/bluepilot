@@ -25,11 +25,16 @@ jobs:
         SHA: ${{ github.sha }}
       run: |
         set -euo pipefail
-        prs=$(gh api "repos/$REPO/commits/$SHA/pulls" -q '.[] | select(.head.ref == "sunnypilot-clean" and .merged_at != null) | "\(.number) \(.head.sha)"')
+        # GitHub's API sometimes answers with an empty body ("unexpected end of JSON input"): retry before failing
+        api() {
+          for _ in 1 2 3 4 5; do gh api "$@" && return 0; sleep 15; done
+          return 1
+        }
+        prs=$(api "repos/$REPO/commits/$SHA/pulls" -q '.[] | select(.head.ref == "sunnypilot-clean" and .merged_at != null) | "\(.number) \(.head.sha)"')
         while read -r pr head; do
           [ -n "$pr" ] || continue
           # a merge commit keeps the PR's head in the branch's history: the compare from it is "ahead" or "identical"
-          status=$(gh api "repos/$REPO/compare/$head...$SHA" -q .status)
+          status=$(api "repos/$REPO/compare/$head...$SHA" -q .status)
           if [ "$status" = ahead ] || [ "$status" = identical ]; then
             echo "#$pr landed as a merge commit"
             continue
