@@ -12,7 +12,6 @@ from openpilot.common.utils import sudo_read, sudo_write
 from openpilot.common.gpio import gpio_set, gpio_init, get_irqs_for_action
 from openpilot.system.hardware.base import HardwareBase, LPABase, ThermalConfig, ThermalZone
 from openpilot.system.hardware.tici import iwlist
-from openpilot.system.hardware.tici.lpa import TiciLPA
 from openpilot.system.hardware.tici.pins import GPIO
 from openpilot.system.hardware.tici.amplifier import Amplifier
 
@@ -145,6 +144,13 @@ class Tici(HardwareBase):
     }
 
   def get_sim_lpa(self) -> LPABase:
+    # BluePilot: import lazily -- TiciLPA pulls in pyserial, which isn't bundled in the
+    # system/hardware/tici/updater zipapp (release/pack.py only vendors pure-Python source)
+    # and isn't guaranteed to be present in AGNOS's system Python. An eager module-level
+    # import here broke the AGNOS updater (ModuleNotFoundError: No module named 'serial')
+    # on devices where it's missing, even though eSIM/LPA has nothing to do with flashing.
+    # End BluePilot
+    from openpilot.system.hardware.tici.lpa import TiciLPA
     return TiciLPA()
 
   def get_imei(self, slot):
