@@ -109,6 +109,41 @@ sections:
       all metrics into a gauge cluster at the bottom of the screen.'
     visibility:
     - $ref: '#/macros/hide_on_mici'
+  - key: BPThemePack
+    widget: multiple_button
+    title: '[Visuals] Theme'
+    description: "8-Bit Racer game view, or a seasonal theme pack (recolors the road and the wheel icon, adds the pack's scene)."
+    options:
+    - value: ''
+      label: 'Off'
+    - value: 'rad_racer'
+      label: '8-Bit Racer'
+    - value: 'april_fools'
+      label: 'April Fools'
+    - value: 'christmas_week'
+      label: 'Christmas'
+    - value: 'cinco_de_mayo'
+      label: 'Cinco de Mayo'
+    - value: 'easter_week'
+      label: 'Easter'
+    - value: 'fourth_of_july'
+      label: 'Fourth of July'
+    - value: 'halloween_week'
+      label: 'Halloween'
+    - value: 'new_years'
+      label: "New Year's"
+    - value: 'st_patricks_day'
+      label: "St. Patrick's"
+    - value: 'thanksgiving_week'
+      label: 'Thanksgiving'
+    - value: 'valentines_day'
+      label: "Valentine's"
+    - value: 'veterans_day'
+      label: 'Veterans Day'
+  - key: BPThemeAutoSeasonal
+    widget: toggle
+    title: '[Visuals] Auto Seasonal Theme'
+    description: 'During a holiday week, switch to that seasonal theme pack automatically. Outside holiday weeks the Theme selection applies.'
   - key: BPRainbowLines
     widget: toggle
     title: '[Visuals] Rainbow Lane Lines'
@@ -330,6 +365,46 @@ sections:
     - type: param
       key: FordPrefLateralControl
       equals: 1
+  - key: enable_lane_positioning_ang
+    widget: toggle
+    title: '[Lateral Tuning] Enable Lane Positioning (Angle)'
+    description: Enable the angle-mode lane centering trim. Required for the in-lane offset to have any effect.
+    visibility:
+    - type: param
+      key: FordPrefLateralControl
+      equals: 1
+  - key: custom_path_offset_ang
+    widget: option
+    title: '[Lateral Tuning] In-Lane Offset (Angle)'
+    description: Adjust the in-lane offset (-0.5 to 0.5 m). Positive is right.
+    min: -0.5
+    max: 0.5
+    step: 0.01
+    unit: m
+    visibility:
+    - type: param
+      key: FordPrefLateralControl
+      equals: 1
+    enablement:
+    - type: param
+      key: enable_lane_positioning_ang
+      equals: true
+  - key: lane_centering_strength_ang
+    widget: option
+    title: '[Lateral Tuning] Lane Centering Strength (Angle)'
+    description: How hard the trim pulls toward the target (0.0-1.0). Zero disables the correction without turning off lane
+      positioning.
+    min: 0.0
+    max: 1.0
+    step: 0.05
+    visibility:
+    - type: param
+      key: FordPrefLateralControl
+      equals: 1
+    enablement:
+    - type: param
+      key: enable_lane_positioning_ang
+      equals: true
   # Curvature-mode tuning (hidden unless Primary Control Variable = Curvature)
   - key: enable_human_turn_detection_curv
     widget: toggle
