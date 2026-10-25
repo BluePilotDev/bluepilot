@@ -3,16 +3,13 @@
 import pyray as rl
 
 
-LANE_CENTER_ICON_SCALE = 0.79
 LANE_CENTER_ICON_GAP = 24.0
 
 
 def lane_center_indicator_rect(button_x: float, button_y: float, button_size: float) -> rl.Rectangle:
-  """Place the indicator immediately left of, and centered with, the steering-wheel button."""
-  size = button_size * LANE_CENTER_ICON_SCALE
-  return rl.Rectangle(button_x - LANE_CENTER_ICON_GAP - size,
-                      button_y + (button_size - size) / 2.0,
-                      size, size)
+  """Match the steering-wheel control's full footprint immediately to its left."""
+  return rl.Rectangle(button_x - LANE_CENTER_ICON_GAP - button_size,
+                      button_y, button_size, button_size)
 
 
 def lane_center_indicator_visible(toggle_enabled: bool, message_alive: bool,

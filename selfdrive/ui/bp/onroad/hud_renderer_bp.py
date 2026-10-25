@@ -143,7 +143,7 @@ class HudRendererBP(HudRendererSP):
     self._hide_v_ego_ui = self._bp_params.get_bool("HideVEgoUI")
     self._show_lateral_control = self._bp_params.get_bool("BpShowLateralControl")
     self._lane_positioning_active = False
-    lane_center_icon_size = round(UI_CONFIG.button_size * 0.79)
+    lane_center_icon_size = UI_CONFIG.button_size
     self._lane_center_indicator_texture = gui_app.texture(
       "icons/lane_centering_active.png", lane_center_icon_size, lane_center_icon_size,
       keep_aspect_ratio=False,

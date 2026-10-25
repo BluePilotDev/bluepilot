@@ -31,6 +31,7 @@ def test_lane_center_indicator_aligns_left_of_wheel():
 
   assert rect.x + rect.width == pytest.approx(button_x - LANE_CENTER_ICON_GAP)
   assert rect.y + rect.height / 2.0 == pytest.approx(button_y + button_size / 2.0)
+  assert rect.width == button_size
   assert rect.width == rect.height
 
 

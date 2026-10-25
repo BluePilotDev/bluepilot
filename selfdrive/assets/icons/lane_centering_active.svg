@@ -1,13 +1,15 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="304" height="304" viewBox="0 0 152 152">
-  <circle cx="76" cy="76" r="76" fill="#000" fill-opacity=".88"/>
+  <rect x="3" y="3" width="146" height="146" rx="12"
+        fill="#000" fill-opacity=".92" stroke="#005a9c" stroke-width="6"/>
   <g fill="none" stroke="#5dc6ff" stroke-width="10" stroke-linecap="round">
     <path d="M30 124 39 89M45 63l5-30M122 124l-9-35M107 63l-5-30"/>
   </g>
   <g fill="#5dc6ff">
     <path d="m33 75-13-9v18zM119 75l13 9V66z"/>
     <path fill-rule="evenodd" d="M76 62a31 31 0 1 0 0 62 31 31 0 0 0 0-62Zm0 7a24 24 0 1 0 0 48 24 24 0 0 0 0-48Z"/>
-    <rect x="51" y="72" width="50" height="6" rx="3"/>
-    <rect x="73" y="74" width="6" height="28" rx="3"/>
-    <circle cx="76" cy="75" r="7"/>
   </g>
+  <g fill="none" stroke="#5dc6ff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="m76 93-22-11M76 93l22-11M76 93v24"/>
+  </g>
+  <circle cx="76" cy="93" r="7" fill="#5dc6ff"/>
 </svg>
