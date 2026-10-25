@@ -67,3 +67,5 @@ selfdrive/assets/sounds/bluepilot/*.wav -filter -diff -merge
 selfdrive/assets/bp_themes/** -filter -diff -merge
 selfdrive/assets/images/tesla_lead_sedan.png -filter -diff -merge
 selfdrive/assets/images/tesla_lead_sedan_far.png -filter -diff -merge
+selfdrive/assets/icons/lane_centering_active.png -filter -diff -merge
+selfdrive/assets/icons/lane_centering_active.svg -filter -diff -merge

@@ -142,8 +142,12 @@ class HudRendererBP(HudRendererSP):
     self._show_brake_status = self._bp_params.get_bool("ShowBrakeStatus")
     self._hide_v_ego_ui = self._bp_params.get_bool("HideVEgoUI")
     self._show_lateral_control = self._bp_params.get_bool("BpShowLateralControl")
-    self._show_lane_center_indicator = self._bp_params.get_bool("BPLaneCenterIcon")
     self._lane_positioning_active = False
+    lane_center_icon_size = round(UI_CONFIG.button_size * 0.79)
+    self._lane_center_indicator_texture = gui_app.texture(
+      "icons/lane_centering_active.png", lane_center_icon_size, lane_center_icon_size,
+      keep_aspect_ratio=False,
+    )
     self._tesla_style = theme_pack.tesla_active(self._bp_params)
     self._tesla_confidence_enabled = False
     self._tesla_confidence_colors = (rl.Color(50, 50, 50, 255), rl.Color(13, 13, 13, 255))
@@ -188,7 +192,6 @@ class HudRendererBP(HudRendererSP):
       self._show_brake_status = self._bp_params.get_bool("ShowBrakeStatus")
       self._hide_v_ego_ui = self._bp_params.get_bool("HideVEgoUI")
       self._show_lateral_control = self._bp_params.get_bool("BpShowLateralControl")
-      self._show_lane_center_indicator = self._bp_params.get_bool("BPLaneCenterIcon")
       tesla_style = theme_pack.tesla_active(self._bp_params)
       if tesla_style != self._tesla_style:
         self.reset_tesla_lead_fade()
@@ -207,8 +210,9 @@ class HudRendererBP(HudRendererSP):
     controller_state_alive = bool(sm.alive.get('controllerStateBP', False))
     controller_state_valid = bool(sm.valid.get('controllerStateBP', False))
     active = bool(sm['controllerStateBP'].lanePositioningActive) if controller_state_alive and controller_state_valid else False
+    show_indicator = bool(sm['controllerStateBP'].bmsShowLaneCenteringIndicator) if controller_state_alive and controller_state_valid else False
     self._lane_positioning_active = lane_center_indicator_visible(
-      self._show_lane_center_indicator, controller_state_alive, controller_state_valid, active,
+      show_indicator, controller_state_alive, controller_state_valid, active,
     )
 
     # Check brake status if enabled
@@ -371,7 +375,7 @@ class HudRendererBP(HudRendererSP):
     if self._lane_positioning_active:
       draw_lane_center_indicator(lane_center_indicator_rect(
         button_x, button_y, UI_CONFIG.button_size,
-      ))
+      ), self._lane_center_indicator_texture)
     self._draw_lateral_control_overlay(
       button_x + UI_CONFIG.button_size / 2,
       button_y + UI_CONFIG.button_size / 2,
