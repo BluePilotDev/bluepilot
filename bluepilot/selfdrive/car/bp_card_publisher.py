@@ -82,6 +82,7 @@ def _refresh_settings_cache() -> dict:
     "bmsTeslaStyleMode":               _get_str(p, "BPThemePack").strip().lower() in ("tesla", "tesla_dark"),
     "bmsShowBrakeStatus":              _get_bool(p, "ShowBrakeStatus"),
     "bmsShowConfidenceBall":           _get_bool(p, "BPShowConfidenceBall", True),
+    "bmsShowLaneCenteringIndicator":   _get_bool(p, "BPLaneCenterIcon"),
     "bmsAnimateSteeringWheel":         _get_bool(p, "BPAnimateSteeringWheel", True),
     "bmsWheelIconStyle":               _get_int(p, "BPSteeringWheelIconStyle", 0),
     "bmsShowRadarLeadOverlay":         _get_bool(p, "FordPrefShowRadarLeadOverlay", True),
@@ -132,6 +133,7 @@ def publish_controller_state_bp(CI, pm):
     cs_bp.curvatureDeviationLimited = getattr(CI.CC, "curvatureDeviationLimited", False)
     cs_bp.humanTurnLateralPaused = bool(getattr(CI.CC, "humanTurnLateralPaused", False))
     cs_bp.stallBlipActive = bool(getattr(CI.CC, "stallBlipActive", False))
+    cs_bp.lanePositioningActive = bool(getattr(CI.CC, "lanePositioningActive", False))
     # BluePilot: mode the controller actually ran, straight off the car controller (not Params).
     if getattr(CI.CC, "disable_BP_lat_UI", True):
       cs_bp.activeLateralMode = structs.ControllerStateBP.LateralMode.openpilot

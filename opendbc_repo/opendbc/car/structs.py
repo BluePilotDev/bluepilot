@@ -202,6 +202,7 @@ class ControllerStateBP:
   bmsTeslaStyleMode: bool = False
   bmsShowBrakeStatus: bool = False
   bmsShowConfidenceBall: bool = True
+  bmsShowLaneCenteringIndicator: bool = False
   bmsAnimateSteeringWheel: bool = True
   bmsWheelIconStyle: int = 0
   bmsShowRadarLeadOverlay: bool = True
@@ -243,6 +244,7 @@ class ControllerStateBP:
   bmsFingerprint: str = ""
   # --- Lateral mode the car controller actually ran (not the param) ---
   activeLateralMode: 'ControllerStateBP.LateralMode' = field(default_factory=lambda: ControllerStateBP.LateralMode.openpilot)
+  lanePositioningActive: bool = False
 
   class LateralMode(StrEnum):
     openpilot = auto()  # BP lateral bypassed

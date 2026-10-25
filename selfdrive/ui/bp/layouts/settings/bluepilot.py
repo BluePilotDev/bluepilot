@@ -90,6 +90,7 @@ class BluePilotLayout(Widget):
       ("ShowBrakeStatus", self._show_brake_status),
       ("BPHideOnroadBorder", self._hide_onroad_border),
       ("BPShowConfidenceBall", self._show_confidence_ball),
+      ("BPLaneCenterIcon", self._lane_center_icon),
       ("BPAnimateSteeringWheel", self._animate_steering_wheel),
       ("BPUseCustomSounds", self._use_custom_sounds),
       ("FordPrefShowRadarLeadOverlay", self._show_ford_radar_overlay),
@@ -196,6 +197,14 @@ class BluePilotLayout(Widget):
       initial_state=self._safe_get_bool(self._params, "BPShowConfidenceBall"),
       callback=lambda state: self._toggle_callback(state, "BPShowConfidenceBall"),
       icon="warning.png"
+    )
+
+    self._lane_center_icon = toggle_item(
+      lambda: tr("Lane Positioning Confidence Indicator"),
+      lambda: tr("Show Lane Centering Icon on Interface when lane positioning controls are active."),
+      initial_state=self._safe_get_bool(self._params, "BPLaneCenterIcon"),
+      callback=lambda state: self._toggle_callback(state, "BPLaneCenterIcon"),
+      icon="monitoring.png"
     )
 
     # Animate steering wheel toggle
@@ -787,6 +796,7 @@ class BluePilotLayout(Widget):
         self._show_blindspot,
         self._show_brake_status,
         self._show_confidence_ball,
+        self._lane_center_icon,
         self._animate_steering_wheel,
         self._wheel_icon_style_btn,
         self._dm_icon_style_btn,

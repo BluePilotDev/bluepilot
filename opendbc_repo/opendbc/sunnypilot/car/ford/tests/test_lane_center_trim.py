@@ -81,6 +81,7 @@ class TestLaneCenterTrim(unittest.TestCase):
     model = _good_model()
     self._run(model, enabled=False, offset=1.0, iterations=50)
     self.assertEqual(self.trim.correction, 0.0)
+    self.assertFalse(self.trim.active)
 
   def test_inactive_no_correction(self):
     model = _good_model()
@@ -101,6 +102,26 @@ class TestLaneCenterTrim(unittest.TestCase):
     model = _good_model(lane_center_y=0.0, model_y=0.0)
     self._run(model, offset=0.0, iterations=50)
     self.assertAlmostEqual(self.trim.correction, 0.0, places=6)
+    self.assertTrue(self.trim.active)
+
+  def test_lane_positioning_active_tracks_laneline_confidence(self):
+    self._run(_good_model(), gain=1.0)
+    self.assertTrue(self.trim.active)
+    self.assertGreater(self.trim.lane_line_strength, 0.0)
+
+    self._run(_no_lanelines_model(), gain=1.0)
+    self.assertFalse(self.trim.active)
+    self.assertEqual(self.trim.lane_line_strength, 0.0)
+
+  def test_lane_positioning_inactive_when_strength_is_zero(self):
+    self._run(_good_model(), gain=0.0)
+    self.assertFalse(self.trim.active)
+
+  def test_lane_positioning_active_resets_during_lane_change(self):
+    self._run(_good_model(), gain=1.0)
+    self.assertTrue(self.trim.active)
+    self._run(_good_model(), gain=1.0, lane_change=True)
+    self.assertFalse(self.trim.active)
 
   def test_offset_converges_to_clipped_ceiling(self):
     # A large offset saturates the raw correction against its safety ceiling; full gain and full

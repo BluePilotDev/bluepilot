@@ -565,6 +565,10 @@ struct ControllerStateBP @0xcd96dafb67a082d0 {
   # experiment and remains reserved so Tesla telemetry keeps its wire ordinal.
   reservedVisualMenuField55 @55 :Void;
   bmsTeslaStyleMode @56 :Bool;  # BPThemePack selected Tesla (ordinal/name retained for API compatibility)
+  bmsShowLaneCenteringIndicator @57 :Bool;  # BPLaneCenterIcon (TICI only)
+
+  # BluePilot: true only while Angle-mode Lane Positioning is actively using confident lane lines.
+  lanePositioningActive @58 :Bool;
   enum LateralMode {
     openpilot @0;  # BP lateral bypassed (disable_BP_lat_UI)
     curvature @1;

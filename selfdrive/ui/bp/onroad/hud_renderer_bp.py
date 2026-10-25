@@ -7,6 +7,11 @@ from openpilot.bluepilot.ui.lib.bp_shaders import draw_shader_circle_gradient
 from openpilot.selfdrive.ui.onroad.hud_renderer import UI_CONFIG, FONT_SIZES, COLORS, CRUISE_DISABLED_CHAR
 from openpilot.selfdrive.ui.sunnypilot.onroad.hud_renderer import HudRendererSP, SLA_ACTIVE_COLOR
 from openpilot.selfdrive.ui.bp.onroad.exp_button_bp import ExpButtonBP
+from openpilot.selfdrive.ui.bp.onroad.lane_center_indicator_bp import (
+  draw_lane_center_indicator,
+  lane_center_indicator_rect,
+  lane_center_indicator_visible,
+)
 from openpilot.selfdrive.ui.bp.onroad.speed_limit_renderer_bp import SpeedLimitRendererBP
 from openpilot.selfdrive.ui.bp.lib import theme_pack
 from openpilot.selfdrive.ui.bp.lib.longitudinal_visuals import longitudinal_control_active
@@ -137,6 +142,8 @@ class HudRendererBP(HudRendererSP):
     self._show_brake_status = self._bp_params.get_bool("ShowBrakeStatus")
     self._hide_v_ego_ui = self._bp_params.get_bool("HideVEgoUI")
     self._show_lateral_control = self._bp_params.get_bool("BpShowLateralControl")
+    self._show_lane_center_indicator = self._bp_params.get_bool("BPLaneCenterIcon")
+    self._lane_positioning_active = False
     self._tesla_style = theme_pack.tesla_active(self._bp_params)
     self._tesla_confidence_enabled = False
     self._tesla_confidence_colors = (rl.Color(50, 50, 50, 255), rl.Color(13, 13, 13, 255))
@@ -181,6 +188,7 @@ class HudRendererBP(HudRendererSP):
       self._show_brake_status = self._bp_params.get_bool("ShowBrakeStatus")
       self._hide_v_ego_ui = self._bp_params.get_bool("HideVEgoUI")
       self._show_lateral_control = self._bp_params.get_bool("BpShowLateralControl")
+      self._show_lane_center_indicator = self._bp_params.get_bool("BPLaneCenterIcon")
       tesla_style = theme_pack.tesla_active(self._bp_params)
       if tesla_style != self._tesla_style:
         self.reset_tesla_lead_fade()
@@ -194,6 +202,14 @@ class HudRendererBP(HudRendererSP):
     if self._show_lateral_control:
       sm = ui_state.sm
       self._lateral_mode = sm['controllerStateBP'].activeLateralMode if sm.alive['controllerStateBP'] else None
+
+    sm = ui_state.sm
+    controller_state_alive = bool(sm.alive.get('controllerStateBP', False))
+    controller_state_valid = bool(sm.valid.get('controllerStateBP', False))
+    active = bool(sm['controllerStateBP'].lanePositioningActive) if controller_state_alive and controller_state_valid else False
+    self._lane_positioning_active = lane_center_indicator_visible(
+      self._show_lane_center_indicator, controller_state_alive, controller_state_valid, active,
+    )
 
     # Check brake status if enabled
     if self._show_brake_status:
@@ -352,6 +368,10 @@ class HudRendererBP(HudRendererSP):
     button_x = rect.x + rect.width - UI_CONFIG.border_size - UI_CONFIG.button_size
     button_y = rect.y + UI_CONFIG.border_size
     self._exp_button.render(rl.Rectangle(button_x, button_y, UI_CONFIG.button_size, UI_CONFIG.button_size))
+    if self._lane_positioning_active:
+      draw_lane_center_indicator(lane_center_indicator_rect(
+        button_x, button_y, UI_CONFIG.button_size,
+      ))
     self._draw_lateral_control_overlay(
       button_x + UI_CONFIG.button_size / 2,
       button_y + UI_CONFIG.button_size / 2,
