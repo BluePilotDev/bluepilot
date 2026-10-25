@@ -7,10 +7,21 @@ PSCM short lookahead d_ref and y ≈ ½κ x² ⇒ path_angle = ½ κ d_ref (see
 blended with ``actuators.curvature`` per ``FordPathAngleBlendRatio`` (0 = planner only,
 1 = model only).
 
-**c0 (path_offset) is always zero on the wire, unconditionally.** Angle mode has no centering
-trim -- an earlier port attempt piped a small additive trim onto path_angle through the
-curv-mode ``LC_PID_controller``, but it never actually tracked lane center correctly in this
-mode and was removed; only the DBC-required zero c0 remains.
+**c0 (path_offset) is always zero on the wire, unconditionally.** An earlier port attempt piped
+a small additive trim onto path_angle through the curv-mode ``LC_PID_controller``, but it never
+actually tracked lane center correctly in this mode: path_angle here is a derived quantity
+(``kappa_cmd * v_ego * curvature_factor``), so an additive trim in that domain has the wrong
+(inverted) speed-dependence for a lane-centering nudge, and it bypassed every limiter this file
+applies to ``kappa_cmd``. That attempt was removed; only the DBC-required zero c0 remains.
+
+**Lane centering trim (``lane_center_trim.py``)** replaces it: a small correction applied to
+``kappa_cmd`` itself (see ``LaneCenterTrim``), before the deviation clip / gain table / PSCM
+clamp / soft ROC below -- so it inherits every one of those limiters automatically instead of
+bypassing them. Blends toward lane-line center by confidence (same formula as
+``lateral_curv_ext``'s ``path_offset``) and falls back to the model's own predicted path -- not
+to zero -- when lines are missing/unreliable, so the user's left/right offset still applies on
+center-stripe-only roads. Disabled during lane changes, user-tunable (enable, offset, authority)
+via ``enable_lane_positioning_ang`` / ``custom_path_offset_ang`` / ``lane_centering_strength_ang``.
 
 **Human-turn override**: while the driver manually turns (same sustained-press + angle criteria
 as ``lateral_curv_ext``, via the shared ``HumanTurnDetector``), lateral is forced inactive (mode
@@ -29,26 +40,36 @@ from opendbc.car.lateral import apply_std_steer_angle_limits
 from opendbc.car.ford.values import CAR, CarControllerParams
 from opendbc.sunnypilot.car.ford.lateral_curv_ext import LateralResult
 from opendbc.sunnypilot.car.ford.human_turn import HumanTurnDetector
+from opendbc.sunnypilot.car.ford.lane_center_trim import LaneCenterTrim
 from opendbc.sunnypilot.car.ford.values_ext import BP_ANGLE_LIMITS
 from selfdrive.modeld.constants import ModelConstants
 
 # Hard-coded per-platform gain defaults.
 # CAN vehicles (Escape MK4, Bronco Sport, Explorer, Maverick, Edge)
 _GAIN_CAN         = (1.00, 1.15)
-# CAN-FD body-on-frame trucks (F-150, Lightning, Expedition, Ranger)
+# CAN-FD body-on-frame trucks (F-150, Lightning, Ranger)
 _GAIN_CANFD_BOF   = (0.95, 0.95)
 # CAN-FD unibody SUVs (Mustang Mach-E, Escape MK4.5)
 _GAIN_CANFD_SUV   = (1.00, 1.05)
+# BluePilot: Expedition MK4 was not in the beta fleet and got lumped into the BOF CANFD group
+# (F-150/Lightning/Ranger) sight-unseen; a real user reported maxing out the FordHighSpeedFactor_ang
+# UI multiplier at its 1.5 ceiling and still wanting more. Rather than raise the UI ceiling, give
+# Expedition its own base -- 1.5x the BOF CANFD values -- as a placeholder default so this user can
+# reset his UI factor to 1.0 and get us a clean read on the real base tune this platform needs.
+# Provisional until confirmed; see bp-dev-expedition.
+_GAIN_EXPEDITION  = (_GAIN_CANFD_BOF[0] * 1.5, _GAIN_CANFD_BOF[1] * 1.5)
 
 _CANFD_BOF_CARS = frozenset({
   CAR.FORD_F_150_MK14,
   CAR.FORD_F_150_LIGHTNING_MK1,
-  CAR.FORD_EXPEDITION_MK4,
   CAR.FORD_RANGER_MK2,
 })
 _CANFD_SUV_CARS = frozenset({
   CAR.FORD_MUSTANG_MACH_E_MK1,
   CAR.FORD_ESCAPE_MK4_5,
+})
+_EXPEDITION_CARS = frozenset({
+  CAR.FORD_EXPEDITION_MK4,
 })
 
 
@@ -147,6 +168,12 @@ class LateralAngleExt:
     # BluePilot: angle mode's own lane-change scaling factor, independent of curvature mode's
     # lane_change_factor_high_curv -- angle needs a boost (>1) where curvature needs a cut (<1).
     self.lane_change_factor_high_ang = 1.0
+    # BluePilot: angle-mode lane centering trim (advanced lane positioning) -- see
+    # lane_center_trim.py and the module docstring above.
+    self.lane_center_trim = LaneCenterTrim()
+    self.enable_lane_positioning_ang = False
+    self.custom_path_offset_ang = 0.0
+    self.lane_centering_strength_ang = 0.25
     # Telemetry: variable curvature lookup time used this frame (s)
     self.bp_curvature_lookup_time = _VLT_T_EXTRA_MAX + 0.3725  # warm start at ~0.5s
     # BluePilot: error-clipped kappa path_angle was derived from -- carcontroller.py reads this as
@@ -179,7 +206,9 @@ class LateralAngleExt:
     """Sets per-platform gain defaults and reads user angle-tuning params."""
     self._ensure_lateral_curv_initialized(self.CP)
     fp = getattr(self.CP, 'carFingerprint', '')
-    if fp in _CANFD_BOF_CARS:
+    if fp in _EXPEDITION_CARS:
+      low, high = _GAIN_EXPEDITION
+    elif fp in _CANFD_BOF_CARS:
       low, high = _GAIN_CANFD_BOF
     elif fp in _CANFD_SUV_CARS:
       low, high = _GAIN_CANFD_SUV
@@ -207,11 +236,28 @@ class LateralAngleExt:
             float(raw.decode("utf-8", errors="replace") if isinstance(raw, bytes) else raw), 0.85, 1.50))
       except Exception:
         pass
+      # BluePilot: angle-mode lane centering trim (advanced lane positioning) params.
+      try:
+        self.enable_lane_positioning_ang = bool(params.get_bool("enable_lane_positioning_ang"))
+      except Exception:
+        pass
+      for attr, key, min_value, max_value in (
+        ("custom_path_offset_ang", "custom_path_offset_ang", -0.5, 0.5),
+        ("lane_centering_strength_ang", "lane_centering_strength_ang", 0.0, 1.0),
+      ):
+        try:
+          raw = params.get(key, return_default=True)
+          if raw is not None and raw != b"":
+            setattr(self, attr, float(clip(
+              float(raw.decode("utf-8", errors="replace") if isinstance(raw, bytes) else raw), min_value, max_value)))
+        except Exception:
+          pass
 
   def update_angle_strategy(self, CC, CS, actuators, CP):
     """
-    Curvature from planner (+ optional predicted blend) → path_angle via ½·κ·d_ref.
-    c0 (path_offset) is always zero on the wire -- no centering trim in angle mode. c2 and c3 are zero.
+    Curvature from planner (+ optional predicted blend, + lane centering trim) → path_angle via
+    ½·κ·d_ref. c0 (path_offset) is always zero on the wire; the lane centering trim lives entirely
+    in the curvature domain (kappa_cmd), not on c0. c2 and c3 are zero.
     Blended κ is not passed through Ford c2 rate / DBC limits (those target the curvature actuator).
     """
     self._ensure_lateral_curv_initialized(CP)
@@ -245,6 +291,7 @@ class LateralAngleExt:
       self.bp_kappa_cmd = self.get_current_curvature(CS)
       self.human_turn_detector.reset()
       self.angle_human_turn_active = False
+      self.lane_center_trim.reset()
       self.stall_blip_hold_s = 0.0
       self.stall_blip_frames_left = 0
       self.stall_blip_cooldown_s = 0.0
@@ -285,6 +332,7 @@ class LateralAngleExt:
       self.bp_kappa_cmd = self.get_current_curvature(CS)
       # Keep exit detection current so resume doesn't compare against a stale pre-turn value.
       self._desired_curvature_last = float(actuators.curvature)
+      self.lane_center_trim.reset()
       # A human turn ends any stall episode -- its own mode 0 does the PSCM reset job. That also
       # covers the press so far: only press time accumulated AFTER the latch releases should earn
       # a hand-off pulse.
@@ -336,6 +384,7 @@ class LateralAngleExt:
       # Truthful shadow during the blip (see the inactive-path comment).
       self.bp_kappa_cmd = self.get_current_curvature(CS)
       self._desired_curvature_last = float(actuators.curvature)
+      self.lane_center_trim.reset()
       self.precision_type = 1
       if self.stall_blip_frames_left <= 0:
         self.stall_blip_cooldown_s = _STALL_COOLDOWN_S
@@ -434,6 +483,16 @@ class LateralAngleExt:
 
     # Use planner / predicted κ directly for the κ → path_angle map; we are not sending κ on CAN.
     kappa_cmd = float(requested_curvature)
+
+    # BluePilot: lane centering trim (advanced lane positioning) -- nudges kappa_cmd toward true
+    # lane-line center + user offset, gated on lane-line confidence and disabled during lane
+    # changes (see lane_center_trim.py). Applied here, before the deviation clip below, so the
+    # trimmed value inherits every limiter this file already applies to kappa_cmd instead of
+    # bypassing them.
+    kappa_cmd = self.lane_center_trim.update(
+      kappa_cmd, self.model, v_ego, self.enable_lane_positioning_ang,
+      self.custom_path_offset_ang, self.lane_centering_strength_ang,
+      CC.latActive, self.lane_change)
 
     # BluePilot: clip kappa_cmd to current_curvature (measured, from yaw rate) +- CURVATURE_ERROR,
     # mirroring lateral_curv_ext.py's apply_ford_curvature_limits_ext exactly (same formula, same

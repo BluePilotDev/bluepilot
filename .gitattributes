@@ -14,7 +14,15 @@ selfdrive/car/tests/test_models_segs.txt filter=lfs diff=lfs merge=lfs -text
 system/hardware/tici/updater filter=lfs diff=lfs merge=lfs -text
 
 # BluePilot: keep BP-owned binaries as raw git objects (not LFS) so they need no LFS hosting
-bluepilot/** -filter -diff -merge
+# Scoped to the extensions the LFS rules above claim. Text files under bluepilot/
+# get no override, so git applies its own binary detection to them.
+bluepilot/**/*.png -filter -diff -merge
+bluepilot/**/*.gif -filter -diff -merge
+bluepilot/**/*.svg -filter -diff -merge
+bluepilot/**/*.ttf -filter -diff -merge
+bluepilot/**/*.otf -filter -diff -merge
+bluepilot/**/*.wav -filter -diff -merge
+bluepilot/**/*.onnx -filter -diff -merge
 selfdrive/assets/icons_mici/onroad/bookmark_fill.png -filter -diff -merge
 selfdrive/assets/icons_mici/onroad/driver_monitoring/dm_center.png -filter -diff -merge
 selfdrive/assets/icons_mici/settings/car_icon.png -filter -diff -merge

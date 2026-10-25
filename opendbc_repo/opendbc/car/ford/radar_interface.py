@@ -124,6 +124,8 @@ class RadarInterface(RadarInterfaceBase):
     self.scan_index_invalid_cnt = 0
     self.radar_unavailable_cnt = 0
     self.prev_headerScanIndex = 0
+    # BluePilot: post-recovery hold for radarUnavailableTemporary, see _update_delphi_mrr
+    self.radar_unavailable_hold_frames = 0
     if CP.radarUnavailable:
       self.rcp = None
     elif self.radar == RADAR.DELPHI_ESR:
@@ -259,6 +261,11 @@ class RadarInterface(RadarInterfaceBase):
         if ii in self.pts:
           del self.pts[ii]
 
+  # BluePilot: how long to keep reporting radarUnavailableTemporary after the raw scan-index
+  # freeze (below) clears, in radar frames (~33Hz, MRR_Header_InformationDetections). See the
+  # hold-frames block in _update_delphi_mrr for why.
+  RADAR_UNAVAILABLE_HOLD_FRAMES = 33  # ~1s
+
   def _update_delphi_mrr(self, ret: structs.RadarData):
     headerScanIndex = int(self.rcp.vl["MRR_Header_InformationDetections"]['CAN_SCAN_INDEX']) & 0b11
 
@@ -270,6 +277,25 @@ class RadarInterface(RadarInterfaceBase):
     self.prev_headerScanIndex = headerScanIndex
 
     if self.radar_unavailable_cnt >= 5:
+      self.pts.clear()
+      self.points.clear()
+      self.clusters.clear()
+      ret.errors.radarUnavailableTemporary = True
+      # BluePilot: reset every frame we're still actually frozen, so the hold below always
+      # starts counting down from the real recovery moment, not from when the freeze began.
+      self.radar_unavailable_hold_frames = self.RADAR_UNAVAILABLE_HOLD_FRAMES
+      return True
+
+    # BluePilot: the raw freeze above clears as soon as a fresh CAN_SCAN_INDEX shows up, but on
+    # Reverse->Drive the Delphi MRR takes noticeably longer (~0.6-0.9s observed on a Ford
+    # Explorer MK6) to actually resume producing valid detections than it does to un-freeze the
+    # header index. Without this hold, selfdrived's generic commIssue catch-all can race into
+    # that gap the instant radarUnavailableTemporary clears: this flag's own NO_ENTRY+SOFT_DISABLE
+    # tier normally suppresses the generic check entirely while it's set (has_disable_events in
+    # selfdrived.py), so holding it open a beat longer keeps that existing suppression covering
+    # the real recovery window instead of dropping a beat early. See BluePilotDev/bluepilot#188.
+    if self.radar_unavailable_hold_frames > 0:
+      self.radar_unavailable_hold_frames -= 1
       self.pts.clear()
       self.points.clear()
       self.clusters.clear()

@@ -97,6 +97,7 @@ class BluePilotLayout(Widget):
       ("enable_lane_positioning_curv", self._enable_lane_positioning),
       ("enable_lane_full_mode_curv", self._enable_lane_full_mode),
       ("custom_profile_curv", self._custom_profile),
+      ("enable_lane_positioning_ang", self._enable_lane_positioning_ang),
       ("disable_BP_lat_UI", self._disable_BP_lat),
       ("disable_BP_long_UI", self._disable_BP_long),
       ("disable_downhill_comp_UI", self._disable_dowhill_comp),
@@ -557,6 +558,38 @@ class BluePilotLayout(Widget):
       step=0.01,
       icon="chffr_wheel.png"
     )
+
+    # Lane centering trim — angle mode's "advanced lane positioning" (curvature-domain trim,
+    # see lane_center_trim.py). Mirrors the curv-mode items below, one-to-one, but scoped to
+    # its own _ang params.
+    self._enable_lane_positioning_ang = toggle_item(
+      lambda: tr("Enable Lane Positioning"),
+      lambda: tr("Nudge the vehicle toward true lane-line center (plus optional bias) while in angle-primary control."),
+      initial_state=self._safe_get_bool(self._params, "enable_lane_positioning_ang"),
+      callback=lambda state: self._toggle_callback(state, "enable_lane_positioning_ang"),
+      icon="chffr_wheel.png"
+    )
+    self._custom_path_offset_ang = float_control_item(
+      lambda: tr("In-Lane Offset"),
+      lambda: tr("Adjust the in-lane offset (-0.5 to 0.5)."),
+      param="custom_path_offset_ang",
+      min_value=-0.5,
+      max_value=0.5,
+      step=0.01,
+      enabled=lambda: self._safe_get_bool(self._params, "enable_lane_positioning_ang"),
+      icon="chffr_wheel.png"
+    )
+    self._lane_centering_strength_ang = float_control_item(
+      lambda: tr("Lane Centering Strength"),
+      lambda: tr("How much authority the lane centering trim has vs. the model's own path (0.0-1.0)."),
+      param="lane_centering_strength_ang",
+      min_value=0.0,
+      max_value=1.0,
+      step=0.05,
+      enabled=lambda: self._safe_get_bool(self._params, "enable_lane_positioning_ang"),
+      icon="chffr_wheel.png"
+    )
+
     # Disable BP lateral control toggle
     self._disable_BP_lat = toggle_item(
       lambda: tr("Disable BP Lateral Control"),
@@ -641,6 +674,9 @@ class BluePilotLayout(Widget):
       self._high_speed_curv_factor,
       self._high_speed_dampening,
       self._lane_change_factor_high_ang,
+      self._enable_lane_positioning_ang,
+      self._custom_path_offset_ang,
+      self._lane_centering_strength_ang,
     ]
     angle_header = CollapsibleSectionHeader(tr("Angle Tuning"))
     angle_header.set_items(angle_items)
@@ -880,6 +916,7 @@ class BluePilotLayout(Widget):
     self._primary_lateral_control_btn.action_item.set_selected_button(plat_idx)
     custom_prof = fresh.get("custom_profile_curv") if "custom_profile_curv" in fresh else self._safe_get_bool(ui_state.params, "custom_profile_curv")
     lane_pos = fresh.get("enable_lane_positioning_curv") if "enable_lane_positioning_curv" in fresh else self._safe_get_bool(ui_state.params, "enable_lane_positioning_curv")
+    lane_pos_ang = fresh.get("enable_lane_positioning_ang") if "enable_lane_positioning_ang" in fresh else self._safe_get_bool(ui_state.params, "enable_lane_positioning_ang")
     pause_lc = fresh.get("BlinkerPauseLaneChange") if "BlinkerPauseLaneChange" in fresh else self._safe_get_bool(ui_state.params, "BlinkerPauseLaneChange")
     is_angle = (plat_idx == PrimaryLateralControl.angle)
     is_curv = not is_angle
@@ -890,6 +927,9 @@ class BluePilotLayout(Widget):
     self._high_speed_curv_factor.action_item.set_enabled(is_angle)
     self._high_speed_dampening.action_item.set_enabled(is_angle)
     self._lane_change_factor_high_ang.action_item.set_enabled(is_angle)
+    self._enable_lane_positioning_ang.action_item.set_enabled(is_angle)
+    self._custom_path_offset_ang.action_item.set_enabled(is_angle and lane_pos_ang)
+    self._lane_centering_strength_ang.action_item.set_enabled(is_angle and lane_pos_ang)
     # Curvature-mode items: always visible (Curvature Tuning section), greyed out when angle mode is active
     self._lane_change_factor_high_curv.action_item.set_enabled(is_curv)
     self._enable_human_turn_detection.action_item.set_enabled(is_curv)

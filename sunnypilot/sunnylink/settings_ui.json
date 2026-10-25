@@ -2649,6 +2649,66 @@
           ]
         },
         {
+          "key": "enable_lane_positioning_ang",
+          "widget": "toggle",
+          "title": "[Lateral Tuning] Enable Lane Positioning (Angle)",
+          "description": "Nudge the vehicle toward true lane-line center (plus optional bias) while in angle-primary control.",
+          "visibility": [
+            {
+              "type": "param",
+              "key": "FordPrefLateralControl",
+              "equals": 1
+            }
+          ]
+        },
+        {
+          "key": "custom_path_offset_ang",
+          "widget": "option",
+          "title": "[Lateral Tuning] In-Lane Offset (Angle)",
+          "description": "Adjust the in-lane offset (-0.5 to 0.5 m).",
+          "min": -0.5,
+          "max": 0.5,
+          "step": 0.01,
+          "unit": "m",
+          "visibility": [
+            {
+              "type": "param",
+              "key": "FordPrefLateralControl",
+              "equals": 1
+            }
+          ],
+          "enablement": [
+            {
+              "type": "param",
+              "key": "enable_lane_positioning_ang",
+              "equals": true
+            }
+          ]
+        },
+        {
+          "key": "lane_centering_strength_ang",
+          "widget": "option",
+          "title": "[Lateral Tuning] Lane Centering Strength (Angle)",
+          "description": "How much authority the lane centering trim has vs. the model's own path (0.0-1.0). Default 0.25.",
+          "min": 0.0,
+          "max": 1.0,
+          "step": 0.05,
+          "visibility": [
+            {
+              "type": "param",
+              "key": "FordPrefLateralControl",
+              "equals": 1
+            }
+          ],
+          "enablement": [
+            {
+              "type": "param",
+              "key": "enable_lane_positioning_ang",
+              "equals": true
+            }
+          ]
+        },
+        {
           "key": "enable_human_turn_detection_curv",
           "widget": "toggle",
           "title": "[Lateral Tuning] Enable Human Turn Detection (Curvature)",

@@ -51,6 +51,11 @@ TurnDirection = custom.ModelDataV2SP.TurnDirection
 
 IGNORED_SAFETY_MODES = (SafetyModel.silent, SafetyModel.noOutput)
 
+# BluePilot: debounce for the generic commIssue catch-all, see the comment at its use site
+# (update_events) for why. 20 frames @ 100Hz = 200ms.
+COMM_ISSUE_DEBOUNCE_FRAMES = 20
+# End BluePilot
+
 
 class SelfdriveD(CruiseHelper):
   def __init__(self, CP=None, CP_SP=None):
@@ -128,6 +133,9 @@ class SelfdriveD(CruiseHelper):
     self.active = False
     self.mismatch_counter = 0
     self.cruise_mismatch_counter = 0
+    # BluePilot: debounce counter for the generic commIssue catch-all, see update_events
+    self.comm_issue_counter = 0
+    # End BluePilot
     self.last_steering_pressed_frame = 0
     self.distance_traveled = 0
     self.last_functional_fan_frame = 0
@@ -392,7 +400,21 @@ class SelfdriveD(CruiseHelper):
     # generic catch-all. ideally, a more specific event should be added above instead
     has_disable_events = self.events.contains(ET.NO_ENTRY) and (self.events.contains(ET.SOFT_DISABLE) or self.events.contains(ET.IMMEDIATE_DISABLE))
     no_system_errors = (not has_disable_events) or (len(self.events) == num_events)
-    if not self.sm.all_checks() and no_system_errors:
+    # BluePilot: debounce this catch-all like the panda-safety mismatch check a few lines up already
+    # does for the same class of problem ("the status from [...] another socket [...] can arrive
+    # earlier than the other. Therefore we allow a mismatch for two samples, then we trigger the
+    # disengagement") -- this check had no such tolerance of its own. A brand-specific NO_ENTRY+
+    # SOFT_DISABLE event (e.g. radarTempUnavailable) stops suppressing this catch-all (via
+    # has_disable_events above) in the exact same frame the socket it was covering for actually
+    # recovers, racing selfdrived's own SubMaster snapshot against the other process's publish.
+    # Reproduced repeatably on Ford Reverse->Drive: longitudinalPlan.valid flips true within ~10ms
+    # of radarTempUnavailable clearing, but commIssue still fired every time regardless -- a
+    # BluePilotDev/bluepilot#188 hold on the radar side alone (bp-dev-188) narrowed but could not
+    # close this, since the race is at the transition boundary, not about recovery duration.
+    raw_comm_issue = not self.sm.all_checks() and no_system_errors
+    self.comm_issue_counter = self.comm_issue_counter + 1 if raw_comm_issue else 0
+    if self.comm_issue_counter > COMM_ISSUE_DEBOUNCE_FRAMES:
+      # End BluePilot
       if not self.sm.all_alive():
         self.events.add(EventName.commIssue)
       elif not self.sm.all_freq_ok():
