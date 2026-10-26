@@ -78,6 +78,7 @@ def _refresh_settings_cache() -> dict:
     "bmsMinimalDrivingView":           _get_bool(p, "BPHideCameraView"),
     "bmsEightBitRacerTheme":           _get_str(p, "BPThemePack").strip().lower() == "rad_racer",
     "bmsRainbowLaneLines":             _get_bool(p, "BPRainbowLines"),
+    "bmsModelPathColor":               _get_int(p, "BPModelPathColor", 0),
     "bmsShowBlindspotOverlay":         _get_bool(p, "ShowBlindspotOverlay", True),
     "bmsTeslaStyleMode":               _get_str(p, "BPThemePack").strip().lower() in ("tesla", "tesla_dark"),
     "bmsShowBrakeStatus":              _get_bool(p, "ShowBrakeStatus"),

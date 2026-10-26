@@ -22,6 +22,12 @@ from openpilot.selfdrive.ui.bp.lib.longitudinal_visuals import (
 )
 from openpilot.selfdrive.ui.bp.lib.blindspot_visuals import tesla_blindspot_lane_active
 from openpilot.selfdrive.ui.bp.lib.lane_change_visuals import tesla_lane_change_lane_active
+from openpilot.selfdrive.ui.bp.lib.model_path_color import (
+  FORD_PATH_COLOR_RGBA,
+  FORD_PATH_STOPS,
+  ModelPathColor,
+  get_model_path_color,
+)
 from openpilot.selfdrive.ui.bp.lib.tesla_palette import palette_for_dark_fraction, tesla_path_gradient_colors
 
 class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
@@ -33,6 +39,13 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
     self._tesla_path_visibility = 0.0
     self._disable_lane_line_status_color = self._bp_params.get_bool("BPDisableLaneLineStatusColor")
     self._rainbow_lane_lines = self._bp_params.get_bool("BPRainbowLines")
+    self._model_path_color = get_model_path_color(self._bp_params)
+    self._ford_path_gradient = Gradient(
+      start=(0.0, 1.0),
+      end=(0.0, 0.0),
+      colors=[rl.Color(*rgba) for rgba in FORD_PATH_COLOR_RGBA],
+      stops=list(FORD_PATH_STOPS),
+    )
     self._tesla_style = theme_pack.tesla_active(self._bp_params)
     self._tesla_dark_fraction = ui_state.tesla_dark_fraction
     # BluePilot: Rad Racer 8-bit theme (green game road; dash scroll animation state)
@@ -64,6 +77,7 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
     if self._counter % 60 == 0:
       self._disable_lane_line_status_color = self._bp_params.get_bool("BPDisableLaneLineStatusColor")
       self._rainbow_lane_lines = self._bp_params.get_bool("BPRainbowLines")
+      self._model_path_color = get_model_path_color(self._bp_params)
       self.set_tesla_style(theme_pack.tesla_active(self._bp_params), ui_state.tesla_dark_fraction)
       self._rad_racer = theme_pack.rad_racer_active(self._bp_params)
       self._theme_pack = theme_pack.get_active_pack()
@@ -134,6 +148,14 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
         draw_polygon(self._rect, path_pts, rl.Color(0, 0, 0, 90))
       else:
         draw_polygon(self._rect, path_pts, gradient=themed_gradient)
+    elif self._model_path_color == ModelPathColor.FORD:
+      if not self._path.projected_points.size:
+        return
+      path_pts = self._path.projected_points + np.array([self._rect.x, self._rect.y], dtype=np.float32)
+      if ui_state.status == UIStatus.DISENGAGED:
+        draw_polygon(self._rect, path_pts, rl.Color(0, 0, 0, 90))
+      else:
+        draw_polygon(self._rect, path_pts, gradient=self._ford_path_gradient)
     else:
       super()._draw_path(sm)
 

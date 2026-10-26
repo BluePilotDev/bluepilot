@@ -154,6 +154,15 @@ class TestTestManeuversSection:
 
 
 class TestBluePilotVehicleVisuals:
+  def test_model_path_color_options(self, schema):
+    item = _find_item(schema, "BPModelPathColor")
+    assert item is not None
+    assert item["title"] == "[Visuals] Model Path Color"
+    assert item["options"] == [
+      {"value": 0, "label": "Green (Default)"},
+      {"value": 1, "label": "Ford"},
+    ]
+
   def test_tesla_is_a_theme_option_not_a_standalone_toggle(self, schema):
     assert _find_item(schema, "BPTeslaStyleMode") is None
     item = _find_item(schema, "BPThemePack")

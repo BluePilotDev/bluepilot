@@ -131,6 +131,15 @@ sections:
     widget: toggle
     title: '[Visuals] Minimal Driving View'
     description: Disable camera feed & only show lane lines and model path.
+  - key: BPModelPathColor
+    widget: multiple_button
+    title: '[Visuals] Model Path Color'
+    description: Choose between the default green model path and a Ford-style blue model path.
+    options:
+    - value: 0
+      label: Green (Default)
+    - value: 1
+      label: Ford
   - key: BPThemePack
     widget: multiple_button
     title: '[Visuals] Theme'

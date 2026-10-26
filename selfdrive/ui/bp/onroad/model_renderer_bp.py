@@ -21,6 +21,13 @@ from openpilot.selfdrive.ui.bp.lib.longitudinal_visuals import (
 )
 from openpilot.selfdrive.ui.bp.lib.blindspot_visuals import tesla_blindspot_lane_active
 from openpilot.selfdrive.ui.bp.lib.lane_change_visuals import tesla_lane_change_lane_active
+from openpilot.selfdrive.ui.bp.lib.model_path_color import (
+  FORD_PATH_COLOR_RGBA,
+  FORD_PATH_EDGE_RGBA,
+  FORD_PATH_STOPS,
+  ModelPathColor,
+  get_model_path_color,
+)
 from openpilot.selfdrive.ui.bp.lib.tesla_palette import palette_for_dark_fraction, tesla_path_gradient_colors
 # BluePilot: seasonal theme packs (colors.json overrides for road colors)
 from openpilot.selfdrive.ui.bp.lib import theme_pack
@@ -105,6 +112,14 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
     self._disable_lane_line_status_color = self._bp_params.get_bool("BPDisableLaneLineStatusColor")
     self._hide_camera_view = self._bp_params.get_bool("BPHideCameraView")
     self._rainbow_lane_lines = self._bp_params.get_bool("BPRainbowLines")
+    self._model_path_color = get_model_path_color(self._bp_params)
+    self._ford_path_gradient = Gradient(
+      start=(0.0, 1.0),
+      end=(0.0, 0.0),
+      colors=[rl.Color(*rgba) for rgba in FORD_PATH_COLOR_RGBA],
+      stops=list(FORD_PATH_STOPS),
+    )
+    self._ford_path_edge_color = rl.Color(*FORD_PATH_EDGE_RGBA)
     self._tesla_style = theme_pack.tesla_active(self._bp_params)
     self._tesla_dark_fraction = ui_state.tesla_dark_fraction
     # BluePilot: Rad Racer 8-bit theme (green game road, dash scroll animation state)
@@ -165,6 +180,7 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
     self.ford_overlay_enabled = self._bp_params.get_bool("FordPrefShowRadarLeadOverlay")
     self._disable_lane_line_status_color = self._bp_params.get_bool("BPDisableLaneLineStatusColor")
     self._rainbow_lane_lines = self._bp_params.get_bool("BPRainbowLines")
+    self._model_path_color = get_model_path_color(self._bp_params)
     new_pack = theme_pack.get_active_pack()
     if (new_pack is None) != (self._theme_pack is None):
       self._transform_dirty = True  # themed lane widths differ; re-project on toggle
@@ -697,6 +713,8 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
     elif (themed_gradient := self._themed_path_gradient()) is not None:
       # BluePilot: theme pack path colors replace the throttle/no-throttle gradient
       draw_polygon(self._rect, self._path.projected_points, gradient=themed_gradient)
+    elif self._model_path_color == ModelPathColor.FORD:
+      draw_polygon(self._rect, self._path.projected_points, gradient=self._ford_path_gradient)
     else:
       super()._draw_path(sm)
 
@@ -743,6 +761,9 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
     if pack_edge is not None and ui_state.status != UIStatus.DISENGAGED:
       # BluePilot: theme pack path edge color (disengaged keeps the status blackout)
       edge_color = pack_edge
+    elif (self._model_path_color == ModelPathColor.FORD and
+          not ui_state.rainbow_path and ui_state.status != UIStatus.DISENGAGED):
+      edge_color = self._ford_path_edge_color
     elif self._disable_lane_line_status_color and ui_state.status != UIStatus.DISENGAGED:
       edge_color = rl.Color(255, 255, 255, 255)
     else:

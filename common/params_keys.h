@@ -344,6 +344,7 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"BPThemePack", {PERSISTENT | BACKUP, STRING, ""}},
     {"BPThemeAutoSeasonal", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"BPRainbowLines", {PERSISTENT | BACKUP, BOOL, "0"}},
+    {"BPModelPathColor", {PERSISTENT | BACKUP, INT, "0"}},  // 0=green (default), 1=Ford blue
     {"BPShowConfidenceBall", {PERSISTENT | BACKUP, BOOL, "1"}},
     {"BPLaneCenterIcon", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"BPAnimateSteeringWheel", {PERSISTENT | BACKUP, BOOL, "1"}},

@@ -29,6 +29,7 @@ from openpilot.selfdrive.ui.bp.lib.dm_icon_style import (
   get_dm_icon_style,
 )
 from openpilot.selfdrive.ui.bp.lib.custom_sound import get_custom_sound_selection
+from openpilot.selfdrive.ui.bp.lib.model_path_color import ModelPathColor, get_model_path_color
 from opendbc.sunnypilot.car.ford.lateral_curv_ext import PrimaryLateralControl
 from openpilot.selfdrive.ui.bp.onroad.augmented_road_view_bp import GaugeStyle
 
@@ -205,6 +206,20 @@ class BluePilotLayout(Widget):
       initial_state=self._safe_get_bool(self._params, "BPLaneCenterIcon"),
       callback=lambda state: self._toggle_callback(state, "BPLaneCenterIcon"),
       icon="monitoring.png"
+    )
+
+    self._model_path_color_entries = [
+      (tr("Green (Default)"), ModelPathColor.GREEN),
+      (tr("Ford"), ModelPathColor.FORD),
+    ]
+    self._model_path_color_dialog: MultiOptionDialog | None = None
+    self._model_path_color_action = ButtonAction(lambda: tr("SELECT"))
+    self._model_path_color_action.set_value(lambda: self._get_model_path_color_display())
+    self._model_path_color_btn = ListItem(
+      lambda: tr("Model Path Color"),
+      description=lambda: tr("Choose between the default green model path and a Ford-style blue model path."),
+      action_item=self._model_path_color_action,
+      callback=self._select_model_path_color,
     )
 
     # Animate steering wheel toggle
@@ -790,6 +805,7 @@ class BluePilotLayout(Widget):
         self._hide_onroad_border,
         self._disable_lane_line_status_color,
         self._hide_camera_view,
+        self._model_path_color_btn,
         self._theme_pack_btn,
         self._theme_auto_seasonal,
         self._rainbow_lane_lines,
@@ -1145,6 +1161,30 @@ class BluePilotLayout(Widget):
       stored = stored.decode("utf-8", errors="replace")
     stored = theme_pack.normalize_selector_value(stored)
     return next((label for label, v in self._theme_entries if v and v.lower() == stored.lower()), tr("Off"))
+
+  def _get_model_path_color_display(self) -> str:
+    selected = get_model_path_color(self._params)
+    return next(label for label, value in self._model_path_color_entries if value == selected)
+
+  def _select_model_path_color(self):
+    """Open the model-path color menu and persist the selected enum value."""
+    def handle_selection(result: DialogResult):
+      if result == DialogResult.CONFIRM and self._model_path_color_dialog is not None:
+        selection = self._model_path_color_dialog.selection
+        value = next(
+          (value for label, value in self._model_path_color_entries if label == selection),
+          ModelPathColor.GREEN,
+        )
+        self._params.put("BPModelPathColor", int(value))
+      self._model_path_color_dialog = None
+
+    self._model_path_color_dialog = MultiOptionDialog(
+      tr("Model Path Color"),
+      [label for label, _ in self._model_path_color_entries],
+      self._get_model_path_color_display(),
+      callback=handle_selection,
+    )
+    gui_app.push_widget(self._model_path_color_dialog)
 
   def _select_theme(self):
     """Open a scrollable option dialog; stores the selected entry's param value."""
