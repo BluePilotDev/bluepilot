@@ -44,7 +44,7 @@ jobs:
         INTEGRATION: master-local-lateral
         OPENDBC: ford-op/bg-opendbc
         OPENDBC_BRANCH: bg-clean
-        LIBRARY: ford-op/bluepilot-lateral
+        LIBRARY: BluePilotDev/bluepilot-lateral
       run: |
         set -euo pipefail
         git fetch --no-tags origin "$INTEGRATION"
@@ -155,8 +155,14 @@ jobs:
           fi
           # what the move changes: the panda's safety sources (not their tests), and the library pointer
           fw=$(git diff --name-only "$our_opendbc" "$target" -- opendbc/safety | grep -v '/tests/' || true)
-          if [ -n "$fw" ]; then
-            firmware_row="| ⚠️ | Panda firmware | changes ($(awk '{printf "%s`%s`", (NR > 1 ? ", " : ""), $0}' <<<"$fw")): drive before merging |"
+          # the drive rule covers BluePilot's changes only: Ford safety, where BluePilot's hook lives (the library's
+          # own safety code moves with the Library row). Upstream's other safety changes ride on CI.
+          fw_ford=$(grep -x 'opendbc/safety/modes/ford.h' <<<"$fw" || true)
+          fw_files() { awk '{printf "%s`%s`", (NR > 1 ? ", " : ""), $0}' <<<"$1"; }
+          if [ -n "$fw_ford" ]; then
+            firmware_row="| ⚠️ | Panda firmware | Ford safety changes ($(fw_files "$fw")): drive before merging |"
+          elif [ -n "$fw" ]; then
+            firmware_row="| ✅ | Panda firmware | upstream safety changes only ($(fw_files "$fw")): CI covers them, no drive |"
           else
             firmware_row="| ✅ | Panda firmware | unchanged |"
           fi
@@ -275,7 +281,7 @@ jobs:
           if [ -n "$conflicts$overlap" ]; then echo "review=yes"; fi
           echo "files<<EOF"; sort -u <<<"$(printf '%s\n%s\n' "$conflicts" "$overlap")" | sed '/^$/d'; echo "EOF"
           echo "conflicts<<EOF"; echo "$conflicts"; echo "EOF"
-          if [ "$resolve" = yes ]; then echo "resolved=$target"; echo "firmware=$(tr '\n' ' ' <<<"$fw")"; fi
+          if [ "$resolve" = yes ]; then echo "resolved=$target"; echo "firmware=$(tr '\n' ' ' <<<"$fw_ford")"; fi
         } >> "$GITHUB_OUTPUT"
     # BluePilot: a plain-English review of the conflicting and overlapping files, posted once per upstream
     # commit on the sync PR. Read-only: git diff/log/show only. The prompt is .github/sync-review-prompt.md.
@@ -312,7 +318,7 @@ jobs:
           if [ -n "$RESOLVED" ]; then
             echo "- \`opendbc_repo\`: the job already resolved it in this PR, pointing it at $RESOLVED (the bg-opendbc \`bg-clean\` commit with sunnypilot's new pin). Judge it resolved; base the verdict on the other files."
             if [ -n "${FIRMWARE// /}" ]; then
-              echo "- The move changes the panda firmware ($FIRMWARE), so this PR gets a drive before it merges: never call it safe to merge as is; say what's left is the drive."
+              echo "- The move changes Ford's panda safety ($FIRMWARE), where BluePilot's hook lives, so this PR gets a drive before it merges: never call it safe to merge as is; say what's left is the drive. Other upstream safety changes ride on CI and don't need a drive."
             fi
           fi
           echo "- Files to review (conflicts and overlap):"
