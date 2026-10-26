@@ -1,7 +1,8 @@
 # BluePilot: nightly upstream sync (spec: #6). Fast-forwards `sunnypilot-clean` to sunnypilot
-# `master` and keeps one PR open from it into `master-local-lateral`. It never merges, never
-# force-pushes and never moves `opendbc_repo`: if `sunnypilot-clean` is not a fast-forward of
-# upstream it stops and opens an issue.
+# `master` and keeps one PR open from it into `master-local-lateral`. When sunnypilot moves its opendbc
+# pin, it builds the resolve itself (#31): the PR then comes from a `sync/resolve-*` branch with
+# `opendbc_repo` at the bg-opendbc commit that has the pin. It never merges and never force-pushes: if
+# `sunnypilot-clean` is not a fast-forward of upstream it stops and opens an issue.
 name: upstream sync
 
 on:
@@ -108,29 +109,74 @@ jobs:
           *) opendbc_row="| ⚠️ | opendbc | unknown: the compare API failed (see the job log) |" ;;
         esac
 
-        # bp-lateral: the opendbc_repo the merged result points at, and the library that carries. Git takes
-        # upstream's pointer without a conflict when only upstream moved it, which would drop the library.
-        merged_opendbc=$(git rev-parse -q --verify "$tree:opendbc_repo" || true)
-        if grep -qx opendbc_repo <<<"$conflicts"; then
-          lateral_row="| ❌ | bp-lateral | \`opendbc_repo\` conflicts: keep \`${our_opendbc:0:8}\` in the resolve PR |"
-        elif [ "$merged_opendbc" != "$our_opendbc" ]; then
-          lateral_row="| ❌ | bp-lateral | the merge takes \`opendbc_repo\` \`${merged_opendbc:0:8}\` instead of \`${our_opendbc:0:8}\`: BluePilot's library would drop out; keep \`${our_opendbc:0:8}\` in a resolve PR |"
-        elif ! lib=$(gh api "repos/$OPENDBC/contents/opendbc/bluepilot_lateral?ref=$our_opendbc" -q .sha 2>lib.err); then
-          if grep -q "HTTP 404" lib.err; then
-            lateral_row="| ❌ | bp-lateral | \`opendbc_repo\` \`${our_opendbc:0:8}\` has no library at \`opendbc/bluepilot_lateral\` |"
+        # bp-lateral row: the library a given opendbc_repo commit carries, against the library's latest release
+        lateral_row() {  # <opendbc_repo commit> <what happens to opendbc_repo>
+          local lib release tag
+          if ! lib=$(gh api "repos/$OPENDBC/contents/opendbc/bluepilot_lateral?ref=$1" -q .sha 2>lib.err); then
+            if grep -q "HTTP 404" lib.err; then echo "| ❌ | bp-lateral | $2, but \`${1:0:8}\` has no library at \`opendbc/bluepilot_lateral\` |"
+            else cat lib.err >&2; echo "| ⚠️ | bp-lateral | $2; reading the library pointer failed (see the job log) |"; fi
+          elif ! release=$(gh api "repos/$LIBRARY/branches/release" -q .commit.sha) || ! tag=$(gh api "repos/$LIBRARY/releases/latest" -q .tag_name); then
+            echo "| ⚠️ | bp-lateral | $2 (library \`${lib:0:8}\`); reading the latest release failed (see the job log) |"
+          elif [ "$lib" = "$release" ]; then
+            echo "| ✅ | bp-lateral | $2, with the library at \`$tag\`, the latest release |"
           else
-            cat lib.err >&2
-            lateral_row="| ⚠️ | bp-lateral | unknown: reading the library pointer failed (see the job log) |"
+            echo "| ⚠️ | bp-lateral | $2, but its library \`${lib:0:8}\` isn't the latest release \`$tag\` (\`${release:0:8}\`): the release job's bump PR brings it, not this sync |"
           fi
-        elif ! release=$(gh api "repos/$LIBRARY/branches/release" -q .commit.sha) || ! tag=$(gh api "repos/$LIBRARY/releases/latest" -q .tag_name); then
-          lateral_row="| ⚠️ | bp-lateral | the merge keeps \`opendbc_repo\` at \`${our_opendbc:0:8}\` (library \`${lib:0:8}\`); reading the latest release failed (see the job log) |"
-        elif [ "$lib" = "$release" ]; then
-          lateral_row="| ✅ | bp-lateral | the merge keeps \`opendbc_repo\` at \`${our_opendbc:0:8}\`, with the library at \`$tag\`, the latest release |"
-        else
-          lateral_row="| ⚠️ | bp-lateral | the merge keeps \`opendbc_repo\` at \`${our_opendbc:0:8}\`, but its library \`${lib:0:8}\` isn't the latest release \`$tag\` (\`${release:0:8}\`): the release job's bump PR brings it, not this sync |"
+        }
+
+        # BluePilot (#31): when sunnypilot moved its opendbc pin and bg-clean already has it (bg-opendbc syncs
+        # first, ford-op/bg-opendbc#102), the job builds the resolve: the merge with opendbc_repo at the earliest
+        # bg-clean commit containing the pin (the bg-opendbc sync merge, never bg-clean's head, so a sync never
+        # carries a library bump). Only when opendbc_repo is the one conflict. Git takes upstream's pointer
+        # without a conflict when only upstream moved it, which this covers too.
+        base_opendbc=$(git rev-parse "$base:opendbc_repo")
+        merged_opendbc=$(git rev-parse -q --verify "$tree:opendbc_repo" || true)
+        other_conflicts=$(grep -vx opendbc_repo <<<"$conflicts" || true)
+        resolve=no target=""
+        if [ "$upstream_opendbc" != "$base_opendbc" ] && [ "$ready" = yes ] && [ -z "$other_conflicts" ]; then
+          # bg-opendbc's history with trees but no file contents: enough for ancestry and the diffs below
+          git fetch -q --no-tags --filter=blob:none "https://github.com/$OPENDBC.git" "$OPENDBC_BRANCH"
+          if git merge-base --is-ancestor "$upstream_opendbc" "$our_opendbc"; then
+            target=$our_opendbc  # this repo's opendbc already has the pin (say a library bump landed first): never move it back
+          else
+            for c in $(git rev-list --first-parent FETCH_HEAD); do
+              git merge-base --is-ancestor "$upstream_opendbc" "$c" || break
+              target=$c
+            done
+          fi
+          [ -n "$target" ] && resolve=yes
         fi
 
-        if [ -n "$conflicts" ]; then
+        if [ "$resolve" = yes ]; then
+          if [ "$target" = "$our_opendbc" ]; then
+            lateral_row=$(lateral_row "$target" "\`opendbc_repo\` stays at \`${target:0:8}\`, which already has sunnypilot's pin \`${upstream_opendbc:0:8}\`")
+          else
+            lateral_row=$(lateral_row "$target" "\`opendbc_repo\` → \`${target:0:8}\`, the $OPENDBC sync merge that brought in sunnypilot's pin \`${upstream_opendbc:0:8}\`")
+          fi
+          # what the move changes: the panda's safety sources (not their tests), and the library pointer
+          fw=$(git diff --name-only "$our_opendbc" "$target" -- opendbc/safety | grep -v '/tests/' || true)
+          if [ -n "$fw" ]; then
+            firmware_row="| ⚠️ | Panda firmware | changes ($(awk '{printf "%s`%s`", (NR > 1 ? ", " : ""), $0}' <<<"$fw")): drive before merging |"
+          else
+            firmware_row="| ✅ | Panda firmware | unchanged |"
+          fi
+          lib_ours=$(git rev-parse "$our_opendbc:opendbc/bluepilot_lateral") lib_target=$(git rev-parse "$target:opendbc/bluepilot_lateral")
+          if [ "$lib_ours" = "$lib_target" ]; then
+            library_row="| ✅ | Library | unchanged at \`${lib_ours:0:8}\` |"
+          else
+            library_row="| ⚠️ | Library | moves \`${lib_ours:0:8}\` → \`${lib_target:0:8}\`, a lateral change: drive before merging |"
+          fi
+        elif grep -qx opendbc_repo <<<"$conflicts"; then
+          lateral_row="| ❌ | bp-lateral | \`opendbc_repo\` conflicts: point it at the $OPENDBC \`$OPENDBC_BRANCH\` commit that contains sunnypilot's pin \`${upstream_opendbc:0:8}\` in a resolve PR |"
+        elif [ "$merged_opendbc" != "$our_opendbc" ]; then
+          lateral_row="| ❌ | bp-lateral | the merge takes \`opendbc_repo\` \`${merged_opendbc:0:8}\` instead of \`${our_opendbc:0:8}\`: BluePilot's library would drop out; point it at the $OPENDBC \`$OPENDBC_BRANCH\` commit that contains \`${merged_opendbc:0:8}\` in a resolve PR |"
+        else
+          lateral_row=$(lateral_row "$our_opendbc" "the merge keeps \`opendbc_repo\` at \`${our_opendbc:0:8}\`")
+        fi
+
+        if [ "$resolve" = yes ] && [ -n "$conflicts" ]; then
+          conflicts_row="| ✅ | Conflicts | \`opendbc_repo\`, resolved by the job (see bp-lateral) |"
+        elif [ -n "$conflicts" ]; then
           conflicts_row="| ❌ | Conflicts | $(files "$conflicts"), listed below: resolve them in a PR that merges this branch |"
         else
           conflicts_row="| ✅ | Conflicts | none |"
@@ -141,8 +187,35 @@ jobs:
           overlap_row="| ✅ | Overlap | none |"
         fi
 
+        # same-repo resolve PRs only: the repo is public, so anyone can open a PR from a fork's sync/resolve-x
+        open_resolve() { gh pr list -R "$REPO" --base "$INTEGRATION" --state open --json number,headRefName,isCrossRepository \
+          -q 'map(select((.headRefName | startswith("sync/resolve-")) and (.isCrossRepository | not))) | .[0] // empty | "\(.number) \(.headRefName)"'; }
+        rpr=$(open_resolve)
+        if [ "$resolve" = yes ]; then
+          # one resolve PR at a time, rebuilt from the current master-local-lateral and upstream whenever either
+          # moved. The previous resolve (an open PR's head, or a branch a failed run left) becomes an extra
+          # parent, so the branch only fast-forwards.
+          if [ -n "$rpr" ]; then read -r rnum branch <<<"$rpr"; else rnum="" branch="sync/resolve-${up:0:8}"; fi
+          prev=$(git ls-remote origin "refs/heads/$branch" | cut -f1)
+          if [ -n "$prev" ]; then git fetch -q --no-tags origin "$branch"; fi
+          if [ -z "$prev" ] || ! git merge-base --is-ancestor "$integration" "$prev" || ! git merge-base --is-ancestor "$up" "$prev"; then
+            export GIT_INDEX_FILE="$RUNNER_TEMP/resolve.idx"
+            git read-tree "$tree"
+            git update-index --cacheinfo "160000,$target,opendbc_repo"
+            rtree=$(git write-tree)
+            unset GIT_INDEX_FILE
+            parents=(-p "$integration" -p "$up")
+            if [ -n "$prev" ]; then parents+=(-p "$prev"); fi
+            commit=$(git -c user.name="ford-op-sync[bot]" -c user.email="ford-op-sync[bot]@users.noreply.github.com" commit-tree "$rtree" "${parents[@]}" \
+              -m "Merge sunnypilot master ${up:0:8}; opendbc_repo to $OPENDBC ${target:0:8}" \
+              -m "sunnypilot moved its opendbc pin to ${upstream_opendbc:0:8}. opendbc_repo moves to the $OPENDBC commit that has it (${target:0:8}). Built by the nightly sync job (#31).")
+            git push origin "$commit:refs/heads/$branch"
+          fi
+        fi
+
         {
-          echo "❌ **Merge commit only: never squash or rebase, and don't delete the branch.** The head is \`$MIRROR\` itself; a squash or rebase leaves upstream's commits out of \`$INTEGRATION\` (the sync merge check opens an issue if that happens)."
+          if [ "$resolve" = yes ]; then head_desc="\`$branch\`, the job's merge of \`$MIRROR\` with \`opendbc_repo\` resolved"; else head_desc="\`$MIRROR\` itself"; fi
+          echo "❌ **Merge commit only: never squash or rebase, and don't delete the branch.** The head is $head_desc; a squash or rebase leaves upstream's commits out of \`$INTEGRATION\` (the sync merge check opens an issue if that happens)."
           echo
           echo "Automated nightly sync of sunnypilot \`master\` into \`$INTEGRATION\` (#6). Upstream \`${base:0:8}..${up:0:8}\`, $(git rev-list --count "$integration..$up") commits."
           echo
@@ -152,6 +225,7 @@ jobs:
           echo "$lateral_row"
           echo "$conflicts_row"
           echo "$overlap_row"
+          if [ "$resolve" = yes ]; then echo "$firmware_row"; echo "$library_row"; fi
           echo
           echo "### Upstream commits"
           git log -n 200 --format='- %h %s' "$integration..$up"
@@ -168,12 +242,31 @@ jobs:
             awk '{print "- " $0}' <<<"$overlap"
           fi
         } > pr.md
-        pr=$(gh pr list -R "$REPO" --head "$MIRROR" --base "$INTEGRATION" --state open --json number -q '.[0].number // empty')
-        if [ -n "$pr" ]; then
-          gh pr edit "$pr" -R "$REPO" --body-file pr.md
+        plain=$(gh pr list -R "$REPO" --head "$MIRROR" --base "$INTEGRATION" --state open --json number -q '.[0].number // empty')
+        if [ "$resolve" = yes ]; then
+          if [ -n "$rnum" ]; then
+            pr=$rnum
+            gh pr edit "$pr" -R "$REPO" --body-file pr.md
+          else
+            pr=$(gh pr create -R "$REPO" --head "$branch" --base "$INTEGRATION" --title "sync: sunnypilot master → $INTEGRATION (opendbc_repo resolved)" --body-file pr.md)
+            pr=${pr##*/}
+          fi
+          # a plain sync PR stays open and closes as merged when the resolve lands (its head is in it)
+          if [ -n "$plain" ]; then
+            gh pr edit "$plain" -R "$REPO" --body "Resolved in #$pr: merge that one; this PR closes as merged with it."
+          fi
         else
-          pr=$(gh pr create -R "$REPO" --head "$MIRROR" --base "$INTEGRATION" --title "sync: sunnypilot master → $INTEGRATION" --body-file pr.md)
-          pr=${pr##*/}
+          if [ -n "$plain" ]; then
+            pr=$plain
+            gh pr edit "$pr" -R "$REPO" --body-file pr.md
+          else
+            pr=$(gh pr create -R "$REPO" --head "$MIRROR" --base "$INTEGRATION" --title "sync: sunnypilot master → $INTEGRATION" --body-file pr.md)
+            pr=${pr##*/}
+          fi
+          # an open resolve PR the job can no longer keep current
+          if [ -n "$rpr" ]; then
+            gh pr edit "${rpr%% *}" -R "$REPO" --body "Superseded: tonight's sync can't be resolved by the job (#$pr has why); resolve it by hand there."
+          fi
         fi
 
         # the review step below runs when anything conflicts or overlaps
