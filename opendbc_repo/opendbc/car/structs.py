@@ -204,6 +204,9 @@ class ControllerStateBP:
   bmsShowBrakeStatus: bool = False
   bmsShowConfidenceBall: bool = True
   bmsShowLaneCenteringIndicator: bool = False
+  bmsHideDmIcon: bool = False
+  bmsHideWheelIcon: bool = False
+  bmsShowNetworkStatus: bool = False
   bmsAnimateSteeringWheel: bool = True
   bmsWheelIconStyle: int = 0
   bmsShowRadarLeadOverlay: bool = True

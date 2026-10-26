@@ -92,6 +92,9 @@ class BluePilotLayout(Widget):
       ("BPHideOnroadBorder", self._hide_onroad_border),
       ("BPShowConfidenceBall", self._show_confidence_ball),
       ("BPLaneCenterIcon", self._lane_center_icon),
+      ("BPHideDMicon", self._hide_dm_icon),
+      ("BPHideWheelIcon", self._hide_wheel_icon),
+      ("BPShowNetworkStatus", self._show_network_status),
       ("BPAnimateSteeringWheel", self._animate_steering_wheel),
       ("BPUseCustomSounds", self._use_custom_sounds),
       ("FordPrefShowRadarLeadOverlay", self._show_ford_radar_overlay),
@@ -205,6 +208,30 @@ class BluePilotLayout(Widget):
       lambda: tr("Show Lane Centering Icon on Interface when lane positioning controls are active."),
       initial_state=self._safe_get_bool(self._params, "BPLaneCenterIcon"),
       callback=lambda state: self._toggle_callback(state, "BPLaneCenterIcon"),
+      icon="monitoring.png"
+    )
+
+    self._hide_dm_icon = toggle_item(
+      lambda: tr("Hide Driver Monitoring Icon"),
+      lambda: tr("Removes DM silhouette icon from UI."),
+      initial_state=self._safe_get_bool(self._params, "BPHideDMicon"),
+      callback=lambda state: self._toggle_callback(state, "BPHideDMicon"),
+      icon="monitoring.png"
+    )
+
+    self._hide_wheel_icon = toggle_item(
+      lambda: tr("Hide Steering Wheel Icon"),
+      lambda: tr("Removes steering wheel icon from UI."),
+      initial_state=self._safe_get_bool(self._params, "BPHideWheelIcon"),
+      callback=lambda state: self._toggle_callback(state, "BPHideWheelIcon"),
+      icon="chffr_wheel.png"
+    )
+
+    self._show_network_status = toggle_item(
+      lambda: tr("Show Network Status"),
+      lambda: tr("Show network connectivity bars on bottom-left of screen"),
+      initial_state=self._safe_get_bool(self._params, "BPShowNetworkStatus"),
+      callback=lambda state: self._toggle_callback(state, "BPShowNetworkStatus"),
       icon="monitoring.png"
     )
 
@@ -813,6 +840,9 @@ class BluePilotLayout(Widget):
         self._show_brake_status,
         self._show_confidence_ball,
         self._lane_center_icon,
+        self._hide_dm_icon,
+        self._hide_wheel_icon,
+        self._show_network_status,
         self._animate_steering_wheel,
         self._wheel_icon_style_btn,
         self._dm_icon_style_btn,

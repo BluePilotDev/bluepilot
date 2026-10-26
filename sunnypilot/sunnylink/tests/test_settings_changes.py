@@ -154,6 +154,18 @@ class TestTestManeuversSection:
 
 
 class TestBluePilotVehicleVisuals:
+  def test_icon_visibility_and_network_status_controls(self, schema):
+    expected = {
+      "BPHideDMicon": ("[Visuals] Hide Driver Monitoring Icon", "Removes DM silhouette icon from UI."),
+      "BPHideWheelIcon": ("[Visuals] Hide Steering Wheel Icon", "Removes steering wheel icon from UI."),
+      "BPShowNetworkStatus": ("[Visuals] Show Network Status (C3X)", "Show network connectivity bars on bottom-left of screen"),
+    }
+    for key, (title, description) in expected.items():
+      item = _find_item(schema, key)
+      assert item is not None
+      assert item["title"] == title
+      assert item["description"] == description
+
   def test_model_path_color_options(self, schema):
     item = _find_item(schema, "BPModelPathColor")
     assert item is not None

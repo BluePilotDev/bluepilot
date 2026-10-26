@@ -22,6 +22,7 @@ from openpilot.selfdrive.ui.onroad.driver_state import (
 )
 from openpilot.selfdrive.ui.sunnypilot.onroad.developer_ui import get_bottom_dev_ui_offset
 from openpilot.selfdrive.ui.sunnypilot.onroad.driver_state import DriverStateRendererSP
+from openpilot.selfdrive.ui.bp.onroad.network_status_bp import draw_network_status, network_bar_count
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.system.ui.lib.application import gui_app
 from openpilot.system.ui.widgets import Widget
@@ -140,6 +141,8 @@ class DriverStateRendererBP(Widget):
     self._param_frame_counter = 0
     self._should_draw = True
     self._is_mici = device_default == DMIconStyle.COMMA_4
+    self._hide_dm_icon = self._params.get_bool("BPHideDMicon")
+    self._show_network_status = not self._is_mici and self._params.get_bool("BPShowNetworkStatus")
 
     self._comma4_renderer = self._child(DriverStateRendererMici())
     if self._is_mici:
@@ -164,6 +167,8 @@ class DriverStateRendererBP(Widget):
     if self._param_frame_counter >= PARAM_REFRESH_FRAMES:
       self._param_frame_counter = 0
       self._style = get_dm_icon_style(self._params, self._device_default)
+      self._hide_dm_icon = self._params.get_bool("BPHideDMicon")
+      self._show_network_status = not self._is_mici and self._params.get_bool("BPShowNetworkStatus")
 
   def _render(self, rect: rl.Rectangle) -> None:
     if self._is_mici:
@@ -172,6 +177,8 @@ class DriverStateRendererBP(Widget):
       self._render_tici(rect)
 
   def _render_mici(self, rect: rl.Rectangle) -> None:
+    if self._hide_dm_icon:
+      return
     if self._style == DMIconStyle.COMMA_4:
       if self._comma4_renderer.rect.width != rect.width or self._comma4_renderer.rect.height != rect.height:
         self._comma4_renderer.set_rect(rl.Rectangle(rect.x, rect.y, rect.width, rect.height))
@@ -184,12 +191,24 @@ class DriverStateRendererBP(Widget):
       self._comma3x_renderer.render(rect)
 
   def _render_tici(self, rect: rl.Rectangle) -> None:
-    if self._style == DMIconStyle.COMMA_3X:
-      self._comma3x_renderer.render(rect)
-      return
+    is_rhd = bool(ui_state.sm["driverMonitoringState"].isRHD)
+    if not self._hide_dm_icon:
+      if self._style == DMIconStyle.COMMA_3X:
+        self._comma3x_renderer.render(rect)
+      else:
+        x = rect.x + rect.width - UI_BORDER_SIZE - BTN_SIZE if is_rhd else rect.x + UI_BORDER_SIZE
+        y = rect.y + rect.height - UI_BORDER_SIZE - BTN_SIZE - get_bottom_dev_ui_offset()
+        self._comma4_renderer.set_position(x, y)
+        self._comma4_renderer.render()
 
-    is_rhd = ui_state.sm["driverMonitoringState"].isRHD
-    x = rect.x + rect.width - UI_BORDER_SIZE - BTN_SIZE if is_rhd else rect.x + UI_BORDER_SIZE
-    y = rect.y + rect.height - UI_BORDER_SIZE - BTN_SIZE - get_bottom_dev_ui_offset()
-    self._comma4_renderer.set_position(x, y)
-    self._comma4_renderer.render()
+    if self._show_network_status:
+      device_state = ui_state.sm["deviceState"]
+      bars = network_bar_count(device_state.networkType.raw, device_state.networkStrength.raw)
+      dm_center_x = rect.x + (rect.width - UI_BORDER_SIZE - BTN_SIZE / 2 if is_rhd else UI_BORDER_SIZE + BTN_SIZE / 2)
+      indicator_rect = rl.Rectangle(
+        dm_center_x - 35,
+        rect.y + rect.height - UI_BORDER_SIZE - get_bottom_dev_ui_offset() - 35,
+        70,
+        35,
+      )
+      draw_network_status(indicator_rect, bars)

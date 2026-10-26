@@ -142,6 +142,7 @@ class HudRendererBP(HudRendererSP):
     self._show_brake_status = self._bp_params.get_bool("ShowBrakeStatus")
     self._hide_v_ego_ui = self._bp_params.get_bool("HideVEgoUI")
     self._show_lateral_control = self._bp_params.get_bool("BpShowLateralControl")
+    self._hide_wheel_icon = self._bp_params.get_bool("BPHideWheelIcon")
     self._lane_positioning_active = False
     lane_center_icon_size = UI_CONFIG.button_size
     self._lane_center_indicator_texture = gui_app.texture(
@@ -192,6 +193,7 @@ class HudRendererBP(HudRendererSP):
       self._show_brake_status = self._bp_params.get_bool("ShowBrakeStatus")
       self._hide_v_ego_ui = self._bp_params.get_bool("HideVEgoUI")
       self._show_lateral_control = self._bp_params.get_bool("BpShowLateralControl")
+      self._hide_wheel_icon = self._bp_params.get_bool("BPHideWheelIcon")
       tesla_style = theme_pack.tesla_active(self._bp_params)
       if tesla_style != self._tesla_style:
         self.reset_tesla_lead_fade()
@@ -371,16 +373,18 @@ class HudRendererBP(HudRendererSP):
 
     button_x = rect.x + rect.width - UI_CONFIG.border_size - UI_CONFIG.button_size
     button_y = rect.y + UI_CONFIG.border_size
+    self._exp_button.set_hidden(self._hide_wheel_icon)
     self._exp_button.render(rl.Rectangle(button_x, button_y, UI_CONFIG.button_size, UI_CONFIG.button_size))
     if self._lane_positioning_active:
       draw_lane_center_indicator(lane_center_indicator_rect(
         button_x, button_y, UI_CONFIG.button_size,
       ), self._lane_center_indicator_texture)
-    self._draw_lateral_control_overlay(
-      button_x + UI_CONFIG.button_size / 2,
-      button_y + UI_CONFIG.button_size / 2,
-      UI_CONFIG.button_size,
-    )
+    if not self._hide_wheel_icon:
+      self._draw_lateral_control_overlay(
+        button_x + UI_CONFIG.button_size / 2,
+        button_y + UI_CONFIG.button_size / 2,
+        UI_CONFIG.button_size,
+      )
 
     # SP additions (dev UI, road name, speed limit, SCC, turn signals, circular alerts, rocket fuel)
     self.developer_ui.render(rect)

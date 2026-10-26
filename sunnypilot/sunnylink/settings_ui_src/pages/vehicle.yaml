@@ -195,6 +195,20 @@ sections:
     description: Display the confidence ball on the left side of the driving view.
     visibility:
     - $ref: '#/macros/hide_on_mici'
+  - key: BPHideDMicon
+    widget: toggle
+    title: '[Visuals] Hide Driver Monitoring Icon'
+    description: Removes DM silhouette icon from UI.
+  - key: BPHideWheelIcon
+    widget: toggle
+    title: '[Visuals] Hide Steering Wheel Icon'
+    description: Removes steering wheel icon from UI.
+  - key: BPShowNetworkStatus
+    widget: toggle
+    title: '[Visuals] Show Network Status (C3X)'
+    description: Show network connectivity bars on bottom-left of screen
+    visibility:
+    - $ref: '#/macros/hide_on_mici'
   - key: BPAnimateSteeringWheel
     widget: toggle
     title: '[Visuals] Animate Steering Wheel'

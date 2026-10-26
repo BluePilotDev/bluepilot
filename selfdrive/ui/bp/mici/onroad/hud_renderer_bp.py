@@ -38,6 +38,7 @@ class MiciHudRendererBP(HudRenderer):
     self._power_flow = MiciPowerflowGauge()
     self._txt_wheel_comma_3x = gui_app.texture("icons/chffr_wheel.png", self._txt_wheel.width, self._txt_wheel.height)
     self._animate_steering_wheel = self._bp_params.get_bool("BPAnimateSteeringWheel")
+    self._hide_wheel_icon = self._bp_params.get_bool("BPHideWheelIcon")
     self._wheel_icon_style = ensure_steering_wheel_icon_style_initialized(self._bp_params, SteeringWheelIconStyle.COMMA_4)
     self._theme_pack = theme_pack.get_active_pack(force=True)
     self._tesla_style = theme_pack.tesla_active(self._bp_params)
@@ -58,6 +59,7 @@ class MiciHudRendererBP(HudRenderer):
     if self._animate_wheel_param_counter >= 60:
       self._animate_wheel_param_counter = 0
       self._animate_steering_wheel = self._bp_params.get_bool("BPAnimateSteeringWheel")
+      self._hide_wheel_icon = self._bp_params.get_bool("BPHideWheelIcon")
       self._wheel_icon_style = get_steering_wheel_icon_style(self._bp_params, SteeringWheelIconStyle.COMMA_4)
       self._theme_pack = theme_pack.get_active_pack()
       self._tesla_style = theme_pack.tesla_active(self._bp_params)
@@ -142,9 +144,10 @@ class MiciHudRendererBP(HudRenderer):
         ui_state.tesla_dark_fraction,
         int(self._wheel_alpha_filter.x),
       )
-    rl.draw_texture_pro(wheel_txt, src_rect, dest_rect, origin, rotation, color)
+    if not self._hide_wheel_icon:
+      rl.draw_texture_pro(wheel_txt, src_rect, dest_rect, origin, rotation, color)
 
-    if self._show_wheel_critical:
+    if self._show_wheel_critical and not self._hide_wheel_icon:
       EXCLAMATION_POINT_SPACING = 10
       exclamation_pos_x = pos_x - self._txt_exclamation_point.width / 2 + wheel_txt.width / 2 + EXCLAMATION_POINT_SPACING
       exclamation_pos_y = pos_y - self._txt_exclamation_point.height / 2
@@ -154,8 +157,10 @@ class MiciHudRendererBP(HudRenderer):
         0.0, 1.0, rl.WHITE,
       )
 
-    if show_lateral:
+    if show_lateral and not self._hide_wheel_icon:
       self._draw_lateral_control_overlay(pos_x, pos_y, wheel_txt.width)
+    elif self._hide_wheel_icon:
+      self._overlay_size = 0
 
     # BluePilot: Render powerflow gauge around steering wheel
     power_flow_radius = self._power_flow.RADIUS

@@ -26,6 +26,11 @@ class ExpButtonBP(ExpButton):
     self._theme_pack = theme_pack.get_active_pack(force=True)
     self._tesla_style = theme_pack.tesla_active(self._params)
     self._param_counter = 0
+    self._hidden = False
+
+  def set_hidden(self, hidden: bool) -> None:
+    """Hide the artwork while preserving the button's normal touch target."""
+    self._hidden = hidden
 
   def _update_state(self) -> None:
     super()._update_state()
@@ -40,6 +45,9 @@ class ExpButtonBP(ExpButton):
       self._tesla_style = theme_pack.tesla_active(self._params)
 
   def _render(self, rect: rl.Rectangle) -> None:
+    if self._hidden:
+      return
+
     center_x = int(self._rect.x + self._rect.width // 2)
     center_y = int(self._rect.y + self._rect.height // 2)
 

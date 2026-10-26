@@ -347,6 +347,9 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"BPModelPathColor", {PERSISTENT | BACKUP, INT, "0"}},  // 0=green (default), 1=Ford blue
     {"BPShowConfidenceBall", {PERSISTENT | BACKUP, BOOL, "1"}},
     {"BPLaneCenterIcon", {PERSISTENT | BACKUP, BOOL, "0"}},
+    {"BPHideDMicon", {PERSISTENT | BACKUP, BOOL, "0"}},
+    {"BPHideWheelIcon", {PERSISTENT | BACKUP, BOOL, "0"}},
+    {"BPShowNetworkStatus", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"BPAnimateSteeringWheel", {PERSISTENT | BACKUP, BOOL, "1"}},
     // BluePilot: No static defaults; the first active UI persists its matching device styles (C4=0, C3X=1).
     {"BPSteeringWheelIconStyle", {PERSISTENT | BACKUP, INT}},
