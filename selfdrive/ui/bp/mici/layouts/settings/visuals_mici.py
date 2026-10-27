@@ -58,6 +58,7 @@ class VisualsLayoutMici(NavScroller):
     self.show_brake_status = BigParamControlBP("Show Brake Status", "ShowBrakeStatus")
     self.hide_dm_icon = BigParamControlBP("Hide Driver Monitoring Icon", "BPHideDMicon")
     self.hide_wheel_icon = BigParamControlBP("Hide Steering Wheel Icon", "BPHideWheelIcon")
+    self.wide_angle_camera = BigParamControlBP("Use Wide Camera View", "BPWideAngleCamera")
     self.animate_steering_wheel = BigParamControlBP("Animate Steering Wheel", "BPAnimateSteeringWheel")
     ensure_steering_wheel_icon_style_initialized(Params(), SteeringWheelIconStyle.COMMA_4)
     self.wheel_icon_style = BigMultiParamToggleBP(
@@ -86,6 +87,7 @@ class VisualsLayoutMici(NavScroller):
       self.show_brake_status,
       self.hide_dm_icon,
       self.hide_wheel_icon,
+      self.wide_angle_camera,
       self.animate_steering_wheel,
       self.wheel_icon_style,
       self.dm_icon_style,
@@ -104,6 +106,7 @@ class VisualsLayoutMici(NavScroller):
       ("ShowBrakeStatus", self.show_brake_status),
       ("BPHideDMicon", self.hide_dm_icon),
       ("BPHideWheelIcon", self.hide_wheel_icon),
+      ("BPWideAngleCamera", self.wide_angle_camera),
       ("BPAnimateSteeringWheel", self.animate_steering_wheel),
       ("FordPrefHybridPowerFlow", self.show_hybrid_power_flow),
     )

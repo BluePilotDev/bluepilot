@@ -87,6 +87,7 @@ def _refresh_settings_cache() -> dict:
     "bmsHideDmIcon":                  _get_bool(p, "BPHideDMicon"),
     "bmsHideWheelIcon":               _get_bool(p, "BPHideWheelIcon"),
     "bmsShowNetworkStatus":           _get_bool(p, "BPShowNetworkStatus"),
+    "bmsUseWideCamera":               _get_bool(p, "BPWideAngleCamera"),
     "bmsAnimateSteeringWheel":         _get_bool(p, "BPAnimateSteeringWheel", True),
     "bmsWheelIconStyle":               _get_int(p, "BPSteeringWheelIconStyle", 0),
     "bmsShowRadarLeadOverlay":         _get_bool(p, "FordPrefShowRadarLeadOverlay", True),

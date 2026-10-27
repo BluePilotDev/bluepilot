@@ -209,6 +209,10 @@ sections:
     description: Show network connectivity bars on bottom-left of screen
     visibility:
     - $ref: '#/macros/hide_on_mici'
+  - key: BPWideAngleCamera
+    widget: toggle
+    title: '[Visuals] Use Wide Camera View'
+    description: Show video feed from wide-angle camera.
   - key: BPAnimateSteeringWheel
     widget: toggle
     title: '[Visuals] Animate Steering Wheel'

@@ -95,6 +95,7 @@ class BluePilotLayout(Widget):
       ("BPHideDMicon", self._hide_dm_icon),
       ("BPHideWheelIcon", self._hide_wheel_icon),
       ("BPShowNetworkStatus", self._show_network_status),
+      ("BPWideAngleCamera", self._wide_angle_camera),
       ("BPAnimateSteeringWheel", self._animate_steering_wheel),
       ("BPUseCustomSounds", self._use_custom_sounds),
       ("FordPrefShowRadarLeadOverlay", self._show_ford_radar_overlay),
@@ -232,6 +233,14 @@ class BluePilotLayout(Widget):
       lambda: tr("Show network connectivity bars on bottom-left of screen"),
       initial_state=self._safe_get_bool(self._params, "BPShowNetworkStatus"),
       callback=lambda state: self._toggle_callback(state, "BPShowNetworkStatus"),
+      icon="monitoring.png"
+    )
+
+    self._wide_angle_camera = toggle_item(
+      lambda: tr("Use Wide Camera View"),
+      lambda: tr("Show video feed from wide-angle camera."),
+      initial_state=self._safe_get_bool(self._params, "BPWideAngleCamera"),
+      callback=lambda state: self._toggle_callback(state, "BPWideAngleCamera"),
       icon="monitoring.png"
     )
 
@@ -843,6 +852,7 @@ class BluePilotLayout(Widget):
         self._hide_dm_icon,
         self._hide_wheel_icon,
         self._show_network_status,
+        self._wide_angle_camera,
         self._animate_steering_wheel,
         self._wheel_icon_style_btn,
         self._dm_icon_style_btn,

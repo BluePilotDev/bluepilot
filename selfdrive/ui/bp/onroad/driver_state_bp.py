@@ -22,9 +22,9 @@ from openpilot.selfdrive.ui.onroad.driver_state import (
 )
 from openpilot.selfdrive.ui.sunnypilot.onroad.developer_ui import get_bottom_dev_ui_offset
 from openpilot.selfdrive.ui.sunnypilot.onroad.driver_state import DriverStateRendererSP
-from openpilot.selfdrive.ui.bp.onroad.network_status_bp import draw_network_status, network_bar_count
+from openpilot.selfdrive.ui.bp.onroad.network_status_bp import draw_network_status, network_bar_count, network_mode_label
 from openpilot.selfdrive.ui.ui_state import ui_state
-from openpilot.system.ui.lib.application import gui_app
+from openpilot.system.ui.lib.application import gui_app, FontWeight
 from openpilot.system.ui.widgets import Widget
 
 
@@ -143,6 +143,7 @@ class DriverStateRendererBP(Widget):
     self._is_mici = device_default == DMIconStyle.COMMA_4
     self._hide_dm_icon = self._params.get_bool("BPHideDMicon")
     self._show_network_status = not self._is_mici and self._params.get_bool("BPShowNetworkStatus")
+    self._network_font = gui_app.font(FontWeight.SEMI_BOLD)
 
     self._comma4_renderer = self._child(DriverStateRendererMici())
     if self._is_mici:
@@ -204,11 +205,15 @@ class DriverStateRendererBP(Widget):
     if self._show_network_status:
       device_state = ui_state.sm["deviceState"]
       bars = network_bar_count(device_state.networkType.raw, device_state.networkStrength.raw)
-      dm_center_x = rect.x + (rect.width - UI_BORDER_SIZE - BTN_SIZE / 2 if is_rhd else UI_BORDER_SIZE + BTN_SIZE / 2)
+      network_info = getattr(device_state, "networkInfo", None)
+      label = network_mode_label(device_state.networkType.raw, getattr(network_info, "technology", ""))
+      # Network state is a fixed bottom-left status item, independent of the
+      # driver-monitoring side selected for right-hand-drive vehicles.
+      network_center_x = rect.x + UI_BORDER_SIZE + BTN_SIZE / 2
       indicator_rect = rl.Rectangle(
-        dm_center_x - 35,
-        rect.y + rect.height - UI_BORDER_SIZE - get_bottom_dev_ui_offset() - 35,
-        70,
-        35,
+        network_center_x - 95,
+        rect.y + rect.height - UI_BORDER_SIZE - get_bottom_dev_ui_offset() - 56,
+        190,
+        56,
       )
-      draw_network_status(indicator_rect, bars)
+      draw_network_status(indicator_rect, bars, label, self._network_font)

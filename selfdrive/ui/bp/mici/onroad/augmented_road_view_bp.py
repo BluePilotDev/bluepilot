@@ -4,7 +4,7 @@ from openpilot.common.filter_simple import FirstOrderFilter
 from openpilot.common.params import Params
 from openpilot.system.ui.lib.application import gui_app
 from openpilot.selfdrive.ui.mici.onroad import SIDE_PANEL_WIDTH
-from openpilot.selfdrive.ui.mici.onroad.augmented_road_view import AugmentedRoadView
+from openpilot.selfdrive.ui.mici.onroad.augmented_road_view import AugmentedRoadView, WIDE_CAM
 from openpilot.selfdrive.ui.bp.mici.onroad.cameraview_bp import MiciCameraViewBP
 from openpilot.selfdrive.ui.bp.mici.onroad.model_renderer_bp import ModelRendererBP
 from openpilot.selfdrive.ui.bp.onroad.blindspot_renderer import BlindspotRendererMixin
@@ -132,6 +132,14 @@ class MiciAugmentedRoadViewBP(MiciCameraViewBP, AugmentedRoadView, BlindspotRend
     # BluePilot: suppress click-to-home when a swipe-down was detected by the detector
     if not self._swipe_detector.interacting():
       super()._handle_mouse_release(mouse_pos)
+
+  def _switch_stream_if_needed(self, sm):
+    """Force the wide road stream when requested; otherwise retain stock experimental-mode behavior."""
+    if self._bp_wide_camera and WIDE_CAM in self.available_streams:
+      if self.stream_type != WIDE_CAM:
+        self.switch_stream(WIDE_CAM)
+      return
+    AugmentedRoadView._switch_stream_if_needed(self, sm)
 
   def _render(self, _):
     """Override render to place confidence ball on left, offset driver state, and conditionally hide border."""

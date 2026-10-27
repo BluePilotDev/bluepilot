@@ -573,6 +573,7 @@ struct ControllerStateBP @0xcd96dafb67a082d0 {
   bmsHideDmIcon @60 :Bool;  # BPHideDMicon
   bmsHideWheelIcon @61 :Bool;  # BPHideWheelIcon
   bmsShowNetworkStatus @62 :Bool;  # BPShowNetworkStatus (TICI only)
+  bmsUseWideCamera @63 :Bool;  # BPWideAngleCamera
   enum LateralMode {
     openpilot @0;  # BP lateral bypassed (disable_BP_lat_UI)
     curvature @1;
