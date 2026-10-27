@@ -12,3 +12,4 @@ jobs:
     uses: ./.github/workflows/tests.yaml
     with:
       run_number: ${{ github.run_number }}
+    secrets: inherit  # the process-replay publish step pushes with the bluepilot-sync App

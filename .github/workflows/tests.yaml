@@ -222,10 +222,18 @@ jobs:
         timeout_minutes: 2
         max_attempts: 3
         command: cd ${{ github.workspace }}/ci-artifacts && git push origin process-replay --force
+    # BluePilot: BluePilotDev keeps workflow tokens read-only, so the publish step pushes with the sync App
+    - name: bluepilot-sync token
+      id: publish-token
+      if: github.repository == 'BluePilotDev/bp-sunnypilot' && github.ref == 'refs/heads/master-local-lateral'
+      uses: actions/create-github-app-token@v2
+      with:
+        app-id: ${{ secrets.SYNC_APP_ID }}
+        private-key: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
     - name: Publish BluePilot refs  # BluePilot: test_processes.py's BP_REF_CARS compare against this branch
       if: github.repository == 'BluePilotDev/bp-sunnypilot' && github.ref == 'refs/heads/master-local-lateral'
       env:
-        GH_TOKEN: ${{ github.token }}
+        GH_TOKEN: ${{ steps.publish-token.outputs.token }}
       run: |
         fakedata=${{ github.workspace }}/openpilot/selfdrive/test/process_replay/fakedata
         segs=$(python3 -c "from openpilot.selfdrive.test.process_replay.test_processes import segments, BP_REF_CARS; print(' '.join(s.replace('|', '_') for c, s in segments if c in BP_REF_CARS))")
