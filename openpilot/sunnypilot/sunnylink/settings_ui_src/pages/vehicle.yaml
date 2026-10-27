@@ -7,7 +7,7 @@ order: 99
 kind: vehicle
 sections:
 - id: ford
-  # BluePilot: the lateral library's settings (params/manifest.py in ford-op/bluepilot-lateral), with
+  # BluePilot: the lateral library's settings (params/manifest.py in BluePilotDev/bluepilot-lateral), with
   # BluePilot 7's titles, text and order. test_ford_settings.py checks the keys and limits against the
   # manifest. No disable toggle: BluePilot is always on in bp-sunnypilot.
   title: Ford BluePilot Settings

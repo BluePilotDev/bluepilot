@@ -223,7 +223,7 @@ jobs:
         max_attempts: 3
         command: cd ${{ github.workspace }}/ci-artifacts && git push origin process-replay --force
     - name: Publish BluePilot refs  # BluePilot: test_processes.py's BP_REF_CARS compare against this branch
-      if: github.repository == 'ford-op/bp-sunnypilot' && github.ref == 'refs/heads/master-local-lateral'
+      if: github.repository == 'BluePilotDev/bp-sunnypilot' && github.ref == 'refs/heads/master-local-lateral'
       env:
         GH_TOKEN: ${{ github.token }}
       run: |

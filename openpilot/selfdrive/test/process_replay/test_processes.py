@@ -70,7 +70,7 @@ excluded_interfaces = {brand for brand, platforms in interface_names.items()
 BASE_URL = "https://raw.githubusercontent.com/sunnypilot/ci-artifacts/refs/heads/process-replay/"
 # BluePilot: these brands run BluePilot lateral, so they compare against bp-sunnypilot's own output from its
 # last merge (tests.yaml publishes it), not stock sunnypilot's
-BP_BASE_URL = "https://raw.githubusercontent.com/ford-op/bp-sunnypilot/refs/heads/process-replay/"
+BP_BASE_URL = "https://raw.githubusercontent.com/BluePilotDev/bp-sunnypilot/refs/heads/process-replay/"
 BP_REF_CARS = {"FORD"}
 REF_COMMIT_FN = os.path.join(PROC_REPLAY_DIR, "ref_commit")
 EXCLUDED_PROCS = {"modeld", "dmonitoringmodeld"}

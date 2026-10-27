@@ -17,11 +17,11 @@ concurrency:
 
 jobs:
   sync:
-    if: github.repository == 'ford-op/bp-sunnypilot'
+    if: github.repository == 'BluePilotDev/bp-sunnypilot'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
-    # GITHUB_TOKEN can't be used: pushes and PRs made with it don't start CI. The ford-op-sync
+    # GITHUB_TOKEN can't be used: pushes and PRs made with it don't start CI. The bluepilot-sync
     # App's PRs run CI normally.
     - uses: actions/create-github-app-token@v2
       id: app
@@ -42,7 +42,7 @@ jobs:
         UPSTREAM_URL: https://github.com/sunnypilot/sunnypilot.git
         MIRROR: sunnypilot-clean
         INTEGRATION: master-local-lateral
-        OPENDBC: ford-op/bg-opendbc
+        OPENDBC: BluePilotDev/opendbc
         OPENDBC_BRANCH: bg-clean
         LIBRARY: BluePilotDev/bluepilot-lateral
       run: |
@@ -125,7 +125,7 @@ jobs:
         }
 
         # BluePilot (#31): when sunnypilot moved its opendbc pin and bg-clean already has it (bg-opendbc syncs
-        # first, ford-op/bg-opendbc#102), the job builds the resolve: the merge with opendbc_repo at the earliest
+        # first, BluePilotDev/opendbc#3), the job builds the resolve: the merge with opendbc_repo at the earliest
         # bg-clean commit containing the pin (the bg-opendbc sync merge, never bg-clean's head, so a sync never
         # carries a library bump). Only when opendbc_repo is the one conflict. Git takes upstream's pointer
         # without a conflict when only upstream moved it, which this covers too.
@@ -212,7 +212,7 @@ jobs:
             unset GIT_INDEX_FILE
             parents=(-p "$integration" -p "$up")
             if [ -n "$prev" ]; then parents+=(-p "$prev"); fi
-            commit=$(git -c user.name="ford-op-sync[bot]" -c user.email="ford-op-sync[bot]@users.noreply.github.com" commit-tree "$rtree" "${parents[@]}" \
+            commit=$(git -c user.name="bluepilot-sync[bot]" -c user.email="bluepilot-sync[bot]@users.noreply.github.com" commit-tree "$rtree" "${parents[@]}" \
               -m "Merge sunnypilot master ${up:0:8}; opendbc_repo to $OPENDBC ${target:0:8}" \
               -m "sunnypilot moved its opendbc pin to ${upstream_opendbc:0:8}. opendbc_repo moves to the $OPENDBC commit that has it (${target:0:8}). Built by the nightly sync job (#31).")
             git push origin "$commit:refs/heads/$branch"
