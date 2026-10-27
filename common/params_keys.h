@@ -344,7 +344,13 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"BPThemePack", {PERSISTENT | BACKUP, STRING, ""}},
     {"BPThemeAutoSeasonal", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"BPRainbowLines", {PERSISTENT | BACKUP, BOOL, "0"}},
+    {"BPModelPathColor", {PERSISTENT | BACKUP, INT, "0"}},  // 0=green (default), 1=Ford blue
     {"BPShowConfidenceBall", {PERSISTENT | BACKUP, BOOL, "1"}},
+    {"BPLaneCenterIcon", {PERSISTENT | BACKUP, BOOL, "0"}},
+    {"BPHideDMicon", {PERSISTENT | BACKUP, BOOL, "0"}},
+    {"BPHideWheelIcon", {PERSISTENT | BACKUP, BOOL, "0"}},
+    {"BPShowNetworkStatus", {PERSISTENT | BACKUP, BOOL, "0"}},
+    {"BPWideAngleCamera", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"BPAnimateSteeringWheel", {PERSISTENT | BACKUP, BOOL, "1"}},
     // BluePilot: No static defaults; the first active UI persists its matching device styles (C4=0, C3X=1).
     {"BPSteeringWheelIconStyle", {PERSISTENT | BACKUP, INT}},
@@ -356,6 +362,19 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"BPUIDebugLog", {PERSISTENT, BOOL, "0"}},
     {"Blindspot", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"BlinkerPauseLaneChange", {PERSISTENT | BACKUP, BOOL, "0"}},
+
+    // BluePilot: Vision-Adjacent Spot Monitoring (ported from StarPilot PR #75)
+    {"VASMEnabled", {PERSISTENT | BACKUP, BOOL, "0"}},
+    {"VASMConfidenceThreshold", {PERSISTENT | BACKUP, FLOAT, "0.85"}},
+    {"VASMSmoothSeconds", {PERSISTENT | BACKUP, FLOAT, "0.2"}},
+    {"VASMAnnotationConfig", {PERSISTENT | BACKUP, JSON, "{}"}},
+    {"VASMLeftActive", {CLEAR_ON_MANAGER_START | CLEAR_ON_ONROAD_TRANSITION | CLEAR_ON_OFFROAD_TRANSITION, BOOL, "0"}},
+    {"VASMRightActive", {CLEAR_ON_MANAGER_START | CLEAR_ON_ONROAD_TRANSITION | CLEAR_ON_OFFROAD_TRANSITION, BOOL, "0"}},
+    {"VASMLeftConfidence", {CLEAR_ON_MANAGER_START | CLEAR_ON_ONROAD_TRANSITION | CLEAR_ON_OFFROAD_TRANSITION, FLOAT, "0.0"}},
+    {"VASMRightConfidence", {CLEAR_ON_MANAGER_START | CLEAR_ON_ONROAD_TRANSITION | CLEAR_ON_OFFROAD_TRANSITION, FLOAT, "0.0"}},
+    {"VASMHeartbeat", {CLEAR_ON_MANAGER_START | CLEAR_ON_ONROAD_TRANSITION | CLEAR_ON_OFFROAD_TRANSITION, FLOAT, "0.0"}},
+    {"VASMTimestampEof", {CLEAR_ON_MANAGER_START | CLEAR_ON_ONROAD_TRANSITION | CLEAR_ON_OFFROAD_TRANSITION, INT, "0"}},
+    // End BluePilot
 
     // BluePilot: Portal (Web Routes Server)
     {"EnableWebRoutesServer", {PERSISTENT | BACKUP, BOOL, "0"}},

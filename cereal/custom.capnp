@@ -129,6 +129,7 @@ struct ModelManagerSP @0xaedffd8f31e7b55d {
     downloaded @2;
     cached @3;
     failed @4;
+    verifying @5;
   }
 
   struct DownloadProgress {
@@ -137,10 +138,16 @@ struct ModelManagerSP @0xaedffd8f31e7b55d {
     eta @2 :UInt32;
   }
 
+  struct Chunk {
+    fileName @0 :Text;
+    sha256 @1 :Text;
+  }
+
   struct Artifact {
     fileName @0 :Text;
     downloadUri @1 :DownloadUri;
     downloadProgress @2 :DownloadProgress;
+    chunks @3 :List(Chunk);
   }
 
   struct Model {
@@ -155,6 +162,7 @@ struct ModelManagerSP @0xaedffd8f31e7b55d {
       policy @3;
       offPolicy @4;
       onPolicy @5;
+      chunked @6;
     }
   }
 
@@ -499,7 +507,7 @@ struct ControllerStateBP @0xcd96dafb67a082d0 {
   bmsHideOnroadBorder @12 :Bool;  # BPHideOnroadBorder
   bmsDisableLaneLineStatusColor @13 :Bool;  # BPDisableLaneLineStatusColor
   bmsMinimalDrivingView @14 :Bool;  # BPHideCameraView
-  bmsEightBitRacerTheme @15 :Bool;  # BPRadRacerTheme (TICI only)
+  bmsEightBitRacerTheme @15 :Bool;  # BPThemePack == "rad_racer"
   bmsRainbowLaneLines @16 :Bool;  # BPRainbowLines
   bmsShowBlindspotOverlay @17 :Bool;  # ShowBlindspotOverlay
   bmsShowBrakeStatus @18 :Bool;  # ShowBrakeStatus
@@ -553,6 +561,19 @@ struct ControllerStateBP @0xcd96dafb67a082d0 {
   # Only published by Ford BP, so other cars show nothing.
   activeLateralMode @54 :LateralMode;
 
+  # BluePilot: append-only menu fields. Ordinal 55 was used by an unpublished
+  # experiment and remains reserved so Tesla telemetry keeps its wire ordinal.
+  reservedVisualMenuField55 @55 :Void;
+  bmsTeslaStyleMode @56 :Bool;  # BPThemePack selected Tesla (ordinal/name retained for API compatibility)
+  bmsShowLaneCenteringIndicator @57 :Bool;  # BPLaneCenterIcon (TICI only)
+
+  # BluePilot: true only while Angle-mode Lane Positioning is actively using confident lane lines.
+  lanePositioningActive @58 :Bool;
+  bmsModelPathColor @59 :UInt8;  # BPModelPathColor: 0=green (default), 1=Ford blue
+  bmsHideDmIcon @60 :Bool;  # BPHideDMicon
+  bmsHideWheelIcon @61 :Bool;  # BPHideWheelIcon
+  bmsShowNetworkStatus @62 :Bool;  # BPShowNetworkStatus (TICI only)
+  bmsUseWideCamera @63 :Bool;  # BPWideAngleCamera
   enum LateralMode {
     openpilot @0;  # BP lateral bypassed (disable_BP_lat_UI)
     curvature @1;

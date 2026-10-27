@@ -36,7 +36,7 @@ class VisualsLayoutMici(NavScroller):
       ["off", "lead car speed", "speed", "lead car distance", "time to lead car"],
     )
     self.rainbow_mode = BigParamControlBP("Rainbow Mode", "RainbowMode")
-    # BluePilot: one theme selector for everything (8-Bit Racer + seasonal packs),
+    # BluePilot: one theme selector for everything (code themes + seasonal packs),
     # same entries and param as the C3X page — see theme_pack.selector_entries().
     _theme_entries = theme_pack.selector_entries()
     self.theme_pack_sel = BigMultiParamToggleStrBP(
@@ -50,9 +50,15 @@ class VisualsLayoutMici(NavScroller):
     self.hide_fade = BigParamControlBP("Hide Onroad Fade", "mici_hide_onroad_fade")
     self.hide_border = BigParamControlBP("Hide Onroad Border", "BPHideOnroadBorder")
     self.hide_camera_view = BigParamControlBP("Minimal Driving View", "BPHideCameraView")
+    self.model_path_color = BigMultiParamToggleBP(
+      "Model Path Color", "BPModelPathColor", ["Green (Default)", "Ford"],
+    )
     self.rainbow_lane_lines = BigParamControlBP("Rainbow Lane Lines", "BPRainbowLines")
     self.show_blindspot_ui = BigParamControlBP("Show Blindspot Overlay", "ShowBlindspotOverlay")
     self.show_brake_status = BigParamControlBP("Show Brake Status", "ShowBrakeStatus")
+    self.hide_dm_icon = BigParamControlBP("Hide Driver Monitoring Icon", "BPHideDMicon")
+    self.hide_wheel_icon = BigParamControlBP("Hide Steering Wheel Icon", "BPHideWheelIcon")
+    self.wide_angle_camera = BigParamControlBP("Use Wide Camera View", "BPWideAngleCamera")
     self.animate_steering_wheel = BigParamControlBP("Animate Steering Wheel", "BPAnimateSteeringWheel")
     ensure_steering_wheel_icon_style_initialized(Params(), SteeringWheelIconStyle.COMMA_4)
     self.wheel_icon_style = BigMultiParamToggleBP(
@@ -75,9 +81,13 @@ class VisualsLayoutMici(NavScroller):
       self.hide_fade,
       self.hide_border,
       self.hide_camera_view,
+      self.model_path_color,
       self.rainbow_lane_lines,
       self.show_blindspot_ui,
       self.show_brake_status,
+      self.hide_dm_icon,
+      self.hide_wheel_icon,
+      self.wide_angle_camera,
       self.animate_steering_wheel,
       self.wheel_icon_style,
       self.dm_icon_style,
@@ -94,6 +104,9 @@ class VisualsLayoutMici(NavScroller):
       ("BPRainbowLines", self.rainbow_lane_lines),
       ("ShowBlindspotOverlay", self.show_blindspot_ui),
       ("ShowBrakeStatus", self.show_brake_status),
+      ("BPHideDMicon", self.hide_dm_icon),
+      ("BPHideWheelIcon", self.hide_wheel_icon),
+      ("BPWideAngleCamera", self.wide_angle_camera),
       ("BPAnimateSteeringWheel", self.animate_steering_wheel),
       ("FordPrefHybridPowerFlow", self.show_hybrid_power_flow),
     )
@@ -103,6 +116,7 @@ class VisualsLayoutMici(NavScroller):
   def _update_state(self):
     super()._update_state()
     self.show_lead_vehicle._load_value()
+    self.model_path_color._load_value()
     self.hybrid_power_flow_style._load_value()
     self._update_buttons()
 

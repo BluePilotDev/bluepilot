@@ -29,6 +29,7 @@ export const Header = ({
     if (location.pathname.startsWith('/parameters')) return 'Parameters'
     if (location.pathname.startsWith('/logs')) return 'System Logs'
     if (location.pathname.startsWith('/settings')) return 'Settings'
+    if (location.pathname.startsWith('/vasm')) return 'Configure V-ASM'
     return 'BluePilot'
   }
 

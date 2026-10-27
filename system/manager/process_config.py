@@ -3,7 +3,7 @@ import operator
 import platform
 
 from cereal import car, custom
-from openpilot.common.params import Params
+from openpilot.common.params import Params, UnknownKeyName
 from openpilot.common.bluepilot import is_bluepilot
 from openpilot.system.hardware import PC, TICI
 from openpilot.system.manager.process import PythonProcess, NativeProcess, DaemonProcess
@@ -196,10 +196,20 @@ if is_bluepilot():
     return params.get_bool("EnableWebRoutesServer")
   def _bp_route_preprocessor_enabled(started, params, CP):
     return params.get_bool("EnableWebRoutesServer") and only_offroad(started, params, CP)
+  def _vasm_enabled(started, params, CP):
+    try:
+      return only_onroad(started, params, CP) and params.get_bool("VASMEnabled")
+    except UnknownKeyName:
+      # A stale Quickboot build may not have compiled the new key yet. Fail closed.
+      return False
   procs += [
     PythonProcess("bp_portal", "bluepilot.backend.bp_portal", _bp_portal_enabled),
     PythonProcess("bp_route_preprocessor", "bluepilot.backend.routes.preprocessor", _bp_route_preprocessor_enabled),
+    # BluePilot: V-ASM has large optional native dependencies. Never import them in manager;
+    # stale Quickboot environments must disable this feature rather than block device startup.
+    PythonProcess("adj_spot_monitor_vision", "bluepilot.vasm.daemon", _vasm_enabled, preimport=False),
   ]
+# End BluePilot
 
 if os.path.exists("./github_runner.sh"):
   procs += [NativeProcess("github_runner_start", "system/manager", ["./github_runner.sh", "start"], and_(only_offroad, use_github_runner), sigkill=False)]

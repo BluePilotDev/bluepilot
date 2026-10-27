@@ -14,6 +14,8 @@ from openpilot.system.ui.lib.wifi_manager import WifiManager, Network
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.selfdrive.ui.bp.widgets.float_control_item import float_control_item, int_control_item
 from openpilot.selfdrive.ui.bp.widgets.section_header import CollapsibleSectionHeader
+from openpilot.selfdrive.ui.bp.widgets.web_server_qr_dialog_tici import WebServerQRDialogTici
+from openpilot.bluepilot.vasm.config import normalize_annotation_config
 from openpilot.selfdrive.ui.bp.lib.steering_wheel_style import (
   ensure_steering_wheel_icon_style_initialized,
   get_steering_wheel_icon_style,
@@ -27,6 +29,7 @@ from openpilot.selfdrive.ui.bp.lib.dm_icon_style import (
   get_dm_icon_style,
 )
 from openpilot.selfdrive.ui.bp.lib.custom_sound import get_custom_sound_selection
+from openpilot.selfdrive.ui.bp.lib.model_path_color import ModelPathColor, get_model_path_color
 from opendbc.sunnypilot.car.ford.lateral_curv_ext import PrimaryLateralControl
 from openpilot.selfdrive.ui.bp.onroad.augmented_road_view_bp import GaugeStyle
 
@@ -79,6 +82,7 @@ class BluePilotLayout(Widget):
     # Toggle refresh list
     self._refresh_toggles = (
       ("send_hands_free_cluster_msg", self._show_hands_free_ui),
+      ("VASMEnabled", self._vasm_enabled),
       ("FordPrefSteerAngleCurvature", self._steer_angle_curvature),
       ("BPDisableLaneLineStatusColor", self._disable_lane_line_status_color),
       ("BPHideCameraView", self._hide_camera_view),
@@ -87,6 +91,11 @@ class BluePilotLayout(Widget):
       ("ShowBrakeStatus", self._show_brake_status),
       ("BPHideOnroadBorder", self._hide_onroad_border),
       ("BPShowConfidenceBall", self._show_confidence_ball),
+      ("BPLaneCenterIcon", self._lane_center_icon),
+      ("BPHideDMicon", self._hide_dm_icon),
+      ("BPHideWheelIcon", self._hide_wheel_icon),
+      ("BPShowNetworkStatus", self._show_network_status),
+      ("BPWideAngleCamera", self._wide_angle_camera),
       ("BPAnimateSteeringWheel", self._animate_steering_wheel),
       ("BPUseCustomSounds", self._use_custom_sounds),
       ("FordPrefShowRadarLeadOverlay", self._show_ford_radar_overlay),
@@ -195,6 +204,60 @@ class BluePilotLayout(Widget):
       icon="warning.png"
     )
 
+    self._lane_center_icon = toggle_item(
+      lambda: tr("Lane Positioning Confidence Indicator"),
+      lambda: tr("Show Lane Centering Icon on Interface when lane positioning controls are active."),
+      initial_state=self._safe_get_bool(self._params, "BPLaneCenterIcon"),
+      callback=lambda state: self._toggle_callback(state, "BPLaneCenterIcon"),
+      icon="monitoring.png"
+    )
+
+    self._hide_dm_icon = toggle_item(
+      lambda: tr("Hide Driver Monitoring Icon"),
+      lambda: tr("Removes DM silhouette icon from UI."),
+      initial_state=self._safe_get_bool(self._params, "BPHideDMicon"),
+      callback=lambda state: self._toggle_callback(state, "BPHideDMicon"),
+      icon="monitoring.png"
+    )
+
+    self._hide_wheel_icon = toggle_item(
+      lambda: tr("Hide Steering Wheel Icon"),
+      lambda: tr("Removes steering wheel icon from UI."),
+      initial_state=self._safe_get_bool(self._params, "BPHideWheelIcon"),
+      callback=lambda state: self._toggle_callback(state, "BPHideWheelIcon"),
+      icon="chffr_wheel.png"
+    )
+
+    self._show_network_status = toggle_item(
+      lambda: tr("Show Network Status"),
+      lambda: tr("Show network connectivity bars on bottom-left of screen"),
+      initial_state=self._safe_get_bool(self._params, "BPShowNetworkStatus"),
+      callback=lambda state: self._toggle_callback(state, "BPShowNetworkStatus"),
+      icon="monitoring.png"
+    )
+
+    self._wide_angle_camera = toggle_item(
+      lambda: tr("Use Wide Camera View"),
+      lambda: tr("Show video feed from wide-angle camera."),
+      initial_state=self._safe_get_bool(self._params, "BPWideAngleCamera"),
+      callback=lambda state: self._toggle_callback(state, "BPWideAngleCamera"),
+      icon="monitoring.png"
+    )
+
+    self._model_path_color_entries = [
+      (tr("Green (Default)"), ModelPathColor.GREEN),
+      (tr("Ford"), ModelPathColor.FORD),
+    ]
+    self._model_path_color_dialog: MultiOptionDialog | None = None
+    self._model_path_color_action = ButtonAction(lambda: tr("SELECT"))
+    self._model_path_color_action.set_value(lambda: self._get_model_path_color_display())
+    self._model_path_color_btn = ListItem(
+      lambda: tr("Model Path Color"),
+      description=lambda: tr("Choose between the default green model path and a Ford-style blue model path."),
+      action_item=self._model_path_color_action,
+      callback=self._select_model_path_color,
+    )
+
     # Animate steering wheel toggle
     self._animate_steering_wheel = toggle_item(
       lambda: tr("Animate Steering Wheel"),
@@ -204,7 +267,7 @@ class BluePilotLayout(Widget):
       icon="chffr_wheel.png"
     )
 
-    # BluePilot: one theme selector for everything (8-Bit Racer + seasonal packs),
+    # BluePilot: one theme selector for everything (code themes + seasonal packs),
     # same entries and param as the MICI page — see theme_pack.selector_entries().
     # A dialog (not a button row) so any number of packs stays inside the item box.
     self._theme_entries = theme_pack.selector_entries()
@@ -213,7 +276,7 @@ class BluePilotLayout(Widget):
     self._theme_action.set_value(lambda: self._get_theme_display())
     self._theme_pack_btn = ListItem(
       lambda: tr("Theme"),
-      description=lambda: tr("8-Bit Racer game view, or a seasonal theme pack (recolors the road and the wheel icon)."),
+      description=lambda: tr("Choose 8-Bit Racer, Tesla, or a seasonal theme pack."),
       action_item=self._theme_action,
       callback=self._select_theme,
     )
@@ -488,6 +551,44 @@ class BluePilotLayout(Widget):
       icon="warning.png"
     )
 
+    # BluePilot: StarPilot-derived driver-camera adjacent-spot monitoring.
+    self._vasm_enabled = toggle_item(
+      lambda: tr("Vision-Adjacent Spot Monitoring"),
+      lambda: tr("Use the driver camera to supplement the vehicle's blind-spot sensors. Configure the monitored window regions before enabling."),
+      initial_state=self._safe_get_bool(self._params, "VASMEnabled"),
+      callback=lambda state: self._toggle_callback(state, "VASMEnabled"),
+      enabled=self._has_vasm_config,
+      icon="warning.png",
+    )
+    self._vasm_configure_btn = button_item(
+      lambda: tr("V-ASM Camera Regions"),
+      lambda: tr("CONFIGURE"),
+      lambda: tr("Open BluePilot Portal on your phone to mark the left and right window regions."),
+      callback=self._configure_vasm,
+    )
+    self._vasm_confidence = float_control_item(
+      lambda: tr("V-ASM Confidence Threshold"),
+      lambda: tr("Minimum vehicle-detection confidence. Higher values reduce false alerts."),
+      param="VASMConfidenceThreshold",
+      min_value=0.25,
+      max_value=1.0,
+      step=0.05,
+      enabled=lambda: self._safe_get_bool(self._params, "VASMEnabled"),
+      icon="warning.png",
+    )
+    self._vasm_smoothing = float_control_item(
+      lambda: tr("V-ASM Smoothing"),
+      lambda: tr("Time used to stabilize vision detections."),
+      param="VASMSmoothSeconds",
+      min_value=0.1,
+      max_value=0.5,
+      step=0.1,
+      suffix="s",
+      enabled=lambda: self._safe_get_bool(self._params, "VASMEnabled"),
+      icon="warning.png",
+    )
+    # End BluePilot
+
     # UI Debug Logging toggle
     self._ui_debug_log = toggle_item(
       lambda: tr("UI Debug Logging"),
@@ -726,6 +827,10 @@ class BluePilotLayout(Widget):
       _section(tr("Vehicle"), [
         self._show_hands_free_ui,
         self._steer_angle_curvature,
+        self._vasm_enabled,
+        self._vasm_configure_btn,
+        self._vasm_confidence,
+        self._vasm_smoothing,
         self._vbatt_pause_charging,
       ]) +
       _section(tr("Audio"), [
@@ -736,12 +841,18 @@ class BluePilotLayout(Widget):
         self._hide_onroad_border,
         self._disable_lane_line_status_color,
         self._hide_camera_view,
+        self._model_path_color_btn,
         self._theme_pack_btn,
         self._theme_auto_seasonal,
         self._rainbow_lane_lines,
         self._show_blindspot,
         self._show_brake_status,
         self._show_confidence_ball,
+        self._lane_center_icon,
+        self._hide_dm_icon,
+        self._hide_wheel_icon,
+        self._show_network_status,
+        self._wide_angle_camera,
         self._animate_steering_wheel,
         self._wheel_icon_style_btn,
         self._dm_icon_style_btn,
@@ -767,6 +878,17 @@ class BluePilotLayout(Widget):
       return float(self._params.get(param, return_default=True))
     except (TypeError, ValueError):
       return default
+
+  def _has_vasm_config(self) -> bool:
+    try:
+      normalize_annotation_config(self._params.get("VASMAnnotationConfig", return_default=True) or {})
+      return True
+    except (TypeError, ValueError, UnknownKeyName):
+      return False
+
+  def _configure_vasm(self) -> None:
+    self._params.put_bool("EnableWebRoutesServer", True)
+    gui_app.push_widget(WebServerQRDialogTici(path="/vasm", title=tr("Configure V-ASM")))
 
   def _toggle_callback(self, state: bool, param: str):
     """Handle toggle state changes."""
@@ -1077,7 +1199,32 @@ class BluePilotLayout(Widget):
     stored = self._safe_get(self._params, theme_pack.PARAM_KEY) or ""
     if isinstance(stored, bytes):
       stored = stored.decode("utf-8", errors="replace")
+    stored = theme_pack.normalize_selector_value(stored)
     return next((label for label, v in self._theme_entries if v and v.lower() == stored.lower()), tr("Off"))
+
+  def _get_model_path_color_display(self) -> str:
+    selected = get_model_path_color(self._params)
+    return next(label for label, value in self._model_path_color_entries if value == selected)
+
+  def _select_model_path_color(self):
+    """Open the model-path color menu and persist the selected enum value."""
+    def handle_selection(result: DialogResult):
+      if result == DialogResult.CONFIRM and self._model_path_color_dialog is not None:
+        selection = self._model_path_color_dialog.selection
+        value = next(
+          (value for label, value in self._model_path_color_entries if label == selection),
+          ModelPathColor.GREEN,
+        )
+        self._params.put("BPModelPathColor", int(value))
+      self._model_path_color_dialog = None
+
+    self._model_path_color_dialog = MultiOptionDialog(
+      tr("Model Path Color"),
+      [label for label, _ in self._model_path_color_entries],
+      self._get_model_path_color_display(),
+      callback=handle_selection,
+    )
+    gui_app.push_widget(self._model_path_color_dialog)
 
   def _select_theme(self):
     """Open a scrollable option dialog; stores the selected entry's param value."""
