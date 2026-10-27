@@ -1,6 +1,6 @@
-# BluePilot: nightly upstream sync (spec: #6). Fast-forwards `sunnypilot-clean` to sunnypilot
+# BluePilot: nightly upstream sync (spec: ford-op/bp-sunnypilot#6). Fast-forwards `sunnypilot-clean` to sunnypilot
 # `master` and keeps one PR open from it into `bp-sunnypilot`. When sunnypilot moves its opendbc
-# pin, it builds the resolve itself (#31): the PR then comes from a `sync/resolve-*` branch with
+# pin, it builds the resolve itself (ford-op/bp-sunnypilot#31): the PR then comes from a `sync/resolve-*` branch with
 # `opendbc_repo` at the BluePilotDev/opendbc commit that has the pin. It never merges and never force-pushes: if
 # `sunnypilot-clean` is not a fast-forward of upstream it stops and opens an issue.
 name: upstream sync
@@ -124,7 +124,7 @@ jobs:
           fi
         }
 
-        # BluePilot (#31): when sunnypilot moved its opendbc pin and bp-opendbc already has it (BluePilotDev/opendbc syncs
+        # BluePilot (ford-op/bp-sunnypilot#31): when sunnypilot moved its opendbc pin and bp-opendbc already has it (BluePilotDev/opendbc syncs
         # first, BluePilotDev/opendbc#3), the job builds the resolve: the merge with opendbc_repo at the earliest
         # bp-opendbc commit containing the pin (the BluePilotDev/opendbc sync merge, never bp-opendbc's head, so a sync never
         # carries a library bump). Only when opendbc_repo is the one conflict. Git takes upstream's pointer
@@ -214,7 +214,7 @@ jobs:
             if [ -n "$prev" ]; then parents+=(-p "$prev"); fi
             commit=$(git -c user.name="bluepilot-sync[bot]" -c user.email="bluepilot-sync[bot]@users.noreply.github.com" commit-tree "$rtree" "${parents[@]}" \
               -m "Merge sunnypilot master ${up:0:8}; opendbc_repo to $OPENDBC ${target:0:8}" \
-              -m "sunnypilot moved its opendbc pin to ${upstream_opendbc:0:8}. opendbc_repo moves to the $OPENDBC commit that has it (${target:0:8}). Built by the nightly sync job (#31).")
+              -m "sunnypilot moved its opendbc pin to ${upstream_opendbc:0:8}. opendbc_repo moves to the $OPENDBC commit that has it (${target:0:8}). Built by the nightly sync job (ford-op/bp-sunnypilot#31).")
             git push origin "$commit:refs/heads/$branch"
           fi
         fi
@@ -223,7 +223,7 @@ jobs:
           if [ "$resolve" = yes ]; then head_desc="\`$branch\`, the job's merge of \`$MIRROR\` with \`opendbc_repo\` resolved"; else head_desc="\`$MIRROR\` itself"; fi
           echo "❌ **Merge commit only: never squash or rebase, and don't delete the branch.** The head is $head_desc; a squash or rebase leaves upstream's commits out of \`$INTEGRATION\` (the sync merge check opens an issue if that happens)."
           echo
-          echo "Automated nightly sync of sunnypilot \`master\` into \`$INTEGRATION\` (#6). Upstream \`${base:0:8}..${up:0:8}\`, $(git rev-list --count "$integration..$up") commits."
+          echo "Automated nightly sync of sunnypilot \`master\` into \`$INTEGRATION\` (ford-op/bp-sunnypilot#6). Upstream \`${base:0:8}..${up:0:8}\`, $(git rev-list --count "$integration..$up") commits."
           echo
           echo "| | Check | Result |"
           echo "|---|---|---|"

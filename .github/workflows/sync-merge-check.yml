@@ -1,4 +1,4 @@
-# BluePilot: a sync PR (head sunnypilot-clean, or the job's sync/resolve-* branch, #31) has to land as a merge commit; a squash or rebase
+# BluePilot: a sync PR (head sunnypilot-clean, or the job's sync/resolve-* branch, ford-op/bp-sunnypilot#31) has to land as a merge commit; a squash or rebase
 # leaves upstream's commits out of the bp-sunnypilot branch. GitHub can't allow merge methods per PR,
 # so this catches it right after the merge and opens an issue.
 name: sync merge check
