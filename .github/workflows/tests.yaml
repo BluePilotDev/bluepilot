@@ -174,7 +174,7 @@ jobs:
       run: echo "label=$(gh api repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/labels --jq 'any(.[]; .name == "replay-accepted")')" >> "$GITHUB_OUTPUT"
     - name: Run replay
       timeout-minutes: ${{ contains(runner.name, 'nsc') && 2 || 20 }}
-      continue-on-error: ${{ github.ref == 'refs/heads/master' || github.ref == 'refs/heads/master-local-lateral' || steps.accepted.outputs.label == 'true' }}
+      continue-on-error: ${{ github.ref == 'refs/heads/master' || github.ref == 'refs/heads/bp-sunnypilot' || steps.accepted.outputs.label == 'true' }}
       run: openpilot/selfdrive/test/process_replay/test_processes.py -j$(nproc)
     - name: Print diff
       id: print-diff
@@ -225,13 +225,13 @@ jobs:
     # BluePilot: BluePilotDev keeps workflow tokens read-only, so the publish step pushes with the sync App
     - name: bluepilot-sync token
       id: publish-token
-      if: github.repository == 'BluePilotDev/bp-sunnypilot' && github.ref == 'refs/heads/master-local-lateral'
+      if: github.repository == 'BluePilotDev/bp-sunnypilot' && github.ref == 'refs/heads/bp-sunnypilot'
       uses: actions/create-github-app-token@v2
       with:
         app-id: ${{ secrets.SYNC_APP_ID }}
         private-key: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
     - name: Publish BluePilot refs  # BluePilot: test_processes.py's BP_REF_CARS compare against this branch
-      if: github.repository == 'BluePilotDev/bp-sunnypilot' && github.ref == 'refs/heads/master-local-lateral'
+      if: github.repository == 'BluePilotDev/bp-sunnypilot' && github.ref == 'refs/heads/bp-sunnypilot'
       env:
         GH_TOKEN: ${{ steps.publish-token.outputs.token }}
       run: |
@@ -239,7 +239,7 @@ jobs:
         segs=$(python3 -c "from openpilot.selfdrive.test.process_replay.test_processes import segments, BP_REF_CARS; print(' '.join(s.replace('|', '_') for c, s in segments if c in BP_REF_CARS))")
         repo="https://github.com/${{ github.repository }}.git"
         # a later merge publishes its own refs; this one's would overwrite them
-        [ "$(git ls-remote "$repo" refs/heads/master-local-lateral | cut -f1)" = "${{ github.sha }}" ] || { echo "not the branch head, skipping"; exit 0; }
+        [ "$(git ls-remote "$repo" refs/heads/bp-sunnypilot | cut -f1)" = "${{ github.sha }}" ] || { echo "not the branch head, skipping"; exit 0; }
         mkdir "$RUNNER_TEMP/bp-refs" && cd "$RUNNER_TEMP/bp-refs" && git init -q -b process-replay
         # keep the two previous refs too: a PR run that read an older ref_commit (or a cached one) still finds its
         # files when merges land minutes apart. ref_commits lists the kept refs, newest last.

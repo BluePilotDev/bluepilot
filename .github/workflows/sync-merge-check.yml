@@ -1,12 +1,12 @@
 # BluePilot: a sync PR (head sunnypilot-clean, or the job's sync/resolve-* branch, #31) has to land as a merge commit; a squash or rebase
-# leaves upstream's commits out of master-local-lateral. GitHub can't allow merge methods per PR,
+# leaves upstream's commits out of the bp-sunnypilot branch. GitHub can't allow merge methods per PR,
 # so this catches it right after the merge and opens an issue.
 name: sync merge check
 
 on:
   push:
     branches:
-      - master-local-lateral
+      - bp-sunnypilot
 
 permissions:
   contents: read
@@ -40,7 +40,7 @@ jobs:
             continue
           fi
           {
-            echo "Sync PR #$pr landed on \`master-local-lateral\` as \`${SHA:0:8}\`, a squash or rebase, so upstream's commits up to \`${head:0:8}\` aren't in its history."
+            echo "Sync PR #$pr landed on \`bp-sunnypilot\` as \`${SHA:0:8}\`, a squash or rebase, so upstream's commits up to \`${head:0:8}\` aren't in its history."
             echo
             echo "Nothing to undo: the changes are in. The next nightly sync opens a PR with the same upstream commits; merge that one with a merge commit and close this issue."
           } > issue.md

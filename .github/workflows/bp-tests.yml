@@ -1,11 +1,11 @@
-# bp-sunnypilot: run tests.yaml on merges into master-local-lateral too. Upstream's push trigger is
+# bp-sunnypilot: run tests.yaml on merges into the bp-sunnypilot branch too. Upstream's push trigger is
 # `master` only, which this repo doesn't have; calling it keeps upstream's file unchanged there.
 name: bp tests
 
 on:
   push:
     branches:
-      - master-local-lateral
+      - bp-sunnypilot
 
 jobs:
   tests:

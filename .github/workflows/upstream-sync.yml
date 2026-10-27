@@ -1,5 +1,5 @@
 # BluePilot: nightly upstream sync (spec: #6). Fast-forwards `sunnypilot-clean` to sunnypilot
-# `master` and keeps one PR open from it into `master-local-lateral`. When sunnypilot moves its opendbc
+# `master` and keeps one PR open from it into `bp-sunnypilot`. When sunnypilot moves its opendbc
 # pin, it builds the resolve itself (#31): the PR then comes from a `sync/resolve-*` branch with
 # `opendbc_repo` at the BluePilotDev/opendbc commit that has the pin. It never merges and never force-pushes: if
 # `sunnypilot-clean` is not a fast-forward of upstream it stops and opens an issue.
@@ -41,7 +41,7 @@ jobs:
         REPO: ${{ github.repository }}
         UPSTREAM_URL: https://github.com/sunnypilot/sunnypilot.git
         MIRROR: sunnypilot-clean
-        INTEGRATION: master-local-lateral
+        INTEGRATION: bp-sunnypilot
         OPENDBC: BluePilotDev/opendbc
         OPENDBC_BRANCH: bp-opendbc
         LIBRARY: BluePilotDev/bluepilot-lateral
@@ -198,7 +198,7 @@ jobs:
           -q 'map(select((.headRefName | startswith("sync/resolve-")) and (.isCrossRepository | not))) | .[0] // empty | "\(.number) \(.headRefName)"'; }
         rpr=$(open_resolve)
         if [ "$resolve" = yes ]; then
-          # one resolve PR at a time, rebuilt from the current master-local-lateral and upstream whenever either
+          # one resolve PR at a time, rebuilt from the current bp-sunnypilot branch and upstream whenever either
           # moved. The previous resolve (an open PR's head, or a branch a failed run left) becomes an extra
           # parent, so the branch only fast-forwards.
           if [ -n "$rpr" ]; then read -r rnum branch <<<"$rpr"; else rnum="" branch="sync/resolve-${up:0:8}"; fi
