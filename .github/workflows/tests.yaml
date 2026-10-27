@@ -233,13 +233,19 @@ jobs:
         # a later merge publishes its own refs; this one's would overwrite them
         [ "$(git ls-remote "$repo" refs/heads/master-local-lateral | cut -f1)" = "${{ github.sha }}" ] || { echo "not the branch head, skipping"; exit 0; }
         mkdir "$RUNNER_TEMP/bp-refs" && cd "$RUNNER_TEMP/bp-refs" && git init -q -b process-replay
-        # keep the previous refs too: a PR run that read the old ref_commit (or a cached one) still finds its files
+        # keep the two previous refs too: a PR run that read an older ref_commit (or a cached one) still finds its
+        # files when merges land minutes apart. ref_commits lists the kept refs, newest last.
+        keep=""
         if git fetch -q --depth=1 "$repo" process-replay; then
           git checkout -q FETCH_HEAD -- .
-          prev=$(cat ref_commit)
-          find . -maxdepth 1 -name '*.zst' ! -name "*_${prev}.zst" -delete
+          keep=$( { cat ref_commits 2>/dev/null || cat ref_commit; } | grep -vx "${{ github.sha }}" | tail -n 2)
+          for f in *.zst; do
+            c=${f##*_}
+            grep -qx "${c%.zst}" <<<"$keep" || rm -f "$f"
+          done
         fi
         for seg in $segs; do cp "$fakedata/${seg}"_*_${{ github.sha }}.zst .; done
+        { if [ -n "$keep" ]; then echo "$keep"; fi; echo "${{ github.sha }}"; } > ref_commits
         echo "${{ github.sha }}" > ref_commit
         git add -A
         git -c user.name="GitHub Actions Bot" -c user.email="<>" commit -qm "process-replay refs for ${{ github.repository }}@${{ github.sha }}"
