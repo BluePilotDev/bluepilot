@@ -1,7 +1,7 @@
 # BluePilot: nightly upstream sync (spec: #6). Fast-forwards `sunnypilot-clean` to sunnypilot
 # `master` and keeps one PR open from it into `master-local-lateral`. When sunnypilot moves its opendbc
 # pin, it builds the resolve itself (#31): the PR then comes from a `sync/resolve-*` branch with
-# `opendbc_repo` at the bg-opendbc commit that has the pin. It never merges and never force-pushes: if
+# `opendbc_repo` at the BluePilotDev/opendbc commit that has the pin. It never merges and never force-pushes: if
 # `sunnypilot-clean` is not a fast-forward of upstream it stops and opens an issue.
 name: upstream sync
 
@@ -43,7 +43,7 @@ jobs:
         MIRROR: sunnypilot-clean
         INTEGRATION: master-local-lateral
         OPENDBC: BluePilotDev/opendbc
-        OPENDBC_BRANCH: bg-clean
+        OPENDBC_BRANCH: bp-opendbc
         LIBRARY: BluePilotDev/bluepilot-lateral
       run: |
         set -euo pipefail
@@ -93,8 +93,8 @@ jobs:
         overlap=$(comm -12 <(git diff --name-only "$base" "$up" | sort) <(git diff --name-only "$base" "$integration" | sort))
         files() { n=$(wc -l <<<"$1" | tr -d ' '); [ "$n" = 1 ] && echo "1 file" || echo "$n files"; }  # $1 is non-empty
 
-        # opendbc: bg-clean contains sunnypilot's opendbc when the compare from it to bg-clean is "ahead" or
-        # "identical"; a 404 means bg-opendbc doesn't have the commit at all yet
+        # opendbc: bp-opendbc contains sunnypilot's opendbc when the compare from it to bp-opendbc is "ahead" or
+        # "identical"; a 404 means BluePilotDev/opendbc doesn't have the commit at all yet
         if status=$(gh api "repos/$OPENDBC/compare/$upstream_opendbc...$OPENDBC_BRANCH" -q .status 2>compare.err); then
           case "$status" in ahead|identical) ready=yes ;; *) ready=no ;; esac
         elif grep -q "HTTP 404" compare.err; then
@@ -124,9 +124,9 @@ jobs:
           fi
         }
 
-        # BluePilot (#31): when sunnypilot moved its opendbc pin and bg-clean already has it (bg-opendbc syncs
+        # BluePilot (#31): when sunnypilot moved its opendbc pin and bp-opendbc already has it (BluePilotDev/opendbc syncs
         # first, BluePilotDev/opendbc#3), the job builds the resolve: the merge with opendbc_repo at the earliest
-        # bg-clean commit containing the pin (the bg-opendbc sync merge, never bg-clean's head, so a sync never
+        # bp-opendbc commit containing the pin (the BluePilotDev/opendbc sync merge, never bp-opendbc's head, so a sync never
         # carries a library bump). Only when opendbc_repo is the one conflict. Git takes upstream's pointer
         # without a conflict when only upstream moved it, which this covers too.
         base_opendbc=$(git rev-parse "$base:opendbc_repo")
@@ -134,7 +134,7 @@ jobs:
         other_conflicts=$(grep -vx opendbc_repo <<<"$conflicts" || true)
         resolve=no target=""
         if [ "$upstream_opendbc" != "$base_opendbc" ] && [ "$ready" = yes ] && [ -z "$other_conflicts" ]; then
-          # bg-opendbc's history with trees but no file contents: enough for ancestry and the diffs below
+          # BluePilotDev/opendbc's history with trees but no file contents: enough for ancestry and the diffs below
           git fetch -q --no-tags --filter=blob:none "https://github.com/$OPENDBC.git" "$OPENDBC_BRANCH"
           if git merge-base --is-ancestor "$upstream_opendbc" "$our_opendbc"; then
             target=$our_opendbc  # this repo's opendbc already has the pin (say a library bump landed first): never move it back
@@ -316,7 +316,7 @@ jobs:
           echo "- INTEGRATION: $INTEGRATION"
           echo "- Files that conflict: ${CONFLICTS:-none}"
           if [ -n "$RESOLVED" ]; then
-            echo "- \`opendbc_repo\`: the job already resolved it in this PR, pointing it at $RESOLVED (the bg-opendbc \`bg-clean\` commit with sunnypilot's new pin). Judge it resolved; base the verdict on the other files."
+            echo "- \`opendbc_repo\`: the job already resolved it in this PR, pointing it at $RESOLVED (the BluePilotDev/opendbc \`bp-opendbc\` commit with sunnypilot's new pin). Judge it resolved; base the verdict on the other files."
             if [ -n "${FIRMWARE// /}" ]; then
               echo "- The move changes Ford's panda safety ($FIRMWARE), where BluePilot's hook lives, so this PR gets a drive before it merges: never call it safe to merge as is; say what's left is the drive. Other upstream safety changes ride on CI and don't need a drive."
             fi
