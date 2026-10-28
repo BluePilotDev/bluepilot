@@ -212,7 +212,7 @@ jobs:
             unset GIT_INDEX_FILE
             parents=(-p "$integration" -p "$up")
             if [ -n "$prev" ]; then parents+=(-p "$prev"); fi
-            commit=$(git -c user.name="bluepilot-sync[bot]" -c user.email="bluepilot-sync[bot]@users.noreply.github.com" commit-tree "$rtree" "${parents[@]}" \
+            commit=$(git -c user.name="bluepilot-sync[bot]" -c user.email="348581487+bluepilot-sync[bot]@users.noreply.github.com" commit-tree "$rtree" "${parents[@]}" \
               -m "Merge sunnypilot master ${up:0:8}; opendbc_repo to $OPENDBC ${target:0:8}" \
               -m "sunnypilot moved its opendbc pin to ${upstream_opendbc:0:8}. opendbc_repo moves to the $OPENDBC commit that has it (${target:0:8}). Built by the nightly sync job (ford-op/bp-sunnypilot#31).")
             git push origin "$commit:refs/heads/$branch"
