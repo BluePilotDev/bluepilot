@@ -134,6 +134,7 @@ struct OnroadEvent @0xc4fa6047f024e718 {
     audioFeedback @97;
 
     soundsUnavailableDEPRECATED @47;
+    radarIsNotDetected @100;
   }
 }
 
