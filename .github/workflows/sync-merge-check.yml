@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   check:
-    if: github.repository == 'BluePilotDev/bp-sunnypilot'
+    if: github.repository == 'ford-op/bp-sunnypilot'
     runs-on: ubuntu-24.04
     steps:
     - name: Check how sync PRs landed
