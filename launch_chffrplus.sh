@@ -82,6 +82,11 @@ function launch {
   ln -sfn teleoprtc_repo/teleoprtc teleoprtc
   ln -sfn tinygrad_repo/tinygrad tinygrad
 
+  # BluePilot: fill the nested bluepilot_lateral submodule if the installer's
+  # non-recursive clone left it empty (see openpilot/sunnypilot/bluepilot_ensure_submodules.sh)
+  bash openpilot/sunnypilot/bluepilot_ensure_submodules.sh || true
+  # End BluePilot
+
   # hardware specific init
   if [ -f /AGNOS ]; then
     agnos_init
