@@ -33,7 +33,7 @@ jobs:
           runs=$(gh api "repos/$REPO/commits/$SHA/check-runs" --paginate --jq '.check_runs[] | "\(.name)\t\(.conclusion)"')
           ok=1
           for c in "${REQ[@]}"; do
-            concl=$(printf '%s\n' "$runs" | awk -F'\t' -v n="$c" '$1==n{print $2}' | tail -1)
+            concl=$(printf '%s\n' "$runs" | awk -F'\t' -v n="$c" '$1==n || $1 ~ (" / " n "$"){print $2}' | tail -1)
             echo "required check: $c -> ${concl:-MISSING}"
             [ "$concl" = "success" ] || ok=0
           done
