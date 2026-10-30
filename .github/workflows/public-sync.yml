@@ -4,6 +4,11 @@ on:
     - cron: "41 */3 * * *"      # every 3h; gate decides whether to actually publish
   workflow_dispatch:
 
+permissions:
+  contents: read
+  checks: read
+  pull-requests: read
+
 concurrency:
   group: public-sync
   cancel-in-progress: false
@@ -29,7 +34,8 @@ jobs:
         run: |
           SHA=$(git rev-parse HEAD)
           echo "integration tip: $SHA"
-          mapfile -t REQ < <(gh api "repos/$REPO/branches/bp-sunnypilot/protection/required_status_checks" --jq '.contexts[]')
+          # required checks, mirrored from branch protection (keep in sync if that list changes)
+          REQ=("build release" "build macOS" "static analysis" "unit tests" "process replay" "install smoke")
           runs=$(gh api "repos/$REPO/commits/$SHA/check-runs" --paginate --jq '.check_runs[] | "\(.name)\t\(.conclusion)"')
           ok=1
           for c in "${REQ[@]}"; do
