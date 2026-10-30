@@ -1,0 +1,72 @@
+name: publish public bp-sunnypilot
+on:
+  schedule:
+    - cron: "41 */3 * * *"      # every 3h; gate decides whether to actually publish
+  workflow_dispatch:
+
+concurrency:
+  group: public-sync
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.repository == 'ford-op/bp-sunnypilot'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout bp-sunnypilot tip (full history, no creds persisted)
+        uses: actions/checkout@v4
+        with:
+          ref: bp-sunnypilot
+          fetch-depth: 0
+          submodules: false
+          persist-credentials: false
+
+      - name: Gate - tip green and no pending sync
+        id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          SHA=$(git rev-parse HEAD)
+          echo "integration tip: $SHA"
+          mapfile -t REQ < <(gh api "repos/$REPO/branches/bp-sunnypilot/protection/required_status_checks" --jq '.contexts[]')
+          runs=$(gh api "repos/$REPO/commits/$SHA/check-runs" --paginate --jq '.check_runs[] | "\(.name)\t\(.conclusion)"')
+          ok=1
+          for c in "${REQ[@]}"; do
+            concl=$(printf '%s\n' "$runs" | awk -F'\t' -v n="$c" '$1==n{print $2}' | tail -1)
+            echo "required check: $c -> ${concl:-MISSING}"
+            [ "$concl" = "success" ] || ok=0
+          done
+          pending=$(gh pr list --repo "$REPO" --state open --json headRefName \
+            --jq '[.[] | select(.headRefName=="sunnypilot-clean" or (.headRefName|startswith("sync/resolve")))] | length')
+          echo "open sync/resolve PRs: $pending"
+          [ "$pending" = "0" ] || ok=0
+          if [ "$ok" = "1" ]; then
+            { echo "go=yes"; echo "sha=$SHA"; } >> "$GITHUB_OUTPUT"
+          else
+            echo "gate not satisfied - skipping publish"
+            echo "go=no" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: App token for BluePilotDev
+        if: steps.gate.outputs.go == 'yes'
+        id: apptoken
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.SYNC_APP_ID }}
+          private-key: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
+          owner: BluePilotDev
+          repositories: bluepilot
+
+      - name: Force-push tip to public (only if changed)
+        if: steps.gate.outputs.go == 'yes'
+        env:
+          TOKEN: ${{ steps.apptoken.outputs.token }}
+          SHA: ${{ steps.gate.outputs.sha }}
+        run: |
+          remote="https://x-access-token:${TOKEN}@github.com/BluePilotDev/bluepilot.git"
+          current=$(git ls-remote "$remote" refs/heads/bp-sunnypilot | awk '{print $1}')
+          echo "public at: ${current:-<none>}; tip: $SHA"
+          if [ "$current" = "$SHA" ]; then echo "public already matches; nothing to publish"; exit 0; fi
+          git -c filter.lfs.process= -c filter.lfs.required=false push --no-verify --force "$remote" "$SHA:refs/heads/bp-sunnypilot"
+          echo "published $SHA to BluePilotDev/bluepilot@bp-sunnypilot"

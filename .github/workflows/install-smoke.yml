@@ -1,0 +1,32 @@
+name: install smoke
+on:
+  pull_request:
+  push:
+    branches: [bp-sunnypilot]
+  workflow_dispatch:
+
+jobs:
+  install-smoke:
+    name: install smoke
+    if: github.repository == 'ford-op/bp-sunnypilot'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout without submodules (mimic the installer)
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+      - name: Non-recursive init, self-heal, verify the library installs
+        run: |
+          set -e
+          git submodule update --init          # non-recursive: what the installer's cached path does
+          if [ ! -f opendbc_repo/opendbc/bluepilot_lateral/__init__.py ]; then
+            echo "library empty after non-recursive init (installer trap) - running self-heal"
+            bash openpilot/sunnypilot/bluepilot_ensure_submodules.sh
+          fi
+          test -f opendbc_repo/opendbc/bluepilot_lateral/__init__.py \
+            || { echo "FAIL: bluepilot_lateral still missing after heal" >&2; exit 1; }
+          ln -sfn opendbc_repo/opendbc opendbc
+          PYTHONPATH="$PWD" python3 -c \
+            "import importlib.util,sys; sys.exit(0 if importlib.util.find_spec('opendbc.bluepilot_lateral.host_types') else 1)" \
+            || { echo "FAIL: library present but not importable" >&2; exit 1; }
+          echo "install smoke PASS: library installs and imports"
