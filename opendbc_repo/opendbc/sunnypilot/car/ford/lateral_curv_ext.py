@@ -143,6 +143,10 @@ class LateralCurvExt:
 
     # Predicted curvature blending
     self.curvature_lookup_time = 0.2  # seconds into the future for curvature extraction
+    # Speed-scaled look-ahead (driver-style): aim at a point farther ahead as speed rises, like a human
+    # looking ~20 ft ahead at 10 mph and ~50 ft at 40 mph. Distances (m) vs speed (m/s); time = d / v.
+    self.lookahead_speed_bp = [4.47, 6.71, 11.18, 17.88, 24.59, 31.29]   # 10, 15, 25, 40, 55, 70 mph
+    self.lookahead_dist_v = [6.1, 9.1, 12.2, 15.2, 19.8, 24.4]           # 20, 30, 40, 50, 65, 80 ft
     self.pc_blend_ratio = 0.5
     self.pc_blend_ratio_bp = [0.0, 0.001]  # curvature breakpoints (1/m)
     self.pc_blend_ratio_low = 0.40
@@ -327,6 +331,8 @@ class LateralCurvExt:
       # Extract predicted curvature from modelV2
       if self.model is not None and len(self.model.orientation.x) >= 17:
         curvatures = np.array(self.model.orientationRate.z) / max(0.01, CS.out.vEgoRaw)
+        v_look = max(CS.out.vEgoRaw, self.lookahead_speed_bp[0])
+        self.curvature_lookup_time = float(interp(v_look, self.lookahead_speed_bp, self.lookahead_dist_v)) / v_look
         predicted_curvature = interp(self.curvature_lookup_time, ModelConstants.T_IDXS, curvatures)
       else:
         predicted_curvature = 0.0
