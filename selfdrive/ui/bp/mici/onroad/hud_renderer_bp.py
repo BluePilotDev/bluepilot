@@ -18,6 +18,9 @@ from openpilot.selfdrive.ui.bp.lib.ui_debug_logger import bp_ui_log
 from openpilot.selfdrive.ui.bp.lib import theme_pack
 from openpilot.selfdrive.ui.bp.lib.longitudinal_visuals import longitudinal_control_active
 from openpilot.selfdrive.ui.bp.lib.tesla_palette import tesla_wheel_color
+from openpilot.selfdrive.ui.bp.onroad.lane_center_indicator_bp import (
+  draw_lane_center_dot, lane_center_dot_position, lane_center_indicator_visible,
+)
 from openpilot.system.ui.lib.text_measure import measure_text_cached
 from openpilot.system.ui.lib.application import gui_app
 from openpilot.bluepilot.ui.lib.bp_shaders import draw_shader_circle_gradient
@@ -35,6 +38,7 @@ class MiciHudRendererBP(HudRenderer):
     self._torque_bar = TorqueBar()
     self._bp_params = Params()
     self._brakes_on = False
+    self._lane_positioning_active = False
     self._power_flow = MiciPowerflowGauge()
     self._txt_wheel_comma_3x = gui_app.texture("icons/chffr_wheel.png", self._txt_wheel.width, self._txt_wheel.height)
     self._animate_steering_wheel = self._bp_params.get_bool("BPAnimateSteeringWheel")
@@ -53,6 +57,16 @@ class MiciHudRendererBP(HudRenderer):
 
   def _update_state(self) -> None:
     super()._update_state()
+
+    sm = ui_state.sm
+    controller_alive = bool(sm.alive.get('controllerStateBP', False))
+    controller_valid = bool(sm.valid.get('controllerStateBP', False))
+    controller = sm['controllerStateBP'] if controller_alive and controller_valid else None
+    self._lane_positioning_active = lane_center_indicator_visible(
+      bool(controller.bmsShowLaneCenteringIndicator) if controller is not None else False,
+      controller_alive, controller_valid,
+      bool(controller.lanePositioningActive) if controller is not None else False,
+    )
 
     # BluePilot: Refresh the shared wheel-animation toggle periodically.
     self._animate_wheel_param_counter += 1
@@ -171,6 +185,14 @@ class MiciHudRendererBP(HudRenderer):
       wheel_txt.height + power_flow_radius * 2)
     self._power_flow.set_wheel_rect(power_rect)
     self._power_flow.render(rect)
+
+    if self._lane_positioning_active and self._can_draw_top_icons and not self._show_wheel_critical:
+      # Keep the dot fixed even when the normal wheel is hidden or animates away.
+      draw_lane_center_dot(lane_center_dot_position(
+        rect.x + 21 + wheel_txt.width / 2,
+        rect.y + rect.height - 14 - wheel_txt.height / 2,
+        wheel_txt.width,
+      ))
 
   def _draw_set_speed(self, rect: rl.Rectangle) -> None:
     """Upstream set-speed drawing, with the theme pack Accent tinting the value text."""

@@ -56,6 +56,7 @@ class VisualsLayoutMici(NavScroller):
     self.rainbow_lane_lines = BigParamControlBP("Rainbow Lane Lines", "BPRainbowLines")
     self.show_blindspot_ui = BigParamControlBP("Show Blindspot Overlay", "ShowBlindspotOverlay")
     self.show_brake_status = BigParamControlBP("Show Brake Status", "ShowBrakeStatus")
+    self.lane_center_indicator = BigParamControlBP("Lane Positioning Confidence Indicator", "BPLaneCenterIcon")
     self.hide_dm_icon = BigParamControlBP("Hide Driver Monitoring Icon", "BPHideDMicon")
     self.hide_wheel_icon = BigParamControlBP("Hide Steering Wheel Icon", "BPHideWheelIcon")
     self.wide_angle_camera = BigParamControlBP("Use Wide Camera View", "BPWideAngleCamera")
@@ -85,6 +86,7 @@ class VisualsLayoutMici(NavScroller):
       self.rainbow_lane_lines,
       self.show_blindspot_ui,
       self.show_brake_status,
+      self.lane_center_indicator,
       self.hide_dm_icon,
       self.hide_wheel_icon,
       self.wide_angle_camera,
@@ -104,6 +106,7 @@ class VisualsLayoutMici(NavScroller):
       ("BPRainbowLines", self.rainbow_lane_lines),
       ("ShowBlindspotOverlay", self.show_blindspot_ui),
       ("ShowBrakeStatus", self.show_brake_status),
+      ("BPLaneCenterIcon", self.lane_center_indicator),
       ("BPHideDMicon", self.hide_dm_icon),
       ("BPHideWheelIcon", self.hide_wheel_icon),
       ("BPWideAngleCamera", self.wide_angle_camera),

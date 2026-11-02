@@ -8,6 +8,7 @@ from openpilot.selfdrive.ui.bp.onroad.lane_center_indicator_bp import (
   draw_lane_center_indicator,
   lane_center_indicator_rect,
   lane_center_indicator_visible,
+  lane_center_dot_position,
 )
 
 
@@ -45,3 +46,10 @@ def test_lane_center_indicator_is_one_cached_texture_draw(monkeypatch):
   )
 
   assert len(calls) == 1
+
+
+def test_c4_dot_clears_wheel_perimeter_and_stays_above_torque_bar():
+  position = lane_center_dot_position(46, 201, 50)
+  assert position.y == 201
+  assert position.x - 11 > 46 + 25 + 25
+  assert position.y + 11 < 216

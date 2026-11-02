@@ -21,3 +21,14 @@ def draw_lane_center_indicator(rect: rl.Rectangle, texture: rl.Texture) -> None:
   """Draw the pre-rasterized glyph with one GPU call instead of rebuilding it each frame."""
   source = rl.Rectangle(0.0, 0.0, texture.width, texture.height)
   rl.draw_texture_pro(texture, source, rect, rl.Vector2(0.0, 0.0), 0.0, rl.WHITE)
+
+
+def lane_center_dot_position(wheel_x: float, wheel_y: float, wheel_size: float) -> rl.Vector2:
+  """Reserve the C4 wheel's turn-intent and power-flow perimeter before placing the dot."""
+  return rl.Vector2(wheel_x + wheel_size / 2 + 25 + 16, wheel_y)
+
+
+def draw_lane_center_dot(position: rl.Vector2) -> None:
+  """Compact C4 lane-positioning status, visible against any camera or theme."""
+  rl.draw_circle_v(position, 11, rl.Color(0, 0, 0, 230))
+  rl.draw_circle_v(position, 8, rl.Color(93, 198, 255, 255))
