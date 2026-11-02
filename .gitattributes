@@ -69,3 +69,5 @@ selfdrive/assets/images/tesla_lead_sedan.png -filter -diff -merge
 selfdrive/assets/images/tesla_lead_sedan_far.png -filter -diff -merge
 selfdrive/assets/icons/lane_centering_active.png -filter -diff -merge
 selfdrive/assets/icons/lane_centering_active.svg -filter -diff -merge
+selfdrive/assets/img_radar.png -filter -diff -merge
+selfdrive/assets/img_vision.png -filter -diff -merge
