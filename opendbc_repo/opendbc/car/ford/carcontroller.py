@@ -89,6 +89,7 @@ class CarController(CarControllerBase, LateralCurvExt, LateralAngleExt, Longitud
     self.apply_curvature_last = 0
     self.anti_overshoot_curvature_last = 0
     self.disable_BP_lat_UI = False
+    self.lanePositioningActive = False
     self.accel = 0.0
     self.gas = 0.0
     self.last_button_frame = 0  # BluePilot: ICBM button press tracking
@@ -143,6 +144,7 @@ class CarController(CarControllerBase, LateralCurvExt, LateralAngleExt, Longitud
       # BluePilot: bypass flag is owned by stock carcontroller path.
       bypass_bp_lat = self.disable_BP_lat_UI
       if bypass_bp_lat:
+        self.lanePositioningActive = False
         # Stock curvature-only path only. Anti-overshoot is not used when BP lateral is active (disable_BP_lat_UI off).
         if self.CP.carFingerprint in (CAR.FORD_BRONCO_SPORT_MK1, CAR.FORD_F_150_MK14):
           self.anti_overshoot_curvature_last = anti_overshoot(actuators.curvature, self.anti_overshoot_curvature_last, CS.out.vEgoRaw)
@@ -184,6 +186,7 @@ class CarController(CarControllerBase, LateralCurvExt, LateralAngleExt, Longitud
         self.curvatureDeviationLimited = getattr(self, 'bp_curvature_deviation_limited', False)
         self.humanTurnLateralPaused = self.angle_human_turn_active if _angle_mode else False
         self.stallBlipActive = self.angle_stall_blip_active if _angle_mode else False
+        self.lanePositioningActive = bool(self.lane_center_trim.active) if _angle_mode else False
 
         # BluePilot: angle-mode human-turn override -- send lateral inactive (mode 0) while the
         # driver manually turns, so the PSCM releases cleanly instead of stalling 2-3 s on

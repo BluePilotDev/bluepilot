@@ -18,7 +18,7 @@ from openpilot.sunnypilot.models.constants import Meta, MetaSimPose, MetaTombRai
 from openpilot.system.hardware.hw import Paths
 
 # SET ME TO THE EXACT JSON VERSION WE SET IN SUNNYPILOT_MODELS REPO
-REQUIRED_JSON_VERSION = 15
+REQUIRED_JSON_VERSION = 19
 
 CUSTOM_MODEL_PATH = Paths.model_root()
 METADATA_PATH = Path(__file__).parent / '../models/supercombo_metadata.pkl'
@@ -27,9 +27,10 @@ _LAST_VALIDATED_RAW = None
 
 
 def _compute_hash(file_path: str) -> str | None:
-  from openpilot.common.file_chunker import read_file_chunked
+  from openpilot.common.file_chunker import open_file_chunked
   try:
-    return hashlib.sha256(read_file_chunked(file_path)).hexdigest().lower()
+    with open_file_chunked(file_path) as f:
+      return hashlib.file_digest(f, "sha256").hexdigest().lower()
   except FileNotFoundError:
     return None
 
@@ -55,9 +56,16 @@ def is_bundle_version_compatible(bundle: dict) -> bool:
 
 def _bundle_artifacts(bundle: custom.ModelManagerSP.ModelBundle) -> list[tuple[str, str]]:
   artifacts = []
+  from openpilot.common.file_chunker import get_chunk_name
   for model in getattr(bundle, 'models', []) or []:
-    for artifact in (getattr(model, 'artifact', None), getattr(model, 'metadata', None)):
-      if artifact and getattr(artifact, 'fileName', None) and getattr(artifact, 'downloadUri', None):
+    for artifact in (getattr(model, 'artifact', None),):
+      if not artifact or not getattr(artifact, 'fileName', None):
+        continue
+      if len(artifact.chunks) > 0:
+        for i, chunk in enumerate(artifact.chunks):
+          if getattr(chunk, 'sha256', None):
+            artifacts.append((get_chunk_name(artifact.fileName, i, len(artifact.chunks)), chunk.sha256))
+      elif getattr(artifact, 'downloadUri', None):
         sha256 = getattr(artifact.downloadUri, 'sha256', None)
         if sha256:
           artifacts.append((artifact.fileName, sha256))
@@ -149,16 +157,16 @@ def get_active_model_runner(params: Params | None = None, force_check: bool = Fa
 
 def _get_model():
   if bundle := get_active_bundle():
-    drive_model = next(model for model in bundle.models if model.type == ModelManager.Model.Type.supercombo)
+    drive_model = next(model for model in bundle.models if model.type in (ModelManager.Model.Type.supercombo,
+                                                                          ModelManager.Model.Type.chunked))
     return drive_model
   return None
 
 
 def load_metadata():
-  model = _get_model()
-  metadata_path = f"{CUSTOM_MODEL_PATH}/{model.metadata.fileName}" if model else METADATA_PATH
-
-  with open(metadata_path, 'rb') as f:
+  # v22 bundles embed metadata in their compiled model pickle. modeld_v2 reads it
+  # directly; this helper remains for the stock/default model path.
+  with open(METADATA_PATH, 'rb') as f:
     return pickle.load(f)
 
 

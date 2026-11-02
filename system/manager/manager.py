@@ -24,6 +24,8 @@ from openpilot.system.hardware import PC
 
 from openpilot.sunnypilot.system.params_migration import run_migration
 
+QUICKBOOT_COMMIT_FILE = "/data/openpilot/.quickboot_commit"
+
 
 def manager_init() -> None:
   save_bootlog()
@@ -47,6 +49,14 @@ def manager_init() -> None:
     prebuilt_path = "/data/openpilot/prebuilt"
     if not os.path.exists(prebuilt_path):
       open(prebuilt_path, 'x').close()
+    # BluePilot: bind user-created Quickboot artifacts to the exact source commit. The
+    # launcher invalidates them after an update so uv sync and SCons cannot be skipped.
+    try:
+      with atomic_write(QUICKBOOT_COMMIT_FILE, "w", overwrite=True) as f:
+        f.write(build_metadata.openpilot.git_commit)
+    except OSError as exc:
+      print(f"WARNING: failed to record Quickboot commit: {exc}")
+    # End BluePilot
 
   if params.get_bool("RecordFrontLock"):
     params.put_bool("RecordFront", True, block=True)
