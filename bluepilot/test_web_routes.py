@@ -25,7 +25,7 @@ except ImportError:
         """Mock Params class for local testing"""
         def __init__(self):
             self._params = {
-                "IsOnRoad": b"0",
+                "IsOnroad": b"0",
                 "BPPortalPort": b"8088"
             }
 

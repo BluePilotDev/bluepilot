@@ -114,7 +114,7 @@ class ParamsWatcher:
         """Read a param value using the Params instance"""
         try:
             # Try boolean first
-            if key.endswith("Enabled") or key.endswith("Toggle") or key in ["IsOnRoad", "IsOffroad", "Passive"]:
+            if key.endswith("Enabled") or key.endswith("Toggle") or key in ["IsOnroad", "IsOffroad", "Passive"]:
                 return self.params.get_bool(key)
 
             # Try getting as string
