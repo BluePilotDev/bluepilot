@@ -199,9 +199,10 @@ class ChevronMetricsBP(ChevronMetrics):
           # Offset base below box bottom so outline doesn't overlap into box
           base_y = y + box_height + tri_gap
           apex_y = base_y + CHEVRON_H
+          # Keep the same winding as the upward triangle so the GPU draws its fill.
           chevron = [rl.Vector2(center_x, apex_y),
-                     rl.Vector2(box.x, base_y),
-                     rl.Vector2(box.x + box.width, base_y)]
+                     rl.Vector2(box.x + box.width, base_y),
+                     rl.Vector2(box.x, base_y)]
         else:
           # Normal: apex above (point toward lead), base above box top
           # Offset base above box top so outline doesn't overlap into box
