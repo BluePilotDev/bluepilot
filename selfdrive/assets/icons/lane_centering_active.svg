@@ -2,10 +2,10 @@
   <rect x="3" y="3" width="146" height="146" rx="12"
         fill="#000" fill-opacity=".92" stroke="#005a9c" stroke-width="6"/>
   <g fill="none" stroke="#5dc6ff" stroke-width="10" stroke-linecap="round">
-    <path d="M30 124 39 89M45 63l5-30M122 124l-9-35M107 63l-5-30"/>
+    <path d="m61 30-5 9m-7 13-8 14m-7 14-12 25m69-75 5 9m7 13 8 14m7 14 12 25"/>
   </g>
   <g fill="#5dc6ff">
-    <path d="m33 75-13-9v18zM119 75l13 9V66z"/>
+    <path d="m40 53-20-12v24zM112 53l20 12V41z"/>
     <path fill-rule="evenodd" d="M76 62a31 31 0 1 0 0 62 31 31 0 0 0 0-62Zm0 7a24 24 0 1 0 0 48 24 24 0 0 0 0-48Z"/>
   </g>
   <g fill="none" stroke="#5dc6ff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
