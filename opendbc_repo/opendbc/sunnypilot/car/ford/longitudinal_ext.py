@@ -19,7 +19,13 @@ from collections import namedtuple
 import numpy as np
 from numpy import clip
 
-from opendbc.car.ford.values import CarControllerParams
+from opendbc.car.ford.values import CAR, CarControllerParams
+
+# EVs: below MIN_GAS the motor request goes inactive and the motor coast-regens on top of the
+# brake request, so gentle slowing overshoots (Lightning: -0.26 asked -> -0.38 delivered).
+# Keep gentle slowing on the motor (controlled regen via the propulsion request, panda allows
+# down to MIN_GAS) and engage the brakes only past MIN_GAS.
+FORD_EV_CARS = frozenset({CAR.FORD_F_150_LIGHTNING_MK1, CAR.FORD_MUSTANG_MACH_E_MK1})
 
 
 # Result namedtuple returned by LongitudinalExt.update()
@@ -63,6 +69,11 @@ class LongitudinalExt:
     self.brake_actuate_release = -0.06  # release brakes above this accel
     self.precharge_actuate_target = -0.12
     self.precharge_actuate_release = -0.06
+    if CP.carFingerprint in FORD_EV_CARS:
+      self.brake_actuate_target = CarControllerParams.MIN_GAS      # -0.5
+      self.brake_actuate_release = CarControllerParams.MIN_GAS + 0.1
+      self.precharge_actuate_target = CarControllerParams.MIN_GAS + 0.05
+      self.precharge_actuate_release = CarControllerParams.MIN_GAS + 0.15
     self.op_brake_actuate_last = False
 
     # Toggles (updated from Params each frame)
