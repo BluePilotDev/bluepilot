@@ -13,7 +13,7 @@ import threading
 import time
 import pyray as rl
 from collections.abc import Callable
-from cereal import log
+from openpilot.cereal import log
 from openpilot.common.params import Params
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.system.hardware import PC

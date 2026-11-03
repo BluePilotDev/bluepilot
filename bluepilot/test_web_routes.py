@@ -17,7 +17,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
 # Mock Params if not available
 try:
-    from common.params import Params
+    from openpilot.common.params import Params
 except ImportError:
     print("Warning: Could not import Params, using mock")
 

@@ -466,8 +466,8 @@ def extract_fingerprint_from_segment(segment_path):
     """
     # Try method 1: Use runtime messaging module (works on device without pycapnp dependency)
     try:
-        from cereal import car
-        import cereal.messaging as messaging
+        from opendbc.car.structs import car
+        import openpilot.cereal.messaging as messaging
         from openpilot.common.params import Params
 
         # Check if this is the current route by checking Params
@@ -710,8 +710,8 @@ def extract_drive_stats_from_segments(segments):
     use_manual_method = False
     if not use_logreader:
         try:
-            import cereal.messaging as messaging
-            from cereal import log as log_capnp
+            import openpilot.cereal.messaging as messaging
+            from openpilot.cereal import log as log_capnp
             import bz2
             import subprocess
 

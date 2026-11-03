@@ -1,8 +1,10 @@
-* text=auto
+* text=auto eol=lf
 
 # to move existing files into LFS:
 # git add --renormalize .
 *.onnx filter=lfs diff=lfs merge=lfs -text
+openpilot/selfdrive/modeld/models/big_*_tinygrad.pkl filter=lfs diff=lfs merge=lfs -text
+openpilot/sunnypilot/modeld_v2/models/*.pkl filter=lfs diff=lfs merge=lfs -text
 *.svg filter=lfs diff=lfs merge=lfs -text
 *.png filter=lfs diff=lfs merge=lfs -text
 *.gif filter=lfs diff=lfs merge=lfs -text
@@ -10,12 +12,12 @@
 *.otf filter=lfs diff=lfs merge=lfs -text
 *.wav filter=lfs diff=lfs merge=lfs -text
 
-selfdrive/car/tests/test_models_segs.txt filter=lfs diff=lfs merge=lfs -text
-system/hardware/tici/updater filter=lfs diff=lfs merge=lfs -text
+openpilot/selfdrive/car/tests/test_models_segs.txt filter=lfs diff=lfs merge=lfs -text
+openpilot/common/hardware/comma/updater filter=lfs diff=lfs merge=lfs -text
 
-# BluePilot: keep BP-owned binaries as raw git objects (not LFS) so they need no LFS hosting
-# Scoped to the extensions the LFS rules above claim. Text files under bluepilot/
-# get no override, so git applies its own binary detection to them.
+# BluePilot (BPx): BluePilot's own binaries are plain git files, not LFS: BluePilot can't push to
+# sunnypilot's LFS server. Scoped to the extensions the LFS rules above claim, so text files keep git's
+# own handling.
 bluepilot/**/*.png -filter -diff -merge
 bluepilot/**/*.gif -filter -diff -merge
 bluepilot/**/*.svg -filter -diff -merge
@@ -23,45 +25,35 @@ bluepilot/**/*.ttf -filter -diff -merge
 bluepilot/**/*.otf -filter -diff -merge
 bluepilot/**/*.wav -filter -diff -merge
 bluepilot/**/*.onnx -filter -diff -merge
-selfdrive/assets/icons_mici/onroad/bookmark_fill.png -filter -diff -merge
-selfdrive/assets/icons_mici/onroad/driver_monitoring/dm_center.png -filter -diff -merge
-selfdrive/assets/icons_mici/settings/car_icon.png -filter -diff -merge
-selfdrive/assets/icons_mici/settings/charge_icon.png -filter -diff -merge
-selfdrive/assets/icons_mici/settings/device/language.png -filter -diff -merge
-selfdrive/assets/icons_mici/setup/back_new.png -filter -diff -merge
-selfdrive/assets/icons_mici/setup/medium_button_bg.png -filter -diff -merge
-selfdrive/assets/icons_mici/setup/medium_button_pressed_bg.png -filter -diff -merge
-selfdrive/assets/icons_mici/setup/reset/small_button.png -filter -diff -merge
-selfdrive/assets/icons_mici/setup/reset/small_button_pressed.png -filter -diff -merge
-selfdrive/assets/icons_mici/setup/reset/wide_button.png -filter -diff -merge
-selfdrive/assets/icons_mici/setup/reset/wide_button_pressed.png -filter -diff -merge
-selfdrive/assets/icons_mici/setup/scroll_down_indicator.png -filter -diff -merge
-selfdrive/assets/icons_mici/setup/small_red_pill.png -filter -diff -merge
-selfdrive/assets/icons_mici/setup/small_red_pill_pressed.png -filter -diff -merge
-selfdrive/assets/icons_mici/setup/small_slider/slider_bg.png -filter -diff -merge
-selfdrive/assets/icons_mici/setup/small_slider/slider_red_circle.png -filter -diff -merge
-selfdrive/assets/icons_mici/setup/small_slider/slider_red_circle_pressed.png -filter -diff -merge
-selfdrive/assets/icons_mici/setup/smaller_button.png -filter -diff -merge
-selfdrive/assets/icons_mici/setup/smaller_button_disabled.png -filter -diff -merge
-selfdrive/assets/icons_mici/setup/smaller_button_pressed.png -filter -diff -merge
-selfdrive/assets/icons_mici/setup/widish_button.png -filter -diff -merge
-selfdrive/assets/icons_mici/setup/widish_button_disabled.png -filter -diff -merge
-selfdrive/assets/icons_mici/setup/widish_button_pressed.png -filter -diff -merge
-selfdrive/assets/images/button_fan.png -filter -diff -merge
-selfdrive/assets/images/button_settings2.png -filter -diff -merge
-selfdrive/assets/images/spinner_bluepilot.png -filter -diff -merge
-sunnypilot/selfdrive/assets/images/spinner_sunnypilot.png -filter -diff -merge
-selfdrive/assets/img_bluepilot_boot.jpg -filter -diff -merge
-selfdrive/assets/img_bluepilot_boot_mici.jpg -filter -diff -merge
-selfdrive/assets/offroad/icon_debug.png -filter -diff -merge
-selfdrive/assets/offroad/icon_flag.png -filter -diff -merge
-selfdrive/assets/offroad/icon_settings.png -filter -diff -merge
-
-# Small vendored font: store in git (not LFS) so pushes work without GitLab LFS (see .lfsconfig pushurl).
-third_party/bootstrap/bootstrap-icons.ttf -filter -diff -merge
-
-# BluePilot custom sounds: store directly in Git, not upstream GitLab LFS.
-selfdrive/assets/sounds/bluepilot/*.wav -filter -diff -merge
-
-# Theme pack assets: store directly in Git, not upstream GitLab LFS.
-selfdrive/assets/bp_themes/** -filter -diff -merge
+openpilot/selfdrive/assets/bp_themes/** -filter -diff -merge
+openpilot/selfdrive/assets/sounds/bluepilot/*.wav -filter -diff -merge
+# BluePilot-added images inside upstream asset folders (to move under a BluePilot folder: BluePilotDev/bluepilot#223)
+openpilot/selfdrive/assets/icons_mici/onroad/driver_monitoring/dm_center.png -filter -diff -merge
+openpilot/selfdrive/assets/icons_mici/settings/car_icon.png -filter -diff -merge
+openpilot/selfdrive/assets/icons_mici/settings/charge_icon.png -filter -diff -merge
+openpilot/selfdrive/assets/icons_mici/settings/device/language.png -filter -diff -merge
+openpilot/selfdrive/assets/icons_mici/setup/back_new.png -filter -diff -merge
+openpilot/selfdrive/assets/icons_mici/setup/medium_button_bg.png -filter -diff -merge
+openpilot/selfdrive/assets/icons_mici/setup/medium_button_pressed_bg.png -filter -diff -merge
+openpilot/selfdrive/assets/icons_mici/setup/reset/small_button.png -filter -diff -merge
+openpilot/selfdrive/assets/icons_mici/setup/reset/small_button_pressed.png -filter -diff -merge
+openpilot/selfdrive/assets/icons_mici/setup/reset/wide_button.png -filter -diff -merge
+openpilot/selfdrive/assets/icons_mici/setup/reset/wide_button_pressed.png -filter -diff -merge
+openpilot/selfdrive/assets/icons_mici/setup/scroll_down_indicator.png -filter -diff -merge
+openpilot/selfdrive/assets/icons_mici/setup/small_red_pill.png -filter -diff -merge
+openpilot/selfdrive/assets/icons_mici/setup/small_red_pill_pressed.png -filter -diff -merge
+openpilot/selfdrive/assets/icons_mici/setup/small_slider/slider_bg.png -filter -diff -merge
+openpilot/selfdrive/assets/icons_mici/setup/small_slider/slider_red_circle.png -filter -diff -merge
+openpilot/selfdrive/assets/icons_mici/setup/small_slider/slider_red_circle_pressed.png -filter -diff -merge
+openpilot/selfdrive/assets/icons_mici/setup/smaller_button.png -filter -diff -merge
+openpilot/selfdrive/assets/icons_mici/setup/smaller_button_disabled.png -filter -diff -merge
+openpilot/selfdrive/assets/icons_mici/setup/smaller_button_pressed.png -filter -diff -merge
+openpilot/selfdrive/assets/icons_mici/setup/widish_button.png -filter -diff -merge
+openpilot/selfdrive/assets/icons_mici/setup/widish_button_disabled.png -filter -diff -merge
+openpilot/selfdrive/assets/icons_mici/setup/widish_button_pressed.png -filter -diff -merge
+openpilot/selfdrive/assets/images/button_fan.png -filter -diff -merge
+openpilot/selfdrive/assets/images/button_settings2.png -filter -diff -merge
+openpilot/selfdrive/assets/images/spinner_bluepilot.png -filter -diff -merge
+openpilot/selfdrive/assets/offroad/icon_debug.png -filter -diff -merge
+openpilot/selfdrive/assets/offroad/icon_flag.png -filter -diff -merge
+openpilot/selfdrive/assets/offroad/icon_settings.png -filter -diff -merge

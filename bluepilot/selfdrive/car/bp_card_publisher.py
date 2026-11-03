@@ -7,7 +7,7 @@ card.py only needs a single function call instead of inline BP blocks.
 
 import time
 
-import cereal.messaging as messaging
+import openpilot.cereal.messaging as messaging
 from opendbc.car import structs
 from openpilot.common.params import Params
 from openpilot.selfdrive.car.helpers import convert_to_capnp

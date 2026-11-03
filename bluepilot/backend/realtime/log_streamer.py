@@ -39,7 +39,7 @@ class LogStreamer:
                 return False
 
             try:
-                import cereal.messaging as messaging
+                import openpilot.cereal.messaging as messaging
 
                 self._sock = messaging.sub_sock('logMessage', timeout=1000, conflate=True)
             except Exception as exc:
@@ -90,7 +90,7 @@ class LogStreamer:
     def _read_logs(self):
         """Read logs from messaging stream and broadcast"""
         try:
-            import cereal.messaging as messaging
+            import openpilot.cereal.messaging as messaging
         except Exception as exc:
             logger.error("Unable to import messaging for log stream: %s", exc)
             self._broadcast_status('error', 'messaging unavailable')

@@ -2142,7 +2142,7 @@ class WebRoutesHandler(BaseHTTPRequestHandler):
                     # Parse CarParams if available
                     if param_exists("CarParams"):
                         try:
-                            from cereal import car
+                            from opendbc.car.structs import car
                             car_params_bytes = params.get("CarParams")
                             car_params = car.CarParams.from_bytes(car_params_bytes)
 
@@ -2174,7 +2174,7 @@ class WebRoutesHandler(BaseHTTPRequestHandler):
                     icbm_available = False
                     if param_exists("CarParamsSP"):
                         try:
-                            from cereal import custom
+                            from openpilot.cereal import custom
                             car_params_sp_bytes = params.get("CarParamsSP")
                             car_params_sp = custom.CarParamsSP.from_bytes(car_params_sp_bytes)
                             icbm_available = car_params_sp.intelligentCruiseButtonManagementAvailable

@@ -40,7 +40,7 @@ field report, 2026-07).
 
 import os
 from openpilot.common.swaglog import cloudlog
-from openpilot.system.hardware.hw import Paths
+from openpilot.common.hardware.hw import Paths
 
 UNREGISTERED_DONGLE_ID = "UnregisteredDevice"
 

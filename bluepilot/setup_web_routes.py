@@ -80,7 +80,7 @@ def main():
     # Check params system (optional)
     print("System Integration:")
     try:
-        from common.params import Params
+        from openpilot.common.params import Params
         params = Params()
         print("✓ Params system available")
 

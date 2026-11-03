@@ -621,7 +621,7 @@ def decode_bytes_param(key: str, raw_bytes: bytes) -> Optional[Dict[str, Any]]:
 
     if key in CAR_PARAM_KEYS:
         try:
-            from cereal import car
+            from opendbc.car.structs import car
             with car.CarParams.from_bytes(raw_bytes) as car_params:
                 cp_dict = car_params.to_dict()
                 summary = {

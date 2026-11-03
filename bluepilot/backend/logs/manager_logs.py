@@ -16,7 +16,7 @@ from collections import deque
 from datetime import datetime
 from typing import Deque, Dict, Optional, Tuple
 
-from openpilot.system.hardware.hw import Paths
+from openpilot.common.hardware.hw import Paths
 
 logger = logging.getLogger(__name__)
 
