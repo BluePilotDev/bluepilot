@@ -2,6 +2,7 @@
 import json
 import os
 import random
+import re
 import requests
 import threading
 import time
@@ -46,8 +47,9 @@ class FakeResponse:
 
 
 def get_directory_sort(d: str) -> list[str]:
-  # ensure old format is sorted sooner
-  o = ["0", ] if d.startswith("2024-") else ["1", ]
+  # BluePilot: sort legacy date-based routes before counter-based routes in every year.
+  o = ["0", ] if re.match(r"^\d{4}-\d{2}-\d{2}--", d) else ["1", ]
+  # End BluePilot
   return o + [s.rjust(10, '0') for s in d.rsplit('--', 1)]
 
 def listdir_by_creation(d: str) -> list[str]:
