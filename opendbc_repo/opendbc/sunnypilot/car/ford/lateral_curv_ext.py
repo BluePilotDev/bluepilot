@@ -28,7 +28,8 @@ from opendbc.car import ACCELERATION_DUE_TO_GRAVITY, DT_CTRL
 from opendbc.car.lateral import ISO_LATERAL_ACCEL, apply_std_steer_angle_limits
 from opendbc.car.vehicle_model import VehicleModel
 from opendbc.car.ford.values import CarControllerParams, FordFlags
-from opendbc.sunnypilot.car.ford.values_ext import BP_ANGLE_LIMITS, CURVATURE_MAX, FordSafetyFlagsSP
+from opendbc.sunnypilot.car.ford.values_ext import (
+  BP_ANGLE_LIMITS, CURVATURE_MAX, PINION_CURVATURE_ERROR, FordSafetyFlagsSP)
 from opendbc.sunnypilot.car.ford.human_turn import HumanTurnDetector
 from selfdrive.modeld.constants import ModelConstants
 
@@ -56,7 +57,8 @@ LateralResult = namedtuple('LateralResult', [
 
 
 def apply_ford_curvature_limits_ext(apply_curvature, apply_curvature_last, current_curvature,
-                                     v_ego_raw, steering_angle, lat_active, CP):
+                                     v_ego_raw, steering_angle, lat_active, CP,
+                                     curvature_error=CarControllerParams.CURVATURE_ERROR):
   """Extended version of apply_ford_curvature_limits that returns
   (apply_curvature, max_curvature, curvature_deviation_limited).
 
@@ -74,10 +76,10 @@ def apply_ford_curvature_limits_ext(apply_curvature, apply_curvature_last, curre
   # No blending at low speed due to lack of torque wind-up and inaccurate current curvature
   if v_ego_raw > 9:
     apply_curvature_pre_error_clip = apply_curvature
-    apply_curvature = np.clip(apply_curvature, current_curvature - CarControllerParams.CURVATURE_ERROR,
-                              current_curvature + CarControllerParams.CURVATURE_ERROR)
+    apply_curvature = np.clip(apply_curvature, current_curvature - curvature_error,
+                              current_curvature + curvature_error)
     curvature_deviation_limited = bool(abs(apply_curvature - apply_curvature_pre_error_clip) > 1e-9)
-    max_curvature = abs(current_curvature) + CarControllerParams.CURVATURE_ERROR
+    max_curvature = abs(current_curvature) + curvature_error
 
   # Curvature rate limit after driver torque limit (same inputs/order as apply_ford_curvature_limits)
   apply_curvature_before_std = apply_curvature
@@ -129,6 +131,11 @@ class LateralCurvExt:
     # a live flip against stale firmware would fight the panda.
     self.bp_pinion_curvature_enabled = bool(
       CP_SP is not None and (CP_SP.safetyParam & FordSafetyFlagsSP.STEER_ANGLE_CURVATURE))
+
+    # Track ford.h's per-source band (FORD_STEERING_LIMITS_PINION widens to the
+    # PINION_CURVATURE_ERROR band); stays under panda's +1 unit.
+    self.bp_curvature_error = (PINION_CURVATURE_ERROR if self.bp_pinion_curvature_enabled
+                               else CarControllerParams.CURVATURE_ERROR)
 
     # Toggles (updated from Params each frame)
     self.enable_human_turn_detection_curv = True
@@ -369,7 +376,7 @@ class LateralCurvExt:
       # Apply curvature limits (extended version returning max_curvature)
       apply_curvature, max_curvature, curvature_deviation_limited = apply_ford_curvature_limits_ext(
         requested_curvature, apply_curvature_last, current_curvature,
-        CS.out.vEgoRaw, 0, CC.latActive, CP)
+        CS.out.vEgoRaw, 0, CC.latActive, CP, self.bp_curvature_error)
 
       # Lateral uncertainty for torque bar visualization
       lateralUncertainty = self._calculate_lateral_uncertainty(requested_curvature, apply_curvature, max_curvature)
