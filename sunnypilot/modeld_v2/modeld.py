@@ -8,6 +8,8 @@ See the LICENSE.md file in the root directory for more details.
 
 import os
 os.environ['GMMU'] = '0'
+from openpilot.sunnypilot.modeld_v2.catalog_runtime import configure_catalog_runtime, is_plain_model
+configure_catalog_runtime()
 from openpilot.system.hardware import TICI
 os.environ['DEV'] = 'QCOM' if TICI else 'CPU'
 USBGPU = "USBGPU" in os.environ
@@ -102,30 +104,62 @@ class ModelState(ModelStateBase):
   def _init_combined(self, pkl_path, cam_w, cam_h, bundle):
     from tinygrad.tensor import Tensor
     from openpilot.system.camerad.cameras.nv12_info import get_nv12_info
-    from openpilot.sunnypilot.modeld_v2.compile_modeld import derive_frame_skip
     from tinygrad.device import Device
 
     from openpilot.common.file_chunker import open_file_chunked
 
     cloudlog.warning(f"loading combined pkl: {pkl_path}")
-    with open_file_chunked(pkl_path) as model_file:
-      if bundle is not None and bundle.models[0].type == custom.ModelManagerSP.Model.Type.chunked:
-        jits = load_oob(model_file)
-      else:
-        jits = pickle.load(model_file)
+    plain = os.path.isfile(pkl_path) and is_plain_model(pkl_path)
+    if plain:
+      from openpilot.sunnypilot.modeld_v2.plain_artifact import load_model
+      jits = load_model(pkl_path)
+    else:
+      with open_file_chunked(pkl_path) as model_file:
+        if bundle is not None and bundle.models[0].type == custom.ModelManagerSP.Model.Type.chunked:
+          jits = load_oob(model_file)
+        else:
+          jits = pickle.load(model_file)
 
     self.DEV = Device.DEFAULT
     self.WARP_DEV = 'QCOM' if TICI else self.DEV
     self.QUEUE_DEV = self.DEV
 
     metadata = jits['metadata']
+    self.is_native_model = 'input_specs' in jits
+    if self.is_native_model:
+      from openpilot.sunnypilot.modeld_v2.plain_runtime import NativePlainModel
+      from openpilot.sunnypilot.modeld_v2.parse_model_outputs import Parser
+      from openpilot.sunnypilot.models.split_model_constants import SplitModelConstants
+      self._native_model = NativePlainModel(jits, cam_w, cam_h)
+      self.is_legacy_model = False
+      self._combined_model_type = 'supercombo'
+      self.vision_output_slices = self._native_model.vision_output_slices
+      self.policy_output_slices = {}
+      self._policy_slices_list = []
+      self._vision_input_names = ['img', 'big_img']
+      self._road_key, self._wide_key, self._desire_key = 'img', 'big_img', 'desire'
+      self.numpy_inputs = self._native_model.numpy_inputs
+      self.input_queues = self._native_model.input_queues
+      self.constants = SplitModelConstants()
+      self.parser = Parser()
+      self.prev_desire = np.zeros(self.constants.DESIRE_LEN, dtype=np.float32)
+      self.full_frames, self._blob_cache = {}, {}
+      self.frame_buf_params = dict.fromkeys(self._vision_input_names, get_nv12_info(cam_w, cam_h))
+      return
+
+    from openpilot.sunnypilot.modeld_v2.compile_modeld import derive_frame_skip
     self.is_legacy_model = 'run_policy' not in jits
     if self.is_legacy_model:
       self.warp = jits[(cam_w, cam_h)]['warp_enqueue']
       self.run_policy = jits[(cam_w, cam_h)]['run_policy']
     else:
       self.run_policy = jits['run_policy']
-      self.warp = jits[(cam_w, cam_h)]
+      self.warp = jits.get((cam_w, cam_h))
+      if self.warp is None and plain:
+        from openpilot.sunnypilot.modeld_v2.plain_runtime import make_camera_warp
+        vision_metadata = metadata.get('vision', metadata.get('model'))
+        image_shape = next(shape for key, shape in vision_metadata['input_shapes'].items() if 'img' in key)
+        self.warp = make_camera_warp(cam_w, cam_h, image_shape[3] * 2, image_shape[2] * 2)
 
     if 'model' in metadata:
       model_metadata = metadata['model']
@@ -143,7 +177,7 @@ class ModelState(ModelStateBase):
                                                                           device=self.QUEUE_DEV)
     else:
       vision_metadata = metadata['vision']
-      policy_keys = [k for k in metadata if k != 'vision']
+      policy_keys = [k for k in metadata if k not in ('vision', 'warp_dev')]
       if policy_keys == ['policy']:
         self._combined_model_type = 'split'
       else:
@@ -233,7 +267,11 @@ class ModelState(ModelStateBase):
     self.numpy_inputs['tfm'][:, :] = transforms[road_key].reshape(3, 3)
     self.numpy_inputs['big_tfm'][:, :] = transforms[wide_key].reshape(3, 3)
 
-    if self.is_legacy_model:
+    if self.is_native_model:
+      raw_outputs = self._native_model.run(self.full_frames, prepare_only)
+      if prepare_only:
+        return None
+    elif self.is_legacy_model:
       if prepare_only:
         self.warp(**self.input_queues, frame=self.full_frames[road_key], big_frame=self.full_frames[wide_key])
         return None
