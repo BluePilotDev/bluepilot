@@ -26,6 +26,11 @@ state in device memory and alias next-state outputs to the input state buffers.
 Their two-camera NV12 preparation uses the warp implementation from that same
 pinned runtime. Existing pickle and out-of-band artifact paths remain available.
 
+The loader translates portable dtype aliases (including Cheddar's `f16` and
+`i64`) to the long names exposed by the pinned runtime. Without this translation,
+Cheddar exits during loading, so it publishes no camera odometry and calibration
+remains at 0%. Calibration acceptance thresholds are unchanged.
+
 If catalog migration changes a model's files or selector version, the existing
 model validation can reset that cached selection to the stock default; select
 and download the model again from the updated list.

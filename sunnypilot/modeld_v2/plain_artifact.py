@@ -18,6 +18,7 @@ import math
 import mmap
 import os
 import pickle
+import re
 import struct
 
 MAGIC = b"SPTGPLN1"
@@ -206,6 +207,11 @@ def _write_cache(path: str, jits: dict, device_map: dict | None, extra: str = ""
 
 def _dtype(text: str):
   from tinygrad.dtype import dtypes
+  # Portable artifacts use newer short names; this pinned runtime uses long names.
+  aliases = {'f16': 'float16', 'f32': 'float32', 'f64': 'float64', 'bf16': 'bfloat16',
+             **{f'{prefix}{bits}': f'{kind}{bits}' for prefix, kind in (('i', 'int'), ('u', 'uint'))
+                for bits in (8, 16, 32, 64)}}
+  text = re.sub(r'\bdtypes\.(\w+)\b', lambda match: 'dtypes.' + aliases.get(match[1], match[1]), text)
   return eval(text, {"__builtins__": {}}, {"dtypes": dtypes})
 
 

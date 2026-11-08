@@ -9,7 +9,7 @@ from types import SimpleNamespace
 import numpy as np
 from tinygrad import Tensor, TinyJit
 
-from openpilot.sunnypilot.modeld_v2.plain_artifact import cache_is_fresh, load_model, write_bundle
+from openpilot.sunnypilot.modeld_v2.plain_artifact import _dtype, cache_is_fresh, load_model, write_bundle
 from openpilot.sunnypilot.modeld_v2.plain_runtime import NativePlainModel
 from openpilot.sunnypilot.modeld_v2.tests.plain_fixture_compiler import capture_frame, record_kernel_linear, serialize_jit
 from openpilot.system.camerad.cameras.nv12_info import get_nv12_info
@@ -26,6 +26,12 @@ def compile_part(function, inputs, output_container=None):
 
 
 def main():
+  from tinygrad.dtype import dtypes
+  # Cheddar's actual QCOM artifact uses short dtype names, unlike our CPU fixture.
+  for short, long in (('f16', 'float16'), ('f32', 'float32'), ('f64', 'float64'), ('bf16', 'bfloat16'),
+                      *((f'{prefix}{bits}', f'{kind}{bits}') for prefix, kind in (('i', 'int'), ('u', 'uint'))
+                        for bits in (8, 16, 32, 64)), ('bool', 'bool')):
+    assert _dtype(f'dtypes.{short}') == getattr(dtypes, long)
   with tempfile.TemporaryDirectory() as temp:
     path = str(Path(temp) / 'native.pkl')
     specs = {
