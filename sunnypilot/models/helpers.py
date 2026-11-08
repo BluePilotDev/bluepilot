@@ -18,8 +18,7 @@ from openpilot.sunnypilot.models.constants import Meta, MetaSimPose, MetaTombRai
 from openpilot.system.hardware.hw import Paths
 
 # SET ME TO THE EXACT JSON VERSION WE SET IN SUNNYPILOT_MODELS REPO
-REQUIRED_JSON_VERSION = 21
-SUPPORTED_JSON_VERSIONS = (19, REQUIRED_JSON_VERSION)
+REQUIRED_JSON_VERSION = 19
 
 CUSTOM_MODEL_PATH = Paths.model_root()
 METADATA_PATH = Path(__file__).parent / '../models/supercombo_metadata.pkl'
@@ -50,10 +49,9 @@ def is_bundle_version_compatible(bundle: dict) -> bool:
   """
   The bundle parsed from the json specifies a `minimum_selector_version`, which defines the minimum selector version
   required to load the model. This function ensures that:
-    Version 19 remains supported by the original tinygrad runtime during migration.
-    Version 21 uses the isolated v26 runtime and portable model loader.
+    the bundle MUST match the `REQUIRED_JSON_VERSION` set here in helpers.
   """
-  return bundle.get("minimumSelectorVersion", 0) in SUPPORTED_JSON_VERSIONS
+  return bundle.get("minimumSelectorVersion", 0) == REQUIRED_JSON_VERSION
 
 
 def _bundle_artifacts(bundle: custom.ModelManagerSP.ModelBundle) -> list[tuple[str, str]]:

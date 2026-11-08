@@ -131,8 +131,6 @@ class ModelsLayout(Widget):
 
   def _handle_bundle_download_progress(self):
     labels = {custom.ModelManagerSP.Model.Type.supercombo: self.supercombo_label,
-              # BluePilot: v22/v26 compiled bundles use the driving-model progress row.
-              custom.ModelManagerSP.Model.Type.chunked: self.supercombo_label,
               custom.ModelManagerSP.Model.Type.vision: self.vision_label,
               custom.ModelManagerSP.Model.Type.policy: self.policy_label,
               custom.ModelManagerSP.Model.Type.offPolicy: self.off_policy_label,

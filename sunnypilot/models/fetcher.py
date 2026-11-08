@@ -124,7 +124,7 @@ class ModelCache:
 
 class ModelFetcher:
   """Handles fetching and caching of model data from remote source"""
-  MODEL_URL = "https://raw.githubusercontent.com/sunnypilot/sunnypilot-models/refs/heads/gh-pages/docs/driving_models_v26.json"
+  MODEL_URL = "https://raw.githubusercontent.com/sunnypilot/sunnypilot-models/refs/heads/gh-pages/docs/driving_models_v22.json"
 
   def __init__(self, params: Params):
     self.params = params
@@ -168,10 +168,10 @@ class ModelFetcher:
 
     if cached_data and not is_expired:
       cached_bundles = self.model_parser.parse_models(cached_data)
-      if cached_bundles and any(bundle.minimumSelectorVersion == 21 for bundle in cached_bundles):
+      if cached_bundles:
         cloudlog.debug("Using valid cached models data")
         return cached_bundles
-      cloudlog.warning("Cached catalog predates selector 21 or has no compatible bundles; refetching")
+      cloudlog.warning("Cached model catalog has no version-compatible bundles; refetching")
 
     fetched_bundles = self._fetch_and_cache_models()
     if fetched_bundles is not None:

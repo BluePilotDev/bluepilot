@@ -16,6 +16,3 @@
 [submodule "sunnypilot/neural_network_data"]
   path = sunnypilot/neural_network_data
   url = https://github.com/sunnypilot/neural-network-data.git
-[submodule "tinygrad_v26"]
-  path = sunnypilot/modeld_v2/tinygrad_v26_repo
-  url = https://github.com/sunnypilot/tinygrad.git
