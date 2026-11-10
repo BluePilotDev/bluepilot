@@ -199,6 +199,7 @@ class CAR(Platforms):
   )
   LINCOLN_NAVIGATOR_MK4 = FordCANFDPlatformConfig(
     [],
+    # Standard-wheelbase Navigator. The Navigator L has a longer wheelbase.
     CarSpecs(mass=2742, wheelbase=3.1115, steerRatio=19.6),
   )
   FORD_F_150_MK14 = FordCANFDPlatformConfig(
