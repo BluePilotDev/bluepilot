@@ -6,7 +6,7 @@ from opendbc.car.ford.carcontroller import CarController
 from opendbc.car.ford.carstate import CarState
 from opendbc.car.ford.fordcan import CanBus
 from opendbc.car.ford.radar_interface import RadarInterface
-from opendbc.car.ford.values import CAR, CarControllerParams, DBC, Ecu, FordFlags, RADAR, FordSafetyFlags
+from opendbc.car.ford.values import CarControllerParams, DBC, Ecu, FordFlags, RADAR, FordSafetyFlags
 from opendbc.car.interfaces import CarInterfaceBase
 from opendbc.sunnypilot.car.ford.interfaces_ext import apply_ford_ext_params, apply_ford_ext_params_sp
 
@@ -31,8 +31,6 @@ class CarInterface(CarInterfaceBase):
   @staticmethod
   def _get_params(ret: structs.CarParams, candidate, fingerprint, car_fw, alpha_long, is_release, docs) -> structs.CarParams:
     ret.brand = "ford"
-    # BluePilot: identify the Navigator before enabling driving support.
-    ret.dashcamOnly = candidate == CAR.LINCOLN_NAVIGATOR_MK4
 
     ret.radarUnavailable = Bus.radar not in DBC[candidate]
 
