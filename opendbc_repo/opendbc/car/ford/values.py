@@ -197,6 +197,10 @@ class CAR(Platforms):
     # JK1 is the MAX; same platform here
     wmis={'1FM'}, vds_codes={'JU1', 'JU2', 'JK1'}, years={MY_2022, MY_2023, MY_2024},
   )
+  LINCOLN_NAVIGATOR_MK4 = FordCANFDPlatformConfig(
+    [],
+    CarSpecs(mass=2742, wheelbase=3.1115, steerRatio=19.6),
+  )
   FORD_F_150_MK14 = FordCANFDPlatformConfig(
     [FordCarDocs("Ford F-150 2021-23", "Co-Pilot360 Assist 2.0", hybrid=True)],
     CarSpecs(mass=3334, wheelbase=3.99, steerRatio=17.0),
