@@ -194,7 +194,7 @@ void cloneFinished(int exitCode) {
   assert(err == 0);
   run(("git checkout " + migrated_branch).c_str());
   run(("git reset --hard origin/" + migrated_branch).c_str());
-  run("git submodule update --init");
+  run("git submodule update --init --recursive");
 
   // move into place
   run(("rm -f " + VALID_CACHE_PATH).c_str());
