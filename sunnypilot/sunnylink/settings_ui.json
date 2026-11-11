@@ -636,12 +636,22 @@
                   "type": "offroad_only"
                 },
                 {
-                  "type": "not",
-                  "condition": {
-                    "type": "capability",
-                    "field": "has_longitudinal_control",
-                    "equals": true
-                  }
+                  "type": "any",
+                  "conditions": [
+                    {
+                      "type": "not",
+                      "condition": {
+                        "type": "capability",
+                        "field": "has_longitudinal_control",
+                        "equals": true
+                      }
+                    },
+                    {
+                      "type": "capability",
+                      "field": "brand",
+                      "equals": "ford"
+                    }
+                  ]
                 }
               ]
             }

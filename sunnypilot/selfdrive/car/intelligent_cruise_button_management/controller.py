@@ -45,8 +45,8 @@ class IntelligentCruiseButtonManagement:
 
     self.cruise_button_timers = CRUISE_BUTTON_TIMER
     
-    # BluePilot: Track initial cruise speed when first enabled
-    self.initial_cruise_speed_kph = 0
+    # BluePilot: Track initial cruise speed when first enabled, in cluster units (mph or km/h)
+    self.initial_cruise_speed = 0
     self.cruise_enabled_prev = False
 
   @property
@@ -61,9 +61,9 @@ class IntelligentCruiseButtonManagement:
     # Use current speed (vEgo) as the initial setpoint if planner target is invalid/unreasonable
     cruise_enabled = CS.cruiseState.available and CS.cruiseState.enabled
     if cruise_enabled and not self.cruise_enabled_prev:
-      # Cruise just enabled - capture current speed as initial setpoint
-      current_speed_kph = CS.vEgo * CV.MS_TO_KPH
-      self.initial_cruise_speed_kph = round(current_speed_kph)
+      # Cruise just enabled - capture current speed as initial setpoint, in the same cluster
+      # units as v_target and v_cruise_cluster (it used to be stored in km/h and compared to mph)
+      self.initial_cruise_speed = round(CS.vEgo * speed_conv)
     self.cruise_enabled_prev = cruise_enabled
 
     self.v_target_ms_last = apply_hysteresis(LP_SP.vTarget, self.v_target_ms_last, HYST_GAP * ms_conv)
@@ -77,8 +77,8 @@ class IntelligentCruiseButtonManagement:
     MAX_REASONABLE_TARGET = 145 if self.is_metric else 90
     if self.v_target >= MAX_REASONABLE_TARGET or self.v_target == 0:
       # Planner target is invalid - use initial cruise speed or cluster speed
-      if self.initial_cruise_speed_kph > 0:
-        self.v_target = self.initial_cruise_speed_kph
+      if self.initial_cruise_speed > 0:
+        self.v_target = self.initial_cruise_speed
       elif self.v_cruise_cluster > 0:
         self.v_target = self.v_cruise_cluster
 
@@ -101,16 +101,14 @@ class IntelligentCruiseButtonManagement:
               # BluePilot: Prevent ICBM from increasing speed when cruise is first enabled
               # If cluster speed is 0 or very low, don't increase - wait for user to set initial speed
               # Also cap target to reasonable maximum (145 kph / 90 mph)
-              # Don't increase if target exceeds initial cruise speed by more than 5 mph/kph
+              # An invalid planner target is already replaced with the engagement speed in
+              # update_calculations, so there is no separate cap relative to the engagement speed:
+              # that cap also blocked legitimate raises (a higher speed limit, or the driver's own
+              # set speed) for the rest of the engagement.
               MAX_REASONABLE_TARGET = 145 if self.is_metric else 90
-              MAX_INITIAL_INCREASE = 5  # Allow small increases from initial speed
-              
+
               if self.v_cruise_cluster == 0 or self.v_target >= MAX_REASONABLE_TARGET:
                 # Don't increase - stay in preActive or go to holding
-                self.state = State.holding
-              elif self.initial_cruise_speed_kph > 0 and self.v_target > (self.initial_cruise_speed_kph + MAX_INITIAL_INCREASE):
-                # Don't increase beyond initial cruise speed + small margin
-                # This prevents ICBM from ramping up when cruise is first enabled
                 self.state = State.holding
               else:
                 self.state = State.increasing
@@ -156,7 +154,7 @@ class IntelligentCruiseButtonManagement:
         self.cruise_button_timers[k] = 0
       # BluePilot: Reset initial cruise speed when cruise is disabled
       # This ensures we capture a fresh initial speed when cruise is re-enabled
-      self.initial_cruise_speed_kph = 0
+      self.initial_cruise_speed = 0
 
     self.is_ready = ready and not button_pressed
 

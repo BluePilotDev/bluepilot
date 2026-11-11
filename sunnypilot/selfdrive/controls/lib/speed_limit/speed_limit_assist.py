@@ -86,7 +86,9 @@ class SpeedLimitAssist:
     self._distance = 0.
     self.state = SpeedLimitAssistState.disabled
     self._state_prev = SpeedLimitAssistState.disabled
-    self.pcm_op_long = CP.openpilotLongitudinalControl and CP.pcmCruise
+    # BluePilot: with ICBM managing the PCM set speed under openpilot longitudinal (pcmCruiseSpeed
+    # False), openpilot owns the set speed, so the limit is the target itself, not a 70/80 ceiling.
+    self.pcm_op_long = CP.openpilotLongitudinalControl and CP.pcmCruise and CP_SP.pcmCruiseSpeed
 
     self._plus_hold = 0.
     self._minus_hold = 0.
