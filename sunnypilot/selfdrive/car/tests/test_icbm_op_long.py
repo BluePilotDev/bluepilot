@@ -104,9 +104,10 @@ _CC = _Obj(enabled=True, cruiseControl=_Obj(override=False, cancel=False, resume
 
 
 class TestIcbmRaisesSetSpeed:
-  """The cluster set speed follows the planner target up, however far it is above the engagement speed."""
+  """The cluster set speed follows the planner target up, however far it is above the engagement speed,
+  once the short guard right after engagement has passed."""
 
-  def _run(self, v_ego_mph, cluster_mph, target_mph, frames=100):
+  def _run(self, v_ego_mph, cluster_mph, target_mph, frames=500):
     CI, _ = _setup(FORD.FORD_EXPEDITION_MK4, op_long=True, icbm=True)
     icbm = IntelligentCruiseButtonManagement(CI.CP, CI.CP_SP)
     lp_sp = _Obj(vTarget=target_mph * CV.MPH_TO_MS)
@@ -121,6 +122,32 @@ class TestIcbmRaisesSetSpeed:
     icbm, buttons = self._run(engage_mph, engage_mph, target_mph)
     assert icbm.v_target == target_mph
     assert buttons[-1] == SendButtonState.increase
+
+  @pytest.mark.parametrize("engage_mph, target_mph, guarded", [(25, 28, False), (25, 30, False), (25, 31, True), (25, 72, True)])
+  def test_engage_guard_holds_large_increases_for_the_first_seconds(self, engage_mph, target_mph, guarded):
+    from openpilot.sunnypilot.selfdrive.car.intelligent_cruise_button_management.controller import ENGAGE_GUARD_TIME
+    guard_frames = int(ENGAGE_GUARD_TIME * 100)
+    _, buttons = self._run(engage_mph, engage_mph, target_mph, frames=guard_frames + 100)
+    early, late = buttons[:guard_frames - 5], buttons[guard_frames + 60:]
+    assert (SendButtonState.increase not in early) == guarded
+    assert set(late) == {SendButtonState.increase}
+
+  def test_engage_guard_restarts_on_re_engage(self):
+    CI, _ = _setup(FORD.FORD_EXPEDITION_MK4, op_long=True, icbm=True)
+    icbm = IntelligentCruiseButtonManagement(CI.CP, CI.CP_SP)
+    lp_sp = _Obj(vTarget=72 * CV.MPH_TO_MS)
+    off = _Obj(vEgo=25 * CV.MPH_TO_MS, buttonEvents=[], cruiseState=_Obj(available=True, enabled=False, speedCluster=25 * CV.MPH_TO_MS))
+    cc_off = _Obj(enabled=False, cruiseControl=_Obj(override=False, cancel=False, resume=False))
+    for _ in range(500):
+      icbm.run(_cs(25, 25), _CC, lp_sp, False)
+    assert icbm.cruise_button == SendButtonState.increase
+    for _ in range(10):
+      icbm.run(off, cc_off, lp_sp, False)
+    buttons = []
+    for _ in range(200):
+      icbm.run(_cs(25, 25), _CC, lp_sp, False)
+      buttons.append(icbm.cruise_button)
+    assert SendButtonState.increase not in buttons
 
   def test_decrease(self):
     _, buttons = self._run(45, 45, 30)

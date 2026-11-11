@@ -18,6 +18,11 @@ SendButtonState = custom.IntelligentCruiseButtonManagement.SendButtonState
 ALLOWED_SPEED_THRESHOLD = 1.8  # m/s, ~4 MPH
 HYST_GAP = 0.0  # currently disabled; TODO-SP: might need to be brand-specific
 INACTIVE_TIMER = 0.4
+# BluePilot: for this long after cruise is enabled, don't raise the set speed more than
+# ENGAGE_GUARD_MAX_INCREASE (cluster units) above the speed it was enabled at. The planner target can
+# be briefly wrong right at engagement, and following it would ramp the set speed up within seconds.
+ENGAGE_GUARD_TIME = 3.0  # secs.
+ENGAGE_GUARD_MAX_INCREASE = 5
 
 
 SEND_BUTTONS = {
@@ -48,6 +53,7 @@ class IntelligentCruiseButtonManagement:
     # BluePilot: Track initial cruise speed when first enabled, in cluster units (mph or km/h)
     self.initial_cruise_speed = 0
     self.cruise_enabled_prev = False
+    self.engage_guard_timer = 0
 
   @property
   def v_cruise_equal(self) -> bool:
@@ -64,6 +70,9 @@ class IntelligentCruiseButtonManagement:
       # Cruise just enabled - capture current speed as initial setpoint, in the same cluster
       # units as v_target and v_cruise_cluster (it used to be stored in km/h and compared to mph)
       self.initial_cruise_speed = round(CS.vEgo * speed_conv)
+      self.engage_guard_timer = int(ENGAGE_GUARD_TIME / DT_CTRL)
+    else:
+      self.engage_guard_timer = max(0, self.engage_guard_timer - 1)
     self.cruise_enabled_prev = cruise_enabled
 
     self.v_target_ms_last = apply_hysteresis(LP_SP.vTarget, self.v_target_ms_last, HYST_GAP * ms_conv)
@@ -101,13 +110,14 @@ class IntelligentCruiseButtonManagement:
               # BluePilot: Prevent ICBM from increasing speed when cruise is first enabled
               # If cluster speed is 0 or very low, don't increase - wait for user to set initial speed
               # Also cap target to reasonable maximum (145 kph / 90 mph)
-              # An invalid planner target is already replaced with the engagement speed in
-              # update_calculations, so there is no separate cap relative to the engagement speed:
-              # that cap also blocked legitimate raises (a higher speed limit, or the driver's own
-              # set speed) for the rest of the engagement.
+              # For the first ENGAGE_GUARD_TIME after cruise is enabled, don't increase more than
+              # ENGAGE_GUARD_MAX_INCREASE above the engagement speed. After that the cap is lifted, so
+              # a higher speed limit or the driver's own set speed can be followed.
               MAX_REASONABLE_TARGET = 145 if self.is_metric else 90
+              engage_guard = self.engage_guard_timer > 0 and self.initial_cruise_speed > 0 and \
+                             self.v_target > (self.initial_cruise_speed + ENGAGE_GUARD_MAX_INCREASE)
 
-              if self.v_cruise_cluster == 0 or self.v_target >= MAX_REASONABLE_TARGET:
+              if self.v_cruise_cluster == 0 or self.v_target >= MAX_REASONABLE_TARGET or engage_guard:
                 # Don't increase - stay in preActive or go to holding
                 self.state = State.holding
               else:
@@ -155,6 +165,7 @@ class IntelligentCruiseButtonManagement:
       # BluePilot: Reset initial cruise speed when cruise is disabled
       # This ensures we capture a fresh initial speed when cruise is re-enabled
       self.initial_cruise_speed = 0
+      self.engage_guard_timer = 0
 
     self.is_ready = ready and not button_pressed
 
