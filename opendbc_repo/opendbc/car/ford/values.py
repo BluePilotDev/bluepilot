@@ -64,6 +64,7 @@ class RADAR:
 
 
 class Footnote(Enum):
+  NAVIGATOR = CarFootnote("Standard-wheelbase Navigator only. Navigator L is excluded.", Column.MODEL)
   FOCUS = CarFootnote(
     "Refers only to the Focus Mk4 (C519) available in Europe/China/Taiwan/Australasia, not the Focus Mk3 (C346) in " +
     "North and South America/Southeast Asia.",
@@ -201,7 +202,7 @@ class CAR(Platforms):
     wmis={'1FM'}, vds_codes={'JU1', 'JU2', 'JK1'}, years={MY_2022, MY_2023, MY_2024},
   )
   LINCOLN_NAVIGATOR_MK4 = FordCANFDPlatformConfig(
-    [FordCarDocs("Lincoln Navigator 2023", "Lincoln Co-Pilot360 2.0")],
+    [FordCarDocs("Lincoln Navigator 2023", "Lincoln Co-Pilot360 2.0", footnotes=[Footnote.NAVIGATOR])],
     # Standard-wheelbase Navigator. The Navigator L has a longer wheelbase.
     CarSpecs(mass=2742, wheelbase=3.1115, steerRatio=19.6),
   )
