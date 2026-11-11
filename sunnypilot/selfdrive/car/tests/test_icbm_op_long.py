@@ -18,9 +18,11 @@ from openpilot.sunnypilot.selfdrive.car.intelligent_cruise_button_management.con
 from openpilot.sunnypilot.selfdrive.car.intelligent_cruise_button_management.helpers import icbm_with_op_long
 from openpilot.sunnypilot.selfdrive.controls.lib.speed_limit import PCM_LONG_REQUIRED_MAX_SET_SPEED
 from openpilot.sunnypilot.selfdrive.controls.lib.speed_limit.common import Mode
-from openpilot.sunnypilot.selfdrive.controls.lib.speed_limit.speed_limit_assist import SpeedLimitAssist
+from openpilot.sunnypilot.selfdrive.controls.lib.speed_limit.speed_limit_assist import SpeedLimitAssist, ACTIVE_STATES
+from openpilot.sunnypilot.selfdrive.selfdrived.events import EventsSP
 
 SendButtonState = custom.IntelligentCruiseButtonManagement.SendButtonState
+SpeedLimitAssistState = custom.LongitudinalPlanSP.SpeedLimit.AssistState
 
 
 def _setup(car_name, op_long: bool, icbm: bool):
@@ -138,3 +140,132 @@ class TestIcbmRaisesSetSpeed:
   def test_no_increase_from_unset_cluster(self):
     _, buttons = self._run(25, 0, 50)
     assert SendButtonState.increase not in buttons
+
+
+class TestSpeedLimitAssistAutoConfirm:
+  """Ford + ICBM under openpilot longitudinal: the limit is applied with no +/- press, at any speed."""
+
+  def _sla(self, icbm=True, car=FORD.FORD_EXPEDITION_MK4):
+    CI, _ = _setup(car, op_long=True, icbm=icbm)
+    sla = SpeedLimitAssist(CI.CP, CI.CP_SP)
+    sla.enabled = True
+    self.states = []
+    return sla
+
+  def _step(self, sla, limit_mph, set_mph, frames=40, engaged=True):
+    limit = limit_mph * CV.MPH_TO_MS
+    for _ in range(frames):
+      sla.update(engaged, False, set_mph * CV.MPH_TO_MS, 0., set_mph * CV.MPH_TO_MS, limit, limit, limit_mph > 0, 0., EventsSP())
+      sla.enabled = True  # params are re-read periodically; keep Assist mode on for the test
+      self.states.append(sla.state)
+
+  @pytest.mark.parametrize("limit_mph", [25, 35, 45, 65])
+  def test_first_limit_applies_without_a_press(self, limit_mph):
+    sla = self._sla()
+    assert sla.auto_confirm
+    self._step(sla, limit_mph, set_mph=30)
+    assert sla.state in ACTIVE_STATES
+    assert SpeedLimitAssistState.preActive not in self.states
+    assert sla.output_v_target == pytest.approx(limit_mph * CV.MPH_TO_MS)
+
+  def test_new_limit_below_50_applies_without_a_press(self):
+    sla = self._sla()
+    self._step(sla, 25, set_mph=25)
+    self._step(sla, 45, set_mph=25)
+    assert sla.state in ACTIVE_STATES
+    assert SpeedLimitAssistState.preActive not in self.states
+    assert sla.output_v_target == pytest.approx(45 * CV.MPH_TO_MS)
+
+  def test_manual_set_speed_change_holds_until_next_limit(self):
+    sla = self._sla()
+    self._step(sla, 45, set_mph=45)
+    assert sla.state in ACTIVE_STATES
+    self._step(sla, 45, set_mph=52)            # driver bumps the set speed
+    assert sla.state == SpeedLimitAssistState.inactive
+    self._step(sla, 45, set_mph=52, frames=200)  # same limit: the driver's choice stands
+    assert sla.state == SpeedLimitAssistState.inactive
+    self._step(sla, 35, set_mph=52)            # a new limit takes over again
+    assert sla.state in ACTIVE_STATES
+    assert SpeedLimitAssistState.preActive not in self.states
+
+  def test_no_limit_means_not_active(self):
+    sla = self._sla()
+    self._step(sla, 0, set_mph=40)
+    assert sla.state not in ACTIVE_STATES
+
+  def test_disengaged_means_disabled(self):
+    sla = self._sla()
+    self._step(sla, 45, set_mph=45)
+    self._step(sla, 45, set_mph=45, engaged=False, frames=2)
+    assert sla.state == SpeedLimitAssistState.disabled
+
+  def test_without_icbm_nothing_is_auto_confirmed(self):
+    sla = self._sla(icbm=False)
+    assert not sla.auto_confirm and sla.pcm_op_long
+    self._step(sla, 45, set_mph=35)
+    assert sla.state not in ACTIVE_STATES      # still waits for the 70/80 confirmation
+
+  def test_other_brand_is_not_auto_confirmed(self):
+    assert not self._sla(car=HYUNDAI.HYUNDAI_SONATA).auto_confirm
+
+
+class TestSignToClusterChain:
+  """Cruise helper + Speed Limit Assist + ICBM stepped together the way card, plannerd and selfdrived run
+  them, with a simulated Ford cluster that moves 1 mph per button press."""
+
+  def _drive(self, limits_mph, engage_mph=30, seconds_per_limit=12):
+    from cereal import car
+    from openpilot.selfdrive.car.cruise import VCruiseHelper
+    CI, _ = _setup(FORD.FORD_EXPEDITION_MK4, op_long=True, icbm=True)
+    helper = VCruiseHelper(CI.CP, CI.CP_SP)
+    sla = SpeedLimitAssist(CI.CP, CI.CP_SP)
+    sla.enabled = True
+    icbm = IntelligentCruiseButtonManagement(CI.CP, CI.CP_SP)
+
+    cluster_mph = engage_mph   # the PCM's own setpoint, as shown on the cluster
+    enabled_prev = False
+    log = []
+    for limit_mph in limits_mph:
+      limit = limit_mph * CV.MPH_TO_MS
+      for frame in range(seconds_per_limit * 100):
+        CS = car.CarState.new_message()
+        CS.vEgo = engage_mph * CV.MPH_TO_MS
+        CS.cruiseState.available = True
+        CS.cruiseState.enabled = True
+        CS.cruiseState.speed = cluster_mph * CV.MPH_TO_MS
+        CS.cruiseState.speedCluster = cluster_mph * CV.MPH_TO_MS
+
+        # plannerd (20 Hz): Speed Limit Assist sees openpilot's own set speed
+        if frame % 5 == 0:
+          v_cruise_ms = min(helper.v_cruise_cluster_kph, 145) * CV.KPH_TO_MS
+          sla.update(True, False, CS.vEgo, 0., v_cruise_ms, limit, limit, True, 0., EventsSP())
+          sla.enabled = True
+          lp_sp = custom.LongitudinalPlanSP.new_message()
+          lp_sp.speedLimit.resolver.speedLimitValid = True
+          lp_sp.speedLimit.resolver.speedLimitFinalLast = limit
+          lp_sp.speedLimit.assist.state = sla.state
+          lp_sp.vTarget = float(min(helper.v_cruise_kph * CV.KPH_TO_MS, sla.output_v_target))
+
+        # card (100 Hz)
+        helper.update_speed_limit_assist(False, lp_sp)
+        helper.update_v_cruise(CS, True, False)
+        if not enabled_prev:
+          helper.initialize_v_cruise(CS, False, False)
+        enabled_prev = True
+
+        # selfdrived (100 Hz) -> car controller -> PCM: one press moves the cluster 1 mph, at most 10 Hz
+        icbm.run(CS, _CC, lp_sp, False)
+        if frame % 10 == 0:
+          if icbm.cruise_button == SendButtonState.increase:
+            cluster_mph += 1
+          elif icbm.cruise_button == SendButtonState.decrease:
+            cluster_mph -= 1
+      log.append((limit_mph, round(helper.v_cruise_kph * CV.KPH_TO_MPH), cluster_mph, sla.state))
+    return log
+
+  def test_cluster_follows_each_limit_with_no_driver_input(self):
+    log = self._drive([45, 65, 25, 35])
+    for limit_mph, set_speed_mph, cluster_mph, state in log:
+      assert state in ACTIVE_STATES, log
+      assert set_speed_mph == limit_mph, log    # openpilot's set speed is the limit, not 70/80
+      assert cluster_mph == limit_mph, log      # and the truck's cluster was walked to it

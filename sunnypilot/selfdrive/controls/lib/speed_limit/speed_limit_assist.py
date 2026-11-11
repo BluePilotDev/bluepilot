@@ -17,6 +17,7 @@ from openpilot.sunnypilot.selfdrive.selfdrived.events import EventsSP
 from openpilot.sunnypilot.selfdrive.controls.lib.speed_limit import PCM_LONG_REQUIRED_MAX_SET_SPEED, CONFIRM_SPEED_THRESHOLD
 from openpilot.sunnypilot.selfdrive.controls.lib.speed_limit.common import Mode
 from openpilot.sunnypilot.selfdrive.controls.lib.speed_limit.helpers import compare_cluster_target, set_speed_limit_assist_availability
+from openpilot.sunnypilot.selfdrive.car.intelligent_cruise_button_management.helpers import icbm_with_op_long
 
 ButtonType = car.CarState.ButtonEvent.Type
 EventNameSP = custom.OnroadEventSP.EventName
@@ -89,6 +90,9 @@ class SpeedLimitAssist:
     # BluePilot: with ICBM managing the PCM set speed under openpilot longitudinal (pcmCruiseSpeed
     # False), openpilot owns the set speed, so the limit is the target itself, not a 70/80 ceiling.
     self.pcm_op_long = CP.openpilotLongitudinalControl and CP.pcmCruise and CP_SP.pcmCruiseSpeed
+    # BluePilot: in that mode the limit is applied without a +/- press to confirm it, at any speed,
+    # like Ford's own intelligent ACC. A manual set speed change still holds until the next new limit.
+    self.auto_confirm = icbm_with_op_long(CP) and CP.openpilotLongitudinalControl and CP.pcmCruise and not CP_SP.pcmCruiseSpeed
 
     self._plus_hold = 0.
     self._minus_hold = 0.
@@ -331,7 +335,7 @@ class SpeedLimitAssist:
           if self.v_cruise_cluster_changed:
             self.state = SpeedLimitAssistState.inactive
 
-          elif self.speed_limit_changed and self.apply_confirm_speed_threshold:
+          elif self.speed_limit_changed and self.apply_confirm_speed_threshold and not self.auto_confirm:
             self.state = SpeedLimitAssistState.preActive
             self.pre_active_timer = int(PRE_ACTIVE_GUARD_PERIOD[self.pcm_op_long] / DT_MDL)
 
@@ -345,7 +349,9 @@ class SpeedLimitAssist:
 
         # INACTIVE
         elif self.state == SpeedLimitAssistState.inactive:
-          if self.speed_limit_changed:
+          if self.speed_limit_changed and self.auto_confirm and self._has_speed_limit:
+            self.state = SpeedLimitAssistState.active
+          elif self.speed_limit_changed:
             self.state = SpeedLimitAssistState.preActive
             self.pre_active_timer = int(PRE_ACTIVE_GUARD_PERIOD[self.pcm_op_long] / DT_MDL)
           elif self._update_non_pcm_long_confirmed_state():
@@ -359,7 +365,7 @@ class SpeedLimitAssist:
           self.long_engaged_timer = int(DISABLED_GUARD_PERIOD / DT_MDL)
 
         elif self.long_engaged_timer <= 0:
-          if self._update_non_pcm_long_confirmed_state():
+          if self._update_non_pcm_long_confirmed_state() or (self.auto_confirm and self._has_speed_limit):
             self.state = SpeedLimitAssistState.active
           elif self._has_speed_limit:
             self.state = SpeedLimitAssistState.preActive
