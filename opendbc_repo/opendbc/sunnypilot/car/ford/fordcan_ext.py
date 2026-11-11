@@ -371,6 +371,10 @@ def create_button_msg(packer, bus: int, stock_values: dict, cancel=False, resume
   })
 
   # ICBM button support — set the specified button signal to 1
+  # Don't replay a Set+/Set- the driver is holding (see fordcan.create_button_msg): only ICBM's own
+  # press goes out, so a cancel or resume frame can't be rejected for carrying one.
+  values["CcAslButtnSetIncPress"] = 0
+  values["CcAslButtnSetDecPress"] = 0
   if icbm_button is not None:
     values[icbm_button] = 1
 
