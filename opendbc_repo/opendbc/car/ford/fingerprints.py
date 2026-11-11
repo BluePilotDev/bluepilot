@@ -4,6 +4,21 @@ from opendbc.car.ford.values import CAR
 
 Ecu = CarParams.Ecu
 
+# The 2022 camera is shared with Expedition. Require the EPS and camera
+# to come from the same observed Navigator firmware pair.
+FW_VERSION_GROUPS = {
+  CAR.LINCOLN_NAVIGATOR_MK4: (
+    {
+      (Ecu.eps, 0x730, None): b'NL14-14D003-AE'.ljust(24, b'\x00'),
+      (Ecu.fwdCamera, 0x706, None): b'RJ6T-14H102-BAH'.ljust(24, b'\x00'),
+    },
+    {
+      (Ecu.eps, 0x730, None): b'NL14-14D003-AC'.ljust(24, b'\x00'),
+      (Ecu.fwdCamera, 0x706, None): b'ML3T-14H102-ABT'.ljust(24, b'\x00'),
+    },
+  ),
+}
+
 FW_VERSIONS = {
   CAR.FORD_BRONCO_SPORT_MK1: {
     (Ecu.eps, 0x730, None): [
@@ -102,6 +117,23 @@ FW_VERSIONS = {
       b'LB5T-14F397-AF\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00',
       b'LC5T-14F397-AE\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00',
       b'LC5T-14F397-AH\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00',
+    ],
+  },
+  CAR.LINCOLN_NAVIGATOR_MK4: {
+    (Ecu.eps, 0x730, None): [
+      b'NL14-14D003-AE\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00',  # Observed on 2023
+      b'NL14-14D003-AC\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00',  # Observed on 2022
+    ],
+    (Ecu.abs, 0x760, None): [
+      b'PL14-2D053-AB\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00',  # Observed on 2023
+      b'NL14-2D053-AE\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00',  # Observed on 2022
+    ],
+    (Ecu.fwdRadar, 0x764, None): [
+      b'ML3T-14D049-AL\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00',  # Observed on 2022 and 2023
+    ],
+    (Ecu.fwdCamera, 0x706, None): [
+      b'RJ6T-14H102-BAH\x00\x00\x00\x00\x00\x00\x00\x00\x00',  # Observed on 2023
+      b'ML3T-14H102-ABT\x00\x00\x00\x00\x00\x00\x00\x00\x00',  # Observed on 2022
     ],
   },
   CAR.FORD_EXPEDITION_MK4: {

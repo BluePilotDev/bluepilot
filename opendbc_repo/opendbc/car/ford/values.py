@@ -80,14 +80,19 @@ class FordCarDocs(CarDocs):
   def init_make(self, CP: CarParams):
     harness = CarHarness.ford_q4 if CP.flags & FordFlags.CANFD else CarHarness.ford_q3
     # BluePilot: device mount customization moved to sunnypilot/car/ford/values_ext.py::apply_bp_device_mount()
-    from opendbc.sunnypilot.car.ford.values_ext import apply_bp_device_mount
-    apply_bp_device_mount(self, CP)
+    if CP.carFingerprint == CAR.LINCOLN_NAVIGATOR_MK4:
+      self.car_parts = CarParts.common([harness])
+    else:
+      from opendbc.sunnypilot.car.ford.values_ext import apply_bp_device_mount
+      apply_bp_device_mount(self, CP)
 
     if harness == CarHarness.ford_q4:
       self.setup_video = "https://www.youtube.com/watch?v=uUGkH6C_EQU"
 
     if CP.carFingerprint in (CAR.FORD_F_150_MK14, CAR.FORD_F_150_LIGHTNING_MK1, CAR.FORD_EXPEDITION_MK4):
       self.setup_video = "https://www.youtube.com/watch?v=MewJc9LYp9M"
+    elif CP.carFingerprint == CAR.LINCOLN_NAVIGATOR_MK4:
+      self.setup_video = "https://www.youtube.com/watch?v=CZsjGJOTj8E"
 
 
 @dataclass
@@ -196,6 +201,11 @@ class CAR(Platforms):
     CarSpecs(mass=2000, wheelbase=3.69, steerRatio=17.0),
     # JK1 is the MAX; same platform here
     wmis={'1FM'}, vds_codes={'JU1', 'JU2', 'JK1'}, years={MY_2022, MY_2023, MY_2024},
+  )
+  LINCOLN_NAVIGATOR_MK4 = FordCANFDPlatformConfig(
+    [FordCarDocs("Lincoln Navigator 2022-23", "Lincoln Co-Pilot360 2.0")],
+    # Standard-wheelbase Navigator. The Navigator L has a longer wheelbase.
+    CarSpecs(mass=2742, wheelbase=3.1115, steerRatio=19.6),
   )
   FORD_F_150_MK14 = FordCANFDPlatformConfig(
     [FordCarDocs("Ford F-150 2021-23", "Co-Pilot360 Assist 2.0", hybrid=True)],
