@@ -130,10 +130,13 @@ class CarController(CarControllerBase, LateralCurvExt, LateralAngleExt, Longitud
       can_sends.append(fordcan.create_button_msg(self.packer, self.CAN.camera, CS.buttons_stock_values, tja_toggle=True))
 
     # BluePilot: Intelligent Cruise Button Management (ICBM)
-    icbm_can_sends, self.last_button_frame = IntelligentCruiseButtonManagementInterface.update(
-      self, CC_SP, CS, self.packer, self.CAN, self.frame, self.last_button_frame
-    )
-    can_sends.extend(icbm_can_sends)
+    # Only while cruise is engaged on both sides and no cancel/resume is going out: the button
+    # command comes from selfdrived a frame or more behind, so it can be stale across a disengage.
+    if CC.enabled and CS.out.cruiseState.enabled and not CC.cruiseControl.cancel and not CC.cruiseControl.resume:
+      icbm_can_sends, self.last_button_frame = IntelligentCruiseButtonManagementInterface.update(
+        self, CC_SP, CS, self.packer, self.CAN, self.frame, self.last_button_frame
+      )
+      can_sends.extend(icbm_can_sends)
 
     ### lateral control ###
     # BluePilot: keep stock lateral path in carcontroller, and run BP 4-signal lateral

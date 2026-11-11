@@ -123,31 +123,73 @@ class TestIcbmRaisesSetSpeed:
     assert icbm.v_target == target_mph
     assert buttons[-1] == SendButtonState.increase
 
-  @pytest.mark.parametrize("engage_mph, target_mph, guarded", [(25, 28, False), (25, 30, False), (25, 31, True), (25, 72, True)])
-  def test_engage_guard_holds_large_increases_for_the_first_seconds(self, engage_mph, target_mph, guarded):
-    from openpilot.sunnypilot.selfdrive.car.intelligent_cruise_button_management.controller import ENGAGE_GUARD_TIME
-    guard_frames = int(ENGAGE_GUARD_TIME * 100)
-    _, buttons = self._run(engage_mph, engage_mph, target_mph, frames=guard_frames + 100)
-    early, late = buttons[:guard_frames - 5], buttons[guard_frames + 60:]
-    assert (SendButtonState.increase not in early) == guarded
-    assert set(late) == {SendButtonState.increase}
-
-  def test_engage_guard_restarts_on_re_engage(self):
+  def _controller(self):
+    from openpilot.sunnypilot.selfdrive.car.intelligent_cruise_button_management import controller
     CI, _ = _setup(FORD.FORD_EXPEDITION_MK4, op_long=True, icbm=True)
-    icbm = IntelligentCruiseButtonManagement(CI.CP, CI.CP_SP)
-    lp_sp = _Obj(vTarget=72 * CV.MPH_TO_MS)
-    off = _Obj(vEgo=25 * CV.MPH_TO_MS, buttonEvents=[], cruiseState=_Obj(available=True, enabled=False, speedCluster=25 * CV.MPH_TO_MS))
-    cc_off = _Obj(enabled=False, cruiseControl=_Obj(override=False, cancel=False, resume=False))
-    for _ in range(500):
-      icbm.run(_cs(25, 25), _CC, lp_sp, False)
+    return IntelligentCruiseButtonManagement(CI.CP, CI.CP_SP), int(controller.ENGAGE_GUARD_TIME * 100)
+
+  @pytest.mark.parametrize("engage_mph, target_mph, capped_at", [(25, 28, 28), (25, 30, 30), (25, 31, 30), (25, 72, 30), (0, 40, 5)])
+  def test_engage_guard_caps_the_target_then_lifts(self, engage_mph, target_mph, capped_at):
+    icbm, guard_frames = self._controller()
+    lp_sp = _Obj(vTarget=target_mph * CV.MPH_TO_MS)
+    cluster = max(engage_mph, 1)
+    for _ in range(guard_frames - 1):
+      icbm.run(_cs(engage_mph, cluster), _CC, lp_sp, False)
+      assert icbm.v_target <= capped_at
+    assert icbm.v_target == capped_at
+    for _ in range(100):
+      icbm.run(_cs(engage_mph, cluster), _CC, lp_sp, False)
+    assert icbm.v_target == target_mph
     assert icbm.cruise_button == SendButtonState.increase
-    for _ in range(10):
-      icbm.run(off, cc_off, lp_sp, False)
-    buttons = []
-    for _ in range(200):
+
+  def test_engage_guard_survives_carcontrol_enabling_late(self):
+    # the PCM reports engaged before carControl.enabled follows; the guard must still be running after
+    icbm, guard_frames = self._controller()
+    lp_sp = _Obj(vTarget=72 * CV.MPH_TO_MS)
+    cc_late = _Obj(enabled=False, cruiseControl=_Obj(override=False, cancel=False, resume=False))
+    for _ in range(20):
+      icbm.run(_cs(25, 25), cc_late, lp_sp, False)
+      assert icbm.cruise_button == SendButtonState.none
+    for _ in range(guard_frames - 30):
       icbm.run(_cs(25, 25), _CC, lp_sp, False)
+      assert icbm.v_target == 30
+
+  def test_engage_guard_holds_a_target_that_jumps_mid_ramp(self):
+    icbm, _ = self._controller()
+    for _ in range(100):
+      icbm.run(_cs(25, 25), _CC, _Obj(vTarget=28 * CV.MPH_TO_MS), False)
+    assert icbm.cruise_button == SendButtonState.increase
+    for _ in range(50):
+      icbm.run(_cs(25, 27), _CC, _Obj(vTarget=72 * CV.MPH_TO_MS), False)
+      assert icbm.v_target == 30
+
+  def test_engage_guard_never_lowers_a_higher_cluster(self):
+    # resumed to a 65 mph set speed while doing 30: the guard must not walk the cluster down to 35
+    icbm, guard_frames = self._controller()
+    buttons = []
+    for _ in range(guard_frames + 100):
+      icbm.run(_cs(30, 65), _CC, _Obj(vTarget=65 * CV.MPH_TO_MS), False)
       buttons.append(icbm.cruise_button)
-    assert SendButtonState.increase not in buttons
+    assert set(buttons) == {SendButtonState.none}
+
+  def test_engage_guard_survives_override_and_restarts_on_re_engage(self):
+    icbm, guard_frames = self._controller()
+    lp_sp = _Obj(vTarget=72 * CV.MPH_TO_MS)
+    cc_override = _Obj(enabled=True, cruiseControl=_Obj(override=True, cancel=False, resume=False))
+    for _ in range(50):
+      icbm.run(_cs(25, 25), _CC, lp_sp, False)
+    for _ in range(50):
+      icbm.run(_cs(25, 25), cc_override, lp_sp, False)   # gas pedal: not an engagement change
+      assert icbm.v_target == 30
+    for _ in range(guard_frames):
+      icbm.run(_cs(25, 25), _CC, lp_sp, False)
+    assert icbm.v_target == 72
+    off = _Obj(vEgo=25 * CV.MPH_TO_MS, buttonEvents=[], cruiseState=_Obj(available=True, enabled=False, speedCluster=25 * CV.MPH_TO_MS))
+    for _ in range(10):
+      icbm.run(off, _Obj(enabled=False, cruiseControl=_Obj(override=False, cancel=False, resume=False)), lp_sp, False)
+    for _ in range(100):
+      icbm.run(_cs(25, 25), _CC, lp_sp, False)
+      assert icbm.v_target == 30
 
   def test_decrease(self):
     _, buttons = self._run(45, 45, 30)
@@ -158,10 +200,11 @@ class TestIcbmRaisesSetSpeed:
     assert set(buttons) == {SendButtonState.none}
 
   @pytest.mark.parametrize("bad_target_mph", [0, 90, 200])
-  def test_invalid_target_falls_back_to_engagement_speed_in_cluster_units(self, bad_target_mph):
-    # 25 mph is 40 km/h: the fallback must be 25 on an mph cluster, not 40
-    icbm, buttons = self._run(25, 25, bad_target_mph)
-    assert icbm.v_target == 25
+  @pytest.mark.parametrize("engage_mph, cluster_mph", [(25, 25), (30, 70)])
+  def test_invalid_target_holds_the_cluster(self, bad_target_mph, engage_mph, cluster_mph):
+    # no presses either way: not up to a bogus target, and not down to the engagement speed
+    icbm, buttons = self._run(engage_mph, cluster_mph, bad_target_mph)
+    assert icbm.v_target == cluster_mph
     assert set(buttons) == {SendButtonState.none}
 
   def test_no_increase_from_unset_cluster(self):
@@ -296,3 +339,14 @@ class TestSignToClusterChain:
       assert state in ACTIVE_STATES, log
       assert set_speed_mph == limit_mph, log    # openpilot's set speed is the limit, not 70/80
       assert cluster_mph == limit_mph, log      # and the truck's cluster was walked to it
+
+
+class TestMinimumSetSpeedUnits:
+  def test_imperial_minimum_is_20_mph_in_kph(self):
+    from openpilot.selfdrive.car.cruise import VCruiseHelper
+    CI, _ = _setup(FORD.FORD_EXPEDITION_MK4, op_long=True, icbm=True)
+    helper = VCruiseHelper(CI.CP, CI.CP_SP)
+    helper.get_minimum_set_speed(False)
+    assert helper.v_cruise_min == pytest.approx(20 * CV.MPH_TO_KPH)
+    helper.get_minimum_set_speed(True)
+    assert helper.v_cruise_min == 30

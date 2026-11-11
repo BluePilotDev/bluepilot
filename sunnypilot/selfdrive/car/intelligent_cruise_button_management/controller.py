@@ -71,6 +71,11 @@ class IntelligentCruiseButtonManagement:
       # units as v_target and v_cruise_cluster (it used to be stored in km/h and compared to mph)
       self.initial_cruise_speed = round(CS.vEgo * speed_conv)
       self.engage_guard_timer = int(ENGAGE_GUARD_TIME / DT_CTRL)
+    elif not cruise_enabled:
+      # Only the PCM actually dropping cruise ends an engagement. carControl.enabled lags the PCM
+      # by a few frames at engagement, and override/resume are temporary, so none of those reset this.
+      self.initial_cruise_speed = 0
+      self.engage_guard_timer = 0
     else:
       self.engage_guard_timer = max(0, self.engage_guard_timer - 1)
     self.cruise_enabled_prev = cruise_enabled
@@ -80,16 +85,19 @@ class IntelligentCruiseButtonManagement:
     self.v_target = round(self.v_target_ms_last * speed_conv)
     self.v_cruise_min = get_minimum_set_speed(self.is_metric)
     self.v_cruise_cluster = round(CS.cruiseState.speedCluster * speed_conv)
-    
-    # BluePilot: If planner target is invalid/unreasonable and we have an initial cruise speed,
-    # use the initial speed as the target (or cluster speed if it's been set)
+
+    # BluePilot: a target of 0, or at the top of the range (an unset set speed is clipped to it),
+    # is not something to chase. Hold the cluster where it is: no presses either way.
     MAX_REASONABLE_TARGET = 145 if self.is_metric else 90
     if self.v_target >= MAX_REASONABLE_TARGET or self.v_target == 0:
-      # Planner target is invalid - use initial cruise speed or cluster speed
-      if self.initial_cruise_speed > 0:
-        self.v_target = self.initial_cruise_speed
-      elif self.v_cruise_cluster > 0:
-        self.v_target = self.v_cruise_cluster
+      self.v_target = self.v_cruise_cluster
+
+    # BluePilot: engage guard. For ENGAGE_GUARD_TIME after the PCM engages, the target is capped at
+    # ENGAGE_GUARD_MAX_INCREASE above the engagement speed. Capping the target (not just the entry
+    # into "increasing") means a target that jumps mid-ramp is held too. The cap never drops below
+    # the current cluster speed, so the guard can't cause a decrease by itself.
+    if self.engage_guard_timer > 0:
+      self.v_target = min(self.v_target, max(self.initial_cruise_speed + ENGAGE_GUARD_MAX_INCREASE, self.v_cruise_cluster))
 
   def update_state_machine(self) -> custom.IntelligentCruiseButtonManagement.SendButtonState:
     self.pre_active_timer = max(0, self.pre_active_timer - 1)
@@ -110,14 +118,8 @@ class IntelligentCruiseButtonManagement:
               # BluePilot: Prevent ICBM from increasing speed when cruise is first enabled
               # If cluster speed is 0 or very low, don't increase - wait for user to set initial speed
               # Also cap target to reasonable maximum (145 kph / 90 mph)
-              # For the first ENGAGE_GUARD_TIME after cruise is enabled, don't increase more than
-              # ENGAGE_GUARD_MAX_INCREASE above the engagement speed. After that the cap is lifted, so
-              # a higher speed limit or the driver's own set speed can be followed.
-              MAX_REASONABLE_TARGET = 145 if self.is_metric else 90
-              engage_guard = self.engage_guard_timer > 0 and self.initial_cruise_speed > 0 and \
-                             self.v_target > (self.initial_cruise_speed + ENGAGE_GUARD_MAX_INCREASE)
-
-              if self.v_cruise_cluster == 0 or self.v_target >= MAX_REASONABLE_TARGET or engage_guard:
+              # (the engage guard and invalid targets are handled in update_calculations)
+              if self.v_cruise_cluster == 0:
                 # Don't increase - stay in preActive or go to holding
                 self.state = State.holding
               else:
@@ -162,10 +164,6 @@ class IntelligentCruiseButtonManagement:
     if not ready:
       for k in self.cruise_button_timers:
         self.cruise_button_timers[k] = 0
-      # BluePilot: Reset initial cruise speed when cruise is disabled
-      # This ensures we capture a fresh initial speed when cruise is re-enabled
-      self.initial_cruise_speed = 0
-      self.engage_guard_timer = 0
 
     self.is_ready = ready and not button_pressed
 

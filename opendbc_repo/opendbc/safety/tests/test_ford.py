@@ -454,6 +454,15 @@ class TestFordSafetyBase(common.CarSafetyTest):
     self.safety.set_controls_allowed(0)
     self.assertFalse(self._tx(self._lkas_command_msg(1)))
 
+  def test_icbm_set_buttons_need_controls_allowed(self):
+    # BluePilot: ICBM's Set+/Set- presses are only sent while controls are allowed
+    for signal in ("CcAslButtnSetIncPress", "CcAslButtnSetDecPress"):
+      for controls_allowed in (True, False):
+        self.safety.set_controls_allowed(controls_allowed)
+        for bus in (0, 2):
+          msg = self.packer.make_can_msg_safety("Steering_Data_FD1", bus, {signal: 1})
+          self.assertEqual(controls_allowed, self._tx(msg), (signal, controls_allowed, bus))
+
   def test_acc_buttons(self):
     for allowed in (0, 1):
       self.safety.set_controls_allowed(allowed)
