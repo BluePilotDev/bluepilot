@@ -9,7 +9,7 @@ from opendbc.car.car_helpers import interfaces
 from opendbc.car.structs import CarParams
 from opendbc.car.fingerprints import FW_VERSIONS
 from opendbc.car.fw_versions import FW_QUERY_CONFIGS, FUZZY_EXCLUDE_ECUS, VERSIONS, build_fw_dict, \
-                                    match_fw_to_car, get_brand_ecu_matches, get_fw_versions, get_present_ecus
+                                    FW_VERSION_GROUPS, match_fw_to_car, get_brand_ecu_matches, get_fw_versions, get_present_ecus
 from opendbc.car.vin import get_vin
 from opendbc.testing import parameterized
 
@@ -32,6 +32,7 @@ class TestFwFingerprint(unittest.TestCase):
     CP = CarParams()
     for _ in range(20):
       fw = []
+      group = random.choice(FW_VERSION_GROUPS.get(car_model, ({},)))
       for ecu, fw_versions in ecus.items():
         # Assume non-essential ECUs apply to all cars, so we catch cases where Car A with
         # missing ECUs won't match to Car B where only Car B has labeled non-essential ECUs
@@ -39,7 +40,8 @@ class TestFwFingerprint(unittest.TestCase):
           continue
 
         ecu_name, addr, sub_addr = ecu
-        fw.append(CarFw(ecu=ecu_name, fwVersion=random.choice(fw_versions), brand=brand,
+        version = group[ecu] if ecu in group else random.choice(fw_versions)
+        fw.append(CarFw(ecu=ecu_name, fwVersion=version, brand=brand,
                         address=addr, subAddress=0 if sub_addr is None else sub_addr))
       CP.carFw = fw
       _, matches = match_fw_to_car(CP.carFw, CP.carVin, allow_fuzzy=False)
