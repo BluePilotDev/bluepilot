@@ -9,14 +9,30 @@ from openpilot.common.bluepilot import is_bluepilot
 ROOT = Path(BASEDIR)
 BLUEPILOT_DIRS = ("bluepilot", "openpilot/selfdrive/ui/bp")
 
-# upstream modules whose BluePilot imports sit behind is_bluepilot() at module level
+# upstream modules with is_bluepilot() checks; most hold BluePilot imports behind it at module level
 GATED = (
   "openpilot.selfdrive.car.card",
+  "openpilot.selfdrive.car.cruise",
+  "openpilot.selfdrive.controls.lib.desire_helper",
   "openpilot.system.manager.process_config",
+  "openpilot.selfdrive.ui.ui_state",
   "openpilot.selfdrive.ui.layouts.main",
+  "openpilot.selfdrive.ui.mici.layouts.main",
+  "openpilot.selfdrive.ui.sunnypilot.layouts.settings.settings",
+  "openpilot.selfdrive.ui.sunnypilot.mici.layouts.settings",
+  "openpilot.system.ui.lib.wifi_manager",
 )
 # BluePilot's build wrapper: launch_chffrplus.sh falls back to the stock build when it can't import
 OTHER = ("openpilot.system.manager.bp_build",)
+# BluePilot imports that upstream files make inside functions: (module, name)
+FUNCTION_IMPORTS = (
+  ("openpilot.bluepilot.system.ui.lib.bp_wifi", "SUPPORTS_WPA_EXTENDED"),  # wifi_manager
+  ("openpilot.selfdrive.ui.bp.lib.wifi_favorite", "WifiFavoriteManager"),  # wifi_manager
+  ("openpilot.selfdrive.ui.bp.widgets.platform_selector_bp", "PlatformSelectorBP"),  # vehicle settings
+  ("openpilot.selfdrive.ui.bp.widgets.platform_selector_bp", "LegendWidgetBP"),  # vehicle settings
+  ("bluepilot.backend_switch", "get_connect_backend"),  # pairing dialogs
+  ("bluepilot.backend_switch", "pairing_host"),  # pairing dialogs
+)
 
 
 def bluepilot_modules() -> list[str]:
@@ -42,6 +58,9 @@ class TestBluePilotImports(unittest.TestCase):
     for name in modules + list(GATED) + list(OTHER):
       with self.subTest(module=name):
         importlib.import_module(name)
+    for module, name in FUNCTION_IMPORTS:
+      with self.subTest(module=module, name=name):
+        self.assertTrue(hasattr(importlib.import_module(module), name))
 
 
 if __name__ == "__main__":
