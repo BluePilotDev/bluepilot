@@ -16,9 +16,14 @@ def interface(mode=1, braking=False):
   cp = NS(vl={'EngBrakeData': {'CcMde_D_Actl': mode, 'CcOvrrdActv_B_Actl': 0},
               'DesiredTorqBrk': {'AccBrkActv_B_Actl': braking}},
           ts_nanos={'EngBrakeData': {'CcMde_D_Actl': NOW}, 'DesiredTorqBrk': {'AccBrkActv_B_Actl': NOW}})
+  camera = NS(vl={'ACCDATA': {'AccPrpl_A_Rq': 1.5 if mode == 2 else -5,
+                            'AccBrkTot_A_Rq': -2.0 if braking or mode == 3 else 0,
+                            'AccBrkDecel_B_Rq': braking}},
+              ts_nanos={'ACCDATA': {'AccPrpl_A_Rq': NOW}})
+  cp.ts_nanos['EngBrakeData']['CcOvrrdActv_B_Actl'] = NOW
   cs = NS(cruiseState=NS(enabled=True), gasPressed=False, brakePressed=False)
   return NS(CP=NS(brand='ford', openpilotLongitudinalControl=False),
-            CS=NS(out=cs, car_state_bp_msg=messaging.new_message('carStateBP')), can_parsers={Bus.pt: cp})
+            CS=NS(out=cs, car_state_bp_msg=messaging.new_message('carStateBP')), can_parsers={Bus.pt: cp, Bus.cam: camera})
 
 
 @pytest.mark.parametrize('mode,braking,expected', [(1, False, 0), (2, False, 1), (3, False, -1), (2, True, -1)])
@@ -42,7 +47,7 @@ def test_no_feedback_without_fresh_unoverridden_stock_acc(condition):
   if condition == 'override':
     ci.can_parsers[Bus.pt].vl['EngBrakeData']['CcOvrrdActv_B_Actl'] = 1
   if condition == 'stale':
-    ci.can_parsers[Bus.pt].ts_nanos['EngBrakeData']['CcMde_D_Actl'] -= 600_000_000
+    ci.can_parsers[Bus.pt].ts_nanos['EngBrakeData']['CcOvrrdActv_B_Actl'] -= 600_000_000
   if condition == 'missing':
     ci.can_parsers.clear()
   assert ford_acc_feedback(ci, condition != 'invalid', NOW) == (False, 0)
@@ -103,6 +108,10 @@ def test_real_ford_dbc_decode():
                        packer.make_can_msg('DesiredTorqBrk', 0, {'AccBrkActv_B_Actl': 1})]]])
   ci = interface()
   ci.can_parsers[Bus.pt] = parser
+  camera = CANParser('ford_lincoln_base_pt', [('ACCDATA', 50)], 2)
+  camera.update([[NOW, [packer.make_can_msg('ACCDATA', 2,
+    {'AccPrpl_A_Rq': 1.5, 'AccBrkTot_A_Rq': -2.0, 'AccBrkDecel_B_Rq': 1})]]])
+  ci.can_parsers[Bus.cam] = camera
   assert ford_acc_feedback(ci, True, NOW) == (True, -1.0)
 
 
@@ -126,7 +135,7 @@ def test_overlay_preserves_base_and_handles_startup_without_carparams(monkeypatc
   draw_ford_acc_feedback(renderer, messages(-1), points)
   assert len(calls) == 1
   assert calls[0][1]['gradient']['colors'][0][:3] == (235, 85, 40)
-  assert 0 < calls[0][1]['gradient']['colors'][0][3] <= 65
+  assert 0 < calls[0][1]['gradient']['colors'][0][3] <= 155
   np.testing.assert_array_equal(points, original)
 
 
@@ -136,3 +145,24 @@ def test_registered_param_defaults_off_and_can_be_enabled():
   assert not params.get_bool('BPFordACCPathFeedback')
   params.put_bool('BPFordACCPathFeedback', True, block=True)
   assert params.get_bool('BPFordACCPathFeedback')
+
+
+@pytest.mark.parametrize('propulsion,braking,brake_request,expected', [
+  (-5.0, 0.0, False, 0.0),  # inactive propulsion sentinel is not braking
+  (0.05, -0.05, False, 0.0),
+  (0.75, 0.0, False, 0.5),
+  (1.5, -1.0, True, -0.5),
+  (-5.0, 0.0, True, -0.35),
+])
+def test_actual_requests_work_even_when_generic_cruise_mode_is_keeping_speed(propulsion, braking, brake_request, expected):
+  ci = interface(mode=1)
+  ci.can_parsers[Bus.cam].vl['ACCDATA'].update(
+    AccPrpl_A_Rq=propulsion, AccBrkTot_A_Rq=braking, AccBrkDecel_B_Rq=brake_request,
+  )
+  assert ford_acc_feedback(ci, True, NOW) == (True, expected)
+
+
+def test_stale_camera_request_is_rejected():
+  ci = interface(2)
+  ci.can_parsers[Bus.cam].ts_nanos['ACCDATA']['AccPrpl_A_Rq'] -= 600_000_000
+  assert ford_acc_feedback(ci, True, NOW) == (False, 0)

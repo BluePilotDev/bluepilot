@@ -4,8 +4,10 @@ BluePilot → Visuals → **Ford ACC Path Feedback** (`BPFordACCPathFeedback`, d
 
 Description: Model path changes shading and color for Ford ACC accel / brake signals
 
-The selected path is drawn first, then receives a low-opacity green/cyan tint for
-acceleration or orange/red tint for deceleration/braking. A 250 ms transition
+The selected path is drawn first, then receives a green/cyan tint for
+acceleration or orange/red tint for deceleration/braking. Opacity scales with
+request magnitude, reaching 49% for acceleration and 61% for braking at the near
+end, with a depth fade toward the horizon. A 250 ms transition
 avoids abrupt changes. Neutral cruise mode returns to the selected path colors.
 Rainbow animation and all base path gradients are retained. Tesla's existing
 geometry visibility also applies to the tint. Rad Racer's dashed road is excluded
@@ -13,10 +15,12 @@ because it has no filled model path to shade.
 
 This is read-only telemetry from the existing Ford powertrain CAN parser:
 
-- `EngBrakeData.CcMde_D_Actl`: 2 accelerating, 3 decelerating.
-- `DesiredTorqBrk.AccBrkActv_B_Actl`: ACC brake activity takes priority.
+- Camera bus `ACCDATA.AccPrpl_A_Rq`: positive propulsion demand.
+- Camera bus `ACCDATA.AccBrkTot_A_Rq`: negative acceleration demand.
+- `ACCDATA.AccBrkDecel_B_Rq`: braking request takes priority.
 
-These are operating states, not a continuous acceleration-demand magnitude.
+The inactive propulsion sentinel (-5) is ignored. A small deadband keeps
+near-zero requests neutral. Feedback magnitude is bounded to [-1, 1].
 Vehicle acceleration and model predictions are not substituted for Ford signals.
 The feedback requires valid CAN, both messages received within 500 ms, stock
 cruise enabled, and no driver pedal/cruise override. It is disabled whenever

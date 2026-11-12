@@ -1,4 +1,4 @@
-"""Subtle additive path feedback; the selected base shader/gradient stays intact."""
+"""Blended path feedback; the selected base shader/gradient stays intact."""
 
 import math
 import time
@@ -45,8 +45,8 @@ def draw_ford_acc_feedback(renderer, sm, points, opacity=1.0):
   if abs(value) < 0.01 or not points.size or renderer._rad_racer:
     return
   rgb = (235, 85, 40) if value < 0 else (95, 235, 175)
-  alpha = int(65 * abs(value) * max(0.0, min(1.0, opacity)))
+  alpha = int((155 if value < 0 else 125) * abs(value) * max(0.0, min(1.0, opacity)))
   draw_polygon(renderer._rect, points, gradient=Gradient(
     start=(0.0, 1.0), end=(0.0, 0.0),
-    colors=[rl.Color(*rgb, alpha), rl.Color(*rgb, alpha // 2), rl.Color(*rgb, 0)], stops=[0.0, 0.55, 1.0],
+    colors=[rl.Color(*rgb, alpha), rl.Color(*rgb, int(alpha * 0.8)), rl.Color(*rgb, 0)], stops=[0.0, 0.55, 1.0],
   ))
