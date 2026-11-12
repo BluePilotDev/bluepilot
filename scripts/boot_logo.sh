@@ -95,14 +95,14 @@ readonly BOOT_IMG_BKP="${BOOT_IMG}.backup"
 
 # Select the appropriate boot image based on device type
 if [ "$DEVICE_TYPE" = "mici" ]; then
-    readonly BLUEPILOT_BOOT_IMG="/data/openpilot/selfdrive/assets/img_bluepilot_boot_mici.jpg"
+    readonly BLUEPILOT_BOOT_IMG="/data/openpilot/openpilot/selfdrive/assets/img_bluepilot_boot_mici.jpg"
 else
-    readonly BLUEPILOT_BOOT_IMG="/data/openpilot/selfdrive/assets/img_bluepilot_boot.jpg"
+    readonly BLUEPILOT_BOOT_IMG="/data/openpilot/openpilot/selfdrive/assets/img_bluepilot_boot.jpg"
 fi
 
 # Spinner logo (loading screen): source stored outside LFS; dest is what spinner.py loads
-readonly BLUEPILOT_SPINNER_SRC="/data/openpilot/selfdrive/assets/images/spinner_bluepilot.png"
-readonly SPINNER_DEST="/data/openpilot/sunnypilot/selfdrive/assets/images/spinner_sunnypilot.png"
+readonly BLUEPILOT_SPINNER_SRC="/data/openpilot/openpilot/selfdrive/assets/images/spinner_bluepilot.png"
+readonly SPINNER_DEST="/data/openpilot/openpilot/sunnypilot/selfdrive/assets/images/spinner_sunnypilot.png"
 
 ###############################################################################
 # Partition Management Functions
