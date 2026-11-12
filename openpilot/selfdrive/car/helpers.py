@@ -35,7 +35,7 @@ def asdictref(obj) -> dict[str, Any]:
   return _asdictref_inner(obj)
 
 
-# BluePilot: also takes a ControllerStateBP; not named in the hint because opendbc's structs don't have it
+# BluePilot: ControllerStateBP isn't in opendbc's structs, so its branch below can't be used until the publisher is rebuilt (chunk B)
 def convert_to_capnp(struct: structs.CarParamsSP | structs.CarStateSP) -> capnp.lib.capnp._DynamicStructBuilder:
   struct_dict = asdictref(struct)
 
