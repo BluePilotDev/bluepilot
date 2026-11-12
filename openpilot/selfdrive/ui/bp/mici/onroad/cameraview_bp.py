@@ -1,6 +1,6 @@
 import pyray as rl
 
-from msgq.visionipc import VisionStreamType
+from openpilot.cereal.visionipc import VisionStreamType
 from openpilot.common.params import Params
 from openpilot.selfdrive.ui.mici.onroad.cameraview import CameraView as MiciCameraView
 from openpilot.selfdrive.ui.ui_state import ui_state
@@ -31,7 +31,7 @@ class MiciCameraViewBP(MiciCameraView):
     return (
       (self._bp_hide_camera_view or self._bp_rad_racer_theme) and
       ui_state.is_onroad() and
-      self._stream_type != VisionStreamType.VISION_STREAM_DRIVER
+      self._stream_type != VisionStreamType.VISION_STREAM_CABIN
     )
 
   def _render(self, rect: rl.Rectangle):
