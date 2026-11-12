@@ -15,8 +15,7 @@ from openpilot.system.ui.lib.multilang import tr
 from openpilot.selfdrive.ui.ui_state import ui_state
 
 try:
-  import qrcode
-  import numpy as np
+  from openpilot.common import qrcode
   _HAS_QR = True
 except ImportError:
   _HAS_QR = False
@@ -92,20 +91,9 @@ class _QRCodeSection(Widget):
       return
     self._last_url = url
     try:
-      qr = qrcode.QRCode(version=1, error_correction=qrcode.constants.ERROR_CORRECT_L, box_size=10, border=4)
-      qr.add_data(url)
-      qr.make(fit=True)
-      pil_img = qr.make_image(fill_color="black", back_color="white").convert('RGBA')
-      img_array = np.array(pil_img, dtype=np.uint8)
       if self._qr_texture and self._qr_texture.id != 0:
         rl.unload_texture(self._qr_texture)
-      rl_image = rl.Image()
-      rl_image.data = rl.ffi.cast("void *", img_array.ctypes.data)
-      rl_image.width = pil_img.width
-      rl_image.height = pil_img.height
-      rl_image.mipmaps = 1
-      rl_image.format = rl.PixelFormat.PIXELFORMAT_UNCOMPRESSED_R8G8B8A8
-      self._qr_texture = rl.load_texture_from_image(rl_image)
+      self._qr_texture = qrcode.make_texture(url)
     except Exception as e:
       cloudlog.warning(f"QR code generation failed: {e}")
       self._qr_texture = None
