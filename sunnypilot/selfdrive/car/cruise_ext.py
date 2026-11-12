@@ -89,7 +89,9 @@ class VCruiseHelperSP:
       self.v_cruise_min = V_CRUISE_MIN
       return
 
-    self.v_cruise_min = get_minimum_set_speed(is_metric)
+    # the helper returns cluster units (30 km/h or 20 mph); v_cruise_min is km/h
+    v_cruise_min = get_minimum_set_speed(is_metric)
+    self.v_cruise_min = v_cruise_min if is_metric else v_cruise_min * CV.MPH_TO_KPH
 
   def update_enabled_state(self, CS: car.CarState, enabled: bool) -> bool:
     # special enabled state for non pcmCruiseSpeed, unchanged for non pcmCruise

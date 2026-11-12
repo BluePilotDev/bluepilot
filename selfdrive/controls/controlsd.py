@@ -130,7 +130,13 @@ class Controls(ControlsExt):
       self.LoC.reset()
 
     # accel PID loop
-    pid_accel_limits = self.CI.get_pid_accel_limits(self.CP, self.CP_SP, CS.vEgo, CS.vCruise * CV.KPH_TO_MS)
+    cruise_speed = CS.vCruise * CV.KPH_TO_MS
+    if self.CP.openpilotLongitudinalControl and self.CP.pcmCruise and not self.CP_SP.pcmCruiseSpeed and CS.cruiseState.speed > 0:
+      # BluePilot: with ICBM managing the PCM set speed under openpilot longitudinal, vCruise is openpilot's
+      # own set speed and the PCM's can lag it while buttons are pressed. The limits guard against the
+      # PCM's ceiling, so use whichever is lower.
+      cruise_speed = min(cruise_speed, CS.cruiseState.speed)
+    pid_accel_limits = self.CI.get_pid_accel_limits(self.CP, self.CP_SP, CS.vEgo, cruise_speed)
     actuators.accel = float(self.LoC.update(CC.longActive, CS, long_plan.aTarget, long_plan.shouldStop, pid_accel_limits))
 
     # Steering PID loop and lateral MPC
