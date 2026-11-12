@@ -122,9 +122,9 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
     if ui_state.rainbow_path or self._rainbow_lane_lines:
       self._rainbow_v = np.clip(sm['carState'].vEgo, 2.5, 35) / 30
 
-    if (sm.recv_frame["liveCalibration"] < ui_state.started_frame or
+    if (sm.recv_frame["extrinsicsCalibration"] < ui_state.started_frame or
         sm.recv_frame["modelV2"] < ui_state.started_frame):
-      bp_ui_log.visibility("ModelRenderer", False, reason=f"stale calib={sm.recv_frame['liveCalibration']} model={sm.recv_frame['modelV2']} started={ui_state.started_frame}")
+      bp_ui_log.visibility("ModelRenderer", False, reason=f"stale calib={sm.recv_frame['extrinsicsCalibration']} model={sm.recv_frame['modelV2']} started={ui_state.started_frame}")
       return
 
     bp_ui_log.state("ModelRenderer", "render_active", True)
@@ -135,7 +135,7 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
 
     self._experimental_mode = sm['selfdriveState'].experimentalMode
 
-    live_calib = sm['liveCalibration']
+    live_calib = sm['extrinsicsCalibration']
     from openpilot.selfdrive.locationd.calibrationd import HEIGHT_INIT
     self._path_offset_z = live_calib.height[0] if live_calib.height else HEIGHT_INIT[0]
 
@@ -185,7 +185,7 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
       self._dash_phase = (self._dash_phase + max(0.0, v_ego) / gui_app.target_fps) % period
 
     self._draw_lane_lines()
-    self._draw_path(sm)
+    self._draw_path()
 
     # BluePilot: In Rad Racer theme, leads are drawn as sprites by RadRacerTheme
     if render_lead_indicator and radar_state and not self._rad_racer:
@@ -509,7 +509,7 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
 
     return (points + normal * (width * scales)[:, None]).astype(np.float32)
 
-  def _draw_path(self, sm):
+  def _draw_path(self):
     """Draw path with status-colored edges."""
     # BluePilot: Rad Racer theme draws the path as a dashed center line in _draw_rad_racer_road
     if self._rad_racer:
@@ -521,7 +521,7 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
       # BluePilot: theme pack path colors replace the throttle/no-throttle gradient
       draw_polygon(self._rect, self._path.projected_points, gradient=themed_gradient)
     else:
-      super()._draw_path(sm)
+      super()._draw_path()
 
     self._draw_path_edges()
 
