@@ -15,6 +15,8 @@ GATED = (
   "openpilot.system.manager.process_config",
   "openpilot.selfdrive.ui.layouts.main",
 )
+# BluePilot's build wrapper: launch_chffrplus.sh falls back to the stock build when it can't import
+OTHER = ("openpilot.system.manager.bp_build",)
 
 
 def bluepilot_modules() -> list[str]:
@@ -37,7 +39,7 @@ class TestBluePilotImports(unittest.TestCase):
   def test_every_bluepilot_module_imports(self):
     modules = bluepilot_modules()
     self.assertGreater(len(modules), 100)
-    for name in modules + list(GATED):
+    for name in modules + list(GATED) + list(OTHER):
       with self.subTest(module=name):
         importlib.import_module(name)
 

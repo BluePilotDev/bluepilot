@@ -11,7 +11,7 @@ import subprocess
 # NOTE: Do NOT import anything here that needs be built (e.g. params)
 from openpilot.common.basedir import BASEDIR
 from openpilot.common.bp_spinner import BPSpinner
-from openpilot.system.hardware import HARDWARE, AGNOS
+from openpilot.common.hardware import HARDWARE, AGNOS
 
 # See build.py for the rationale — re-sync the venv whenever the checked-out uv.lock changes.
 UV_LOCK = os.path.join(BASEDIR, "uv.lock")
