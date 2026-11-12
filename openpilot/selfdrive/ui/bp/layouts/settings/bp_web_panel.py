@@ -14,11 +14,7 @@ from openpilot.system.ui.widgets.list_view import toggle_item
 from openpilot.system.ui.lib.multilang import tr
 from openpilot.selfdrive.ui.ui_state import ui_state
 
-try:
-  from openpilot.common import qrcode
-  _HAS_QR = True
-except ImportError:
-  _HAS_QR = False
+from openpilot.common import qrcode
 
 
 PADDING = 30
@@ -81,8 +77,6 @@ class _QRCodeSection(Widget):
 
   def _generate_qr(self):
     """Generate QR code texture from server URL."""
-    if not _HAS_QR:
-      return
     url = self.get_server_url()
     if not url:
       self._qr_texture = None
