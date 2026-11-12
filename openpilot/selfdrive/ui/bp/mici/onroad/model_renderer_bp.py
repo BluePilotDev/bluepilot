@@ -1,7 +1,7 @@
 import numpy as np
 import pyray as rl
 from openpilot.common.params import Params
-from openpilot.selfdrive.ui.mici.onroad.model_renderer import ModelRenderer, THROTTLE_COLORS, NO_THROTTLE_COLORS, CLIP_MARGIN
+from openpilot.selfdrive.ui.mici.onroad.model_renderer import ModelRenderer, CLIP_MARGIN
 from openpilot.selfdrive.ui.ui_state import ui_state, UIStatus
 from openpilot.system.ui.lib.application import gui_app
 from openpilot.system.ui.lib.shader_polygon import draw_polygon, Gradient
