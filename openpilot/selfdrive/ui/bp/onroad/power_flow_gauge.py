@@ -15,7 +15,7 @@ from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.system.ui.lib.application import FontWeight, gui_app
 from openpilot.system.ui.lib.text_measure import measure_text_cached
 from openpilot.system.ui.widgets import Widget
-from opendbc.sunnypilot.car.ford.carstate_ext import get_hev_engine_on_reason_text, get_hev_power_flow_text
+from openpilot.selfdrive.ui.bp.lib.hev_text import hev_engine_on_reason_text, hev_power_flow_text
 from openpilot.selfdrive.ui.bp.lib.ui_debug_logger import bp_ui_log
 
 # --- Size presets (width_ratio, height) for each gauge_scale ---
@@ -115,7 +115,7 @@ class PowerFlowGauge(Widget):
       self._power_flow_mode_value = hd.powerFlowModeValue
       self._engine_on_reason_value = hd.engineOnReasonValue
       # Cache mode flags to avoid per-frame string lookups
-      text = get_hev_power_flow_text(self._power_flow_mode_value)
+      text = hev_power_flow_text(self._power_flow_mode_value)
       self._cached_is_ev = "Electric" in text if text else False
       self._cached_is_hybrid = "Hybrid" in text if text else False
       self._update_bracket_animation(normalized, self._threshold)
@@ -450,8 +450,8 @@ class PowerFlowGauge(Widget):
     text_y_start = rect.y + bar_h
     text_height = rect.height - bar_h
 
-    power_flow_text = get_hev_power_flow_text(self._power_flow_mode_value)
-    engine_reason_text = get_hev_engine_on_reason_text(self._engine_on_reason_value)
+    power_flow_text = hev_power_flow_text(self._power_flow_mode_value)
+    engine_reason_text = hev_engine_on_reason_text(self._engine_on_reason_value)
 
     if not power_flow_text and not engine_reason_text:
       return

@@ -13,7 +13,7 @@ from openpilot.system.ui.widgets import Widget
 from openpilot.selfdrive.ui.mici.onroad.torque_bar import arc_bar_pts, TORQUE_ANGLE_SPAN
 from openpilot.selfdrive.ui.mici.onroad import blend_colors
 from openpilot.system.ui.lib.shader_polygon import draw_polygon, Gradient
-from opendbc.sunnypilot.car.ford.carstate_ext import get_hev_power_flow_text, get_hev_engine_on_reason_text
+from openpilot.selfdrive.ui.bp.lib.hev_text import hev_engine_on_reason_text, hev_power_flow_text
 
 # Constants
 POWERFLOW_ANGLE_SPAN = 15.0  # Slightly longer than torque bar (12.7 degrees)
@@ -257,8 +257,8 @@ class PowerflowGauge(Widget):
     """Draw text labels below the powerflow meter arch, following the arch curve"""
     try:
       # Get text strings from integer values
-      engine_reason_text = get_hev_engine_on_reason_text(getattr(self, '_engine_on_reason_value', 0))
-      power_flow_text = get_hev_power_flow_text(getattr(self, '_power_flow_mode_value', 0))
+      engine_reason_text = hev_engine_on_reason_text(getattr(self, '_engine_on_reason_value', 0))
+      power_flow_text = hev_power_flow_text(getattr(self, '_power_flow_mode_value', 0))
 
       # Skip empty strings
       if not engine_reason_text and not power_flow_text:
