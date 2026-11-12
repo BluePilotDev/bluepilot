@@ -7,6 +7,7 @@ from openpilot.common.params_pyx import UnknownKeyName
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.system.ui.lib.application import gui_app
 from openpilot.selfdrive.ui.bp.lib.ui_debug_logger import bp_ui_log
+from openpilot.bluepilot.vasm.state import combined_blindspots
 
 
 class BlindspotRendererMixin:
@@ -50,10 +51,9 @@ class BlindspotRendererMixin:
       return
 
     car_state = sm['carState']
-    bp_ui_log.state("Blindspot", "left", car_state.leftBlindspot)
-    bp_ui_log.state("Blindspot", "right", car_state.rightBlindspot)
-    left_blindspot = car_state.leftBlindspot
-    right_blindspot = car_state.rightBlindspot
+    left_blindspot, right_blindspot = combined_blindspots(car_state, ui_state.params_memory)
+    bp_ui_log.state("Blindspot", "left", left_blindspot)
+    bp_ui_log.state("Blindspot", "right", right_blindspot)
 
     # Update alpha filters for smooth fade in/out
     self._blindspot_left_alpha_filter.update(1.0 if left_blindspot else 0.0)

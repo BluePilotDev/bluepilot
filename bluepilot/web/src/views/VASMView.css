@@ -1,0 +1,63 @@
+.vasm-page {
+  min-height: calc(100vh - var(--header-height));
+  padding: 24px;
+  background: var(--bp-bg-primary);
+}
+
+.vasm-card {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 24px;
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  background: var(--bg-secondary);
+}
+
+.vasm-intro h2 { margin: 0 0 8px; }
+.vasm-intro p, .vasm-safety { color: var(--text-secondary); line-height: 1.5; }
+
+.vasm-toolbar, .vasm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 18px 0;
+}
+
+.vasm-toolbar button, .vasm-actions button {
+  min-height: 44px;
+  padding: 10px 16px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  color: var(--text-primary);
+  background: var(--bp-bg-tertiary);
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.vasm-toolbar button:disabled, .vasm-actions button:disabled { opacity: 0.45; cursor: default; }
+.vasm-toolbar button.active.left { border-color: #38bdf8; background: rgba(56, 189, 248, 0.18); }
+.vasm-toolbar button.active.right { border-color: #fb923c; background: rgba(251, 146, 60, 0.18); }
+
+.vasm-canvas-wrap {
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+  background: #121826;
+}
+
+.vasm-canvas-wrap canvas { display: block; width: 100%; height: auto; cursor: crosshair; touch-action: manipulation; }
+.vasm-loading { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(0, 0, 0, 0.55); color: white; }
+
+.vasm-notice { margin: 16px 0; padding: 12px 14px; border-radius: 10px; color: #bbf7d0; background: rgba(34, 197, 94, 0.14); }
+.vasm-notice.error { color: #fecaca; background: rgba(239, 68, 68, 0.14); }
+.vasm-actions { justify-content: space-between; }
+.vasm-actions .primary { border-color: #22c55e; background: #15803d; color: white; }
+.vasm-actions .danger { border-color: #ef4444; color: #fecaca; }
+.vasm-safety { margin-bottom: 0; font-size: 0.92rem; }
+
+@media (max-width: 680px) {
+  .vasm-page { padding: 10px; }
+  .vasm-card { padding: 14px; }
+  .vasm-toolbar button { flex: 1 1 calc(50% - 10px); }
+  .vasm-actions button { width: 100%; }
+}

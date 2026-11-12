@@ -14,6 +14,10 @@ from openpilot.system.ui.lib.application import gui_app
 from openpilot.system.ui.widgets import Widget
 from openpilot.common.filter_simple import FirstOrderFilter
 
+# BluePilot: V-ASM feeds the existing SunnyPilot blind-spot indicator path.
+from openpilot.bluepilot.vasm.state import combined_blindspots
+# End BluePilot
+
 
 @dataclass(frozen=True)
 class TurnSignalConfig:
@@ -88,9 +92,12 @@ class TurnSignalController:
 
   def update(self):
     CS = ui_state.sm['carState']
+    # BluePilot: merge fresh V-ASM state with the OEM blind-spot signal.
+    left_blindspot, right_blindspot = combined_blindspots(CS, ui_state.params_memory)
 
-    self._update_signal(self._left_signal, CS.leftBlindspot, CS.leftBlinker)
-    self._update_signal(self._right_signal, CS.rightBlindspot, CS.rightBlinker)
+    self._update_signal(self._left_signal, left_blindspot, CS.leftBlinker)
+    self._update_signal(self._right_signal, right_blindspot, CS.rightBlinker)
+    # End BluePilot
 
   def render(self, rect: rl.Rectangle):
     if not ui_state.turn_signals and not ui_state.blindspot:

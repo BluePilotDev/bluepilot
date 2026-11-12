@@ -74,6 +74,10 @@ dependencies = [
   # logreader
   "zstandard",
 
+  # BluePilot V-ASM (StarPilot PR #75 port)
+  "opencv-python-headless",
+  # End BluePilot
+
   # ui
   "raylib @ git+https://github.com/commaai/dependencies.git@release-raylib#subdirectory=raylib",
   "qrcode",

@@ -154,6 +154,36 @@ class TestTestManeuversSection:
 
 
 class TestBluePilotVehicleVisuals:
+  def test_icon_visibility_and_network_status_controls(self, schema):
+    expected = {
+      "BPHideDMicon": ("[Visuals] Hide Driver Monitoring Icon", "Removes DM silhouette icon from UI."),
+      "BPHideWheelIcon": ("[Visuals] Hide Steering Wheel Icon", "Removes steering wheel icon from UI."),
+      "BPShowNetworkStatus": ("[Visuals] Show Network Status (C3X)", "Show network connectivity bars on bottom-left of screen"),
+      "BPWideAngleCamera": ("[Visuals] Use Wide Camera View", "Show video feed from wide-angle camera."),
+    }
+    for key, (title, description) in expected.items():
+      item = _find_item(schema, key)
+      assert item is not None
+      assert item["title"] == title
+      assert item["description"] == description
+
+  def test_model_path_color_options(self, schema):
+    item = _find_item(schema, "BPModelPathColor")
+    assert item is not None
+    assert item["title"] == "[Visuals] Model Path Color"
+    assert item["options"] == [
+      {"value": 0, "label": "Green (Default)"},
+      {"value": 1, "label": "Ford"},
+    ]
+
+  def test_tesla_is_a_theme_option_not_a_standalone_toggle(self, schema):
+    assert _find_item(schema, "BPTeslaStyleMode") is None
+    item = _find_item(schema, "BPThemePack")
+    assert item is not None
+    values = [option["value"] for option in item["options"]]
+    assert {"", "rad_racer", "tesla"} <= set(values)
+    assert "tesla_dark" not in values
+
   def test_rainbow_lane_lines_ordered_with_visual_toggles(self, schema):
     items = schema["vehicle_settings"]["ford"]["items"]
     keys = [item["key"] for item in items]

@@ -11,6 +11,7 @@ import cereal.messaging as messaging
 from opendbc.car import structs
 from openpilot.common.params import Params
 from openpilot.selfdrive.car.helpers import convert_to_capnp
+from openpilot.bluepilot.selfdrive.car.ford_acc_feedback import ford_acc_feedback
 
 _SETTINGS_INTERVAL = 5.0  # re-read params at most every 5 s
 _settings_last_read: float = 0.0
@@ -78,9 +79,16 @@ def _refresh_settings_cache() -> dict:
     "bmsMinimalDrivingView":           _get_bool(p, "BPHideCameraView"),
     "bmsEightBitRacerTheme":           _get_str(p, "BPThemePack").strip().lower() == "rad_racer",
     "bmsRainbowLaneLines":             _get_bool(p, "BPRainbowLines"),
+    "bmsModelPathColor":               _get_int(p, "BPModelPathColor", 0),
     "bmsShowBlindspotOverlay":         _get_bool(p, "ShowBlindspotOverlay", True),
+    "bmsTeslaStyleMode":               _get_str(p, "BPThemePack").strip().lower() in ("tesla", "tesla_dark"),
     "bmsShowBrakeStatus":              _get_bool(p, "ShowBrakeStatus"),
     "bmsShowConfidenceBall":           _get_bool(p, "BPShowConfidenceBall", True),
+    "bmsShowLaneCenteringIndicator":   _get_bool(p, "BPLaneCenterIcon"),
+    "bmsHideDmIcon":                  _get_bool(p, "BPHideDMicon"),
+    "bmsHideWheelIcon":               _get_bool(p, "BPHideWheelIcon"),
+    "bmsShowNetworkStatus":           _get_bool(p, "BPShowNetworkStatus"),
+    "bmsUseWideCamera":               _get_bool(p, "BPWideAngleCamera"),
     "bmsAnimateSteeringWheel":         _get_bool(p, "BPAnimateSteeringWheel", True),
     "bmsWheelIconStyle":               _get_int(p, "BPSteeringWheelIconStyle", 0),
     "bmsShowRadarLeadOverlay":         _get_bool(p, "FordPrefShowRadarLeadOverlay", True),
@@ -131,6 +139,7 @@ def publish_controller_state_bp(CI, pm):
     cs_bp.curvatureDeviationLimited = getattr(CI.CC, "curvatureDeviationLimited", False)
     cs_bp.humanTurnLateralPaused = bool(getattr(CI.CC, "humanTurnLateralPaused", False))
     cs_bp.stallBlipActive = bool(getattr(CI.CC, "stallBlipActive", False))
+    cs_bp.lanePositioningActive = bool(getattr(CI.CC, "lanePositioningActive", False))
     # BluePilot: mode the controller actually ran, straight off the car controller (not Params).
     if getattr(CI.CC, "disable_BP_lat_UI", True):
       cs_bp.activeLateralMode = structs.ControllerStateBP.LateralMode.openpilot
@@ -171,4 +180,7 @@ def publish_car_state_bp(CI, pm, can_valid):
   if hasattr(CI.CS, 'car_state_bp_msg') and CI.CS.car_state_bp_msg is not None:
     cs_bp_send = CI.CS.car_state_bp_msg
     cs_bp_send.valid = can_valid
+    available, feedback = ford_acc_feedback(CI, can_valid, time.monotonic_ns())
+    cs_bp_send.carStateBP.fordAcc.available = available
+    cs_bp_send.carStateBP.fordAcc.feedback = feedback
     pm.send('carStateBP', cs_bp_send)
