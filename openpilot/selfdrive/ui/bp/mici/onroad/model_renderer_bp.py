@@ -54,7 +54,7 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
       period = RAD_RACER_DASH_LEN_M + RAD_RACER_GAP_LEN_M
       self._dash_phase = (self._dash_phase + max(0.0, sm['carState'].vEgo) / gui_app.target_fps) % period
 
-  def _draw_path(self, sm):
+  def _draw_path(self):
     # BluePilot: Rad Racer theme draws the path ribbon in _draw_rad_racer_road
     if self._rad_racer:
       return
@@ -70,7 +70,7 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
       else:
         draw_polygon(self._rect, path_pts, gradient=themed_gradient)
     else:
-      super()._draw_path(sm)
+      super()._draw_path()
 
   def _themed_path_gradient(self) -> Gradient | None:
     """Bottom-to-top path gradient from the active theme pack, or None.
