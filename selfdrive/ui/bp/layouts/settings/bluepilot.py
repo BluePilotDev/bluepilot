@@ -96,6 +96,7 @@ class BluePilotLayout(Widget):
       ("BPHideWheelIcon", self._hide_wheel_icon),
       ("BPShowNetworkStatus", self._show_network_status),
       ("BPWideAngleCamera", self._wide_angle_camera),
+      ("BPFordACCPathFeedback", self._ford_acc_path_feedback),
       ("BPAnimateSteeringWheel", self._animate_steering_wheel),
       ("BPUseCustomSounds", self._use_custom_sounds),
       ("FordPrefShowRadarLeadOverlay", self._show_ford_radar_overlay),
@@ -242,6 +243,14 @@ class BluePilotLayout(Widget):
       initial_state=self._safe_get_bool(self._params, "BPWideAngleCamera"),
       callback=lambda state: self._toggle_callback(state, "BPWideAngleCamera"),
       icon="monitoring.png"
+    )
+
+    self._ford_acc_path_feedback = toggle_item(
+      lambda: tr("Ford ACC Path Feedback"),
+      lambda: tr("Model path changes shading and color for Ford ACC accel / brake signals"),
+      initial_state=self._safe_get_bool(self._params, "BPFordACCPathFeedback"),
+      callback=lambda state: self._toggle_callback(state, "BPFordACCPathFeedback"),
+      icon="chffr_wheel.png"
     )
 
     self._model_path_color_entries = [
@@ -842,6 +851,7 @@ class BluePilotLayout(Widget):
         self._disable_lane_line_status_color,
         self._hide_camera_view,
         self._model_path_color_btn,
+        self._ford_acc_path_feedback,
         self._theme_pack_btn,
         self._theme_auto_seasonal,
         self._rainbow_lane_lines,

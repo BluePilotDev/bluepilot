@@ -11,6 +11,7 @@ import cereal.messaging as messaging
 from opendbc.car import structs
 from openpilot.common.params import Params
 from openpilot.selfdrive.car.helpers import convert_to_capnp
+from openpilot.bluepilot.selfdrive.car.ford_acc_feedback import ford_acc_feedback
 
 _SETTINGS_INTERVAL = 5.0  # re-read params at most every 5 s
 _settings_last_read: float = 0.0
@@ -179,4 +180,7 @@ def publish_car_state_bp(CI, pm, can_valid):
   if hasattr(CI.CS, 'car_state_bp_msg') and CI.CS.car_state_bp_msg is not None:
     cs_bp_send = CI.CS.car_state_bp_msg
     cs_bp_send.valid = can_valid
+    available, feedback = ford_acc_feedback(CI, can_valid, time.monotonic_ns())
+    cs_bp_send.carStateBP.fordAcc.available = available
+    cs_bp_send.carStateBP.fordAcc.feedback = feedback
     pm.send('carStateBP', cs_bp_send)

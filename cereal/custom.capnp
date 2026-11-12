@@ -585,6 +585,12 @@ struct CarStateBP @0xb057204d7deadf3f {
   hybridDrive @0 :HybridDrive;
   hybridBattery @1 :HybridBattery;
   brakeLightStatus @2 :BrakeLightStatus;
+  fordAcc @3 :FordAcc;
+
+  struct FordAcc {
+    available @0 :Bool;
+    feedback @1 :Float32; # -1 deceleration/braking, +1 accelerating, 0 neutral
+  }
 
   struct HybridDrive {
     dataAvailable @0 :Bool;
