@@ -133,8 +133,6 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
       rect.x - CLIP_MARGIN, rect.y - CLIP_MARGIN, rect.width + 2 * CLIP_MARGIN, rect.height + 2 * CLIP_MARGIN
     )
 
-    self._experimental_mode = sm['selfdriveState'].experimentalMode
-
     live_calib = sm['extrinsicsCalibration']
     from openpilot.selfdrive.locationd.calibrationd import HEIGHT_INIT
     self._path_offset_z = live_calib.height[0] if live_calib.height else HEIGHT_INIT[0]
