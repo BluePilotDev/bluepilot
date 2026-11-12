@@ -2,7 +2,7 @@
 
 import pyray as rl
 
-from opendbc.car.ford.values import match_vin_to_car
+from opendbc.sunnypilot.car.ford.fingerprints_ext import match_vin_to_car
 from openpilot.selfdrive.ui.sunnypilot.layouts.settings.vehicle.platform_selector import LegendWidget, PlatformSelector
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.system.ui.lib.multilang import tr

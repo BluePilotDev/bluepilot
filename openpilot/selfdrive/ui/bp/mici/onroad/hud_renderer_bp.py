@@ -1,7 +1,7 @@
 import pyray as rl
 from openpilot.common.params import Params
-from opendbc.sunnypilot.car.ford.lateral_curv_ext import PrimaryLateralControl
-from opendbc.car.structs import ControllerStateBP
+from opendbc.bluepilot_lateral.core.lateral_curv_ext import PrimaryLateralControl
+from openpilot.cereal import custom
 from openpilot.selfdrive.ui.mici.onroad.hud_renderer import (
   HudRenderer, FONT_SIZES, KM_TO_MILE, CRUISE_DISABLED_CHAR, SET_SPEED_PERSISTENCE,
 )
@@ -22,7 +22,7 @@ from openpilot.bluepilot.ui.lib.bp_shaders import draw_shader_circle_gradient
 # BluePilot: Override upstream Mici torque bar with BP shared state math.
 from openpilot.selfdrive.ui.bp.mici.onroad.torque_bar_bp import TorqueBarBP as TorqueBar
 
-LateralMode = ControllerStateBP.LateralMode
+LateralMode = custom.ControllerStateBP.LateralMode
 
 class MiciHudRendererBP(HudRenderer):
   """BluePilot MICI HudRenderer with brake status coloring and powerflow gauge."""
