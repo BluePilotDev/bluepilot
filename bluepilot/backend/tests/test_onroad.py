@@ -1,34 +1,50 @@
+"""Onroad state in the portal and the route preprocessor, read from the real Params (unknown keys raise)."""
+import logging
+from unittest import mock
+
+from openpilot.common.params import Params
+from openpilot.common.test import OpenpilotTestCase
+
 from bluepilot.backend.network import utils
+from bluepilot.backend.routes import preprocessor
 
 
-class UnknownKeyName(Exception):
-    pass
+class BrokenParams:
+  def get_bool(self, key):
+    raise RuntimeError("params unavailable")
 
 
-class StrictParams:
-    """Like the real Params: reading a key that isn't declared raises."""
+class TestOnroadState(OpenpilotTestCase):
+  def setUp(self):
+    self.params = Params()
+    self.params.put_bool("IsDriverViewEnabled", False, block=True)
+    self.params.put_bool("IsEngaged", False, block=True)
 
-    def __init__(self, values):
-        self._values = values
+  def test_portal_onroad_when_device_is_onroad(self):
+    self.params.put_bool("IsOffroad", False, block=True)
+    with mock.patch.object(utils, "params", self.params):
+      self.assertTrue(utils.is_onroad())
 
-    def get_bool(self, key):
-        if key not in self._values:
-            raise UnknownKeyName(key)
-        return self._values[key]
+  def test_portal_offroad_when_device_is_offroad(self):
+    self.params.put_bool("IsOffroad", True, block=True)
+    with mock.patch.object(utils, "params", self.params):
+      self.assertFalse(utils.is_onroad())
 
-
-def test_onroad_when_device_is_onroad(monkeypatch):
-    monkeypatch.setattr(utils, "params", StrictParams({"IsOnroad": True}))
-    assert utils.is_onroad() is True
-
-
-def test_offroad_when_device_is_offroad(monkeypatch):
-    monkeypatch.setattr(utils, "params", StrictParams({"IsOnroad": False}))
-    assert utils.is_onroad() is False
-
-
-def test_assumes_onroad_when_state_cannot_be_read(monkeypatch, caplog):
+  def test_portal_assumes_onroad_when_state_cannot_be_read(self):
     # Fail closed: a broken read must lock the portal, not unlock it.
-    monkeypatch.setattr(utils, "params", StrictParams({}))
-    assert utils.is_onroad() is True
-    assert any(r.levelname == "WARNING" for r in caplog.records)
+    with mock.patch.object(utils, "params", BrokenParams()), self.assertLogs(utils.logger, logging.WARNING):
+      self.assertTrue(utils.is_onroad())
+
+  def test_preprocessor_idle_when_offroad(self):
+    self.params.put_bool("IsOffroad", True, block=True)
+    with mock.patch.object(preprocessor, "params", self.params):
+      self.assertTrue(preprocessor.is_device_idle())
+
+  def test_preprocessor_busy_when_onroad(self):
+    self.params.put_bool("IsOffroad", False, block=True)
+    with mock.patch.object(preprocessor, "params", self.params):
+      self.assertFalse(preprocessor.is_device_idle())
+
+  def test_preprocessor_busy_when_state_cannot_be_read(self):
+    with mock.patch.object(preprocessor, "params", BrokenParams()):
+      self.assertFalse(preprocessor.is_device_idle())
