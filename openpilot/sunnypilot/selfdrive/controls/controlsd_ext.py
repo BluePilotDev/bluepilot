@@ -113,17 +113,24 @@ class ControlsExt(ModelStateBase):
 
     return CC_SP
 
+  # BluePilot: BPx settings for the Ford car code on bp-full
   def read_bpx_params(self) -> list[dict]:
     """BluePilot (BPx): the longitudinal and cluster settings the Ford car code on bp-full reads. Only
     on BluePilot: bp-sunnypilot's opendbc doesn't have these lists."""
-    from openpilot.common.bluepilot import is_bluepilot
+    try:
+      from openpilot.common.bluepilot import is_bluepilot
+    except ImportError:
+      return []
     if not is_bluepilot():
       return []
-    from opendbc.sunnypilot.car.ford.bluepilot.hud_ext import HUD_PARAMS
-    from opendbc.sunnypilot.car.ford.bluepilot.longitudinal_ext import BPX_LONG_PARAMS
+    try:
+      from opendbc.sunnypilot.car.ford.bluepilot.hud_ext import HUD_PARAMS
+      from opendbc.sunnypilot.car.ford.bluepilot.longitudinal_ext import BPX_LONG_PARAMS
+    except ImportError:  # an opendbc without the BPx car code: it has no reader for these either
+      return []
     return self.read_lateral_params([*BPX_LONG_PARAMS, *HUD_PARAMS])
 
-  def read_lateral_params(self, keys=None) -> list[dict]:
+  def read_lateral_params(self, keys: list[str] | None = None) -> list[dict]:
     """BluePilot: UI-tunable lateral params for the opendbc lateral, as CarControlSP.params entries.
     A key never written on the device publishes its params_keys.h default, so the lateral runs
     the value the settings UI shows (#6 in ford-op/bg-opendbc). Read every frame, as carcontroller did
@@ -140,7 +147,7 @@ class ControlsExt(ModelStateBase):
       except UnknownKeyName:
         # key list (submodule) and params_keys.h (this repo) drifted; skip rather than kill controlsd
         if key not in self._bp_unknown_keys_logged:
-          cloudlog.warning(f"BluePilot lateral param {key} not registered in params_keys.h; skipping")
+          cloudlog.warning(f"BluePilot param {key} not registered in params_keys.h; skipping")
           self._bp_unknown_keys_logged.add(key)
         continue
       if value is None:

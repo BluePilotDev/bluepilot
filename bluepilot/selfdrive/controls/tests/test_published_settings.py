@@ -57,3 +57,14 @@ class TestBluePilotSettingsPublished(OpenpilotTestCase):
     for key in SETTINGS:
       self.assertNotIn(key, published)
     self.assertEqual(published["disable_BP_lat_UI"], b"0")  # the lateral settings still are
+
+
+class TestWithoutBpxCarCode(OpenpilotTestCase):
+  def test_missing_car_code_publishes_nothing(self):
+    import sys
+    from unittest import mock
+    from openpilot.sunnypilot.selfdrive.controls.controlsd_ext import ControlsExt
+    ext = ControlsExt.__new__(ControlsExt)
+    with mock.patch("openpilot.common.bluepilot.is_bluepilot", return_value=True), \
+         mock.patch.dict(sys.modules, {"opendbc.sunnypilot.car.ford.bluepilot.hud_ext": None}):
+      assert ext.read_bpx_params() == []
