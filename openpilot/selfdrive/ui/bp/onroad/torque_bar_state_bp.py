@@ -21,14 +21,14 @@ class TorqueBarStateBP:
     if ui_state.sm['controlsState'].lateralControlState.which() == 'angleState':
       controls_state = ui_state.sm['controlsState']
       car_state = ui_state.sm['carState']
-      live_parameters = ui_state.sm['liveParameters']
+      vehicle_parameters = ui_state.sm['vehicleParameters']
       car_control = ui_state.sm['carControl']
 
       actual_lateral_accel = controls_state.curvature * car_state.vEgo ** 2
       desired_lateral_accel = controls_state.desiredCurvature * car_state.vEgo ** 2
       accel_diff = (desired_lateral_accel - actual_lateral_accel)
 
-      roll_compensation = live_parameters.roll * ACCELERATION_DUE_TO_GRAVITY * self._roll_compensation_weight_bp(car_state.vEgo)
+      roll_compensation = vehicle_parameters.roll * ACCELERATION_DUE_TO_GRAVITY * self._roll_compensation_weight_bp(car_state.vEgo)
       lateral_acceleration = actual_lateral_accel - roll_compensation
       max_lateral_acceleration = ui_state.CP.maxLateralAccel if ui_state.CP else self.default_max_lateral_accel
 

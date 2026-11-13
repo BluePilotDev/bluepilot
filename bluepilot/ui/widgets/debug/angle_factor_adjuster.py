@@ -15,7 +15,7 @@ from openpilot.system.ui.lib.text_measure import measure_text_cached
 from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.button import Button, ButtonStyle
 from openpilot.selfdrive.ui.ui_state import ui_state
-from opendbc.sunnypilot.car.ford.lateral_curv_ext import PrimaryLateralControl
+from opendbc.bluepilot_lateral.core.lateral_curv_ext import PrimaryLateralControl
 from bluepilot.ui.widgets.debug.debug_colors import DebugColors
 
 LOW_KEY = "FordLowSpeedFactor_ang"

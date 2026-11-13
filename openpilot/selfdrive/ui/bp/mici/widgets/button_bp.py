@@ -34,7 +34,14 @@ class BigButtonBP(BigButton):
     # Shrink label area so wrapped text never overlaps the icon drawn at top-right
     if self._txt_icon:
       return int(self._rect.width - self.LABEL_HORIZONTAL_PADDING * 2 - self._txt_icon.width - 20)
-    return super()._width_hint()
+    return int(self._rect.width - self.LABEL_HORIZONTAL_PADDING * 2)
+
+  # BluePilot: upstream split BP7's _width_hint into title and subtitle widths; keep BP7's single width for both
+  def _title_width_hint(self) -> int:
+    return self._width_hint()
+
+  def _subtitle_width_hint(self) -> int:
+    return self._width_hint()
 
   def _draw_content(self, btn_y: float):
     # BluePilot: measure both labels and shrink label font so they don't overlap
@@ -106,6 +113,10 @@ class BigMultiToggleBP(BigToggleBP, BigMultiToggle):
   def _load_images(self):
     BigToggleBP._load_images(self)
     BigMultiToggle._load_images(self)
+
+  def _width_hint(self) -> int:
+    # BluePilot: keep the label clear of the pill column (BP7's BigMultiToggle did this upstream)
+    return int(self._rect.width - self.LABEL_HORIZONTAL_PADDING * 2 - self._txt_enabled_toggle.width)
 
   def _get_label_font_size(self):
     # Multi-toggle has a narrower label area (pill column on the right takes ~84 px).

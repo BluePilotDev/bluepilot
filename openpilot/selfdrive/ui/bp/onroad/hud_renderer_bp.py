@@ -1,6 +1,6 @@
 import pyray as rl
 from openpilot.common.params import Params
-from opendbc.car.structs import ControllerStateBP
+from openpilot.cereal import custom
 from openpilot.bluepilot.ui.lib.bp_shaders import draw_shader_circle_gradient
 from openpilot.selfdrive.ui.onroad.hud_renderer import UI_CONFIG, FONT_SIZES, COLORS
 from openpilot.selfdrive.ui.sunnypilot.onroad.hud_renderer import HudRendererSP
@@ -9,11 +9,15 @@ from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.system.ui.lib.text_measure import measure_text_cached
 from openpilot.selfdrive.ui.bp.lib.ui_debug_logger import bp_ui_log
 
-LateralMode = ControllerStateBP.LateralMode
+LateralMode = custom.ControllerStateBP.LateralMode
 
 # BluePilot: Y center for speed display (matching upstream hardcoded values)
 SPEED_CENTER_Y = 180
 SPEED_UNIT_CENTER_Y = 290
+# BluePilot: wheel button layout, BP7's values (upstream's UIConfig dropped these)
+BORDER_SIZE = 30
+BUTTON_SIZE = 192
+WHEEL_ICON_SIZE = 144
 
 
 class HudRendererBP(HudRendererSP):
@@ -27,7 +31,7 @@ class HudRendererBP(HudRendererSP):
   def __init__(self):
     super().__init__()
     # BluePilot: Restore the animated C3X wheel without modifying the upstream ExpButton.
-    self._exp_button = ExpButtonBP(UI_CONFIG.button_size, UI_CONFIG.wheel_icon_size)
+    self._exp_button = ExpButtonBP(BUTTON_SIZE, WHEEL_ICON_SIZE)
     self._bp_params = Params()
     self._brakes_on = False
     self.speed_right = 0
@@ -94,13 +98,13 @@ class HudRendererBP(HudRendererSP):
       self._draw_set_speed(rect)
     self._draw_current_speed(rect)
 
-    button_x = rect.x + rect.width - UI_CONFIG.border_size - UI_CONFIG.button_size
-    button_y = rect.y + UI_CONFIG.border_size
-    self._exp_button.render(rl.Rectangle(button_x, button_y, UI_CONFIG.button_size, UI_CONFIG.button_size))
+    button_x = rect.x + rect.width - BORDER_SIZE - BUTTON_SIZE
+    button_y = rect.y + BORDER_SIZE
+    self._exp_button.render(rl.Rectangle(button_x, button_y, BUTTON_SIZE, BUTTON_SIZE))
     self._draw_lateral_control_overlay(
-      button_x + UI_CONFIG.button_size / 2,
-      button_y + UI_CONFIG.button_size / 2,
-      UI_CONFIG.button_size,
+      button_x + BUTTON_SIZE / 2,
+      button_y + BUTTON_SIZE / 2,
+      BUTTON_SIZE,
     )
 
     # SP additions (dev UI, road name, speed limit, SCC, turn signals, circular alerts, rocket fuel)

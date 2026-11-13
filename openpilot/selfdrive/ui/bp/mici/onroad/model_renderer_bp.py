@@ -1,7 +1,7 @@
 import numpy as np
 import pyray as rl
 from openpilot.common.params import Params
-from openpilot.selfdrive.ui.mici.onroad.model_renderer import ModelRenderer, THROTTLE_COLORS, NO_THROTTLE_COLORS, CLIP_MARGIN
+from openpilot.selfdrive.ui.mici.onroad.model_renderer import ModelRenderer, CLIP_MARGIN
 from openpilot.selfdrive.ui.ui_state import ui_state, UIStatus
 from openpilot.system.ui.lib.application import gui_app
 from openpilot.system.ui.lib.shader_polygon import draw_polygon, Gradient
@@ -54,7 +54,7 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
       period = RAD_RACER_DASH_LEN_M + RAD_RACER_GAP_LEN_M
       self._dash_phase = (self._dash_phase + max(0.0, sm['carState'].vEgo) / gui_app.target_fps) % period
 
-  def _draw_path(self, sm):
+  def _draw_path(self):
     # BluePilot: Rad Racer theme draws the path ribbon in _draw_rad_racer_road
     if self._rad_racer:
       return
@@ -70,7 +70,7 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
       else:
         draw_polygon(self._rect, path_pts, gradient=themed_gradient)
     else:
-      super()._draw_path(sm)
+      super()._draw_path()
 
   def _themed_path_gradient(self) -> Gradient | None:
     """Bottom-to-top path gradient from the active theme pack, or None.

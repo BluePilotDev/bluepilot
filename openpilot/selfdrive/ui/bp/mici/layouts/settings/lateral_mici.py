@@ -6,7 +6,7 @@ from openpilot.selfdrive.ui.bp.mici.widgets.button_bp import BigParamControlBP
 from openpilot.selfdrive.ui.bp.mici.widgets.floatbutton import BigParamFloatControl, BigParamIntControl
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.system.ui.widgets.scroller import NavScroller
-from opendbc.sunnypilot.car.ford.lateral_curv_ext import PrimaryLateralControl
+from opendbc.bluepilot_lateral.core.lateral_curv_ext import PrimaryLateralControl
 
 
 class LateralLayoutMici(NavScroller):
