@@ -109,11 +109,21 @@ class ControlsExt(ModelStateBase):
     # lateralInputsRequired for every Ford); other cars leave them empty
     if self.CP_SP.lateralInputsRequired:
       self.fill_lateral_inputs(CC_SP.lateralInputs, sm)
-      CC_SP.params = self.read_lateral_params()
+      CC_SP.params = self.read_lateral_params() + self.read_bpx_params()
 
     return CC_SP
 
-  def read_lateral_params(self) -> list[dict]:
+  def read_bpx_params(self) -> list[dict]:
+    """BluePilot (BPx): the longitudinal and cluster settings the Ford car code on bp-full reads. Only
+    on BluePilot: bp-sunnypilot's opendbc doesn't have these lists."""
+    from openpilot.common.bluepilot import is_bluepilot
+    if not is_bluepilot():
+      return []
+    from opendbc.sunnypilot.car.ford.bluepilot.hud_ext import HUD_PARAMS
+    from opendbc.sunnypilot.car.ford.bluepilot.longitudinal_ext import BPX_LONG_PARAMS
+    return self.read_lateral_params([*BPX_LONG_PARAMS, *HUD_PARAMS])
+
+  def read_lateral_params(self, keys=None) -> list[dict]:
     """BluePilot: UI-tunable lateral params for the opendbc lateral, as CarControlSP.params entries.
     A key never written on the device publishes its params_keys.h default, so the lateral runs
     the value the settings UI shows (#6 in ford-op/bg-opendbc). Read every frame, as carcontroller did
@@ -124,7 +134,7 @@ class ControlsExt(ModelStateBase):
     # Ford needs it, so a submodule on another layout must not break controlsd for other brands
     from opendbc.bluepilot_lateral.core.values_ext import BP_LATERAL_PARAMS
     entries = []
-    for key in BP_LATERAL_PARAMS:
+    for key in BP_LATERAL_PARAMS if keys is None else keys:
       try:
         value = self.params.get(key, return_default=True)
       except UnknownKeyName:
