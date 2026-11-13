@@ -35,7 +35,6 @@ def asdictref(obj) -> dict[str, Any]:
   return _asdictref_inner(obj)
 
 
-# BluePilot: ControllerStateBP isn't in opendbc's structs, so its branch below can't be used until the publisher is rebuilt (chunk B)
 def convert_to_capnp(struct: structs.CarParamsSP | structs.CarStateSP) -> capnp.lib.capnp._DynamicStructBuilder:
   struct_dict = asdictref(struct)
 
@@ -43,8 +42,6 @@ def convert_to_capnp(struct: structs.CarParamsSP | structs.CarStateSP) -> capnp.
     struct_capnp = custom.CarParamsSP.new_message(**struct_dict)
   elif isinstance(struct, structs.CarStateSP):
     struct_capnp = custom.CarStateSP.new_message(**struct_dict)
-  elif isinstance(struct, structs.ControllerStateBP):  # BluePilot: controllerStateBP (lateral uncertainty)
-    struct_capnp = custom.ControllerStateBP.new_message(**struct_dict)
   else:
     raise ValueError(f"Unsupported struct type: {type(struct)}")
 

@@ -8,9 +8,8 @@ card.py only needs a single function call instead of inline BP blocks.
 import time
 
 import openpilot.cereal.messaging as messaging
-from opendbc.car import structs
+from openpilot.cereal import custom
 from openpilot.common.params import Params
-from openpilot.selfdrive.car.helpers import convert_to_capnp
 
 _SETTINGS_INTERVAL = 5.0  # re-read params at most every 5 s
 _settings_last_read: float = 0.0
@@ -121,54 +120,58 @@ def _refresh_settings_cache() -> dict:
 
 
 def publish_controller_state_bp(CI, pm):
-  """Publish controllerStateBP if the car controller reports lateralUncertainty."""
+  """Publish controllerStateBP from the BluePilot car controller's status() (every Ford on bp-full)."""
   global _settings_last_read, _settings_cache
-  if hasattr(CI.CC, "lateralUncertainty"):
-    cs_bp = structs.ControllerStateBP()
-    cs_bp.lateralUncertainty = CI.CC.lateralUncertainty
-    cs_bp.angleRateLimited = getattr(CI.CC, "angleRateLimited", False)
-    cs_bp.curvatureRateLimited = getattr(CI.CC, "curvatureRateLimited", False)
-    cs_bp.curvatureDeviationLimited = getattr(CI.CC, "curvatureDeviationLimited", False)
-    cs_bp.humanTurnLateralPaused = bool(getattr(CI.CC, "humanTurnLateralPaused", False))
-    cs_bp.stallBlipActive = bool(getattr(CI.CC, "stallBlipActive", False))
-    # BluePilot: mode the controller actually ran, straight off the car controller (not Params).
-    if getattr(CI.CC, "disable_BP_lat_UI", True):
-      cs_bp.activeLateralMode = structs.ControllerStateBP.LateralMode.openpilot
-    elif getattr(CI.CC, "primary_lateral_control", 0) == 1:
-      cs_bp.activeLateralMode = structs.ControllerStateBP.LateralMode.angle
-    else:
-      cs_bp.activeLateralMode = structs.ControllerStateBP.LateralMode.curvature
+  status = getattr(getattr(CI.CC, "bp", None), "status", None)
+  if status is None:
+    return
+  st = status()
+  cs_bp_send = messaging.new_message('controllerStateBP')
+  cs_bp_send.valid = True
+  cs_bp = cs_bp_send.controllerStateBP
+  cs_bp.lateralUncertainty = float(st.lateralUncertainty)
+  cs_bp.angleRateLimited = bool(st.angleRateLimited)
+  cs_bp.curvatureRateLimited = bool(st.curvatureRateLimited)
+  cs_bp.curvatureDeviationLimited = bool(st.curvatureDeviationLimited)
+  cs_bp.humanTurnLateralPaused = bool(st.humanTurnLateralPaused)
+  cs_bp.stallBlipActive = bool(st.stallBlipActive)
+  # BluePilot: mode the controller actually ran, straight off the car controller (not Params).
+  if st.disable_BP_lat_UI:
+    cs_bp.activeLateralMode = custom.ControllerStateBP.LateralMode.openpilot
+  elif st.primary_lateral_control == 1:
+    cs_bp.activeLateralMode = custom.ControllerStateBP.LateralMode.angle
+  else:
+    cs_bp.activeLateralMode = custom.ControllerStateBP.LateralMode.curvature
 
-    # BluePilot: settings snapshot -- refreshed at most every _SETTINGS_INTERVAL s so Params
-    # reads don't add latency to every card.py tick.
-    now = time.monotonic()
-    if not _settings_cache or now - _settings_last_read >= _SETTINGS_INTERVAL:
-      try:
-        _settings_cache = _refresh_settings_cache()
-      except Exception:
-        pass
-      _settings_last_read = now
-    if _settings_cache:
-      for field, value in _settings_cache.items():
-        setattr(cs_bp, field, value)
+  # BluePilot: settings snapshot -- refreshed at most every _SETTINGS_INTERVAL s so Params
+  # reads don't add latency to every card.py tick.
+  now = time.monotonic()
+  if not _settings_cache or now - _settings_last_read >= _SETTINGS_INTERVAL:
+    try:
+      _settings_cache = _refresh_settings_cache()
+    except Exception:
+      pass
+    _settings_last_read = now
+  if _settings_cache:
+    for field, value in _settings_cache.items():
+      setattr(cs_bp, field, value)
 
-    # BluePilot: fingerprint info -- plain attribute reads on CarParams, no Params round-trip
-    # needed, so no caching required (fingerprint never changes after startup).
-    CP = getattr(CI, "CP", None)
-    if CP is not None:
-      cs_bp.bmsFingerprintForced = bool(getattr(CP, "fingerprintSource", None) == "fixed")
-      cs_bp.bmsFingerprint = str(getattr(CP, "carFingerprint", "") or "")
+  # BluePilot: fingerprint info -- plain attribute reads on CarParams, no Params round-trip
+  # needed, so no caching required (fingerprint never changes after startup).
+  CP = getattr(CI, "CP", None)
+  if CP is not None:
+    cs_bp.bmsFingerprintForced = bool(getattr(CP, "fingerprintSource", None) == "fixed")
+    cs_bp.bmsFingerprint = str(getattr(CP, "carFingerprint", "") or "")
 
-    cs_bp_capnp = convert_to_capnp(cs_bp)
-    cs_bp_send = messaging.new_message('controllerStateBP')
-    cs_bp_send.valid = True
-    cs_bp_send.controllerStateBP = cs_bp_capnp
-    pm.send('controllerStateBP', cs_bp_send)
+  pm.send('controllerStateBP', cs_bp_send)
 
 
 def publish_car_state_bp(CI, pm, can_valid):
-  """Publish carStateBP (hybrid drive gauge data) if available from car state."""
-  if hasattr(CI.CS, 'car_state_bp_msg') and CI.CS.car_state_bp_msg is not None:
-    cs_bp_send = CI.CS.car_state_bp_msg
-    cs_bp_send.valid = can_valid
-    pm.send('carStateBP', cs_bp_send)
+  """Publish carStateBP (hybrid gauges, brake lights) from the BluePilot car state; nothing before its first update."""
+  car_state_bp = getattr(getattr(CI.CS, "bp", None), "car_state_bp", None)
+  if not car_state_bp:
+    return
+  cs_bp_send = messaging.new_message('carStateBP')
+  cs_bp_send.valid = can_valid
+  cs_bp_send.carStateBP = car_state_bp
+  pm.send('carStateBP', cs_bp_send)
