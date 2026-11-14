@@ -7,7 +7,6 @@ from openpilot.common.params_pyx import UnknownKeyName
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.system.ui.lib.application import gui_app
 from openpilot.selfdrive.ui.bp.lib.ui_debug_logger import bp_ui_log
-from openpilot.bluepilot.vasm.state import combined_blindspots
 
 
 class BlindspotRendererMixin:
@@ -51,7 +50,7 @@ class BlindspotRendererMixin:
       return
 
     car_state = sm['carState']
-    left_blindspot, right_blindspot = combined_blindspots(car_state, ui_state.params_memory)
+    left_blindspot, right_blindspot = (bool(car_state.leftBlindspot), bool(car_state.rightBlindspot))
     bp_ui_log.state("Blindspot", "left", left_blindspot)
     bp_ui_log.state("Blindspot", "right", right_blindspot)
 

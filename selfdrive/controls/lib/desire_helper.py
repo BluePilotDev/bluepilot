@@ -7,9 +7,6 @@ from openpilot.sunnypilot.selfdrive.controls.lib.lane_turn_desire import LaneTur
 from openpilot.common.bluepilot import is_bluepilot
 if is_bluepilot():
   from openpilot.bluepilot.selfdrive.controls.bp_desire_helper import BPBlinkerPause
-  # BluePilot: merge vision and OEM blind-spot state before lane-change decisions.
-  from openpilot.bluepilot.vasm.state import combined_blindspots, get_memory_params
-  # End BluePilot
 
 LaneChangeState = log.LaneChangeState
 LaneChangeDirection = log.LaneChangeDirection
@@ -61,9 +58,6 @@ class DesireHelper:
     # BluePilot: blinker-based lane change pause
     if is_bluepilot():
       self._bp_blinker_pause = BPBlinkerPause()
-      # BluePilot: shared-memory V-ASM state reader.
-      self._bp_params_memory = get_memory_params()
-      # End BluePilot
 
   @staticmethod
   def get_lane_change_direction(CS):
@@ -76,10 +70,7 @@ class DesireHelper:
     one_blinker = carstate.leftBlinker != carstate.rightBlinker
     below_lane_change_speed = v_ego < LANE_CHANGE_SPEED_MIN
 
-    # BluePilot: V-ASM participates in both lane-turn and lane-change blocking.
-    blindspot_left, blindspot_right = (combined_blindspots(carstate, self._bp_params_memory)
-                                       if is_bluepilot() else (carstate.leftBlindspot, carstate.rightBlindspot))
-    # End BluePilot
+    blindspot_left, blindspot_right = carstate.leftBlindspot, carstate.rightBlindspot
 
     # Lane turn controller update
     self.lane_turn_controller.update_lane_turn(blindspot_left=blindspot_left, blindspot_right=blindspot_right,

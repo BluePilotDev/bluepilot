@@ -31,9 +31,6 @@ from openpilot.sunnypilot.selfdrive.car.cruise_helpers import CruiseHelper
 from openpilot.sunnypilot.selfdrive.car.intelligent_cruise_button_management.controller import IntelligentCruiseButtonManagement
 from openpilot.sunnypilot.selfdrive.selfdrived.events import EventsSP
 
-# BluePilot: V-ASM augments OEM blind-spot state for lane-change alerts.
-from openpilot.bluepilot.vasm.state import combined_blindspots, get_memory_params
-# End BluePilot
 
 REPLAY = "REPLAY" in os.environ
 SIMULATION = "SIMULATION" in os.environ
@@ -59,16 +56,13 @@ IGNORED_SAFETY_MODES = (SafetyModel.silent, SafetyModel.noOutput)
 # (update_events) for why. 20 frames @ 100Hz = 200ms.
 COMM_ISSUE_DEBOUNCE_FRAMES = 20
 # Optional enhancements must fail closed without becoming engagement blockers.
-NON_CRITICAL_PROCESSES = {"mapd", "adj_spot_monitor_vision"}
+NON_CRITICAL_PROCESSES = {"mapd"}
 # End BluePilot
 
 
 class SelfdriveD(CruiseHelper):
   def __init__(self, CP=None, CP_SP=None):
     self.params = Params()
-    # BluePilot: shared-memory V-ASM state reader.
-    self.params_memory = get_memory_params(self.params)
-    # End BluePilot
 
     # Ensure the current branch is cached, otherwise the first cycle lags
     build_metadata = get_build_metadata()
@@ -335,16 +329,14 @@ class SelfdriveD(CruiseHelper):
       self.events.add(EventName.excessiveActuation)
     # ******************************************************************************************
 
-    # BluePilot: combine OEM BSM with fresh V-ASM detections.
-    combined_left_blindspot, combined_right_blindspot = combined_blindspots(CS, self.params_memory)
-    # End BluePilot
+    left_blindspot, right_blindspot = bool(CS.leftBlindspot), bool(CS.rightBlindspot)
 
     # Handle lane change
     if self.sm['modelV2'].meta.laneChangeState == LaneChangeState.preLaneChange:
       direction = self.sm['modelV2'].meta.laneChangeDirection
-      # BluePilot: use the combined OEM and vision blind-spot state.
-      if (combined_left_blindspot and direction == LaneChangeDirection.left) or \
-         (combined_right_blindspot and direction == LaneChangeDirection.right):
+
+      if (left_blindspot and direction == LaneChangeDirection.left) or \
+         (right_blindspot and direction == LaneChangeDirection.right):
         self.events.add(EventName.laneChangeBlocked)
       # End BluePilot
       else:

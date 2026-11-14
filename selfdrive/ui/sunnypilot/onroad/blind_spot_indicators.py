@@ -10,9 +10,6 @@ from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.system.ui.lib.application import gui_app
 from openpilot.common.filter_simple import FirstOrderFilter
 
-# BluePilot: V-ASM feeds the existing SunnyPilot blind-spot indicator path.
-from openpilot.bluepilot.vasm.state import combined_blindspots
-# End BluePilot
 
 
 class BlindSpotIndicators:
@@ -26,8 +23,8 @@ class BlindSpotIndicators:
   def update(self) -> None:
     sm = ui_state.sm
     CS = sm['carState']
-    # BluePilot: merge fresh V-ASM state with the OEM blind-spot signal.
-    left_blindspot, right_blindspot = combined_blindspots(CS, ui_state.params_memory)
+
+    left_blindspot, right_blindspot = (bool(CS.leftBlindspot), bool(CS.rightBlindspot))
 
     self._blind_spot_left_alpha_filter.update(1.0 if left_blindspot else 0.0)
     self._blind_spot_right_alpha_filter.update(1.0 if right_blindspot else 0.0)

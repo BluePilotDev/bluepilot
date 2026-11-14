@@ -232,7 +232,7 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
     palette = palette_for_dark_fraction(self._tesla_dark_fraction)
     offset = np.array([self._rect.x, self._rect.y], dtype=np.float32)
     for i, lane_line in enumerate(self._lane_lines):
-      blindspot_active = tesla_blindspot_lane_active(ui_state.sm, i, ui_state.params_memory)
+      blindspot_active = tesla_blindspot_lane_active(ui_state.sm, i)
       lane_change_active = tesla_lane_change_lane_active(ui_state.sm, i)
       if (lane_line.projected_points.size == 0 or
           (not blindspot_active and not lane_change_active and self._lane_line_probs[i] < 0.25)):
