@@ -20,7 +20,6 @@ import sentry_sdk
 from sentry_sdk.integrations.threading import ThreadingIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration  # BluePilot: log capture, tuned for memory (see init())
 
-from opendbc.car import structs
 from openpilot.common.params import Params
 from openpilot.system.athena.registration import UNREGISTERED_DONGLE_ID
 from openpilot.common.hardware import HARDWARE
@@ -271,7 +270,7 @@ def capture_fingerprint(candidate: str, car_name: str) -> None:
 
 
 # BluePilot: was log_fingerprint() in sunnypilot/selfdrive/car/interfaces.py, which upstream removed with Sentry
-def log_fingerprint(CP: structs.CarParams) -> None:
+def log_fingerprint(CP) -> None:  # CP: CarParams; no opendbc import here, manager loads this module
   if CP.carFingerprint == "MOCK":
     capture_fingerprint_mock(CP.carVin)  # pass vin for diagnosability
   else:
