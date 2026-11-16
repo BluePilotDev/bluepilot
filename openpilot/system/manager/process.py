@@ -33,7 +33,7 @@ def launcher(proc: str, name: str) -> None:
 
     # add daemon name tag to logs
     cloudlog.bind(daemon=name)
-    sentry.set_tag("daemon", name)  # BluePilot
+    sentry.set_tag("daemon", name)  # BluePilot: tag crash reports with the daemon
 
     # exec the process
     mod.main()

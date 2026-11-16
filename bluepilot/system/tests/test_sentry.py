@@ -5,7 +5,9 @@ import unittest
 import warnings
 from unittest import mock
 
+from opendbc.car import structs
 from openpilot.bluepilot.system import sentry
+from openpilot.common.bluepilot import CrashReporting
 
 
 def log_event(message: str, daemon: str = "card") -> dict:
@@ -121,6 +123,54 @@ class TestOutgoingReport(unittest.TestCase):
     self.assertEqual(events[0]["extra"]["tombstone_fn"], apport)
     self.assertEqual(events[0]["extra"]["tombstone"],
                      "#0 crash_here\n\nExecutablePath: /data/openpilot/selfdrive/ui/ui\nSignal: 11\nProcStatus:\n Name: ui\n")
+
+  def test_tombstone_is_logged_once_when_the_sdk_fails(self):
+    self.assertTrue(sentry.init(sentry.SentryProject.SELFDRIVE_NATIVE))
+    apport = os.path.join(sentry.CRASHES_DIR, "_usr_bin_ui.crash")
+    with open(apport, "w") as f:
+      f.write("ExecutablePath: /data/openpilot/selfdrive/ui/ui\n")
+    with mock.patch.object(sentry, "cloudlog") as cloudlog, mock.patch.object(sentry.sentry_sdk, "capture_message", side_effect=RuntimeError):
+      # the guard reports that it ran, so tombstoned doesn't log the line a second time
+      self.assertTrue(CrashReporting().report_tombstone_file(apport, "ui - Signal: 11", "#0 crash_here"))
+    self.assertEqual(cloudlog.error.call_args_list, [mock.call({'tombstone': "ui - Signal: 11"})])
+
+  def test_guard_reports_only_with_an_active_client(self):
+    guard = CrashReporting()
+    try:
+      raise ZeroDivisionError("before init")
+    except ZeroDivisionError:
+      self.assertFalse(guard.capture_exception())  # no client: the hook logs upstream's line instead
+    self.assertTrue(guard.init("SELFDRIVE"))
+    try:
+      raise ZeroDivisionError("after init")
+    except ZeroDivisionError:
+      self.assertTrue(guard.capture_exception())
+    self.assertEqual([event["exception"]["values"][-1]["value"] for event in self.sent_events()], ["after init"])
+
+  def test_half_started_init_leaves_no_live_client(self):
+    with mock.patch.object(sentry.HARDWARE, "get_device_type", side_effect=RuntimeError("no hardware")):
+      self.assertRaises(RuntimeError, sentry.init, sentry.SentryProject.SELFDRIVE)
+    self.assertFalse(sentry.sentry_sdk.get_client().is_active())
+
+  def test_unrecognized_car_is_sent_with_its_vin(self):
+    self.assertTrue(sentry.init(sentry.SentryProject.SELFDRIVE))
+    sentry.log_fingerprint(structs.CarParams(carFingerprint="MOCK", carVin="1FTFW1E50MFA00000", brand="mock"))
+    events = self.sent_events()
+    self.assertEqual([event["message"] for event in events], ["car doesn't match any fingerprints"])
+    self.assertEqual(events[0]["level"], "error")
+    self.assertEqual(events[0]["tags"]["carVin"], "1FTFW1E50MFA00000")
+
+  def test_recognized_car_is_only_tagged(self):
+    self.assertTrue(sentry.init(sentry.SentryProject.SELFDRIVE))
+    sentry.log_fingerprint(structs.CarParams(carFingerprint="FORD_F_150_MK14", brand="ford"))
+    self.assertEqual(self.sent_events(), [])
+    try:
+      raise ZeroDivisionError("later crash")
+    except ZeroDivisionError:
+      sentry.capture_exception()
+    tags = self.sent_events()[0]["tags"]
+    self.assertEqual((tags["carFingerprint"], tags["carName"]), ("FORD_F_150_MK14", "ford"))
+    self.assertNotIn("carVin", tags)
 
   def test_filtered_daemon_sends_nothing(self):
     self.assertTrue(sentry.init(sentry.SentryProject.SELFDRIVE))

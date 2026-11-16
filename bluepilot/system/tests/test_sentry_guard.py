@@ -1,4 +1,5 @@
 """The guard upstream files call crash reporting through: it can never stop the process."""
+import copy
 import sys
 import unittest
 from unittest import mock
@@ -47,6 +48,23 @@ class TestSentryGuard(unittest.TestCase):
       guard = CrashReporting()
       self.assertFalse(guard.init("SELFDRIVE"))
       self.assertFalse(guard.report_tombstone("fn", "message", "contents"))
+
+  def test_does_nothing_without_an_active_client(self):
+    self.module.is_active.return_value = False  # loaded, but this process never started reporting
+    guard = CrashReporting()
+    self.assertFalse(guard.capture_exception())
+    self.assertFalse(guard.set_tag("daemon", "card"))
+    self.module.capture_exception.assert_not_called()
+    self.module.set_tag.assert_not_called()
+    self.assertTrue(guard.init("SELFDRIVE"))
+
+  def test_private_names_are_not_calls(self):
+    guard = CrashReporting()
+    self.assertFalse(hasattr(guard, "_x"))
+    with mock.patch.object(bluepilot, "_log_failure") as log_failure:
+      copy.copy(guard)
+      copy.deepcopy(guard)
+    log_failure.assert_not_called()
 
   def test_does_nothing_after_init_fails(self):
     self.module.init.side_effect = RuntimeError("bad DSN")

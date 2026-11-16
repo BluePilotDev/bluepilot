@@ -15,17 +15,6 @@ from openpilot.sunnypilot.selfdrive.controls.lib.speed_limit.helpers import set_
 
 from openpilot.sunnypilot.sunnylink.statsd import STATSLOGSP
 
-# BluePilot: crash reporting; does nothing when it can't run
-from openpilot.common.bluepilot import sentry
-
-
-def log_fingerprint(CP: structs.CarParams) -> None:
-  if CP.carFingerprint == "MOCK":
-    sentry.capture_fingerprint_mock(CP.carVin)  # pass vin for diagnosability
-  else:
-    sentry.capture_fingerprint(CP.carFingerprint, CP.brand)
-# End BluePilot
-
 
 def _enforce_torque_lateral_control(CP: structs.CarParams, params: Params | None = None, enabled: bool = False) -> bool:
   if params is None:

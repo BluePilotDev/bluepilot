@@ -138,9 +138,9 @@ class MapdInstallManager:
                              f"Boot will continue in {5 - i}s...")
         time.sleep(1)
 
-      sentry.init("SELFDRIVE")  # BluePilot
+      sentry.init("SELFDRIVE")  # BluePilot: start crash reporting
       traceback.print_exc()
-      sentry.capture_exception()  # BluePilot
+      sentry.capture_exception()  # BluePilot: report the install failure
 
 
 if __name__ == "__main__":

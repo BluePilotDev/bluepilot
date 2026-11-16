@@ -264,7 +264,7 @@ class ModelState(ModelStateBase):
 def main(demo=False):
   cloudlog.warning("modeld init")
 
-  sentry.set_tag("daemon", PROCESS_NAME)  # BluePilot
+  sentry.set_tag("daemon", PROCESS_NAME)  # BluePilot: tag crash reports with the daemon
   cloudlog.bind(daemon=PROCESS_NAME)
   setproctitle(PROCESS_NAME)
 

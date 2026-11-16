@@ -20,8 +20,8 @@ class CrashReporting:
   """BluePilot crash reporting (bluepilot/system/sentry.py) as upstream files call it: `sentry.<function>(...)`.
 
   It can never stop the car software. A call runs only on BluePilot, once the module and its SDK have loaded, and
-  never raises; if `init` fails, every later call does nothing. Each call returns True when it ran, so a hook can
-  fall back to upstream's code when it didn't.
+  never raises; if `init` fails, every later call does nothing, and so does a call in a process where reporting never
+  started. Each call returns True when it ran, so a hook can fall back to upstream's code when it didn't.
   """
   def __init__(self) -> None:
     self._module = None
@@ -51,10 +51,15 @@ class CrashReporting:
       return False
 
   def __getattr__(self, name: str):
+    if name.startswith("_"):  # not a call: lets hasattr, copy and pickle probe the object normally
+      raise AttributeError(name)
+
     def call(*args, **kwargs) -> bool:
       if (module := self._load()) is None:
         return False
       try:
+        if not module.is_active():  # loaded, but reporting never started in this process
+          return False
         getattr(module, name)(*args, **kwargs)
         return True
       except Exception:

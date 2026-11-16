@@ -20,6 +20,7 @@ import sentry_sdk
 from sentry_sdk.integrations.threading import ThreadingIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration  # BluePilot: log capture, tuned for memory (see init())
 
+from opendbc.car import structs
 from openpilot.common.params import Params
 from openpilot.system.athena.registration import UNREGISTERED_DONGLE_ID
 from openpilot.common.hardware import HARDWARE
@@ -179,7 +180,12 @@ def report_tombstone_file(fn: str, message: str, stacktrace: str) -> None:
       if not proc_maps:
         contents += line
 
-  report_tombstone(fn, message, stacktrace + "\n\n" + contents)
+  try:
+    report_tombstone(fn, message, stacktrace + "\n\n" + contents)
+  except Exception:
+    # report_tombstone logs the tombstone line before it reports, so this still counts as done:
+    # tombstoned mustn't log the line a second time
+    cloudlog.exception("sentry tombstone exception")
 # End BluePilot
 
 
@@ -264,6 +270,20 @@ def capture_fingerprint(candidate: str, car_name: str) -> None:
   # End BluePilot
 
 
+# BluePilot: was log_fingerprint() in sunnypilot/selfdrive/car/interfaces.py, which upstream removed with Sentry
+def log_fingerprint(CP: structs.CarParams) -> None:
+  if CP.carFingerprint == "MOCK":
+    capture_fingerprint_mock(CP.carVin)  # pass vin for diagnosability
+  else:
+    capture_fingerprint(CP.carFingerprint, CP.brand)
+
+
+def is_active() -> bool:
+  """Whether this process has a running client: init() ran here, or in the parent before the fork."""
+  return sentry_sdk.get_client().is_active()
+# End BluePilot
+
+
 def set_tag(key: str, value: str) -> None:
   sentry_sdk.set_tag(key, value)
 
@@ -283,7 +303,18 @@ def get_properties() -> tuple[str, str, str]:
   return dongle_id, git_username, sunnylink_dongle_id
 
 
+# BluePilot: a failed start leaves no live client behind, so a half-configured one never reports
 def init(project: SentryProject) -> bool:
+  try:
+    return _init(project)
+  except Exception:
+    sentry_sdk.get_client().close()
+    sentry_sdk.get_global_scope().set_client(None)
+    raise
+# End BluePilot
+
+
+def _init(project: SentryProject) -> bool:
   build_metadata = get_build_metadata()
 
   env = build_metadata.channel_type
