@@ -60,7 +60,7 @@ class VisualsLayoutMici(NavScroller):
     self.lane_center_indicator = BigParamControlBP("Lane Positioning Confidence Indicator", "BPLaneCenterIcon")
     self.hide_dm_icon = BigParamControlBP("Hide Driver Monitoring Icon", "BPHideDMicon")
     self.hide_wheel_icon = BigParamControlBP("Hide Steering Wheel Icon", "BPHideWheelIcon")
-    self.wide_angle_camera = BigParamControlBP("Use Wide Camera View", "BPWideAngleCamera")
+    self.automatic_camera_view = BigParamControlBP("Automatic Camera View", "BPCameraAngleAuto")
     self.animate_steering_wheel = BigParamControlBP("Animate Steering Wheel", "BPAnimateSteeringWheel")
     ensure_steering_wheel_icon_style_initialized(Params(), SteeringWheelIconStyle.COMMA_4)
     self.wheel_icon_style = BigMultiParamToggleBP(
@@ -91,7 +91,7 @@ class VisualsLayoutMici(NavScroller):
       self.lane_center_indicator,
       self.hide_dm_icon,
       self.hide_wheel_icon,
-      self.wide_angle_camera,
+      self.automatic_camera_view,
       self.animate_steering_wheel,
       self.wheel_icon_style,
       self.dm_icon_style,
@@ -112,7 +112,7 @@ class VisualsLayoutMici(NavScroller):
       ("BPLaneCenterIcon", self.lane_center_indicator),
       ("BPHideDMicon", self.hide_dm_icon),
       ("BPHideWheelIcon", self.hide_wheel_icon),
-      ("BPWideAngleCamera", self.wide_angle_camera),
+      ("BPCameraAngleAuto", self.automatic_camera_view),
       ("BPAnimateSteeringWheel", self.animate_steering_wheel),
       ("FordPrefHybridPowerFlow", self.show_hybrid_power_flow),
     )

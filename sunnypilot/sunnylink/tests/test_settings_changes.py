@@ -159,7 +159,10 @@ class TestBluePilotVehicleVisuals:
       "BPHideDMicon": ("[Visuals] Hide Driver Monitoring Icon", "Removes DM silhouette icon from UI."),
       "BPHideWheelIcon": ("[Visuals] Hide Steering Wheel Icon", "Removes steering wheel icon from UI."),
       "BPShowNetworkStatus": ("[Visuals] Show Network Status (C3X)", "Show network connectivity bars on bottom-left of screen"),
-      "BPWideAngleCamera": ("[Visuals] Use Wide Camera View", "Show video feed from wide-angle camera."),
+      "BPCameraAngleAuto": (
+        "[Visuals] Automatic Camera View",
+        "Automatically switch between wide-angle view at low speeds and normal view at higher speeds, without requiring Experimental Mode.",
+      ),
     }
     for key, (title, description) in expected.items():
       item = _find_item(schema, key)

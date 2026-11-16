@@ -207,7 +207,8 @@ class ControllerStateBP:
   bmsHideDmIcon: bool = False
   bmsHideWheelIcon: bool = False
   bmsShowNetworkStatus: bool = False
-  bmsUseWideCamera: bool = False
+  bmsUseWideCamera: bool = False  # Retired force-wide setting.
+  bmsCameraAngleAuto: bool = False
   bmsAnimateSteeringWheel: bool = True
   bmsWheelIconStyle: int = 0
   bmsShowRadarLeadOverlay: bool = True

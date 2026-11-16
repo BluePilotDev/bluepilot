@@ -1,9 +1,12 @@
+from openpilot.selfdrive.ui.bp.lib.camera_angle_auto import speed_camera_stream
 from enum import IntEnum
 import pyray as rl
 from cereal import log
 from openpilot.common.params import Params
 from openpilot.selfdrive.ui import UI_BORDER_SIZE
-from openpilot.selfdrive.ui.onroad.augmented_road_view import AugmentedRoadView, WIDE_CAM
+from openpilot.selfdrive.ui.onroad.augmented_road_view import (
+  AugmentedRoadView, WIDE_CAM, ROAD_CAM, WIDE_CAM_MAX_SPEED, ROAD_CAM_MIN_SPEED,
+)
 from openpilot.selfdrive.ui.bp.onroad.cameraview_bp import CameraViewBP
 from openpilot.selfdrive.ui.bp.onroad.blindspot_renderer import BlindspotRendererMixin
 from openpilot.selfdrive.ui.bp.onroad.hud_renderer_bp import HudRendererBP
@@ -110,12 +113,14 @@ class AugmentedRoadViewBP(CameraViewBP, AugmentedRoadView, BlindspotRendererMixi
     self._hud_renderer.reset_tesla_lead_fade()
 
   def _switch_stream_if_needed(self, sm):
-    """Force the wide road stream when requested; otherwise retain stock experimental-mode behavior."""
-    if self._bp_wide_camera and WIDE_CAM in self.available_streams:
-      if self.stream_type != WIDE_CAM:
-        self.switch_stream(WIDE_CAM)
-      return
-    AugmentedRoadView._switch_stream_if_needed(self, sm)
+    if not self._bp_camera_angle_auto:
+      return AugmentedRoadView._switch_stream_if_needed(self, sm)
+    target = speed_camera_stream(
+      sm['carState'].vEgo, self.stream_type, WIDE_CAM, ROAD_CAM,
+      WIDE_CAM in self.available_streams, WIDE_CAM_MAX_SPEED, ROAD_CAM_MIN_SPEED,
+    )
+    if self.stream_type != target:
+      self.switch_stream(target)
 
   def _render(self, rect):
     """Override render to add blindspot, gauges, confidence ball on left."""

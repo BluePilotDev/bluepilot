@@ -92,7 +92,7 @@ class BluePilotLayout(Widget):
       ("BPHideDMicon", self._hide_dm_icon),
       ("BPHideWheelIcon", self._hide_wheel_icon),
       ("BPShowNetworkStatus", self._show_network_status),
-      ("BPWideAngleCamera", self._wide_angle_camera),
+      ("BPCameraAngleAuto", self._automatic_camera_view),
       ("BPFordACCPathFeedback", self._ford_acc_path_feedback),
       ("BPAnimateSteeringWheel", self._animate_steering_wheel),
       ("BPUseCustomSounds", self._use_custom_sounds),
@@ -234,11 +234,11 @@ class BluePilotLayout(Widget):
       icon="monitoring.png"
     )
 
-    self._wide_angle_camera = toggle_item(
-      lambda: tr("Use Wide Camera View"),
-      lambda: tr("Show video feed from wide-angle camera."),
-      initial_state=self._safe_get_bool(self._params, "BPWideAngleCamera"),
-      callback=lambda state: self._toggle_callback(state, "BPWideAngleCamera"),
+    self._automatic_camera_view = toggle_item(
+      lambda: tr("Automatic Camera View"),
+      lambda: tr("Automatically switch between wide-angle view at low speeds and normal view at higher speeds, without requiring Experimental Mode."),
+      initial_state=self._safe_get_bool(self._params, "BPCameraAngleAuto"),
+      callback=lambda state: self._toggle_callback(state, "BPCameraAngleAuto"),
       icon="monitoring.png"
     )
 
@@ -817,7 +817,7 @@ class BluePilotLayout(Widget):
         self._hide_dm_icon,
         self._hide_wheel_icon,
         self._show_network_status,
-        self._wide_angle_camera,
+        self._automatic_camera_view,
         self._animate_steering_wheel,
         self._wheel_icon_style_btn,
         self._dm_icon_style_btn,
