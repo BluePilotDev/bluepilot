@@ -1,7 +1,66 @@
 """BluePilot detection. Safe to import on any fork — returns False when not BluePilot."""
+import importlib
 import os
 from functools import cache
 
 @cache
 def is_bluepilot() -> bool:
   return os.path.isfile(os.path.join(os.path.dirname(__file__), '..', '..', 'BPVERSION'))  # BPVERSION is at the repo root
+
+
+def _log_failure(message: str) -> None:
+  try:
+    from openpilot.common.swaglog import cloudlog
+    cloudlog.exception(message)
+  except Exception:
+    pass
+
+
+class CrashReporting:
+  """BluePilot crash reporting (bluepilot/system/sentry.py) as upstream files call it: `sentry.<function>(...)`.
+
+  It can never stop the car software. A call runs only on BluePilot, once the module and its SDK have loaded, and
+  never raises; if `init` fails, every later call does nothing. Each call returns True when it ran, so a hook can
+  fall back to upstream's code when it didn't.
+  """
+  def __init__(self) -> None:
+    self._module = None
+    self._off = False
+
+  def _load(self):
+    if self._module is None and not self._off:
+      self._off = not is_bluepilot()
+      if not self._off:
+        try:
+          self._module = importlib.import_module("openpilot.bluepilot.system.sentry")
+        except Exception:
+          self._off = True
+          _log_failure("BluePilot crash reporting failed to load")
+    return self._module
+
+  def init(self, project: str) -> bool:
+    """Starts reporting for a SentryProject, by name."""
+    if (module := self._load()) is None:
+      return False
+    try:
+      module.init(module.SentryProject[project])
+      return True
+    except Exception:
+      self._module, self._off = None, True
+      _log_failure("BluePilot crash reporting failed to start")
+      return False
+
+  def __getattr__(self, name: str):
+    def call(*args, **kwargs) -> bool:
+      if (module := self._load()) is None:
+        return False
+      try:
+        getattr(module, name)(*args, **kwargs)
+        return True
+      except Exception:
+        _log_failure(f"BluePilot crash reporting: {name} failed")
+        return False
+    return call
+
+
+sentry = CrashReporting()

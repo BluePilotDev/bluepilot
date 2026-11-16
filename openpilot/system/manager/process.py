@@ -15,6 +15,9 @@ import openpilot.cereal.messaging as messaging
 from openpilot.common.basedir import BASEDIR
 from openpilot.common.params import Params
 from openpilot.common.swaglog import cloudlog
+# BluePilot: crash reporting; does nothing when it can't run
+from openpilot.common.bluepilot import sentry
+# End BluePilot
 
 
 def launcher(proc: str, name: str) -> None:
@@ -30,6 +33,7 @@ def launcher(proc: str, name: str) -> None:
 
     # add daemon name tag to logs
     cloudlog.bind(daemon=name)
+    sentry.set_tag("daemon", name)  # BluePilot
 
     # exec the process
     mod.main()
@@ -38,7 +42,10 @@ def launcher(proc: str, name: str) -> None:
   except Exception:
     # can't install the crash handler because sys.excepthook doesn't play nice
     # with threads, so catch it here.
-    cloudlog.exception("crash")
+    # BluePilot: report the crash (it logs it too); upstream's log line when reporting can't run
+    if not sentry.capture_exception():
+      cloudlog.exception("crash")
+    # End BluePilot
     raise
 
 

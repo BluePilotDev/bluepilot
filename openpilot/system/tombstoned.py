@@ -12,6 +12,9 @@ from typing import NoReturn
 from openpilot.common.hardware import PC
 from openpilot.common.hardware.hw import Paths
 from openpilot.common.swaglog import cloudlog
+# BluePilot: crash reporting; does nothing when it can't run
+from openpilot.common.bluepilot import sentry
+# End BluePilot
 from openpilot.common.version import get_build_metadata
 from openpilot.system.athena.registration import is_registered_device
 
@@ -108,7 +111,10 @@ def report_tombstone_apport(fn):
     crash_function = re.sub(r'\(.*?\)', '', crash_function)
 
   message = message + " - " + crash_function
-  cloudlog.error({'tombstone': message})
+  # BluePilot: report the native crash (it logs it too); upstream's log line when reporting can't run
+  if not sentry.report_tombstone_file(fn, message, stacktrace):
+    cloudlog.error({'tombstone': message})
+  # End BluePilot
 
   # Copy crashlog to upload folder
   clean_path = path.replace('/', '_')
@@ -134,6 +140,9 @@ def main() -> NoReturn:
   build_metadata = get_build_metadata()
   comma_remote = build_metadata.openpilot.comma_remote and "commaai" in build_metadata.openpilot.git_origin
   should_report = comma_remote and is_registered_device() and not PC
+  # BluePilot: keep and report native crashes on every build
+  should_report = sentry.init("SELFDRIVE_NATIVE") or should_report
+  # End BluePilot
 
   # Clear apport folder on start, otherwise duplicate crashes won't register
   clear_apport_folder()

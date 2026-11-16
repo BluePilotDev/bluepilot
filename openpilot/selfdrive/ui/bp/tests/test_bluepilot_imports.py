@@ -40,7 +40,7 @@ def bluepilot_modules() -> list[str]:
   for folder in BLUEPILOT_DIRS:
     for path in sorted((ROOT / folder).rglob("*.py")):
       rel = path.relative_to(ROOT).with_suffix("")
-      if "tests" in rel.parts or rel.name.startswith("test_"):
+      if "tests" in rel.parts or "vendor" in rel.parts or rel.name.startswith("test_"):  # vendor: third-party, loaded by its user
         continue
       if rel.name == "__init__":
         rel = rel.parent
