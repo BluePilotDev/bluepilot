@@ -109,11 +109,28 @@ class ControlsExt(ModelStateBase):
     # lateralInputsRequired for every Ford); other cars leave them empty
     if self.CP_SP.lateralInputsRequired:
       self.fill_lateral_inputs(CC_SP.lateralInputs, sm)
-      CC_SP.params = self.read_lateral_params()
+      CC_SP.params = self.read_lateral_params() + self.read_bpx_params()
 
     return CC_SP
 
-  def read_lateral_params(self) -> list[dict]:
+  # BluePilot: BPx settings for the Ford car code on bp-full
+  def read_bpx_params(self) -> list[dict]:
+    """BluePilot (BPx): the longitudinal and cluster settings the Ford car code on bp-full reads. Only
+    on BluePilot: bp-sunnypilot's opendbc doesn't have these lists."""
+    try:
+      from openpilot.common.bluepilot import is_bluepilot
+    except ImportError:
+      return []
+    if not is_bluepilot():
+      return []
+    try:
+      from opendbc.sunnypilot.car.ford.bluepilot.hud_ext import HUD_PARAMS
+      from opendbc.sunnypilot.car.ford.bluepilot.longitudinal_ext import BPX_LONG_PARAMS
+    except ImportError:  # an opendbc without the BPx car code: it has no reader for these either
+      return []
+    return self.read_lateral_params([*BPX_LONG_PARAMS, *HUD_PARAMS])
+
+  def read_lateral_params(self, keys: list[str] | None = None) -> list[dict]:
     """BluePilot: UI-tunable lateral params for the opendbc lateral, as CarControlSP.params entries.
     A key never written on the device publishes its params_keys.h default, so the lateral runs
     the value the settings UI shows (#6 in ford-op/bg-opendbc). Read every frame, as carcontroller did
@@ -124,13 +141,13 @@ class ControlsExt(ModelStateBase):
     # Ford needs it, so a submodule on another layout must not break controlsd for other brands
     from opendbc.bluepilot_lateral.core.values_ext import BP_LATERAL_PARAMS
     entries = []
-    for key in BP_LATERAL_PARAMS:
+    for key in BP_LATERAL_PARAMS if keys is None else keys:
       try:
         value = self.params.get(key, return_default=True)
       except UnknownKeyName:
         # key list (submodule) and params_keys.h (this repo) drifted; skip rather than kill controlsd
         if key not in self._bp_unknown_keys_logged:
-          cloudlog.warning(f"BluePilot lateral param {key} not registered in params_keys.h; skipping")
+          cloudlog.warning(f"BluePilot param {key} not registered in params_keys.h; skipping")
           self._bp_unknown_keys_logged.add(key)
         continue
       if value is None:
