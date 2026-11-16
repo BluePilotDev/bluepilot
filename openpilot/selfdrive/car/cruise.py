@@ -4,8 +4,11 @@ import numpy as np
 from opendbc.car.structs import car
 from openpilot.common.constants import CV
 from openpilot.sunnypilot.selfdrive.car.cruise_ext import VCruiseHelperSP
-# BluePilot: ICBM cruise overrides
+# BluePilot: with ICBM on a Ford the target follows the cluster set speed
 from openpilot.common.bluepilot import is_bluepilot
+if is_bluepilot():
+  from openpilot.bluepilot.selfdrive.car.bp_cluster_set_speed import ClusterSetSpeedBP, follows_cluster
+# End BluePilot
 
 
 # WARNING: this value was determined based on the model's training distribution,
@@ -39,6 +42,9 @@ class VCruiseHelper(VCruiseHelperSP):
     self.v_cruise_kph_last = 0
     self.button_timers = {ButtonType.decelCruise: 0, ButtonType.accelCruise: 0}
     self.button_change_states = {btn: {"standstill": False, "enabled": False} for btn in self.button_timers}
+    # BluePilot: with ICBM on a Ford the target follows the cluster set speed at engage and after a driver press
+    self.bp_cluster_set_speed = ClusterSetSpeedBP() if is_bluepilot() and follows_cluster(CP, CP_SP) else None
+    # End BluePilot
 
   @property
   def v_cruise_initialized(self):
@@ -50,11 +56,20 @@ class VCruiseHelper(VCruiseHelperSP):
     self.get_minimum_set_speed(is_metric)
 
     _enabled = self.update_enabled_state(CS, enabled)
+    # BluePilot: track engages and driver Set+/Set- presses
+    bp_follow = False
+    if self.bp_cluster_set_speed is not None:
+      bp_follow = self.bp_cluster_set_speed.update(CS, _enabled, self.update_speed_limit_assist_pre_active_confirmed)
+    # End BluePilot
 
     if CS.cruiseState.available:
       if not self.CP.pcmCruise or (not self.CP_SP.pcmCruiseSpeed and _enabled):
         # if stock cruise is completely disabled, then we can use our own set speed logic
         self._update_v_cruise_non_pcm(CS, _enabled, is_metric)
+        # BluePilot: take the truck's set speed
+        if bp_follow:
+          self.v_cruise_kph = CS.cruiseState.speedCluster * CV.MS_TO_KPH
+        # End BluePilot
         self.update_speed_limit_assist_v_cruise_non_pcm()
         self.v_cruise_cluster_kph = self.v_cruise_kph
       else:
@@ -70,8 +85,7 @@ class VCruiseHelper(VCruiseHelperSP):
       self.v_cruise_kph = V_CRUISE_UNSET
       self.v_cruise_cluster_kph = V_CRUISE_UNSET
 
-    if not self.CP.pcmCruise or not self.CP_SP.pcmCruiseSpeed \
-       or (is_bluepilot() and self.CP_SP.intelligentCruiseButtonManagementAvailable):  # BluePilot: ICBM needs button timers
+    if not self.CP.pcmCruise or not self.CP_SP.pcmCruiseSpeed:
       self.update_button_timers(CS, enabled)
 
   def _update_v_cruise_non_pcm(self, CS, enabled, is_metric):
@@ -129,12 +143,6 @@ class VCruiseHelper(VCruiseHelperSP):
     self.v_cruise_kph = np.clip(round(self.v_cruise_kph, 1), self.v_cruise_min, V_CRUISE_MAX)
 
   def update_button_timers(self, CS, enabled):
-    # BluePilot: Clear stale button timers when cruise is disabled to prevent stale presses
-    if is_bluepilot() and not enabled:
-      for k in self.button_timers:
-        self.button_timers[k] = 0
-      return
-
     # increment timer for buttons still pressed
     for k in self.button_timers:
       if self.button_timers[k] > 0:
@@ -148,18 +156,12 @@ class VCruiseHelper(VCruiseHelperSP):
 
   def initialize_v_cruise(self, CS, initial_speed: int) -> None:
     # initializing is handled by the PCM
-    if self.CP.pcmCruise \
-       and not (is_bluepilot() and self.CP_SP.intelligentCruiseButtonManagementAvailable):  # BluePilot: ICBM needs init
+    if self.CP.pcmCruise:
       return
 
     if any(b.type in (ButtonType.accelCruise, ButtonType.resumeCruise) for b in CS.buttonEvents) and self.v_cruise_initialized:
       self.v_cruise_kph = self.v_cruise_kph_last
     else:
-      # BluePilot: For PCM cars with ICBM, use cluster speed if available
-      if is_bluepilot() and self.CP.pcmCruise and self.CP_SP.intelligentCruiseButtonManagementAvailable \
-         and CS.cruiseState.speedCluster > 0:
-        self.v_cruise_kph = CS.cruiseState.speedCluster * CV.MS_TO_KPH
-      else:
-        self.v_cruise_kph = int(round(np.clip(max(CS.vEgo * CV.MS_TO_KPH, initial_speed), V_CRUISE_INITIAL, V_CRUISE_MAX)))
+      self.v_cruise_kph = int(round(np.clip(max(CS.vEgo * CV.MS_TO_KPH, initial_speed), V_CRUISE_INITIAL, V_CRUISE_MAX)))
 
     self.v_cruise_cluster_kph = self.v_cruise_kph
