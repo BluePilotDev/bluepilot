@@ -5,12 +5,16 @@ from opendbc.car.structs import car
 from openpilot.cereal import custom
 from openpilot.common.constants import CV
 from openpilot.common.test import OpenpilotTestCase
-from openpilot.selfdrive.car.cruise import VCruiseHelper
+from openpilot.selfdrive.car.cruise import V_CRUISE_UNSET, VCruiseHelper
 from openpilot.sunnypilot.selfdrive.car.intelligent_cruise_button_management.controller import INACTIVE_TIMER
 
 from bluepilot.selfdrive.car.bp_cluster_set_speed import SETTLE_TIME
 
 ButtonType = car.CarState.ButtonEvent.Type
+# a target change reaches ICBM through the planner: one plan cycle (20 Hz) plus up to about 60 ms measured on the
+# 2026-11-11 drives; the truck's last change can come 0.1 s after a release
+PLAN_CYCLE = 0.05
+PLANNER_HOP = 0.06
 SlaState = custom.LongitudinalPlanSP.SpeedLimit.AssistState
 
 
@@ -55,20 +59,22 @@ class Truck:
     self.cluster = set_speed
     self.frames(50)
 
-  def press(self, button, steps, release_after):
-    """A driver press: the cluster takes each (frame, speed) in steps while the button is held, then the release."""
+  def press(self, button, steps, release_after, sla_states=()):
+    """A driver press: the cluster takes each (frame, speed) in steps while the button is held, then the release.
+    sla_states: (frame, state) changes of the planner's Speed Limit Assist state during the press."""
     self.frame((button, True))
     for i in range(1, release_after):
       self.cluster = dict(steps).get(i, self.cluster)
+      self.sla_state = dict(sla_states).get(i, self.sla_state)
       self.frame()
     self.frame((button, False))
 
-  def hold(self, button, release_after=70):
+  def hold(self, button, release_after=70, sla_states=()):
     """A held press: 1 unit about 40 ms after the press, the next multiple of 5 at about 0.5 s, released at 0.7 s."""
     sign = 1 if button == ButtonType.accelCruise else -1
     first = self.cluster + sign
     fifth = (first // 5 + (sign > 0)) * 5 if first % 5 else first
-    self.press(button, [(4, first), (50, fifth)], release_after)
+    self.press(button, [(4, first), (50, fifth)], release_after, sla_states)
 
   def tap(self, button):
     """A short tap: 1 unit about 40 ms after the press, released at 0.12 s."""
@@ -79,6 +85,17 @@ class TestEngage(OpenpilotTestCase):
   def test_engage_from_main_off_takes_the_cluster_set_speed(self):
     truck = Truck()
     truck.engage_from_main_off(35)
+    self.assertEqual(truck.target, 35)
+
+  def test_target_stays_unset_until_the_cluster_shows_a_speed(self):
+    # however long the truck takes to show the set speed after it reports enabled
+    truck = Truck()
+    truck.frames(5)
+    truck.enabled = True
+    truck.frames(40)
+    self.assertEqual(truck.helper.v_cruise_kph, V_CRUISE_UNSET)
+    truck.cluster = 35
+    truck.frames(5)
     self.assertEqual(truck.target, 35)
 
 
@@ -134,20 +151,30 @@ class TestIcbmSteps(OpenpilotTestCase):
       self.assertEqual(truck.target, 30)
 
   def test_settle_ends_before_icbm_acts(self):
-    self.assertLess(SETTLE_TIME, INACTIVE_TIMER)
+    self.assertLessEqual(SETTLE_TIME + PLANNER_HOP + PLAN_CYCLE, INACTIVE_TIMER)
     # a truck update just after the release is still taken
     truck = Truck()
     truck.engage_from_main_off(35)
-    truck.tap(ButtonType.decelCruise)
-    truck.frames(5)
+    truck.tap(ButtonType.decelCruise)  # 35 -> 34, the release is the last frame
+    truck.frames(9)
     truck.cluster = 33
-    truck.frames(5)
+    truck.frame()
     self.assertEqual(truck.target, 33)
-    # a cluster change once ICBM can act (INACTIVE_TIMER after the release) is ICBM's, not the driver's
-    truck.frames(round(INACTIVE_TIMER * 100) - 10)
+    # once a change could no longer reach ICBM a plan cycle before it acts, it is ICBM's, not the driver's
+    truck.frames(round((INACTIVE_TIMER - PLANNER_HOP - PLAN_CYCLE) * 100) - 11)
     truck.cluster = 34
     truck.frames(5)
     self.assertEqual(truck.target, 33)
+
+  def test_other_cruise_buttons_are_not_followed(self):
+    # Set and Resume events while engaged (a press that began before the engage) are not Set+/Set- presses
+    for button in (ButtonType.setCruise, ButtonType.resumeCruise):
+      with self.subTest(button=button):
+        truck = Truck()
+        truck.engage_from_main_off(30)
+        truck.press(button, [(4, 31), (8, 32)], 12)
+        truck.frames(5)
+        self.assertEqual(truck.target, 30)
 
 
 class TestSpeedLimitAssist(OpenpilotTestCase):
@@ -188,6 +215,30 @@ class TestSpeedLimitAssist(OpenpilotTestCase):
     truck.hold(ButtonType.decelCruise)
     truck.frames(100)
     self.assertEqual((truck.cluster, truck.target), (30, 30))
+
+  def test_held_confirm_press_sets_the_limit_as_target(self):
+    truck = Truck()
+    truck.engage_from_main_off(35)
+    truck.limit, truck.sla_state = 25, SlaState.preActive
+    truck.frames(10)
+    truck.hold(ButtonType.decelCruise)
+    truck.frames(5)
+    truck.sla_state = SlaState.active
+    truck.frames(100)
+    self.assertEqual(truck.target, 25)
+
+  def test_prompt_ending_during_a_held_press_follows_the_truck(self):
+    # the prompt (limit 25 at 35) times out 0.3 s or 0.65 s into a held Set-: nothing confirms, so the press is a
+    # plain set-speed change and the target must end on the truck's 30
+    for expire in (30, 65):
+      with self.subTest(expire=expire):
+        truck = Truck()
+        truck.engage_from_main_off(35)
+        truck.limit, truck.sla_state = 25, SlaState.preActive
+        truck.frames(10)
+        truck.hold(ButtonType.decelCruise, sla_states=[(expire, SlaState.inactive)])
+        truck.frames(100)
+        self.assertEqual((truck.cluster, truck.target), (30, 30))
 
 
 class TestOtherCars(OpenpilotTestCase):

@@ -63,6 +63,7 @@ class IntelligentCruiseButtonManagement:
     # so ICBM never presses toward it
     if (self.v_target >= (145 if self.is_metric else 90) or self.v_target == 0) and self.v_cruise_cluster > 0:
       self.v_target = self.v_cruise_cluster
+    # End BluePilot
 
   def update_state_machine(self) -> custom.IntelligentCruiseButtonManagement.SendButtonState:
     self.pre_active_timer = max(0, self.pre_active_timer - 1)

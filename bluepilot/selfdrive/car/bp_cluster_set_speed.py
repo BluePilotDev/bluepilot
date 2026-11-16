@@ -21,22 +21,27 @@ def follows_cluster(CP, CP_SP) -> bool:
   return CP.brand == "ford" and CP.pcmCruise and not CP_SP.pcmCruiseSpeed
 
 
-class ClusterSetSpeed:
+class ClusterSetSpeedBP:
   def __init__(self):
     self.frames_left = 0
     self.enabled_prev = False
     self.held = False
+    self.button = None
     self.confirming = False
 
   def update(self, CS, enabled: bool, confirms_limit) -> bool:
     """Once per card frame. True when the target should be the cluster set speed this frame.
     confirms_limit(button): whether a press of that button confirms Speed Limit Assist's prompt."""
     shown = CS.cruiseState.speedCluster > 0
+    released = False
     for b in CS.buttonEvents:
       if b.type in SET_BUTTONS:
-        self.held = b.pressed
-        if b.pressed:
-          self.confirming = confirms_limit(b.type.raw)
+        self.held, self.button = b.pressed, b.type.raw
+        released = not b.pressed
+    # a press confirms only if the prompt still asks for it at the release, when the planner confirms; card asks
+    # again at each of its own steps, so ask on every held frame and keep the release's answer through the settle
+    if self.held or released:
+      self.confirming = confirms_limit(self.button)
     if not enabled:
       self.frames_left = 0
       self.held = self.confirming = False
