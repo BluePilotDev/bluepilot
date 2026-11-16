@@ -45,10 +45,6 @@ class IntelligentCruiseButtonManagement:
     self.is_metric = False
 
     self.cruise_button_timers = CRUISE_BUTTON_TIMER
-    
-    # BluePilot: Track initial cruise speed when first enabled
-    self.initial_cruise_speed_kph = 0
-    self.cruise_enabled_prev = False
 
   @property
   def v_cruise_equal(self) -> bool:
@@ -58,30 +54,15 @@ class IntelligentCruiseButtonManagement:
     speed_conv = CV.MS_TO_KPH if self.is_metric else CV.MS_TO_MPH
     ms_conv = CV.KPH_TO_MS if self.is_metric else CV.MPH_TO_MS
 
-    # BluePilot: Capture initial cruise speed when cruise is first enabled
-    # Use current speed (vEgo) as the initial setpoint if planner target is invalid/unreasonable
-    cruise_enabled = CS.cruiseState.available and CS.cruiseState.enabled
-    if cruise_enabled and not self.cruise_enabled_prev:
-      # Cruise just enabled - capture current speed as initial setpoint
-      current_speed_kph = CS.vEgo * CV.MS_TO_KPH
-      self.initial_cruise_speed_kph = round(current_speed_kph)
-    self.cruise_enabled_prev = cruise_enabled
-
     self.v_target_ms_last = apply_hysteresis(LP_SP.vTarget, self.v_target_ms_last, HYST_GAP * ms_conv)
 
     self.v_target = round(self.v_target_ms_last * speed_conv)
     self.v_cruise_min = get_minimum_set_speed(self.is_metric)
     self.v_cruise_cluster = round(CS.cruiseState.speedCluster * speed_conv)
-    
-    # BluePilot: If planner target is invalid/unreasonable and we have an initial cruise speed,
-    # use the initial speed as the target (or cluster speed if it's been set)
-    MAX_REASONABLE_TARGET = 145 if self.is_metric else 90
-    if self.v_target >= MAX_REASONABLE_TARGET or self.v_target == 0:
-      # Planner target is invalid - use initial cruise speed or cluster speed
-      if self.initial_cruise_speed_kph > 0:
-        self.v_target = self.initial_cruise_speed_kph
-      elif self.v_cruise_cluster > 0:
-        self.v_target = self.v_cruise_cluster
+    # BluePilot: an unset target (the 145 kph / 90 mph maximum) or a zero one holds the cluster set speed,
+    # so ICBM never presses toward it
+    if (self.v_target >= (145 if self.is_metric else 90) or self.v_target == 0) and self.v_cruise_cluster > 0:
+      self.v_target = self.v_cruise_cluster
 
   def update_state_machine(self) -> custom.IntelligentCruiseButtonManagement.SendButtonState:
     self.pre_active_timer = max(0, self.pre_active_timer - 1)
@@ -99,22 +80,7 @@ class IntelligentCruiseButtonManagement:
               self.state = State.holding
 
             elif self.v_target > self.v_cruise_cluster:
-              # BluePilot: Prevent ICBM from increasing speed when cruise is first enabled
-              # If cluster speed is 0 or very low, don't increase - wait for user to set initial speed
-              # Also cap target to reasonable maximum (145 kph / 90 mph)
-              # Don't increase if target exceeds initial cruise speed by more than 5 mph/kph
-              MAX_REASONABLE_TARGET = 145 if self.is_metric else 90
-              MAX_INITIAL_INCREASE = 5  # Allow small increases from initial speed
-              
-              if self.v_cruise_cluster == 0 or self.v_target >= MAX_REASONABLE_TARGET:
-                # Don't increase - stay in preActive or go to holding
-                self.state = State.holding
-              elif self.initial_cruise_speed_kph > 0 and self.v_target > (self.initial_cruise_speed_kph + MAX_INITIAL_INCREASE):
-                # Don't increase beyond initial cruise speed + small margin
-                # This prevents ICBM from ramping up when cruise is first enabled
-                self.state = State.holding
-              else:
-                self.state = State.increasing
+              self.state = State.increasing
 
             elif self.v_target < self.v_cruise_cluster and self.v_cruise_cluster > self.v_cruise_min:
               self.state = State.decreasing
@@ -149,15 +115,6 @@ class IntelligentCruiseButtonManagement:
 
     ready = CC.enabled and not CC.cruiseControl.override and not CC.cruiseControl.cancel and not CC.cruiseControl.resume
     button_pressed = any(self.cruise_button_timers[k] > 0 for k in self.cruise_button_timers)
-
-    # BluePilot: Clear button timers when cruise is disabled to prevent stale presses
-    # This ensures that when cruise is re-enabled, ICBM doesn't see stale button presses
-    if not ready:
-      for k in self.cruise_button_timers:
-        self.cruise_button_timers[k] = 0
-      # BluePilot: Reset initial cruise speed when cruise is disabled
-      # This ensures we capture a fresh initial speed when cruise is re-enabled
-      self.initial_cruise_speed_kph = 0
 
     self.is_ready = ready and not button_pressed
 

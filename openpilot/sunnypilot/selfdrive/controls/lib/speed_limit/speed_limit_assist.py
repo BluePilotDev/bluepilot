@@ -273,18 +273,7 @@ class SpeedLimitAssist:
 
         # PRE_ACTIVE
         elif self.state == SpeedLimitAssistState.preActive:
-          # BluePilot: For PCM cars using ICBM, check target_set_speed_confirmed directly
-          # ICBM adjusts cluster via CAN, so button events won't be in CS.buttonEvents
-          # We need to check if cluster matches target after ICBM has adjusted it
-          if self.CP_SP.intelligentCruiseButtonManagementAvailable:
-            # BluePilot: For ICBM vehicles, rely on target_set_speed_confirmed check instead of button detection
-            # ICBM sends button presses via CAN directly, not through CS.buttonEvents
-            if self.target_set_speed_confirmed:
-              self._update_confirmed_state()
-            elif self.pre_active_timer <= 0:
-              # Timeout - session ended
-              self.state = SpeedLimitAssistState.inactive
-          elif self.target_set_speed_confirmed:
+          if self.target_set_speed_confirmed:
             self._update_confirmed_state()
           elif self.pre_active_timer <= 0:
             # Timeout - session ended
