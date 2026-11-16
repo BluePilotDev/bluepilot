@@ -329,3 +329,16 @@ class TestNotEngagedReplacement:
     rule_types = _flatten_rule_types(item.get("enablement"))
     assert "offroad_only" not in rule_types, f"{key} still uses offroad_only"
     assert "not_engaged" in rule_types, f"{key} missing not_engaged"
+
+
+class TestExperimentalDcamTriggers:
+  def test_trigger_options_require_master_switch(self, schema):
+    master = _find_item(schema, 'BPCroppedDcam')
+    assert master['title'] == '[Visuals] Enable Experimental DCam Features'
+    for key, description in (
+      ('BPCroppedDcamTurnSignal', 'Show DCam view when turn signal active'),
+      ('BPCroppedDcamBSM', 'Show DCam view when vehicle Blind-Spot Monitoring System active'),
+    ):
+      item = _find_item(schema, key)
+      assert item['description'] == description
+      assert {'type': 'param', 'key': 'BPCroppedDcam', 'equals': True} in item['enablement']

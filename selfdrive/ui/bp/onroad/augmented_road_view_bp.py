@@ -1,3 +1,4 @@
+from openpilot.selfdrive.ui.bp.onroad.cropped_dcam_overlay import CroppedDcamOverlayMixin
 from openpilot.selfdrive.ui.bp.lib.camera_angle_auto import speed_camera_stream
 from enum import IntEnum
 import pyray as rl
@@ -60,7 +61,7 @@ def confidence_ball_presentation(enabled: bool, tesla_style: bool) -> tuple[bool
   return enabled and not tesla_style, enabled and tesla_style
 
 
-class AugmentedRoadViewBP(CameraViewBP, AugmentedRoadView, BlindspotRendererMixin):
+class AugmentedRoadViewBP(CroppedDcamOverlayMixin, CameraViewBP, AugmentedRoadView, BlindspotRendererMixin):
   """BluePilot AugmentedRoadView with blindspot indicators, gauges, and BP renderers."""
 
   BLIND_SPOT_WIDTH = 250  # Wider for TICI's larger screen
@@ -104,6 +105,7 @@ class AugmentedRoadViewBP(CameraViewBP, AugmentedRoadView, BlindspotRendererMixi
     self._tesla_style_enabled = theme_pack.tesla_active(self._bp_params)
     self._tesla_style_renderer.set_enabled(self._tesla_style_enabled)
     self.alert_renderer.set_tesla_style(self._tesla_style_enabled, ui_state.tesla_dark_fraction)
+    self._init_cropped_dcam(compact=False)
 
   def update_fade_out_bottom_overlay(self, _content_rect):
     """BluePilot: Skip MICI fade overlay on TICI — causes unwanted black gradient at bottom."""
@@ -210,6 +212,9 @@ class AugmentedRoadViewBP(CameraViewBP, AugmentedRoadView, BlindspotRendererMixi
 
     if self._tesla_style_enabled:
       self._tesla_style_renderer.render_traffic(self._content_rect, self.model_renderer)
+    # BluePilot: side-window camera sits above geometry and below HUD/warnings.
+    self._render_cropped_dcam(self._content_rect)
+
     # SP fade overlay
     self.update_fade_out_bottom_overlay(self._content_rect)
 
@@ -323,6 +328,7 @@ class AugmentedRoadViewBP(CameraViewBP, AugmentedRoadView, BlindspotRendererMixi
 
     # Green game road (ModelRendererBP handles the 8-bit styling internally)
     self.model_renderer.render(content_rect)
+    self._render_cropped_dcam(content_rect)
 
     # Blindspot red edges stay on — safety overlay
     self._draw_blindspot_screen_edges(content_rect, self.BLIND_SPOT_WIDTH)

@@ -1,3 +1,4 @@
+from openpilot.selfdrive.ui.bp.onroad.cropped_dcam_overlay import CroppedDcamOverlayMixin
 from openpilot.selfdrive.ui.bp.lib.camera_angle_auto import speed_camera_stream
 import pyray as rl
 from cereal import car
@@ -72,7 +73,7 @@ class _VerticalSwipeDetector(Widget):
     pass  # transparent — visual is handled by parent
 
 
-class MiciAugmentedRoadViewBP(MiciCameraViewBP, AugmentedRoadView, BlindspotRendererMixin):
+class MiciAugmentedRoadViewBP(CroppedDcamOverlayMixin, MiciCameraViewBP, AugmentedRoadView, BlindspotRendererMixin):
   """BluePilot MICI AugmentedRoadView with blindspot indicators, BP HUD, and complication."""
 
   BLIND_SPOT_WIDTH = 125  # Narrower for MICI's smaller screen
@@ -114,6 +115,7 @@ class MiciAugmentedRoadViewBP(MiciCameraViewBP, AugmentedRoadView, BlindspotRend
     self._show_confidence_ball = self._bp_params.get_bool("BPShowConfidenceBall")
 
     self._theme_param_counter = 0
+    self._init_cropped_dcam(compact=True)
 
   def _on_swipe_down(self):
     if not ui_state.is_onroad():
@@ -208,6 +210,9 @@ class MiciAugmentedRoadViewBP(MiciCameraViewBP, AugmentedRoadView, BlindspotRend
 
     if self._tesla_style_enabled:
       self._tesla_style_renderer.render_traffic(self._content_rect, self._model_renderer)
+    # BluePilot: side-window camera sits above geometry and below HUD/warnings.
+    self._render_cropped_dcam(self._content_rect)
+
     # BluePilot: Rad Racer sprites (ego + leads) over the road; no gauge cluster on MICI,
     # so the ego car anchors to the bottom edge of the content rect instead.
     if _rad_racer:

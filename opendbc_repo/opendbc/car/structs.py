@@ -209,6 +209,9 @@ class ControllerStateBP:
   bmsShowNetworkStatus: bool = False
   bmsUseWideCamera: bool = False  # Retired force-wide setting.
   bmsCameraAngleAuto: bool = False
+  bmsExperimentalDcam: bool = False
+  bmsDcamTurnSignal: bool = True
+  bmsDcamBsm: bool = True
   bmsAnimateSteeringWheel: bool = True
   bmsWheelIconStyle: int = 0
   bmsShowRadarLeadOverlay: bool = True

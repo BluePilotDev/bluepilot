@@ -93,6 +93,7 @@ class BluePilotLayout(Widget):
       ("BPHideWheelIcon", self._hide_wheel_icon),
       ("BPShowNetworkStatus", self._show_network_status),
       ("BPCameraAngleAuto", self._automatic_camera_view),
+      ("BPCroppedDcam", self._experimental_dcam),
       ("BPFordACCPathFeedback", self._ford_acc_path_feedback),
       ("BPAnimateSteeringWheel", self._animate_steering_wheel),
       ("BPUseCustomSounds", self._use_custom_sounds),
@@ -232,6 +233,20 @@ class BluePilotLayout(Widget):
       initial_state=self._safe_get_bool(self._params, "BPShowNetworkStatus"),
       callback=lambda state: self._toggle_callback(state, "BPShowNetworkStatus"),
       icon="monitoring.png"
+    )
+
+    self._experimental_dcam = toggle_item(
+      lambda: tr("Enable Experimental DCam Features"),
+      lambda: tr("Show cropped driver-camera side views using the selected activation options."),
+      initial_state=self._safe_get_bool(self._params, "BPCroppedDcam"),
+      callback=lambda state: self._toggle_callback(state, "BPCroppedDcam"),
+      icon="monitoring.png",
+    )
+    self._dcam_triggers = button_item(
+      lambda: tr("DCam Activation Options"), lambda: tr("SELECT"),
+      lambda: tr("Choose when the driver-camera side views appear."),
+      callback=self._open_dcam_triggers,
+      enabled=lambda: self._safe_get_bool(self._params, "BPCroppedDcam"),
     )
 
     self._automatic_camera_view = toggle_item(
@@ -818,6 +833,8 @@ class BluePilotLayout(Widget):
         self._hide_wheel_icon,
         self._show_network_status,
         self._automatic_camera_view,
+        self._experimental_dcam,
+        self._dcam_triggers,
         self._animate_steering_wheel,
         self._wheel_icon_style_btn,
         self._dm_icon_style_btn,
@@ -1155,6 +1172,10 @@ class BluePilotLayout(Widget):
       stored = stored.decode("utf-8", errors="replace")
     stored = theme_pack.normalize_selector_value(stored)
     return next((label for label, v in self._theme_entries if v and v.lower() == stored.lower()), tr("Off"))
+
+  def _open_dcam_triggers(self):
+    from openpilot.selfdrive.ui.bp.layouts.settings.dcam import DcamTriggersLayout
+    gui_app.push_widget(DcamTriggersLayout())
 
   def _get_model_path_color_display(self) -> str:
     selected = get_model_path_color(self._params)

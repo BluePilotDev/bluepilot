@@ -2376,6 +2376,38 @@
           "description": "Automatically switch between wide-angle view at low speeds and normal view at higher speeds, without requiring Experimental Mode."
         },
         {
+          "key": "BPCroppedDcam",
+          "widget": "toggle",
+          "title": "[Visuals] Enable Experimental DCam Features",
+          "description": "Show cropped driver-camera side views using the selected activation options."
+        },
+        {
+          "key": "BPCroppedDcamTurnSignal",
+          "widget": "toggle",
+          "title": "[Visuals] When Turn Signal Active",
+          "description": "Show DCam view when turn signal active",
+          "enablement": [
+            {
+              "type": "param",
+              "key": "BPCroppedDcam",
+              "equals": true
+            }
+          ]
+        },
+        {
+          "key": "BPCroppedDcamBSM",
+          "widget": "toggle",
+          "title": "[Visuals] When BSM Active",
+          "description": "Show DCam view when vehicle Blind-Spot Monitoring System active",
+          "enablement": [
+            {
+              "type": "param",
+              "key": "BPCroppedDcam",
+              "equals": true
+            }
+          ]
+        },
+        {
           "key": "BPAnimateSteeringWheel",
           "widget": "toggle",
           "title": "[Visuals] Animate Steering Wheel",

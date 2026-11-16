@@ -14,6 +14,7 @@ from openpilot.selfdrive.ui.bp.lib.dm_icon_style import (
   get_dm_icon_style,
 )
 from openpilot.selfdrive.ui.bp.mici.widgets.button_bp import (
+  BigButtonBP,
   BigParamControlBP,
   BigMultiParamToggleBP,
   BigMultiParamToggleBoolBP,
@@ -23,6 +24,8 @@ from openpilot.selfdrive.ui.bp.mici.widgets.button_bp import (
 from openpilot.selfdrive.ui.bp.lib import theme_pack
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.system.ui.widgets.scroller import NavScroller
+from openpilot.system.ui.lib.application import gui_app
+from openpilot.selfdrive.ui.bp.mici.layouts.settings.dcam_mici import DcamParamControlBP
 
 
 class VisualsLayoutMici(NavScroller):
@@ -60,6 +63,10 @@ class VisualsLayoutMici(NavScroller):
     self.lane_center_indicator = BigParamControlBP("Lane Positioning Confidence Indicator", "BPLaneCenterIcon")
     self.hide_dm_icon = BigParamControlBP("Hide Driver Monitoring Icon", "BPHideDMicon")
     self.hide_wheel_icon = BigParamControlBP("Hide Steering Wheel Icon", "BPHideWheelIcon")
+    self.experimental_dcam = DcamParamControlBP("Enable Experimental DCam Features", "BPCroppedDcam")
+    self.dcam_triggers = BigButtonBP("DCam Activation Options", "SELECT")
+    self.dcam_triggers.set_click_callback(self._open_dcam_triggers)
+    self.dcam_triggers.set_enabled(lambda: self.experimental_dcam.params.get_bool("BPCroppedDcam"))
     self.automatic_camera_view = BigParamControlBP("Automatic Camera View", "BPCameraAngleAuto")
     self.animate_steering_wheel = BigParamControlBP("Animate Steering Wheel", "BPAnimateSteeringWheel")
     ensure_steering_wheel_icon_style_initialized(Params(), SteeringWheelIconStyle.COMMA_4)
@@ -92,6 +99,8 @@ class VisualsLayoutMici(NavScroller):
       self.hide_dm_icon,
       self.hide_wheel_icon,
       self.automatic_camera_view,
+      self.experimental_dcam,
+      self.dcam_triggers,
       self.animate_steering_wheel,
       self.wheel_icon_style,
       self.dm_icon_style,
@@ -113,6 +122,7 @@ class VisualsLayoutMici(NavScroller):
       ("BPHideDMicon", self.hide_dm_icon),
       ("BPHideWheelIcon", self.hide_wheel_icon),
       ("BPCameraAngleAuto", self.automatic_camera_view),
+      ("BPCroppedDcam", self.experimental_dcam),
       ("BPAnimateSteeringWheel", self.animate_steering_wheel),
       ("FordPrefHybridPowerFlow", self.show_hybrid_power_flow),
     )
@@ -144,3 +154,7 @@ class VisualsLayoutMici(NavScroller):
     self.wheel_icon_style.set_value(self.wheel_icon_style._options[int(wheel_style)])
     dm_style = get_dm_icon_style(ui_state.params, DMIconStyle.COMMA_4)
     self.dm_icon_style.set_value(self.dm_icon_style._options[int(dm_style)])
+
+  def _open_dcam_triggers(self):
+    from openpilot.selfdrive.ui.bp.mici.layouts.settings.dcam_mici import DcamTriggersLayoutMici
+    gui_app.push_widget(DcamTriggersLayoutMici())
