@@ -33,15 +33,18 @@ class ClusterSetSpeedBP:
     """Once per card frame. True when the target should be the cluster set speed this frame.
     confirms_limit(button): whether a press of that button confirms Speed Limit Assist's prompt."""
     shown = CS.cruiseState.speedCluster > 0
-    released = False
+    pressed = released = False
     for b in CS.buttonEvents:
       if b.type in SET_BUTTONS:
         self.held, self.button = b.pressed, b.type.raw
-        released = not b.pressed
-    # a press confirms only if the prompt still asks for it at the release, when the planner confirms; card asks
-    # again at each of its own steps, so ask on every held frame and keep the release's answer through the settle
-    if self.held or released:
+        pressed, released = b.pressed, not b.pressed
+    # a press confirms the prompt only if it answered it from the start (a prompt appearing mid-hold doesn't make
+    # it an answer) and the prompt still asks for it at the release, when the planner confirms; the release's
+    # answer is kept through the settle
+    if pressed:
       self.confirming = confirms_limit(self.button)
+    elif self.held or released:
+      self.confirming = self.confirming and confirms_limit(self.button)
     if not enabled:
       self.frames_left = 0
       self.held = self.confirming = False

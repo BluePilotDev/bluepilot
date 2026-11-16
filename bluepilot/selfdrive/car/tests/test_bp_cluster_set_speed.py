@@ -59,22 +59,25 @@ class Truck:
     self.cluster = set_speed
     self.frames(50)
 
-  def press(self, button, steps, release_after, sla_states=()):
+  def press(self, button, steps, release_after, sla_states=(), targets=None):
     """A driver press: the cluster takes each (frame, speed) in steps while the button is held, then the release.
-    sla_states: (frame, state) changes of the planner's Speed Limit Assist state during the press."""
+    sla_states: (frame, state) changes of the planner's Speed Limit Assist state during the press.
+    targets: a list that gets the target of every held frame."""
     self.frame((button, True))
     for i in range(1, release_after):
       self.cluster = dict(steps).get(i, self.cluster)
       self.sla_state = dict(sla_states).get(i, self.sla_state)
       self.frame()
+      if targets is not None:
+        targets.append(self.target)
     self.frame((button, False))
 
-  def hold(self, button, release_after=70, sla_states=()):
+  def hold(self, button, release_after=70, sla_states=(), targets=None):
     """A held press: 1 unit about 40 ms after the press, the next multiple of 5 at about 0.5 s, released at 0.7 s."""
     sign = 1 if button == ButtonType.accelCruise else -1
     first = self.cluster + sign
     fifth = (first // 5 + (sign > 0)) * 5 if first % 5 else first
-    self.press(button, [(4, first), (50, fifth)], release_after, sla_states)
+    self.press(button, [(4, first), (50, fifth)], release_after, sla_states, targets)
 
   def tap(self, button):
     """A short tap: 1 unit about 40 ms after the press, released at 0.12 s."""
@@ -229,16 +232,32 @@ class TestSpeedLimitAssist(OpenpilotTestCase):
 
   def test_prompt_ending_during_a_held_press_follows_the_truck(self):
     # the prompt (limit 25 at 35) times out 0.3 s or 0.65 s into a held Set-: nothing confirms, so the press is a
-    # plain set-speed change and the target must end on the truck's 30
+    # plain set-speed change and the target follows the truck from then on, to 30
     for expire in (30, 65):
       with self.subTest(expire=expire):
         truck = Truck()
         truck.engage_from_main_off(35)
         truck.limit, truck.sla_state = 25, SlaState.preActive
         truck.frames(10)
-        truck.hold(ButtonType.decelCruise, sla_states=[(expire, SlaState.inactive)])
+        targets = []
+        truck.hold(ButtonType.decelCruise, sla_states=[(expire, SlaState.inactive)], targets=targets)
+        if expire == 30:
+          self.assertEqual(targets[30:], [34] * 19 + [30] * 20)  # following again from the expiry
         truck.frames(100)
         self.assertEqual((truck.cluster, truck.target), (30, 30))
+
+  def test_prompt_appearing_during_a_held_press_does_not_make_it_a_confirmation(self):
+    # a press that began before the prompt showed isn't an answer to it: the driver's hold wins
+    for button, start, steps, end in ((ButtonType.accelCruise, 28, [(4, 29), (50, 30), (100, 35), (150, 40)], 40),
+                                      (ButtonType.decelCruise, 45, [(4, 44), (50, 40), (100, 35), (150, 30)], 30)):
+      with self.subTest(button=button):
+        truck = Truck()
+        truck.engage_from_main_off(start)
+        truck.limit = 35
+        truck.frames(10)
+        truck.press(button, steps, 170, sla_states=[(60, SlaState.preActive)])
+        truck.frames(100)
+        self.assertEqual((truck.cluster, truck.target), (end, end))
 
 
 class TestOtherCars(OpenpilotTestCase):
