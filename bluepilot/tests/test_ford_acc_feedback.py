@@ -1,6 +1,7 @@
 from types import SimpleNamespace as NS
 
 import pytest
+import time
 from opendbc.car import Bus
 import cereal.messaging as messaging
 
@@ -66,10 +67,11 @@ def test_real_message_publication_preserves_other_fields(monkeypatch):
 
 
 class Messages(dict):
-  healthy = True
-
-  def all_checks(self, services):
-    return self.healthy
+  def __init__(self, *args, **kwargs):
+    super().__init__(*args, **kwargs)
+    self.seen = dict.fromkeys(self, True)
+    self.valid = dict.fromkeys(self, True)
+    self.recv_time = dict.fromkeys(self, time.monotonic())
 
 
 def messages(value=1):
@@ -88,11 +90,12 @@ def test_smooth_transition_and_immediate_safety_gating(monkeypatch):
   clock[0] += .1
   assert -1 < feedback.update(True, sm, False) < first
   sm['carControl'].longActive = True
-  assert feedback.update(True, sm, False) == 0
+  # ICBM may set longActive without openpilot owning longitudinal.
+  assert feedback.update(True, sm, False) != 0
   sm['carControl'].longActive = False
   assert feedback.update(True, sm, True) == 0
   assert feedback.update(False, sm, False) == 0
-  sm.healthy = False
+  sm.valid['carStateBP'] = False
   assert feedback.update(True, sm, False) == 0
 
 
@@ -166,3 +169,38 @@ def test_stale_camera_request_is_rejected():
   ci = interface(2)
   ci.can_parsers[Bus.cam].ts_nanos['ACCDATA']['AccPrpl_A_Rq'] -= 600_000_000
   assert ford_acc_feedback(ci, True, NOW) == (False, 0)
+
+
+@pytest.mark.parametrize('fps', [20, 60])
+def test_real_submaster_at_display_rate_accepts_fresh_feedback(monkeypatch, fps):
+  from openpilot.selfdrive.ui.bp.lib import ford_acc_path
+  clock = [100.0]
+  monkeypatch.setattr(ford_acc_path, 'time', NS(monotonic=lambda: clock[0]))
+  sm = messaging.SubMaster(['carStateBP', 'carState', 'carControl'])
+  state = messaging.new_message('carState')
+  state.valid = True
+  state.carState.cruiseState.enabled = True
+  signal = messaging.new_message('carStateBP')
+  signal.valid = True
+  signal.carStateBP.fordAcc.available = True
+  signal.carStateBP.fordAcc.feedback = -0.35
+  control = messaging.new_message('carControl')
+  control.valid = True
+  feedback = FordAccPathFeedback()
+  for _ in range(fps * 2):
+    clock[0] += 1 / fps
+    sm.update_msgs(clock[0], [state.as_reader(), signal.as_reader(), control.as_reader()])
+    result = feedback.update(True, sm, False)
+  assert sm.all_valid() and sm.all_alive()
+  if fps == 20:
+    assert not sm.all_checks()  # Reproduces the old gate suppressing the tint.
+  assert result == pytest.approx(-0.35, abs=0.001)
+  clock[0] += .6
+  assert feedback.update(True, sm, False) == 0  # Lost data still fails closed.
+
+
+@pytest.mark.parametrize('service', ['carState', 'carStateBP'])
+def test_unseen_visual_inputs_do_not_render(service):
+  sm = messages()
+  sm.seen[service] = False
+  assert FordAccPathFeedback().update(True, sm, False) == 0

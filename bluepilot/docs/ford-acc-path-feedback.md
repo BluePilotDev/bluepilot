@@ -24,8 +24,11 @@ near-zero requests neutral. Feedback magnitude is bounded to [-1, 1].
 Vehicle acceleration and model predictions are not substituted for Ford signals.
 The feedback requires valid CAN, both messages received within 500 ms, stock
 cruise enabled, and no driver pedal/cruise override. It is disabled whenever
-openpilot longitudinal control is configured or `carControl.longActive` is true.
-Missing or unhealthy UI messages immediately remove the tint.
+openpilot longitudinal control is configured. `carControl.longActive` is not used
+as an ownership signal because stock-ACC ICBM can also activate that field.
+UI messages must be seen, valid and received within 500 ms. Control-loop frequency
+checks are deliberately excluded: the C3X UI consumes 100 Hz messages at 20 FPS.
+Missing, invalid or stale UI messages remove the tint.
 
 No CAN subscriptions, control requests, driving-model code, or model catalogs are
 changed. The new optional `carStateBP.fordAcc` fields default to unavailable in

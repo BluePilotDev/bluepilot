@@ -13,14 +13,18 @@ class FordAccPathFeedback:
     now = time.monotonic()
     dt = min(max(now - self.last_time, 0.0), 0.1)
     self.last_time = now
-    if (not enabled or openpilot_longitudinal or
-        not sm.all_checks(['carStateBP', 'carState', 'carControl'])):
+    # UI consumers conflate 100 Hz car messages at the display rate (20 Hz on
+    # C3X). SubMaster's default frequency checks can reject perfectly fresh data.
+    # This visual needs valid, recently received inputs, not control-loop rates.
+    if (not enabled or openpilot_longitudinal or any(
+        not sm.seen.get(service, False) or not sm.valid.get(service, False) or
+        not 0 <= now - sm.recv_time.get(service, 0.0) <= 0.5
+        for service in ('carStateBP', 'carState'))):
       self.value = 0.0
       return 0.0
     cs = sm['carState']
     feedback = sm['carStateBP'].fordAcc
-    if (not feedback.available or not cs.cruiseState.enabled or cs.gasPressed or
-        cs.brakePressed or sm['carControl'].longActive):
+    if (not feedback.available or not cs.cruiseState.enabled or cs.gasPressed or cs.brakePressed):
       self.value = 0.0
       return 0.0
     target = float(feedback.feedback)
