@@ -4,6 +4,9 @@ import numpy as np
 from opendbc.car.structs import car
 from openpilot.common.constants import CV
 from openpilot.sunnypilot.selfdrive.car.cruise_ext import VCruiseHelperSP
+from openpilot.common.bluepilot import is_bluepilot  # BluePilot
+if is_bluepilot():
+  from openpilot.bluepilot.selfdrive.car.bp_cluster_set_speed import ClusterSetSpeed, follows_cluster
 
 
 # WARNING: this value was determined based on the model's training distribution,
@@ -37,6 +40,8 @@ class VCruiseHelper(VCruiseHelperSP):
     self.v_cruise_kph_last = 0
     self.button_timers = {ButtonType.decelCruise: 0, ButtonType.accelCruise: 0}
     self.button_change_states = {btn: {"standstill": False, "enabled": False} for btn in self.button_timers}
+    # BluePilot: with ICBM on a Ford the target follows the cluster set speed at engage and after a driver press
+    self.bp_cluster_set_speed = ClusterSetSpeed() if is_bluepilot() and follows_cluster(CP, CP_SP) else None
 
   @property
   def v_cruise_initialized(self):
@@ -48,11 +53,15 @@ class VCruiseHelper(VCruiseHelperSP):
     self.get_minimum_set_speed(is_metric)
 
     _enabled = self.update_enabled_state(CS, enabled)
+    bp_follow = self.bp_cluster_set_speed is not None and \
+                self.bp_cluster_set_speed.update(CS, _enabled, self.update_speed_limit_assist_pre_active_confirmed)  # BluePilot
 
     if CS.cruiseState.available:
       if not self.CP.pcmCruise or (not self.CP_SP.pcmCruiseSpeed and _enabled):
         # if stock cruise is completely disabled, then we can use our own set speed logic
         self._update_v_cruise_non_pcm(CS, _enabled, is_metric)
+        if bp_follow:  # BluePilot
+          self.v_cruise_kph = CS.cruiseState.speedCluster * CV.MS_TO_KPH
         self.update_speed_limit_assist_v_cruise_non_pcm()
         self.v_cruise_cluster_kph = self.v_cruise_kph
       else:
