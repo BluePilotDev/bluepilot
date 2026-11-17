@@ -8,14 +8,16 @@ from unittest import mock
 
 import pyray as rl
 
-from openpilot.selfdrive.ui.ui_state import ui_state
+from openpilot.common.test import OpenpilotTestCase
 from openpilot.system.ui.lib.application import gui_app
 
 RECT = rl.Rectangle(0, 0, 2160, 1080)
 
 
-class TestOnroadOverrides(unittest.TestCase):
+class TestOnroadOverrides(OpenpilotTestCase):
   def setUp(self):
+    from openpilot.selfdrive.ui.ui_state import ui_state  # inside the test's params prefix: building it writes params
+    self.ui_state = ui_state
     for patch in (mock.patch.object(gui_app, "font", return_value=rl.Font()),
                   mock.patch.object(gui_app, "texture", return_value=rl.Texture()),
                   mock.patch.object(ui_state, "rainbow_path", False)):
@@ -39,7 +41,7 @@ class TestOnroadOverrides(unittest.TestCase):
   def test_tici_render_reads_the_calibration_service_ui_subscribes_to(self):
     from openpilot.selfdrive.ui.bp.onroad.model_renderer_bp import ModelRendererBP
     renderer = self._plain_model_renderer(ModelRendererBP)
-    with mock.patch.object(ui_state, "started_frame", 1):
+    with mock.patch.object(self.ui_state, "started_frame", 1):
       renderer._render(RECT)  # no calibration received since start: returns before drawing
 
   def test_tici_render_reaches_draw_path(self):
@@ -77,7 +79,7 @@ class TestOnroadOverrides(unittest.TestCase):
       "vehicleParameters": SimpleNamespace(roll=0.04),
       "carControl": SimpleNamespace(latActive=True),
     }
-    with mock.patch.object(ui_state, "sm", sm), mock.patch.object(ui_state, "CP", None):
+    with mock.patch.object(self.ui_state, "sm", sm), mock.patch.object(self.ui_state, "CP", None):
       state._update_torque_filter_bp()
     # actual 1.0 m/s^2, desired 1.2, roll 0.04 * 9.81 * 0.25 = 0.0981; (1.0 - 0.0981 + 0.2) / 3.0
     (value,), _ = state._torque_filter.update.call_args

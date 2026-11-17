@@ -2,7 +2,8 @@
 
 usage: ui_frames_child.py tici|mici
 Prints one line `RESULTS <json>`: {case: {"error": traceback or None, "calls": {"Class.method": count}}}.
-Exits 77 when no window can be created (no display / GL).
+Exits NO_WINDOW (77) only when pyray can't load or raylib has no window after init; then the one
+`NOWINDOW <reason>` line says why. Anything else that fails, init_window's own UI code included, is a crash.
 
 raylib has one global window and BIG (tici) is read at import, so each family needs its own process.
 Messages are synthetic (no route), and fake camera frames go through a local VisionIPC server so the
@@ -13,6 +14,7 @@ import importlib
 import json
 import os
 import sys
+import time
 import traceback
 
 FAMILY = sys.argv[1]
@@ -21,11 +23,14 @@ if FAMILY == "tici":
 os.environ["OFFSCREEN"] = "1"
 
 import numpy as np
+
+from openpilot.selfdrive.ui.bp.tests.test_ui_frames import NO_WINDOW
+
 try:
   import pyray as rl
 except (ImportError, OSError) as e:  # e.g. Linux with no display and no EGL for the headless backend
-  print(f"NOWINDOW {type(e).__name__}: {e}")
-  sys.exit(77)
+  print(f"NOWINDOW pyray can't load: {type(e).__name__}: {e}")
+  sys.exit(NO_WINDOW)
 
 from openpilot.common.prefix import OpenpilotPrefix
 
@@ -103,7 +108,11 @@ def onroad_cases(family: str, theme_packs: list[str]) -> list[tuple[str, dict, d
     cases += [
       ("navigation panel", {"NavigationEnabled": True, "NavDestination": {"latitude": 40.0, "longitude": -83.0}}, {},
        model + hud + ["NavigationPanel._render"]),
+      ("navigation panel, right blind spot",
+       {"NavigationEnabled": True, "NavDestination": {"latitude": 40.0, "longitude": -83.0}, "ShowBlindspotOverlay": True},
+       {"right_blind_spot": True, "red_right_edge": True}, model + hud + ["NavigationPanel._render"]),
       ("not started", {}, {"started": False}, ["!ModelRendererBP._draw_lane_lines", "!MiciHudRendererBP._draw_steering_wheel"]),
+      ("model source icon", {}, {"chestnut": True}, model + hud + ["model source icon drawn"]),
     ]
     renders = {1: "_render_lead_speed", 2: "_render_current_speed", 3: "_render_lead_dist", 4: "_render_lead_time"}
     for value, method in renders.items():
@@ -140,6 +149,7 @@ def build_messages(opts: dict) -> dict:
 
   ds = msg("deviceState")
   ds.started = opts.get("started", True)
+  ds.chestnutPresent = bool(opts.get("chestnut"))
   ps = msg("pandaStates", 1)
   ps[0].ignitionLine = ds.started
   ps[0].pandaType = log.PandaState.PandaType.redPanda
@@ -157,7 +167,8 @@ def build_messages(opts: dict) -> dict:
   cs.vCruise = cs.vCruiseCluster = 110.0
   cs.cruiseState.enabled = cs.cruiseState.available = True
   cs.cruiseState.speed = 30.0
-  cs.leftBlindspot = cs.rightBlindspot = bool(opts.get("blind_spot"))
+  cs.leftBlindspot = bool(opts.get("blind_spot"))
+  cs.rightBlindspot = bool(opts.get("blind_spot") or opts.get("right_blind_spot"))
   cs.brakePressed = bool(opts.get("brakes"))
 
   cc = msg("carControl")
@@ -175,7 +186,7 @@ def build_messages(opts: dict) -> dict:
   cp.brand = "ford"
 
   n = 33
-  x = np.linspace(0.0, 100.0, n) ** 1.0
+  x = np.linspace(0.0, 100.0, n)
   md = msg("modelV2")
   md.position.x, md.position.y, md.position.z = x.tolist(), (0.0005 * x ** 2).tolist(), [0.0] * n
   md.acceleration.x = np.linspace(0.5, -0.5, n).tolist()
@@ -229,7 +240,6 @@ def build_messages(opts: dict) -> dict:
 
 def feed(msgs: dict) -> None:
   """Every frame, every service gets its message again (as patch_submaster does with a route)."""
-  import time
   from openpilot.selfdrive.ui.ui_state import ui_state
   sm = ui_state.sm
 
@@ -269,14 +279,10 @@ def main() -> None:
 
     rl.set_config_flags(rl.ConfigFlags.FLAG_WINDOW_HIDDEN)
     from openpilot.system.ui.lib.application import gui_app
-    try:
-      gui_app.init_window("bp ui frames", fps=60)
-    except Exception as e:  # no display / GL context
-      print(f"NOWINDOW {type(e).__name__}: {e}")
-      sys.exit(77)
+    gui_app.init_window("bp ui frames", fps=60)  # it also runs UI code (fonts, patches): an exception is a failure
     if not rl.is_window_ready():
-      print("NOWINDOW raylib window not ready")
-      sys.exit(77)
+      print("NOWINDOW raylib has no window after init")
+      sys.exit(NO_WINDOW)
 
     from openpilot.selfdrive.ui.ui_state import ui_state
     from openpilot.selfdrive.ui.bp.lib import theme_pack
@@ -307,9 +313,9 @@ def main() -> None:
       except Exception:
         results[name] = {"error": traceback.format_exc(), "calls": dict(calls)}
 
-    def draw(widget, n: int, before=None) -> None:
+    def draw(widget, n: int, before=None, last_frame=None) -> None:
       rect = rl.Rectangle(0, 0, gui_app.width, gui_app.height)
-      for _ in range(n):
+      for i in range(n):
         if before:
           before()
         ui_state.update()
@@ -317,8 +323,19 @@ def main() -> None:
         rl.clear_background(rl.BLACK)
         try:
           widget.render(rect)
+          if last_frame and i == n - 1:
+            last_frame()
         finally:
           rl.end_drawing()
+
+    def pixel(x: float, y: float) -> tuple[int, int, int]:
+      """The drawn color at screen point (x, y), read back from the framebuffer before it's shown."""
+      rl.rl_draw_render_batch_active()  # flush the draws raylib still holds in its batch
+      img = rl.load_image_from_screen()
+      scale = img.width / rl.get_screen_width()  # the framebuffer can be larger (HiDPI)
+      c = rl.get_image_color(img, int(x * scale), int(y * scale))
+      rl.unload_image(img)
+      return c.r, c.g, c.b
 
     def put(key: str, value) -> None:
       params.put(key, value, block=True)
@@ -347,6 +364,22 @@ def main() -> None:
       calls["lane-center line polygon"] += 1
       return blendful_polygon(*a, **k)
     blendful.draw_polygon = lane_center_polygon
+    if FAMILY == "mici":  # textures the model-source (chestnut) icon really draws; the method returns early when there's none
+      from openpilot.selfdrive.ui.mici.onroad.hud_renderer import HudRenderer
+      draw_model_source = HudRenderer._draw_model_source
+
+      def model_source(self, rect):
+        draw_texture_ex = rl.draw_texture_ex
+
+        def counted_texture(*a, **k):
+          calls["model source icon drawn"] += 1
+          return draw_texture_ex(*a, **k)
+        rl.draw_texture_ex = counted_texture
+        try:
+          return draw_model_source(self, rect)
+        finally:
+          rl.draw_texture_ex = draw_texture_ex
+      HudRenderer._draw_model_source = model_source
 
     # Fake camera frames
     from msgq.visionipc import VisionIpcServer
@@ -380,12 +413,26 @@ def main() -> None:
         put("CarParams", cp.to_bytes())
         put("CarParamsPersistent", cp.to_bytes())
         reset_theme_caches()
+        if opts.get("chestnut"):  # the chestnut is picked up when the car starts: pass through offroad first
+          feed(build_messages({**opts, "started": False}))
+          ui_state.update()
         feed(build_messages(opts))
         ui_state.update_params()
         view = view_cls()
         view.show_event()
-        draw(view, FRAMES, send_frame)
+        probed: list = []
+
+        def probe_right_edge():  # 3 px inside the road view's right edge (left of the navigation panel when shown)
+          content = view._content_rect
+          probed.append(pixel(content.x + content.width - 3, content.y + content.height / 2))
+        if opts.get("red_right_edge"):  # the edge pulses on a 3 s cycle: start it at its brightest (0.75 s in)
+          view._blindspot_pulse_start_time = time.monotonic() - 0.75
+        draw(view, FRAMES, send_frame, probe_right_edge if opts.get("red_right_edge") else None)
         view.hide_event()
+        for r, g, b in probed:
+          calls[f"right edge rgb {r},{g},{b}"] += 1
+          if not (r > 30 and r > g + 20 and r > b + 20):
+            raise AssertionError(f"no red blind-spot edge at the road view's right edge: rgb {(r, g, b)}")
         missing = [m for m in required if not m.startswith("!") and not calls[m]]
         unexpected = [m[1:] for m in required if m.startswith("!") and calls[m[1:]]]
         if missing or unexpected:
@@ -402,6 +449,23 @@ def main() -> None:
       if not calls["BlendfulRenderer.draw"]:
         raise AssertionError("the main layout never drew the onroad view")
     attempt("onroad/main layout", main_layout_onroad)
+
+    if FAMILY == "tici":  # the 3X controls debug panel (slides over the onroad view): every tab and Other's sub-tabs
+      def debug_panel():
+        from bluepilot.ui.widgets.debug import ControlsDebugPanel
+        panel = ControlsDebugPanel()
+        panel.toggle_visibility()
+        for tab in range(len(panel.TAB_LABELS)):
+          panel._current_tab = tab
+          for sub_tab in (range(5) if tab == 2 else [0]):
+            panel._other_panel._current_sub_tab = sub_tab
+            panel._other_panel._last_update_times = dict.fromkeys(range(5), 0.0)
+            draw(panel, 30, send_frame)  # 30 frames: the panel slides in over ~0.3 s
+        if not calls["DebugDataCard._render"]:
+          raise AssertionError("no debug data card drawn")
+        calls["debug panel tabs drawn"] = len(panel.TAB_LABELS)
+      wrap("bluepilot.ui.widgets.debug.other_debug_panel", "DebugDataCard", "_render")
+      attempt("onroad/controls debug panel", debug_panel)
 
     # Settings pages (offroad)
     feed(build_messages({"started": False}))

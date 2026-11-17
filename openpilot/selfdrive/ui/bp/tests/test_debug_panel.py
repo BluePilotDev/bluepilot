@@ -9,7 +9,7 @@ from unittest import mock
 import pyray as rl
 
 from openpilot.cereal import messaging
-from openpilot.selfdrive.ui.ui_state import ui_state
+from openpilot.common.test import OpenpilotTestCase
 from openpilot.system.ui.lib.application import gui_app
 
 SERVICES = ("carState", "carOutput", "radarState", "carParams", "deviceState")
@@ -29,8 +29,9 @@ def make_panel():
   return OtherDebugPanel()
 
 
-class TestOtherDebugPanel(unittest.TestCase):
+class TestOtherDebugPanel(OpenpilotTestCase):
   def setUp(self):
+    from openpilot.selfdrive.ui.ui_state import ui_state  # inside the test's params prefix: building it writes params
     for patch in (mock.patch.object(gui_app, "font", return_value=rl.Font()), mock.patch.object(ui_state, "sm", _SM())):
       patch.start()
       self.addCleanup(patch.stop)

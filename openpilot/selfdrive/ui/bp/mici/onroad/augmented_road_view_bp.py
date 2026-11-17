@@ -208,8 +208,10 @@ class MiciAugmentedRoadViewBP(MiciCameraViewBP, AugmentedRoadView, BlindspotRend
     if not self._bp_params.get_bool("BPHideOnroadBorder"):
       rl.draw_rectangle_rounded_lines_ex(self._content_rect, 0.2 * 1.02, 10, 50, rl.BLACK)
 
-    # BluePilot: Blindspot indicators (outside scissor, on screen edges)
-    self._draw_blindspot_screen_edges(self.rect, self.BLIND_SPOT_WIDTH)
+    # BluePilot: Blindspot indicators (outside scissor, on screen edges; the right one at the road view's edge
+    # when the navigation panel covers the screen's right side)
+    edges_rect = rl.Rectangle(self.rect.x, self.rect.y, self.rect.width - (PANEL_WIDTH if show_navigation else 0), self.rect.height)
+    self._draw_blindspot_screen_edges(edges_rect, self.BLIND_SPOT_WIDTH)
 
     # BluePilot: Lead car complication widget
     self._complication.render(self._content_rect)

@@ -26,6 +26,7 @@ def run_family(family: str) -> tuple[int, str]:
 class TestUiFrames(unittest.TestCase):
   results: dict = {}
   output: dict = {}
+  no_window: dict = {}
 
   @classmethod
   def setUpClass(cls):
@@ -33,14 +34,21 @@ class TestUiFrames(unittest.TestCase):
       runs = dict(zip(("tici", "mici"), pool.map(run_family, ("tici", "mici")), strict=True))
     for family, (code, out) in runs.items():
       cls.output[family] = out
-      if code == NO_WINDOW:
-        raise unittest.SkipTest(f"{family}: no window can be created here ({out.strip().splitlines()[-1]})")
+      reason = next((ln for ln in out.splitlines() if ln.startswith("NOWINDOW ")), None)
+      if code == NO_WINDOW and reason:  # this family's own tests skip; the other family still runs and can fail
+        cls.no_window[family] = reason
       line = next((ln for ln in out.splitlines() if ln.startswith("RESULTS ")), None)
       cls.results[family] = json.loads(line[len("RESULTS "):]) if line else None
 
-  def _check(self, family: str, prefix: str, minimum: int):
+  def _results(self, family: str) -> dict:
+    if family in self.no_window:
+      self.skipTest(f"{family}: {self.no_window[family]}")
     results = self.results[family]
     self.assertIsNotNone(results, f"{family} child crashed:\n{self.output[family][-6000:]}")
+    return results
+
+  def _check(self, family: str, prefix: str, minimum: int):
+    results = self._results(family)
     cases = {name: r for name, r in results.items() if name.startswith(prefix)}
     self.assertGreaterEqual(len(cases), minimum)
     for name, r in cases.items():
@@ -60,16 +68,23 @@ class TestUiFrames(unittest.TestCase):
     self._check("mici", "settings/", 50)
 
   def test_tici_bluepilot_settings_page_drawn_with_sections_open(self):
-    calls = self.results["tici"]["settings/BLUEPILOT"]["calls"]
+    calls = self._results("tici")["settings/BLUEPILOT"]["calls"]
     for drawn in ("sections expanded", "CollapsibleSectionHeader._render", "FloatControlAction._render"):
       with self.subTest(drawn=drawn):
         self.assertGreater(calls.get(drawn, 0), 0)
+
+  def test_tici_controls_debug_panel_drawn(self):
+    self.assertGreater(self._results("tici")["onroad/controls debug panel"]["calls"].get("DebugDataCard._render", 0), 0)
+
+  def test_mici_model_source_icon_drawn(self):
+    calls = self._results("mici")["onroad/model source icon"]["calls"]
+    self.assertGreater(calls.get("model source icon drawn", 0), 0)
 
   def test_lane_center_line_drawn(self):
     # sunnypilot's lane-center (blendful) line, engaged with lateral active: the 3X override used to skip it
     for family in ("tici", "mici"):
       with self.subTest(family=family):
-        self.assertGreater(self.results[family]["onroad/defaults"]["calls"].get("lane-center line polygon", 0), 0)
+        self.assertGreater(self._results(family)["onroad/defaults"]["calls"].get("lane-center line polygon", 0), 0)
 
 
 if __name__ == "__main__":
