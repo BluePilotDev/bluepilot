@@ -1,0 +1,15 @@
+sentry_sdk 2.62.0
+
+Source: the PyPI wheel sentry_sdk-2.62.0-py3-none-any.whl
+  sha256 27f61d13a86c3c1648dec666dd5a64f79772dd6a84b446f11866601ecab24f6f
+The sentry_sdk folder is the wheel's package, unmodified; LICENSE is the wheel's
+sentry_sdk-2.62.0.dist-info/licenses/LICENSE. Used by bluepilot/system/sentry.py, which puts
+this folder on sys.path. pyproject.toml and uv.lock stay upstream's. The SDK needs urllib3 and
+certifi, which the environment already has.
+
+To update:
+  pip download sentry-sdk==<version> --no-deps
+  check the wheel's sha256 against PyPI
+  unzip it, replace bluepilot/vendor/sentry_sdk with its sentry_sdk folder,
+  copy sentry_sdk-<version>.dist-info/licenses/LICENSE to bluepilot/vendor/sentry_sdk/LICENSE,
+  update this file, run bluepilot/system/tests

@@ -28,6 +28,9 @@ from openpilot.cereal.visionipc import VisionStreamType
 from msgq.visionipc import VisionIpcClient, VisionBuf
 from opendbc.car.car_helpers import get_demo_car_params
 from openpilot.common.swaglog import cloudlog
+# BluePilot: crash reporting; does nothing when it can't run
+from openpilot.common.bluepilot import sentry
+# End BluePilot
 from openpilot.common.params import Params
 from openpilot.common.hardware.usb import cable_connected
 from openpilot.common.filter_simple import FirstOrderFilter
@@ -261,6 +264,7 @@ class ModelState(ModelStateBase):
 def main(demo=False):
   cloudlog.warning("modeld init")
 
+  sentry.set_tag("daemon", PROCESS_NAME)  # BluePilot: tag crash reports with the daemon
   cloudlog.bind(daemon=PROCESS_NAME)
   setproctitle(PROCESS_NAME)
 
@@ -536,5 +540,8 @@ if __name__ == "__main__":
   except KeyboardInterrupt:
     cloudlog.warning(f"child {PROCESS_NAME} got SIGINT")
   except Exception:
-    cloudlog.exception("modeld exception")
+    # BluePilot: report the crash (it logs it too); upstream's log line when reporting can't run
+    if not sentry.capture_exception():
+      cloudlog.exception("modeld exception")
+    # End BluePilot
     raise

@@ -28,6 +28,9 @@ from openpilot.sunnypilot.selfdrive.car import interfaces as sunnypilot_interfac
 from openpilot.common.bluepilot import is_bluepilot
 if is_bluepilot():
   from openpilot.bluepilot.selfdrive.car.bp_card_publisher import publish_controller_state_bp, publish_car_state_bp
+# BluePilot: crash reporting; does nothing when it can't run
+from openpilot.common.bluepilot import sentry
+# End BluePilot
 
 REPLAY = "REPLAY" in os.environ
 
@@ -187,6 +190,10 @@ class Car:
 
     # card is driven by can recv, expected at 100Hz
     self.rk = Ratekeeper(100, print_delay_threshold=None)
+
+    # BluePilot: log fingerprint in crash reporting
+    sentry.log_fingerprint(self.CP)
+    # End BluePilot
 
   def state_update(self) -> tuple[car.CarState, custom.CarStateSP, structs.RadarDataT | None]:
     """carState update loop, driven by can"""

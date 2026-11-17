@@ -21,6 +21,9 @@ from openpilot.common.version import get_build_metadata
 from openpilot.common.hardware.hw import Paths
 
 from openpilot.sunnypilot.system.params_migration import run_migration
+# BluePilot: crash reporting; does nothing when it can't run
+from openpilot.common.bluepilot import sentry
+# End BluePilot
 
 
 def manager_init() -> None:
@@ -93,6 +96,9 @@ def manager_init() -> None:
   if not build_metadata.openpilot.is_dirty:
     os.environ['CLEAN'] = '1'
 
+  # BluePilot: start crash reporting
+  sentry.init("SELFDRIVE")
+  # End BluePilot
   # init logging
   cloudlog.bind_global(dongle_id=dongle_id,
                        version=build_metadata.openpilot.version,
@@ -202,7 +208,10 @@ def main() -> None:
     manager_thread()
   except Exception:
     traceback.print_exc()
-    cloudlog.exception("crash")
+    # BluePilot: report the crash (it logs it too); upstream's log line when reporting can't run
+    if not sentry.capture_exception():
+      cloudlog.exception("crash")
+    # End BluePilot
   finally:
     manager_cleanup()
 
