@@ -79,3 +79,33 @@ class TestParamsKeysMatchManifest(OpenpilotTestCase):
     block = _bluepilot_block(PARAMS_KEYS_H.read_text())
     manifest = {" ".join(line.split()) for line in params_keys_lines()}
     self.assertEqual(block, manifest, "paste the lines `python -m opendbc.bluepilot_lateral.params.manifest` prints")
+
+
+class TestPublishedParams(OpenpilotTestCase):
+  def _ext(self, params):
+    ext = ControlsExt.__new__(ControlsExt)
+    ext.params = params
+    ext._bp_unknown_keys_logged = set()
+    return ext
+
+  def test_publishes_what_read_lateral_params_returns(self):
+    published = {e["key"]: e["value"] for e in self._ext(Params()).published_params()}
+    self.assertTrue(set(BP_LATERAL_PARAMS) <= set(published))
+
+  def test_reads_are_cached_between_refreshes(self):
+    calls = []
+
+    class Counting(_Written):
+      def get(self, key, return_default=False):
+        calls.append(key)
+        return super().get(key, return_default=return_default)
+
+    ext = self._ext(Counting(Params()))
+    first = ext.published_params()
+    n = len(calls)
+    for _ in range(20):
+      self.assertIs(ext.published_params(), first)
+    self.assertEqual(len(calls), n)
+    ext._bp_params_cache_time -= 1.0
+    ext.published_params()
+    self.assertEqual(len(calls), 2 * n)
