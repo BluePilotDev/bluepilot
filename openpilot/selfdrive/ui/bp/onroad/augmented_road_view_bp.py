@@ -90,7 +90,7 @@ class AugmentedRoadViewBP(CameraViewBP, AugmentedRoadView, BlindspotRendererMixi
     self._rad_racer_theme = RadRacerTheme()
 
   def update_fade_out_bottom_overlay(self, _content_rect):
-    """BluePilot: Skip MICI fade overlay on TICI — causes unwanted black gradient at bottom."""
+    """BluePilot: Skip sunnypilot's 3X fade overlay (its texture is the comma four's) — causes unwanted black gradient at bottom."""
     pass
 
   def _render(self, rect):

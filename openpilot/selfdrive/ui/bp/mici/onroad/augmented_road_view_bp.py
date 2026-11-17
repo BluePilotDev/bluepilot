@@ -6,6 +6,7 @@ from openpilot.common.params import Params
 from openpilot.system.ui.lib.application import gui_app
 from openpilot.selfdrive.ui.mici.onroad import SIDE_PANEL_WIDTH
 from openpilot.selfdrive.ui.mici.onroad.augmented_road_view import AugmentedRoadView
+from openpilot.selfdrive.ui.mici.onroad.navigation import PANEL_WIDTH
 from openpilot.selfdrive.ui.bp.mici.onroad.cameraview_bp import MiciCameraViewBP
 from openpilot.selfdrive.ui.bp.mici.onroad.model_renderer_bp import ModelRendererBP
 from openpilot.selfdrive.ui.bp.onroad.blindspot_renderer import BlindspotRendererMixin
@@ -119,15 +120,24 @@ class MiciAugmentedRoadViewBP(MiciCameraViewBP, AugmentedRoadView, BlindspotRend
   def _render(self, _):
     """Override render to place confidence ball on left, offset driver state, and conditionally hide border."""
     bp_ui_log.tick()  # refresh BPUIDebugLog enabled state (mirrors TICI; MICI had no tick, so the toggle was inert)
+    # Draw text if not onroad (upstream)
+    if not ui_state.started:
+      rl.draw_rectangle_rec(self.rect, rl.BLACK)
+      self._offroad_label.render(self._rect)
+      return
+
     start_draw = time.monotonic()
     self._switch_stream_if_needed(ui_state.sm)
     self._update_calibration()
 
-    # Create inner content area (camera view, excluding side panel)
+    alert_to_render, not_animating_out = self._alert_renderer.will_render()
+    show_navigation = ui_state.navigation_enabled and ui_state.nav_destination_set and alert_to_render is None  # upstream
+
+    # Create inner content area (camera view, excluding side panel or navigation panel)
     self._content_rect = rl.Rectangle(
       self.rect.x,
       self.rect.y,
-      self.rect.width - SIDE_PANEL_WIDTH,
+      self.rect.width - (PANEL_WIDTH if show_navigation else SIDE_PANEL_WIDTH),
       self.rect.height,
     )
 
@@ -170,14 +180,14 @@ class MiciAugmentedRoadViewBP(MiciCameraViewBP, AugmentedRoadView, BlindspotRend
       rl.draw_texture_ex(self._fade_texture, rl.Vector2(self._content_rect.x, self._content_rect.y), 0.0, 1.0,
                          rl.Color(255, 255, 255, int(255 * fade_alpha)))
 
-    alert_to_render, not_animating_out = self._alert_renderer.will_render()
-
     # BluePilot: Driver monitor pushed right by ball width
     should_draw_dmoji = (not self._hud_renderer.drawing_top_icons() and ui_state.is_onroad() and
                          (ui_state.status != UIStatus.DISENGAGED or ui_state.always_on_dm))
     self._driver_state_renderer.set_should_draw(should_draw_dmoji)
     self._driver_state_renderer.set_position(self._rect.x + 16, self._rect.y + 10)
     self._driver_state_renderer.render()
+    self._long_indicator.set_should_draw(not self._hud_renderer.drawing_top_icons())  # upstream
+    self._long_indicator.render(self._content_rect)
 
     # HUD and alerts
     self._hud_renderer.set_can_draw_top_icons(alert_to_render is None)
@@ -188,8 +198,7 @@ class MiciAugmentedRoadViewBP(MiciCameraViewBP, AugmentedRoadView, BlindspotRend
     if _scene is not None and not _rad_racer:
       _scene.hero_y_scale = 0.90
       _scene.draw_foreground(self._content_rect, getattr(self, "_bp_hide_camera_view", False))
-    if ui_state.started:
-      self._alert_renderer.render(self._content_rect)
+    self._alert_renderer.render(self._content_rect)
     self._hud_renderer.render(self._content_rect)
 
     bp_ui_log.scissor("MiciAugRoadView", "end")
@@ -205,21 +214,19 @@ class MiciAugmentedRoadViewBP(MiciCameraViewBP, AugmentedRoadView, BlindspotRend
     # BluePilot: Lead car complication widget
     self._complication.render(self._content_rect)
 
-    ball_rect = rl.Rectangle(
-      self._rect.x + self._rect.width - SIDE_PANEL_WIDTH,
-      self._content_rect.y,
-      SIDE_PANEL_WIDTH,
-      self._content_rect.height,
-    )
-    self._confidence_ball.render(ball_rect)
+    if show_navigation:  # upstream: the navigation panel takes the confidence ball's place
+      self._navigation.render(rl.Rectangle(self._content_rect.x + self._content_rect.width, self.rect.y, PANEL_WIDTH, self.rect.height))
+    else:
+      ball_rect = rl.Rectangle(
+        self._rect.x + self._rect.width - SIDE_PANEL_WIDTH,
+        self._content_rect.y,
+        SIDE_PANEL_WIDTH,
+        self._content_rect.height,
+      )
+      self._confidence_ball.render(ball_rect)
 
     # Bookmark icon
     self._bookmark_icon.render(self.rect)
 
     # BluePilot: swipe-down gesture detector (must render after bookmark icon, same rect)
     self._swipe_detector.render(self.rect)
-
-    # Offroad label
-    if not ui_state.started:
-      rl.draw_rectangle(int(self.rect.x), int(self.rect.y), int(self.rect.width), int(self.rect.height), rl.Color(0, 0, 0, 175))
-      self._offroad_label.render(self._content_rect)

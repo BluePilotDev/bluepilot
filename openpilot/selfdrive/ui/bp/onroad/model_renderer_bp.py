@@ -184,6 +184,7 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
 
     self._draw_lane_lines()
     self._draw_path()
+    self.blendful.draw(self._rect)  # sunnypilot's lane-center line, as upstream's _render draws it
 
     # BluePilot: In Rad Racer theme, leads are drawn as sprites by RadRacerTheme
     if render_lead_indicator and radar_state and not self._rad_racer:
