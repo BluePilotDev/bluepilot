@@ -243,11 +243,12 @@ class RadRacerTheme:
     if radar_state is not None:
       leads = [radar_state.leadOne, radar_state.leadTwo]
       # Draw the farther lead first so the closer one overlaps it
-      order = sorted(range(2), key=lambda i: -(leads[i].dRel if leads[i] and leads[i].status else 0.0))
+      order = sorted(range(2), key=lambda i: -(leads[i].dRel if leads[i] and leads[i].present else 0.0))
       for i in order:
         lead = leads[i]
         lv = model_renderer._lead_vehicles[i] if i < len(model_renderer._lead_vehicles) else None
-        if not (lead and lead.status) or lv is None or not lv.chevron or lead.dRel > LEAD_MAX_DRAW_M:
+        # the comma four's lead marker is a bar with no chevron: no lead sprite there
+        if not (lead and lead.present) or not getattr(lv, "chevron", None) or lead.dRel > LEAD_MAX_DRAW_M:
           continue
         cx = lv.chevron[1][0]
         # Anchor lead bottom to chevron base, but never below the ego car icon
@@ -310,7 +311,7 @@ class RadRacerTheme:
     lead_time_text = "---"
     lead_speed_text = "---"
     radar_state = sm['radarState'] if sm.valid['radarState'] else None
-    if radar_state is not None and radar_state.leadOne and radar_state.leadOne.status:
+    if radar_state is not None and radar_state.leadOne and radar_state.leadOne.present:
       lead = radar_state.leadOne
       if lead.dRel > 0 and v_ego > 0.5:
         t = lead.dRel / v_ego

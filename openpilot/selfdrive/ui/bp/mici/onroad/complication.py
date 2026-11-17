@@ -60,7 +60,7 @@ class MiciComplication(Widget):
       self._car_state.gearShifter != structs.CarState.GearShifter.reverse
     self._radar_state = self.sm['radarState'] if self.sm.valid['radarState'] else None
     self._lead_one = self._radar_state.leadOne if self._radar_state else None
-    has_lead_one = self._lead_one.status if self._lead_one else False
+    has_lead_one = self._lead_one.present if self._lead_one else False
     self._render_lead_indicator = self._radar_state is not None and has_lead_one and in_gear
 
     match self._render_type:

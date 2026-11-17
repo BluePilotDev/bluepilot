@@ -2,7 +2,7 @@
 import pyray as rl
 from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.label import gui_label
-from openpilot.system.ui.lib.application import FontWeight
+from openpilot.system.ui.lib.application import FontWeight, TextAlignment, TextAlignmentVertical
 
 # Match list item width; height for bold section title
 SECTION_HEADER_WIDTH = 600
@@ -32,8 +32,8 @@ class SectionHeader(Widget):
       font_size=SECTION_HEADER_FONT_SIZE,
       font_weight=FontWeight.BOLD,
       color=rl.Color(220, 220, 220, 255),
-      alignment=rl.GuiTextAlignment.TEXT_ALIGN_LEFT,
-      alignment_vertical=rl.GuiTextAlignmentVertical.TEXT_ALIGN_MIDDLE,
+      alignment=TextAlignment.LEFT,
+      alignment_vertical=TextAlignmentVertical.MIDDLE,
       elide_right=True,
     )
 
@@ -137,7 +137,7 @@ class CollapsibleSectionHeader(Widget):
       font_size=COLLAPSIBLE_HEADER_FONT_SIZE,
       font_weight=FontWeight.BOLD,
       color=rl.Color(220, 220, 220, 255),
-      alignment=rl.GuiTextAlignment.TEXT_ALIGN_LEFT,
-      alignment_vertical=rl.GuiTextAlignmentVertical.TEXT_ALIGN_MIDDLE,
+      alignment=TextAlignment.LEFT,
+      alignment_vertical=TextAlignmentVertical.MIDDLE,
       elide_right=True,
     )

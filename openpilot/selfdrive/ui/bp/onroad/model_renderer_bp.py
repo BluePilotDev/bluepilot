@@ -198,7 +198,7 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
     """Track whether each lead is radar-sourced for coloring."""
     leads = [radar_state.leadOne, radar_state.leadTwo]
     for i, lead_data in enumerate(leads):
-      if lead_data and lead_data.status:
+      if lead_data and lead_data.present:
         self._lead_is_radar[i] = getattr(lead_data, 'radar', False)
       else:
         self._lead_is_radar[i] = False
@@ -210,7 +210,7 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
 
     dt = 1 / gui_app.target_fps
     for i, lead_data in enumerate(leads):
-      if lead_data and lead_data.status:
+      if lead_data and lead_data.present:
         # Reset filters when a lead first appears so we don't lerp from stale data
         if not self._lead_was_active[i]:
           self._lead_d_filters[i] = FirstOrderFilter(lead_data.dRel, 0.4, dt)

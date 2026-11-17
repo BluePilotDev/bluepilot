@@ -6,7 +6,7 @@ from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.list_view import ListItem, ItemAction
 from openpilot.system.ui.widgets.button import Button, ButtonStyle
 from openpilot.system.ui.widgets.label import gui_label
-from openpilot.system.ui.lib.application import FontWeight, gui_app, MousePos
+from openpilot.system.ui.lib.application import FontWeight, gui_app, MousePos, TextAlignment, TextAlignmentVertical
 from openpilot.system.ui.lib.multilang import tr
 from openpilot.system.ui.lib.text_measure import measure_text_cached
 
@@ -136,8 +136,8 @@ class FloatControlAction(ItemAction):
       font_size=ITEM_TEXT_FONT_SIZE,
       color=ITEM_TEXT_VALUE_COLOR,
       font_weight=FontWeight.NORMAL,
-      alignment=rl.GuiTextAlignment.TEXT_ALIGN_CENTER,
-      alignment_vertical=rl.GuiTextAlignmentVertical.TEXT_ALIGN_MIDDLE
+      alignment=TextAlignment.CENTER,
+      alignment_vertical=TextAlignmentVertical.MIDDLE
     )
     
     # Plus button on right
