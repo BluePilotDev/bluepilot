@@ -68,3 +68,30 @@ class TestWithoutBpxCarCode(OpenpilotTestCase):
     with mock.patch("openpilot.common.bluepilot.is_bluepilot", return_value=True), \
          mock.patch.dict(sys.modules, {"opendbc.sunnypilot.car.ford.bluepilot.hud_ext": None}):
       assert ext.read_bpx_params() == []
+
+
+class TestPublishedSettingsAreCached(OpenpilotTestCase):
+  def test_bpx_settings_are_cached_with_the_lateral_ones(self):
+    calls = []
+
+    class Counting(_Written):
+      def get(self, key, return_default=False):
+        calls.append(key)
+        return super().get(key, return_default=return_default)
+
+    ext = ControlsExt.__new__(ControlsExt)
+    ext.params = Counting(Params())
+    ext._bp_unknown_keys_logged = set()
+    with mock.patch("openpilot.common.bluepilot.is_bluepilot", return_value=True):
+      first = ext.published_params()
+      keys = {e["key"] for e in first}
+      for key in SETTINGS:
+        self.assertTrue(key in keys, key)
+      reads = len(calls)
+      for _ in range(20):  # 20 more frames: nothing is read again
+        self.assertIs(ext.published_params(), first)
+      self.assertEqual(len(calls), reads)
+      ext._bp_params_cache_time -= 1.0  # past the refresh period: everything is read once more
+      ext.published_params()
+      self.assertEqual(len(calls), 2 * reads)
+
