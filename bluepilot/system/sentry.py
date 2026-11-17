@@ -22,7 +22,7 @@ from sentry_sdk.integrations.logging import LoggingIntegration  # BluePilot: log
 
 from openpilot.common.params import Params
 from openpilot.system.athena.registration import UNREGISTERED_DONGLE_ID
-from openpilot.common.hardware import HARDWARE
+from openpilot.common.hardware import HARDWARE, PC
 from openpilot.common.hardware.hw import Paths
 from openpilot.common.swaglog import cloudlog
 from openpilot.common.version import get_build_metadata, get_version
@@ -304,6 +304,9 @@ def get_properties() -> tuple[str, str, str]:
 
 # BluePilot: a failed start leaves no live client behind, so a half-configured one never reports
 def init(project: SentryProject) -> bool:
+  # BluePilot: a PC or CI run is not a device, so it never starts a client (BP7 reported from PCs)
+  if PC:
+    return False
   try:
     return _init(project)
   except Exception:

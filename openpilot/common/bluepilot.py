@@ -39,12 +39,12 @@ class CrashReporting:
     return self._module
 
   def init(self, project: str) -> bool:
-    """Starts reporting for a SentryProject, by name."""
+    """Starts reporting for a SentryProject, by name. False when it didn't start (e.g. on a PC): later calls then do
+    nothing, as there's no active client, but the guard stays on."""
     if (module := self._load()) is None:
       return False
     try:
-      module.init(module.SentryProject[project])
-      return True
+      return bool(module.init(module.SentryProject[project]))
     except Exception:
       self._module, self._off = None, True
       _log_failure("BluePilot crash reporting failed to start")

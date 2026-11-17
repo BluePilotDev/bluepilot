@@ -78,7 +78,8 @@ class TestOutgoingReport(unittest.TestCase):
     self.transport = RecordingTransport()
     real_init = sentry.sentry_sdk.init
     for patcher in (mock.patch.object(sentry.sentry_sdk, "init", lambda *a, **kw: real_init(*a, transport=self.transport, **kw)),
-                    mock.patch.object(sentry, "CRASHES_DIR", self.enterContext(tempfile.TemporaryDirectory()))):
+                    mock.patch.object(sentry, "CRASHES_DIR", self.enterContext(tempfile.TemporaryDirectory())),
+                    mock.patch.object(sentry, "PC", False)):  # reports as on a device; test_pc_does_not_report covers a PC
       patcher.start()
       self.addCleanup(patcher.stop)
     self.addCleanup(lambda: sentry.sentry_sdk.get_isolation_scope().clear())  # tags like daemon stay on the scope
@@ -146,6 +147,20 @@ class TestOutgoingReport(unittest.TestCase):
     except ZeroDivisionError:
       self.assertTrue(guard.capture_exception())
     self.assertEqual([event["exception"]["values"][-1]["value"] for event in self.sent_events()], ["after init"])
+
+  def test_pc_does_not_report(self):
+    with mock.patch.object(sentry, "PC", True):
+      self.assertFalse(sentry.init(sentry.SentryProject.SELFDRIVE))
+      self.assertFalse(sentry.sentry_sdk.get_client().is_active())
+      guard = CrashReporting()
+      self.assertFalse(guard.init("SELFDRIVE"))
+      try:
+        raise ZeroDivisionError("crash on a PC")
+      except ZeroDivisionError:
+        self.assertFalse(guard.capture_exception())  # the hook logs upstream's line instead
+    self.assertEqual(self.sent_events(), [])
+    self.assertTrue(guard.init("SELFDRIVE"))  # the guard stays usable
+    self.assertTrue(guard.set_tag("daemon", "card"))
 
   def test_half_started_init_leaves_no_live_client(self):
     with mock.patch.object(sentry.HARDWARE, "get_device_type", side_effect=RuntimeError("no hardware")):

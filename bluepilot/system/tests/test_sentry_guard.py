@@ -49,6 +49,13 @@ class TestSentryGuard(unittest.TestCase):
       self.assertFalse(guard.init("SELFDRIVE"))
       self.assertFalse(guard.report_tombstone("fn", "message", "contents"))
 
+  def test_init_that_does_not_start_leaves_the_guard_on(self):
+    self.module.init.return_value = False  # e.g. on a PC
+    guard = CrashReporting()
+    self.assertFalse(guard.init("SELFDRIVE"))
+    self.assertTrue(guard.set_tag("daemon", "card"))
+    self.module.set_tag.assert_called_once_with("daemon", "card")
+
   def test_does_nothing_without_an_active_client(self):
     self.module.is_active.return_value = False  # loaded, but this process never started reporting
     guard = CrashReporting()
