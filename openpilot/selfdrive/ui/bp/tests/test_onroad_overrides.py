@@ -50,11 +50,11 @@ class TestOnroadOverrides(unittest.TestCase):
       renderer._render(RECT)
     draw_path.assert_called_once_with()
 
-  def test_tici_hud_places_the_wheel_button_like_bp7(self):
+  def test_tici_hud_places_the_wheel_like_bp7(self):
     from openpilot.selfdrive.ui.bp.onroad.hud_renderer_bp import HudRendererBP
-    with mock.patch("openpilot.selfdrive.ui.bp.onroad.hud_renderer_bp.ExpButtonBP") as exp_button:
+    with mock.patch("openpilot.selfdrive.ui.bp.onroad.hud_renderer_bp.SteeringWheelBP") as steering_wheel:
       hud = HudRendererBP()
-    exp_button.assert_called_once_with(192, 144)  # BP7's button and wheel icon sizes
+    steering_wheel.assert_called_once_with(144)  # BP7's wheel icon size
     hud.is_cruise_available = False
     hud._draw_current_speed = mock.Mock()
     for name in ("developer_ui", "road_name_renderer", "speed_limit_renderer", "smart_cruise_control_renderer",
@@ -63,7 +63,7 @@ class TestOnroadOverrides(unittest.TestCase):
     with mock.patch("pyray.draw_rectangle_gradient_v"):
       hud._render(RECT)
     # BP7's sizes: border 30, button 192
-    (button_rect,), _ = hud._exp_button.render.call_args
+    (button_rect,), _ = hud._steering_wheel.render.call_args
     self.assertEqual((button_rect.x, button_rect.y, button_rect.width, button_rect.height), (2160 - 30 - 192, 30, 192, 192))
 
   def test_torque_bar_estimate_on_angle_control_cars(self):
