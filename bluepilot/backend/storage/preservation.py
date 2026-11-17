@@ -22,9 +22,9 @@ except ImportError:
 
 # Import xattr for preserve marker support
 try:
+    from openpilot.system.loggerd import xattr_cache
     from openpilot.system.loggerd.xattr_cache import getxattr, setxattr
     from openpilot.system.loggerd.deleter import PRESERVE_ATTR_NAME, PRESERVE_ATTR_VALUE, PRESERVE_COUNT, DELETE_LAST
-    import xattr as xattr_module
     XATTR_AVAILABLE = True
 except ImportError:
     XATTR_AVAILABLE = False
@@ -60,6 +60,16 @@ from bluepilot.backend.routes import (
     format_size,
     get_disk_space_info,
 )
+
+
+def removexattr(path: str, attr_name: str) -> None:
+    """Remove an xattr; macOS has no os.removexattr, so use openpilot's libc handle there"""
+    # openpilot's getxattr caches reads and only its setxattr clears them
+    xattr_cache._cached_attributes.pop((path, attr_name), None)
+    if hasattr(os, "removexattr"):
+        os.removexattr(path, attr_name)
+    elif xattr_cache._libc.removexattr(os.fsencode(path), os.fsencode(attr_name), 0) == -1:
+        xattr_cache._raise_os_error(path)
 
 
 def has_preserve_xattr_segment(segment_path: str) -> bool:
@@ -410,7 +420,7 @@ def set_route_preserve(route_base, preserve=True):
                 else:
                     # Remove xattr
                     try:
-                        xattr_module.removexattr(seg['path'], PRESERVE_ATTR_NAME)
+                        removexattr(seg['path'], PRESERVE_ATTR_NAME)
                         affected_segments += 1
                     except OSError:
                         # Attribute doesn't exist - that's fine
