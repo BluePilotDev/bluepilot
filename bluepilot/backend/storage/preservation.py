@@ -64,12 +64,15 @@ from bluepilot.backend.routes import (
 
 def removexattr(path: str, attr_name: str) -> None:
     """Remove an xattr; macOS has no os.removexattr, so use openpilot's libc handle there"""
-    # openpilot's getxattr caches reads and only its setxattr clears them
-    xattr_cache._cached_attributes.pop((path, attr_name), None)
-    if hasattr(os, "removexattr"):
-        os.removexattr(path, attr_name)
-    elif xattr_cache._libc.removexattr(os.fsencode(path), os.fsencode(attr_name), 0) == -1:
-        xattr_cache._raise_os_error(path)
+    try:
+        if hasattr(os, "removexattr"):
+            os.removexattr(path, attr_name)
+        elif xattr_cache._libc.removexattr(os.fsencode(path), os.fsencode(attr_name), 0) == -1:
+            xattr_cache._raise_os_error(path)
+    finally:
+        # openpilot's getxattr caches reads and only its setxattr clears them; clear after the
+        # removal so a read from another portal thread can't cache the old value again
+        xattr_cache._cached_attributes.pop((path, attr_name), None)
 
 
 def has_preserve_xattr_segment(segment_path: str) -> bool:
