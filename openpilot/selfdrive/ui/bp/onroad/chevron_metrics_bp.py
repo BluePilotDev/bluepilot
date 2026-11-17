@@ -101,6 +101,8 @@ class ChevronMetricsBP(ChevronMetrics):
     alpha = int(255 * self._lead_status_alpha)
     text_color = rl.Color(255, 255, 255, alpha)
     shadow_color = rl.Color(0, 0, 0, int(200 * self._lead_status_alpha))
+    chevron_x = lead_vehicle.chevron[1][0]
+    chevron_y = lead_vehicle.chevron[1][1]
 
     if self.ford_overlay_enabled and len(text_lines) == 3:
       # BluePilot: Horizontal boxed layout with colored borders, scaled by overlay size
@@ -109,9 +111,6 @@ class ChevronMetricsBP(ChevronMetrics):
       padding = int(12 * scale)
       box_spacing = int(15 * scale)
       box_color = rl.Color(40, 40, 40, int(220 * self._lead_status_alpha))
-
-      chevron_x = lead_vehicle.chevron[1][0]
-      chevron_y = lead_vehicle.chevron[1][1]
 
       # Measure all text sizes
       text_sizes = []
@@ -231,8 +230,8 @@ class ChevronMetricsBP(ChevronMetrics):
     lead_one = radar_state.leadOne
     lead_two = radar_state.leadTwo
 
-    has_lead_one = lead_one.status if lead_one else False
-    has_lead_two = lead_two.status if lead_two else False
+    has_lead_one = lead_one.present if lead_one else False
+    has_lead_two = lead_two.present if lead_two else False
 
     self.update_alpha(has_lead_one or has_lead_two)
 

@@ -274,7 +274,6 @@ class OtherDebugPanel(Widget):
         ("Fault (Perm)", _fmt_bool(cs.steerFaultPermanent)),
       ])
       cards[2].set_rows([
-        ("Brake", f"{cs.brake:.3f}"),
         ("Brake Pressed", _fmt_bool(cs.brakePressed)),
         ("Gas Pressed", _fmt_bool(cs.gasPressed)),
         ("Regen Braking", _fmt_bool(cs.regenBraking)),
@@ -335,11 +334,8 @@ class OtherDebugPanel(Widget):
           ("Distance", f"{lead.dRel:.1f} m"),
           ("Y Position", f"{lead.yRel:.2f} m"),
           ("Rel. Speed", f"{lead.vRel:.2f} m/s"),
-          ("Rel. Accel", f"{lead.aRel:.2f} m/s\u00b2"),
           ("Lead Speed", f"{lead.vLead:.1f} m/s"),
-          ("Path Dist", f"{lead.dPath:.2f} m"),
-          ("Status", _fmt_bool(lead.status, "Tracking", "No Lead")),
-          ("FCW", _fmt_bool(lead.fcw)),
+          ("Status", _fmt_bool(lead.present, "Tracking", "No Lead")),
           ("Radar", _fmt_bool(lead.radar, "Yes", "Vision")),
         ]
 
@@ -360,7 +356,6 @@ class OtherDebugPanel(Widget):
     if sm.valid.get('carParams', False):
       cp = sm['carParams']
       cards[0].set_rows([
-        ("Mass", f"{cp.mass:.1f} kg"),
         ("Wheelbase", f"{cp.wheelbase:.3f} m"),
         ("Steer Ratio", f"{cp.steerRatio:.2f}"),
         ("Steer Delay", f"{cp.steerActuatorDelay:.3f} s"),
@@ -379,9 +374,6 @@ class OtherDebugPanel(Widget):
           t = lat_tuning.torque
           lat_rows = [
             ("Type", "Torque"),
-            ("Kp", f"{t.kp:.4f}"),
-            ("Ki", f"{t.ki:.4f}"),
-            ("Kf", f"{t.kf:.4f}"),
             ("Friction", f"{t.friction:.4f}"),
             ("Lat Accel Factor", f"{t.latAccelFactor:.4f}"),
             ("Lat Accel Offset", f"{t.latAccelOffset:.4f}"),
@@ -406,16 +398,11 @@ class OtherDebugPanel(Widget):
       long_rows = []
       try:
         lt = cp.longitudinalTuning
-        kp_bp = [f"{v:.1f}" for v in list(lt.kpBP)]
-        kp_v = [f"{v:.4f}" for v in list(lt.kpV)]
         ki_bp = [f"{v:.1f}" for v in list(lt.kiBP)]
         ki_v = [f"{v:.4f}" for v in list(lt.kiV)]
         long_rows = [
-          ("Kp BP", ", ".join(kp_bp) if kp_bp else "N/A"),
-          ("Kp V", ", ".join(kp_v) if kp_v else "N/A"),
           ("Ki BP", ", ".join(ki_bp) if ki_bp else "N/A"),
           ("Ki V", ", ".join(ki_v) if ki_v else "N/A"),
-          ("Kf", f"{lt.kf:.6f}"),
         ]
       except (AttributeError, IndexError):
         long_rows = [("Status", "N/A")]

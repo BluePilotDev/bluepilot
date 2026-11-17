@@ -3,8 +3,10 @@ from openpilot.common.params import Params
 from opendbc.bluepilot_lateral.core.lateral_curv_ext import PrimaryLateralControl
 from openpilot.cereal import custom
 from openpilot.selfdrive.ui.mici.onroad.hud_renderer import (
-  HudRenderer, FONT_SIZES, KM_TO_MILE, CRUISE_DISABLED_CHAR, SET_SPEED_PERSISTENCE,
+  FONT_SIZES, KM_TO_MILE, CRUISE_DISABLED_CHAR, SET_SPEED_PERSISTENCE,
 )
+# BluePilot: on sunnypilot's HUD (model-source icon, blind-spot indicators), as upstream mici picks it
+from openpilot.selfdrive.ui.sunnypilot.mici.onroad.hud_renderer import HudRendererSP
 from openpilot.system.ui.lib.multilang import tr
 from openpilot.selfdrive.ui.bp.mici.onroad.powerflow_gauge import MiciPowerflowGauge
 from openpilot.selfdrive.ui.ui_state import ui_state, UIStatus
@@ -24,7 +26,7 @@ from openpilot.selfdrive.ui.bp.mici.onroad.torque_bar_bp import TorqueBarBP as T
 
 LateralMode = custom.ControllerStateBP.LateralMode
 
-class MiciHudRendererBP(HudRenderer):
+class MiciHudRendererBP(HudRendererSP):
   """BluePilot MICI HudRenderer with brake status coloring and powerflow gauge."""
 
   def __init__(self):
@@ -76,15 +78,6 @@ class MiciHudRendererBP(HudRenderer):
 
     bp_ui_log.state("MiciHudRenderer", "brakes_on", self._brakes_on)
 
-  def _render(self, rect: rl.Rectangle) -> None:
-    """Render HUD elements to the screen."""
-    self._torque_bar.render(rect)
-
-    if self.is_cruise_set:
-      self._draw_set_speed(rect)
-
-    self._draw_steering_wheel(rect)
-
   def _draw_steering_wheel(self, rect: rl.Rectangle) -> None:
     """Override to add brake status coloring to wheel icon, powerflow gauge, and lateral control overlay."""
     normal_wheel_txt = self._txt_wheel_comma_3x if self._wheel_icon_style == SteeringWheelIconStyle.COMMA_3X else self._txt_wheel
@@ -96,7 +89,7 @@ class MiciHudRendererBP(HudRenderer):
     # BluePilot: Preserve the upstream critical-alert wheel regardless of the user's normal wheel style.
     wheel_txt = self._txt_wheel_critical if self._show_wheel_critical else normal_wheel_txt
 
-    bsm_detected = self._has_blind_spot_detected() if hasattr(self, '_has_blind_spot_detected') else False
+    bsm_detected = self._has_blind_spot_detected()
 
     show_lateral = True
 
