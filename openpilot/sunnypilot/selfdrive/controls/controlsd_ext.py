@@ -19,6 +19,9 @@ from openpilot.sunnypilot.selfdrive.controls.lib.blinker_pause_lateral import Bl
 from openpilot.sunnypilot.selfdrive.controls.lib.latcontrol_torque_v0 import LatControlTorque as LatControlTorqueV0
 
 
+BP_PARAMS_REFRESH_PERIOD = 0.5  # seconds
+
+
 class ControlsExt(ModelStateBase):
   def __init__(self, CP: structs.CarParams, params: Params):
     ModelStateBase.__init__(self)
@@ -109,17 +112,26 @@ class ControlsExt(ModelStateBase):
     # lateralInputsRequired for every Ford); other cars leave them empty
     if self.CP_SP.lateralInputsRequired:
       self.fill_lateral_inputs(CC_SP.lateralInputs, sm)
-      CC_SP.params = self.read_lateral_params()
+      CC_SP.params = self.published_params()
 
     return CC_SP
+
+  def published_params(self) -> list[dict]:
+    """The settings published to the car code, re-read from Params every BP_PARAMS_REFRESH_PERIOD.
+    Reading them on every 10 ms frame cost controlsd about 1 ms of CPU per frame on a comma four."""
+    now = time.monotonic()
+    cached = getattr(self, "_bp_params_cache", None)
+    if cached is None or now - getattr(self, "_bp_params_cache_time", 0.0) > BP_PARAMS_REFRESH_PERIOD:
+      cached = self.read_lateral_params()
+      self._bp_params_cache = cached
+      self._bp_params_cache_time = now
+    return cached
 
   def read_lateral_params(self) -> list[dict]:
     """BluePilot: UI-tunable lateral params for the opendbc lateral, as CarControlSP.params entries.
     A key never written on the device publishes its params_keys.h default, so the lateral runs
-    the value the settings UI shows (#6 in ford-op/bg-opendbc). Read every frame, as carcontroller did
-    before, so a UI change (disable_BP_lat_UI in particular) still lands on the next frame.
-    ponytail: ~18 Params reads per 10 ms, the same cost card paid; throttle here if it ever
-    shows in controlsd timing."""
+    the value the settings UI shows (#6 in ford-op/bg-opendbc). ~18 Params reads, so callers go
+    through published_params(), which caches them."""
     # imported here, not at module level: the key list lives in the opendbc submodule and only
     # Ford needs it, so a submodule on another layout must not break controlsd for other brands
     from opendbc.bluepilot_lateral.core.values_ext import BP_LATERAL_PARAMS
