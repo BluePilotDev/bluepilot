@@ -1,4 +1,5 @@
 from openpilot.selfdrive.ui.bp.lib.ford_acc_path import draw_ford_acc_feedback
+from openpilot.selfdrive.ui.bp.lib.curvature_path_edges import draw_curvature_path_edges
 
 import numpy as np
 import pyray as rl
@@ -42,6 +43,7 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
     self._disable_lane_line_status_color = self._bp_params.get_bool("BPDisableLaneLineStatusColor")
     self._rainbow_lane_lines = self._bp_params.get_bool("BPRainbowLines")
     self._model_path_color = get_model_path_color(self._bp_params)
+    self._curvature_path_edges_enabled = self._bp_params.get_bool("BPCurvaturePathEdges")
     self._ford_acc_path_enabled = self._bp_params.get_bool("BPFordACCPathFeedback")
     self._ford_path_gradient = Gradient(
       start=(0.0, 1.0),
@@ -81,6 +83,7 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
       self._disable_lane_line_status_color = self._bp_params.get_bool("BPDisableLaneLineStatusColor")
       self._rainbow_lane_lines = self._bp_params.get_bool("BPRainbowLines")
       self._model_path_color = get_model_path_color(self._bp_params)
+      self._curvature_path_edges_enabled = self._bp_params.get_bool("BPCurvaturePathEdges")
       self._ford_acc_path_enabled = self._bp_params.get_bool("BPFordACCPathFeedback")
       self.set_tesla_style(theme_pack.tesla_active(self._bp_params), ui_state.tesla_dark_fraction)
       self._rad_racer = theme_pack.rad_racer_active(self._bp_params)
@@ -104,6 +107,7 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
     self._draw_base_path(sm)
     opacity = self._tesla_path_visibility if self._tesla_style else 1.0
     draw_ford_acc_feedback(self, sm, self._path.projected_points + np.array([self._rect.x, self._rect.y], dtype=np.float32), opacity)
+    draw_curvature_path_edges(self, sm, self._path.projected_points + np.array([self._rect.x, self._rect.y], dtype=np.float32), opacity)
 
   def _draw_base_path(self, sm):
     if self._tesla_style:

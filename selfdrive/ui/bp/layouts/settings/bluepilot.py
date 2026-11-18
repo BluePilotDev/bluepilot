@@ -94,6 +94,7 @@ class BluePilotLayout(Widget):
       ("BPShowNetworkStatus", self._show_network_status),
       ("BPCameraAngleAuto", self._automatic_camera_view),
       ("BPCroppedDcam", self._experimental_dcam),
+      ("BPCurvaturePathEdges", self._curve_path_highlight),
       ("BPFordACCPathFeedback", self._ford_acc_path_feedback),
       ("BPAnimateSteeringWheel", self._animate_steering_wheel),
       ("BPUseCustomSounds", self._use_custom_sounds),
@@ -277,6 +278,14 @@ class BluePilotLayout(Widget):
       description=lambda: tr("Choose between the default green model path and a Ford-style blue model path."),
       action_item=self._model_path_color_action,
       callback=self._select_model_path_color,
+    )
+
+    self._curve_path_highlight = toggle_item(
+      lambda: tr("Curve Path Highlight"),
+      lambda: tr("Subtly brighten the model path edges through curves while retaining your selected path color."),
+      initial_state=self._safe_get_bool(self._params, "BPCurvaturePathEdges"),
+      callback=lambda state: self._toggle_callback(state, "BPCurvaturePathEdges"),
+      icon="chffr_wheel.png",
     )
 
     # Animate steering wheel toggle
@@ -821,6 +830,7 @@ class BluePilotLayout(Widget):
         self._disable_lane_line_status_color,
         self._hide_camera_view,
         self._model_path_color_btn,
+        self._curve_path_highlight,
         self._ford_acc_path_feedback,
         self._theme_pack_btn,
         self._theme_auto_seasonal,

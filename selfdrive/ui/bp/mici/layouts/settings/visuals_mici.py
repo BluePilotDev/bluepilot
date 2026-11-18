@@ -56,6 +56,7 @@ class VisualsLayoutMici(NavScroller):
     self.model_path_color = BigMultiParamToggleBP(
       "Model Path Color", "BPModelPathColor", ["Green (Default)", "Ford"],
     )
+    self.curve_path_highlight = BigParamControlBP("Curve Path Highlight", "BPCurvaturePathEdges")
     self.ford_acc_path_feedback = BigParamControlBP("Ford ACC Path Feedback", "BPFordACCPathFeedback")
     self.rainbow_lane_lines = BigParamControlBP("Rainbow Lane Lines", "BPRainbowLines")
     self.show_blindspot_ui = BigParamControlBP("Show Blindspot Overlay", "ShowBlindspotOverlay")
@@ -91,6 +92,7 @@ class VisualsLayoutMici(NavScroller):
       self.hide_border,
       self.hide_camera_view,
       self.model_path_color,
+      self.curve_path_highlight,
       self.ford_acc_path_feedback,
       self.rainbow_lane_lines,
       self.show_blindspot_ui,
@@ -115,6 +117,7 @@ class VisualsLayoutMici(NavScroller):
       ("BPHideCameraView", self.hide_camera_view),
       ("BPThemeAutoSeasonal", self.theme_auto_seasonal),
       ("BPRainbowLines", self.rainbow_lane_lines),
+      ("BPCurvaturePathEdges", self.curve_path_highlight),
       ("BPFordACCPathFeedback", self.ford_acc_path_feedback),
       ("ShowBlindspotOverlay", self.show_blindspot_ui),
       ("ShowBrakeStatus", self.show_brake_status),
