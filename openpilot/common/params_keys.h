@@ -308,6 +308,10 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     // BluePilot Ford lateral control: the lines `python -m opendbc.bluepilot_lateral.params.manifest` prints
     // (test_lateral_params.py checks them)
     {"disable_BP_lat_UI", {PERSISTENT | BACKUP, BOOL, "0"}},
+    // how this Ford was steered at its last start, and the steering module's part numbers then
+    // (bluepilot/selfdrive/car/ford_lateral_support.py). Not backed up: it describes one car.
+    {"FordLateralSupport", {PERSISTENT, JSON}},
+    {"Offroad_FordLateralSupport", {CLEAR_ON_MANAGER_START | CLEAR_ON_ONROAD_TRANSITION, JSON}},
 
     // BluePilot (BPx): BluePilot's own settings
     {"ShowBlindspotOverlay", {PERSISTENT | BACKUP, BOOL, "1"}},

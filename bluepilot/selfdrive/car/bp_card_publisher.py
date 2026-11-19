@@ -11,10 +11,12 @@ import time
 import openpilot.cereal.messaging as messaging
 from openpilot.cereal import custom
 from openpilot.common.params import Params
+from openpilot.bluepilot.selfdrive.car.ford_lateral_support import record_degraded
 
 _SETTINGS_INTERVAL = 5.0  # re-read params at most every 5 s
 _settings_last_read: float = 0.0
 _settings_cache: dict = {}
+_degraded_reason: str = ""  # the health check's last reason handed to record_degraded
 
 
 def _get_bool(p: Params, key: str, default: bool = False) -> bool:
@@ -107,7 +109,7 @@ def _refresh_settings_cache() -> dict:
 
 def publish_controller_state_bp(CI, pm):
   """Publish controllerStateBP from the BluePilot car controller's status() (every Ford on bp-full)."""
-  global _settings_last_read, _settings_cache
+  global _settings_last_read, _settings_cache, _degraded_reason
   status = getattr(getattr(CI.CC, "bp", None), "status", None)
   if status is None:
     return
@@ -121,6 +123,10 @@ def publish_controller_state_bp(CI, pm):
   # the mode the controller ran, straight off the car controller (not Params)
   LateralMode = custom.ControllerStateBP.LateralMode
   cs_bp.activeLateralMode = LateralMode.curvature if st.active else LateralMode.openpilot
+  # the health check's verdict, kept for the settings pages when it changes
+  if st.degradedReason != _degraded_reason:
+    _degraded_reason = st.degradedReason
+    record_degraded(Params(), _degraded_reason)
 
   # BluePilot: settings snapshot -- refreshed at most every _SETTINGS_INTERVAL s so Params
   # reads don't add latency to every card.py tick.

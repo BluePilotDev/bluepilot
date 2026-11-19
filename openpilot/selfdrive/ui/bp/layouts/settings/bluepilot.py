@@ -5,7 +5,7 @@ from openpilot.common.params import UnknownKeyName
 from openpilot.common.swaglog import cloudlog
 from openpilot.system.ui.widgets import Widget, DialogResult
 from openpilot.system.ui.widgets.confirm_dialog import ConfirmDialog
-from openpilot.system.ui.widgets.list_view import toggle_item, multiple_button_item, button_item, ButtonAction, ListItem
+from openpilot.system.ui.widgets.list_view import toggle_item, multiple_button_item, button_item, text_item, ButtonAction, ListItem
 from openpilot.system.ui.widgets.scroller_tici import Scroller
 from openpilot.system.ui.widgets.option_dialog import MultiOptionDialog
 from openpilot.system.ui.lib.application import gui_app
@@ -27,6 +27,7 @@ from openpilot.selfdrive.ui.bp.lib.dm_icon_style import (
   get_dm_icon_style,
 )
 from openpilot.selfdrive.ui.bp.lib.custom_sound import get_custom_sound_selection
+from openpilot.bluepilot.selfdrive.car.ford_lateral_support import SUPPORT_PARAM, support_row
 from openpilot.selfdrive.ui.bp.onroad.augmented_road_view_bp import GaugeStyle
 
 
@@ -387,10 +388,18 @@ class BluePilotLayout(Widget):
       callback=self._restore_dongle_id
     )
 
+    # How this Ford is steered: level, why, the steering module's part numbers, how the car was matched
+    self._lateral_support = support_row(None)
+    self._lateral_support_item = text_item(
+      lambda: tr("Steering Support"),
+      lambda: self._lateral_support[0],
+      lambda: self._lateral_support[1],
+    )
+
     # Disable BP lateral control toggle
     self._disable_BP_lat = toggle_item(
       lambda: tr("Disable BP Lateral Control"),
-      lambda: tr("Disable BluePilot lateral control."),
+      lambda: tr("Steer with openpilot's stock Ford command instead of BluePilot's. Applies the next time the car starts."),
       initial_state=self._safe_get_bool(self._params, "disable_BP_lat_UI"),
       callback=lambda state: self._toggle_callback(state, "disable_BP_lat_UI"),
       icon="chffr_wheel.png"
@@ -508,6 +517,7 @@ class BluePilotLayout(Widget):
         self._disable_ford_radar,
       ]) +
       _section(tr("Lateral Tuning"), [
+        self._lateral_support_item,
         self._disable_BP_lat,
         self._disable_lane_change_under_speed,
         self._blinker_min_speed,
@@ -670,6 +680,7 @@ class BluePilotLayout(Widget):
     pause_lc = fresh.get("BlinkerPauseLaneChange") if "BlinkerPauseLaneChange" in fresh else self._safe_get_bool(ui_state.params, "BlinkerPauseLaneChange")
     # Conditional on BlinkerPauseLaneChange
     self._blinker_min_speed.action_item.set_enabled(pause_lc)
+    self._lateral_support = support_row(self._safe_get(ui_state.params, SUPPORT_PARAM))
 
   def show_event(self):
     super().show_event()

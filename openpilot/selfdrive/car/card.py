@@ -28,6 +28,7 @@ from openpilot.sunnypilot.selfdrive.car import interfaces as sunnypilot_interfac
 from openpilot.common.bluepilot import is_bluepilot
 if is_bluepilot():
   from openpilot.bluepilot.selfdrive.car.bp_card_publisher import publish_controller_state_bp, publish_car_state_bp
+  from openpilot.bluepilot.selfdrive.car.ford_lateral_support import record_start
 # BluePilot: crash reporting; does nothing when it can't run
 from openpilot.common.bluepilot import sentry
 # End BluePilot
@@ -193,6 +194,9 @@ class Car:
 
     # BluePilot: log fingerprint in crash reporting
     sentry.log_fingerprint(self.CP)
+    # BluePilot: how this Ford is steered, for the settings pages and the next start's comparison
+    if is_bluepilot() and not REPLAY:
+      record_start(self.CI, self.params)
     # End BluePilot
 
   def state_update(self) -> tuple[car.CarState, custom.CarStateSP, structs.RadarDataT | None]:
