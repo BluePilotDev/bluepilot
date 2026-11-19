@@ -14,10 +14,12 @@ UNKNOWN = ("ZZ9V-14D003-AA", "ZZ94-14D007-AAA")
 
 
 def _ci(parts=None, vin="1FTFW1E80MFA00001", active=True):
-  """A Ford as card holds it after get_car: the start-up read in carFw, the library's verdict in status()."""
+  """A Ford as card holds it after get_car: the start-up read in carFw, the library's verdict in status().
+  parts: strategy, data file and, where given, calibration."""
   CP = structs.CarParams(carFingerprint="FORD_F_150_MK14", carVin=vin)
   CP.fingerprintSource = structs.CarParams.FingerprintSource.fw
-  answers = {} if parts is None else {strategy.DID_STRATEGY: parts[0].encode(), strategy.DID_DATA_FILE: parts[1].encode()}
+  dids = (strategy.DID_STRATEGY, strategy.DID_DATA_FILE, strategy.DID_CALIBRATION)
+  answers = {} if parts is None else {did: part.encode() for did, part in zip(dids, parts, strict=False)}
   CP.carFw = pscm_fw_entries(answers)
   match = strategy.match_car(CP)
   status = LateralStatus(active=active, supportLevel=int(match.level), supportReason=match.reason)
@@ -52,6 +54,20 @@ class TestStartRecord(OpenpilotTestCase):
     notice = self._start()
     self.assertIn(strategy.NO_ANSWER, notice)
     self.assertNotIn("upload", notice)
+
+  def test_a_replaced_level_points_to_the_dealer(self):
+    """The 2024 F-150's first level on a truck Ford's service message covers: the notice and the
+    settings row say so, and nobody is asked for a route."""
+    notice = self._start(parts=("RL34-14D003-AD", "RL34-14D007-ECC", "RL34-14D004-EE"))
+    self.assertIn("SSM 53105", notice)
+    self.assertIn("Ask a Ford dealer to update the power steering module", notice)
+    self.assertNotIn("upload", notice)
+    value, text = support.support_row(self.params.get(support.SUPPORT_PARAM))
+    self.assertEqual(value, "Fallback")
+    self.assertIn("Ask a Ford dealer to update the power steering module.", text)
+    notice = self._start(parts=("RL34-14D003-AD", "RL34-14D007-BCD", "RL34-14D004-BE"), vin="1FTFW1E50RKF00002")
+    self.assertIn(strategy.OLDER_SOFTWARE, notice)
+    self.assertNotIn("SSM", notice)
 
   def test_changed_software_is_told_with_old_and_new(self):
     self._start(parts=F150)
