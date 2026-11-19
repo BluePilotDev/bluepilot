@@ -642,6 +642,7 @@ struct ControllerStateBP @0xcd96dafb67a082d0 {
     standstillSteeringTorque @23 :Float32;
     laneMessage @24 :Text;           # the lane-message variant the frames are built by
     lag @25 :Float32;                # the table row's lag at this speed, s; 0 where it has none
+    pathAngleEnabled @26 :Bool;      # path angle is switched on for this module's table row, and the panda was told
   }
 }
 

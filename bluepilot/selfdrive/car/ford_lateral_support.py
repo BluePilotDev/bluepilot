@@ -56,6 +56,7 @@ def start_record(CP, status) -> dict:
     "active": bool(status.active),
     "level": int(status.supportLevel),
     "reason": str(status.supportReason),
+    "pathAngle": bool(status.pathAngleEnabled),
     "strategy": identity.strategy,
     "dataFile": identity.data_file,
     "calibration": identity.calibration,
@@ -153,6 +154,8 @@ def support_row(record: dict | None) -> tuple[str, str]:
   else:
     value = LEVEL_NAMES.get(record["level"], "Fallback")
     lines = [record["reason"] + "."]
+    if record["level"] in (SupportLevel.curvature, SupportLevel.full):
+      lines.append("Steers by curvature and path angle." if record.get("pathAngle") else "Steers by curvature.")
   if record.get("degradedReason"):
     value += ", degraded"
     lines.append(f"Degraded on the last drive: {record['degradedReason']}.")
