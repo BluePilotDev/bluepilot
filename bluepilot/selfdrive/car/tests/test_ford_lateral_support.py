@@ -5,7 +5,11 @@ from openpilot.common.test import OpenpilotTestCase
 from opendbc.bluepilot_lateral.core import strategy
 from opendbc.bluepilot_lateral.core.pscm_read import pscm_fw_entries
 from opendbc.bluepilot_lateral.host_types import LateralStatus, SupportLevel
+from opendbc.bluepilot_lateral.tests import harness
 from opendbc.car import structs
+from opendbc.car.car_helpers import interfaces
+from opendbc.car.ford.values import CAR
+from opendbc.sunnypilot.car.interfaces import setup_interfaces
 
 from openpilot.bluepilot.selfdrive.car import ford_lateral_support as support
 
@@ -26,6 +30,47 @@ def _ci(parts=None, vin="1FTFW1E80MFA00001", active=True):
   return SimpleNamespace(CP=CP, CC=SimpleNamespace(bp=SimpleNamespace(status=lambda: status)))
 
 
+def _real_ci(module, params_list=None):
+  """The real Ford car interface as card holds it when it calls record_start: built by get_car's own
+  steps, no steering frame yet."""
+  CP = harness.car_params(CAR.FORD_F_150_MK14, module)
+  CP.carVin = "1FTFW1E80MFA00001"
+  CI = interfaces[CAR.FORD_F_150_MK14]
+  CP_SP = CI.get_non_essential_params_sp(CP, CAR.FORD_F_150_MK14)
+  setup_interfaces(CI, CP, CP_SP, params_list)
+  return CI(CP, CP_SP)
+
+
+class TestStartRecordWithTheCarInterface(OpenpilotTestCase):
+  """record_start as card calls it: once, before any steering frame, with the library's own status."""
+
+  def setup_method(self):
+    self.params = Params()
+    self.params.remove(support.SUPPORT_PARAM)
+    self.params.remove(support.NOTICE_ALERT)
+
+  def test_a_row_reads_its_level_before_the_first_frame(self):
+    support.record_start(_real_ci(harness.F150_2021), self.params)
+    stored = self.params.get(support.SUPPORT_PARAM)
+    self.assertEqual((stored["active"], stored["level"], stored["reason"]), (True, SupportLevel.full, strategy.MATCHED))
+    self.assertEqual(support.support_row(stored)[0], "Full")
+    self.assertIsNone(self.params.get(support.NOTICE_ALERT))
+
+  def test_the_fallback_is_named_and_told_before_the_first_frame(self):
+    support.record_start(_real_ci(harness.UNKNOWN), self.params)
+    stored = self.params.get(support.SUPPORT_PARAM)
+    value, text = support.support_row(stored)
+    self.assertEqual(value, "Fallback")
+    self.assertIn(strategy.UNKNOWN_STRATEGY, text)
+    self.assertIn(strategy.UNKNOWN_STRATEGY, self.params.get(support.NOTICE_ALERT)["extra"])
+
+  def test_the_setting_reads_off(self):
+    support.record_start(_real_ci(harness.F150_2021, [{"disable_BP_lat_UI": "1"}]), self.params)
+    stored = self.params.get(support.SUPPORT_PARAM)
+    self.assertEqual((stored["active"], support.support_row(stored)[0]), (False, "Off"))
+    self.assertIsNone(self.params.get(support.NOTICE_ALERT))
+
+
 class TestStartRecord(OpenpilotTestCase):
   def setup_method(self):
     self.params = Params()
@@ -43,11 +88,15 @@ class TestStartRecord(OpenpilotTestCase):
     stored = self.params.get(support.SUPPORT_PARAM)
     self.assertEqual((stored["level"], stored["strategy"], stored["dataFile"]), (SupportLevel.full, *F150))
 
-  def test_the_fallback_is_told_once(self):
+  def test_the_fallback_is_told_on_its_first_starts(self):
+    """The alert is cleared by the next start whether or not anyone saw it, so one notice is shown on
+    a few starts, then no more."""
     notice = self._start(parts=UNKNOWN)
     self.assertIn(strategy.UNKNOWN_STRATEGY, notice)
     self.assertIn(UNKNOWN[0], notice)
     self.assertIn("upload a route", notice)
+    for _ in range(support.FALLBACK_NOTICE_STARTS - 1):
+      self.assertEqual(self._start(parts=UNKNOWN), notice)
     self.assertEqual(self._start(parts=UNKNOWN), "")
 
   def test_no_answer_asks_for_no_route(self):
@@ -76,7 +125,7 @@ class TestStartRecord(OpenpilotTestCase):
     for part in (*F150, *UNKNOWN):
       self.assertIn(part, notice)
     self.assertEqual(self.params.get(support.SUPPORT_PARAM)["changedFrom"], {"strategy": F150[0], "dataFile": F150[1], "calibration": ""})
-    self.assertEqual(self._start(parts=UNKNOWN), "")  # the start after: nothing new to say
+    self.assertNotIn("changed", self._start(parts=UNKNOWN))  # the start after: the change isn't told again
 
   def test_a_start_without_an_answer_is_not_a_change(self):
     self._start(parts=F150)

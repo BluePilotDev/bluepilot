@@ -7,8 +7,10 @@ param, FordLateralSupport, so that:
   - the settings pages can show it, parked or driving (support_row);
   - the next start can tell that the module's software changed since this one: Ford changes it over
     the air and at the dealer. The old and new part numbers are logged;
-  - the driver is told once, in an offroad alert, when the module's software changed or when the car
-    is on the fallback, and is asked for a route when the software isn't in the table yet.
+  - the driver is told, in an offroad alert, when the module's software changed or when the car is on
+    the fallback, and is asked for a route when the software isn't in the table yet. The alert is gone
+    at the next start, seen or not, so the fallback is told on its first FALLBACK_NOTICE_STARTS
+    starts; the settings row says it for as long as it applies.
 
 card calls record_start once per start and the publisher calls record_degraded when the library's
 health check changes its mind during a drive.
@@ -25,6 +27,7 @@ PART_NUMBERS = ("strategy", "dataFile", "calibration")
 LEVEL_NAMES = {SupportLevel.fallback: "Fallback", SupportLevel.curvature: "Curvature", SupportLevel.full: "Full",
                SupportLevel.not_supported: "Not supported"}
 MATCHED_BY = {"can": "CAN messages", "fw": "module software", "fixed": "your selection"}
+FALLBACK_NOTICE_STARTS = 3  # starts on which one fallback notice is shown
 
 _stored: dict | None = None  # this start's record as record_start stored it, for record_degraded
 
@@ -62,8 +65,8 @@ def compare_with_last(record: dict, last: dict | None) -> tuple[dict, str]:
   """What to store for this start, and the notice to show ("" for none).
 
   The part numbers kept are the last ones the module answered: a start without an answer isn't a
-  change of software. A change is told on the start that finds it. The fallback is told once: again
-  only when what there is to say about it changes."""
+  change of software. A change is told on the start that finds it. The fallback is told on its first
+  FALLBACK_NOTICE_STARTS starts, and again when what there is to say about it changes."""
   last = last if last and last.get("vin") == record["vin"] else {}
   answered = bool(record["strategy"] and record["dataFile"])
   known = {k: last.get(k, "") for k in (*PART_NUMBERS, "otaCounter")}
@@ -78,13 +81,16 @@ def compare_with_last(record: dict, last: dict | None) -> tuple[dict, str]:
   lines = []
   if changed:
     lines.append(f"The steering module's software changed since the last drive: {_parts(known)} before, {_parts(record)} now.")
-  if fallback and fallback != last.get("fallbackNotice", ""):
+  told = int(last.get("fallbackNoticeStarts", 0)) if fallback == last.get("fallbackNotice", "") else 0
+  if fallback and told < FALLBACK_NOTICE_STARTS:
     lines.append(fallback)
+    told += 1
 
   stored = dict(record)
   if not answered:
     stored.update(known)
   stored["fallbackNotice"] = fallback
+  stored["fallbackNoticeStarts"] = told
   stored["changedFrom"] = {k: known[k] for k in PART_NUMBERS} if changed else None
   return stored, " ".join(lines)
 
