@@ -171,7 +171,6 @@ The table at this build. A row applies only when your module answers exactly the
 | Ranger 2024–25 | RB3C-14D003-AA | RB3C-14D007-ECC |
 | Maverick 2022–24 | NZ6C-14D003-AL | NZ6C-14D007-ABD |
 | Corsair, Escape and Bronco Sport 2020–22 | LX6C-14D003-AL | LX6C-14D007-CAH |
-| Bronco Sport 2025 | RZ1C-14D003-AC | RZ1C-14D007-AAF |
 | Escape 2025 | PZ11-14D003-FC | PZ11-14D007-EAD |
 
 **Curvature:**
@@ -179,17 +178,13 @@ The table at this build. A row applies only when your module answers exactly the
 | Vehicle | Strategy | Data file(s) |
 |---|---|---|
 | F-150 2021–23, level BC | ML3V-14D003-BC | any, but the module must answer it (below) |
-| F-150 2024–26 | RL14-14D003-AC | SL34-14D007-ECD, -BCD, -CCD, -BAD, -EFD, -EAD; TL34-14D007-BCA |
-| Explorer 2025 | V1MC-14D003-AA | V1MC-14D007-GAA |
-| Mustang 2025 | SR3C-14D003-AA | SR3C-14D007-AA, -DA |
-| Mustang Mach-E 2025 | SJ9C-14D003-AD | SJ9C-14D007-AAF, -ABG, -ADF |
 | Mustang Mach-E 2021–22 | LJ9C-14D003-GA; LJ9C-14D003-HA | LJ9C-14D007-ANA, -AMA, -ARA; LJ9C-14D007-KNB |
 | Mustang Mach-E 2023–24 | LJ9C-14D003-FA | LJ9C-14D007-VDA, -VBA |
-| Mustang 2024 | PR3C-14D003-AD | PR3C-14D007-BF, -EF |
 | Transit and E-Transit 2024 | KK21-14D003-AM | LK41-14D007-AH, NK41-14D007-BC |
 
-**Known, and kept on the fallback:** Maverick 2025 (SZ1C-14D003-AE), Super Duty 2023 (PC3C-14D003-BG)
-and 2025 (PC3C-14D003-BH).
+**Not supported by this build:** F-150 2024–26, Expedition and Navigator 2025, Explorer 2025, Mustang 2024–25,
+Mustang Mach-E 2025, Maverick and Bronco Sport 2025, Super Duty 2023 on, and Nautilus 2025 on. openpilot runs
+these as dashcam only, and so does this build.
 
 **Two older software levels with their own message.** A 2024 F-150 on its first software level
 (RL34-14D003-AD) stays on the fallback. If its calibration is in the family Ford's service message
