@@ -7,8 +7,9 @@ extending and the path upstream. The owner's version is [USER_GUIDE.md](USER_GUI
 [INSTALL.md](INSTALL.md).
 
 Claims are as of bluepilot `7fb69ebfb`, opendbc `88701a67`, library `ca0b134`. Research notes are cited by
-name. They live in the private research repo (jrneulight/ford-pscm-research) under
-`research/pscm/notes/`. Where a claim wasn't checked it says so.
+file name (for example `approach-comparison.md`, at `notes/approach-comparison.md`): they are the project's
+research notes (to be published), and the scripts and twin they name are in the same set. Where a claim
+wasn't checked it says so.
 
 Paths: `L/` = `opendbc_repo/opendbc/bluepilot_lateral/` (the library), `O/` = `opendbc_repo/`, `B/` = this
 repo's root.
@@ -23,8 +24,8 @@ curvature (c2), path angle (c1), path offset (c0) and curvature rate (c3), plus 
 a precision bit. The module turns the path into a steering-angle target with its own controller, limits
 and driver override.
 
-Jacob's question was why the same command gives different results. The research's answer (Jacob's card
-"Where seen", `decisions.md`) is that most of the variation is **across vehicles, not within one truck**:
+The question this build starts from is why the same command gives different results on different Fords.
+The research's answer is that most of the variation is **across vehicles, not within one truck**:
 
 - **Each module runs its own strategy (F188) with its own data file (F10A).** One program serves
   several vehicle lines, one platform name covers different modules, and Ford changes both over the air
@@ -46,11 +47,10 @@ Jacob's question was why the same command gives different results. The research'
 
 ### 1.2 The goal
 
-Jacob, `decisions.md` (2026-11-18): "Ideally we want to get it as close to understanding and implementing
-the proper steering code so that all vehicles behave the same." And for the build: "one clean branch of
-the control code … with any workarounds and hacks and anything else unnecessary remove[d]". Later: the
-code should be upstream-ready, one setup for every Ford we can support, with any submission waiting for
-his approval.
+Understand and implement the module's own steering closely enough that every supported Ford behaves the
+same. The build is one clean branch of the control code, with the workarounds, hacks and anything else
+unnecessary removed. The code is meant to be upstream-ready: one setup for every Ford that can be
+supported.
 
 ### 1.3 The shape of the solution
 
@@ -70,8 +70,7 @@ his approval.
 
 ## 2. The decisions
 
-Each section gives the problem, the options, the evidence, the choice and its cost. Jacob's card answers
-are quoted word for word in `decisions.md`.
+Each section gives the problem, the options, the evidence, the choice and its cost.
 
 ### 2.1 Curvature base, path angle as a per-row switch (A′)
 
@@ -100,9 +99,11 @@ speeds, sameness across Fords, fit with openpilot, robustness and cost. The main
 module's c2 rate, so path angle adds nothing (`clean-build.md` §13). The stock camera sends c1 all the
 time, so the module isn't being asked for anything new.
 
-**Choice.** Card "Approach": "Build A′ (Recommended)". Card "Lane offset": "Remove for now". Path angle
-is a constant in each row (`StrategyRow.path_angle`), off everywhere
-(`test_path_angle_is_a_switch_per_row_and_off`).
+**Choice.** The project chose A′ because it is the only option that gets past the module's c2 rate in
+town while keeping the steady state on curvature, so a wrong K2 costs a transient and never the gain
+(evidence above). The lane offset (c0) is removed for now, because it feeds the module's integrator and its
+gains differ 3–10× between trucks (option A). Path angle is a constant in each row
+(`StrategyRow.path_angle`), off everywhere (`test_path_angle_is_a_switch_per_row_and_off`).
 
 **Trade-offs.**
 - Recorded requests through the F-150 twin make the wheel 1.2–2.6 times as busy below 12 m/s as the
@@ -131,7 +132,7 @@ its program with the 2025 Mach-E: neither may use the other's row.
 **Choice.** A row lists exact pairs (`StrategyRow.modules`). Several data files share a row only where
 the note shows equal lane-centering numbers (`test_data_files_with_the_same_numbers_share_a_row`). A
 level across generations never shares a row (`test_the_mach_e_generations_never_share_a_row`). No
-calibration (F124) is pinned yet, because F124 on a truck is unconfirmed (issue #24), and the 2022–24
+calibration (F124) is pinned yet, because F124 on a truck is unconfirmed (no vehicle read yet), and the 2022–24
 Maverick's module has none.
 
 **One exception, the BC row** (2.11): `ANY_DATA_FILE`, allowed by test only on a curvature row with
@@ -154,8 +155,8 @@ command is the one with fleet evidence: gain 0.97–1.05 on 102 vehicles of 11 p
 (`cross-vehicle.md`).
 
 **Choice.** `FALLBACK_ROW`: curvature only, ramp type 0, precision 1, nothing of a module's own. It is a
-row like any other, so the controller always reads one row. The fallback has no band either (card
-"Panda band", 2.4). A level `not_supported` makes car init set dashcam only, for a module that takes no
+row like any other, so the controller always reads one row. The fallback has no band either
+(2.4). A level `not_supported` makes car init set dashcam only, for a module that takes no
 lane message built here. No row uses it today. Rows kept on the fallback (Maverick 2025, Super Duty) are
 in the table so the support row can say "known, and not yet supported" instead of "not in the table".
 Replaced levels (`SUPERSEDED`) carry a reason the owner can act on: SSM 53105's wording for RL34-14D003-AD
@@ -187,8 +188,8 @@ early 2024 Mustang (PR3C) at 0.25 and the Ranger at 0.167 (`scripts/clean-build/
 is now `min(0.26, max(1.7/v, 0.03))` per rad. The floor of 0.03 is there because above 205 km/h `1.7/v`
 fell under the Explorer row.
 
-**Choice.** The last two options, chosen together with the rest of the build. Card "Panda band": "Keep as
-built (Recommended)", no band on BluePilot's paths, the fallback included. Pinion yaw (K20) stays
+**Choice.** The third option, because the band is incompatible with A′ and the single sum bound is
+unsound. There is no measured band on BluePilot's paths, the fallback included. Pinion yaw (K20) stays
 removed, since nothing reads it without the band. Two startup bits in the second safety param
 (`current_safety_param_sp`):
 - **bit 5 `BP_LATERAL`**: BluePilot's check instead of the stock one. Cleared by "Disable BP Lateral
@@ -211,8 +212,9 @@ Path offset and curvature rate must be inactive on every module.
 
 **Problem.** bp-dev had two controllers and 19 settings. **Evidence:** `change-analysis.md` §0–2. Most
 patched effects of three root causes: the panda latch, the measured-curvature clip pinned by a biased yaw
-signal, and angle mode's path-angle mapping. **Choice:** card "Keep/remove": "Take them all
-(Recommended)", then the A′ and "Lane offset" cards. Removed: angle mode, the stall and hand-off pulses,
+signal, and angle mode's path-angle mapping. **Choice:** remove them all, since each patched an effect of
+a cause this build removes (the latch, the clip) or replaces (angle mode, by A′, 2.1); the lane offset as
+in 2.1. Removed: angle mode, the stall and hand-off pulses,
 both human-turn resets, the predicted-curvature blend, lane positioning, the lane-change factors, the
 post-lane-change limiter, the clip, the pinion source, and 18 of 19 settings. One setting is left:
 `disable_BP_lat_UI`. The library is about 2,300 lines shorter. **Trade-off:** owners lose their tuning.
@@ -230,10 +232,10 @@ start. It uses service 0x22 after tester-present, the same shape as openpilot's 
 are logged and never take part in matching. F188 and F10A are asked up to three times, because one lost
 frame would otherwise put the car on the fallback for the whole drive
 (`test_a_lost_answer_to_the_key_is_asked_again`). A silent module costs the start about 0.1 s per
-identifier, plus 0.2 s more per key identifier. Card "Start reads": steering module only; camera status
-and fault-code reads are future improvements, after a truck test (`clean-build.md` §10).
+identifier, plus 0.2 s more per key identifier. Only the steering module is read; camera status and
+fault-code reads are future improvements, after a truck test (`clean-build.md` §10).
 
-**Trade-offs, not checked:** whether F10A answers in the default session on a real truck (issue #24). If
+**Trade-offs, not checked:** whether F10A answers in the default session on a real truck (no vehicle read yet). If
 it doesn't, every car is on the fallback. EE80's session isn't known either. It was added because a
 refusal answers nothing and the first truck log is the check. DE01 isn't decoded: the byte offsets are a
 hypothesis on most rows.
@@ -301,20 +303,20 @@ speed changes nothing today. The limit is read at the car's speed, which errs lo
 **Problem.** Path angle's numbers rest on firmware reads and the twin, and no drive has sent it. Review
 finding 8 showed a busier wheel on real requests.
 
-**Choice.** Jacob, card "Two steps": "two steps but document, once we test we can make one release after
-my first drive" (`clean-build.md` §14.5).
+**Choice.** Two steps, documented, and one release after the first confirming drive (`clean-build.md`
+§14.5), because path angle's numbers haven't been driven: the base ships with it off, and a family
+switches on only after a drive confirms its row.
 1. **Step one, the base:** every row's switch off, bit 6 clear on every car.
 2. **Step two, per family:** a row switches on after a drive on one of its modules where
    `drive_check.py` (3.6) finds the measured path-angle gain within ±30 % of the row's below 20 m/s, and a
    low-speed turn with hands on, released at the exit, shows no wind-up. Switching on is one line in the
    row, and it also sets bit 6 for that row.
 3. **The confirming drive needs path angle on**, and the switch is a constant, so the step-one build
-   can't produce it. The first drive uses a test branch, **`clean/ford-lateral-drive1`** in the private
-   repo, identical except that the Explorer row's L1MC-14D003-AL / MB5C-14D007-BA pair has path angle on.
-   The window test already runs that case with zero refused frames. (The coordinator creates the branch.
-   It doesn't exist at the time of writing.)
-4. **One release:** after Jacob's first drive, on his Explorer, the rows confirmed by then switch on and
-   the build ships once. Unconfirmed rows ship off.
+   can't produce it. The first drive uses a test branch, **`clean/ford-lateral-drive1`**, identical
+   except that the Explorer row's L1MC-14D003-AL / MB5C-14D007-BA pair has path angle on. The window test
+   already runs that case with zero refused frames.
+4. **One release:** after the first confirming drive, on a 2020–24 Explorer, the rows confirmed by then
+   switch on and the build ships once. Unconfirmed rows ship off.
 
 **Release-notes wording** (§14.5 item 5): engaging in a curve starts from straight and builds in at the
 module's own rate, about 5–6 s at 30 km/h and about 2 s at 60 km/h. Only rows whose path angle is
@@ -338,18 +340,19 @@ same as BD, and engage the same way. They are **faster**: 0.27 s against 0.57 s 
 rate can't be tested from public data: every engaged second on every truck is curvature only.
 
 **Choice.** A curvature row with comma's stock constants, the BD row's lateral-acceleration limit, BC's
-own lag (0.35, 0.33, 0.28, 0.27 s at 30/60/100/130 km/h), and `ANY_DATA_FILE` (2.2). It took the
-coordinator's later input over the earlier "older level" wording. BA keeps "older than Ford's current
-level". **Trade-off:** it rests on behaviour, not files, and it applies only once the module answers F10A.
+own lag (0.35, 0.33, 0.28, 0.27 s at 30/60/100/130 km/h), and `ANY_DATA_FILE` (2.2). BC no longer
+carries the "older level" reason it had at first. BA keeps "older than Ford's current level". **Trade-off:** it rests on behaviour, not files, and it applies only once the module answers F10A.
 
 ### 2.12 The three-repo layout
 
 **Problem.** Where the code lives.
 
-**Options.** bp-dev's in-tree Ford code, or the 7.1 bluepilot-lateral library. **Choice:** card "Base":
-"7.1 library (Recommended)", taken from `f267286`. Card "Panda fix": panda safety and controller on the
-same branch, in separate commits, with one test set. Card "Push where": "Private repo, after fixes
-(Recommended)".
+**Options.** bp-dev's in-tree Ford code, or the 7.1 bluepilot-lateral library. **Choice:** the 7.1
+library, taken from `f267286`, because 7.1 already discards bp-dev's Ford safety and its host already has
+the comma-compatible limits and the stock fallback; building on bp-dev would mean writing the safety change
+twice (`change-analysis.md` §4.1). Panda safety and controller are on the same branch, in separate
+commits, with one test set, so one set of tests shows the controller never leaves the panda's window
+(`change-analysis.md` §4.2). The three parts are branches of one repository, bluepilot-clean.
 
 | Part | Upstream base | In bluepilot-clean |
 |---|---|---|
@@ -357,14 +360,14 @@ same branch, in separate commits, with one test set. Card "Push where": "Private
 | opendbc at `opendbc_repo/` | ford-op/opendbc `e80aa6cb` | `clean/opendbc` `88701a67` |
 | bluepilot-lateral at `opendbc_repo/opendbc/bluepilot_lateral/` | BluePilotDev/bluepilot-lateral `f267286` | `clean/bluepilot-lateral` `ca0b134` |
 
-`B/.gitmodules` points `opendbc_repo` at `https://github.com/jrneulight/bluepilot-clean.git`, branch
+`B/.gitmodules` points `opendbc_repo` at that repository, branch
 `clean/opendbc`. `O/.gitmodules` points `opendbc/bluepilot_lateral` at the same repo, branch
 `clean/bluepilot-lateral`. A recursive clone gets all three. LFS objects stay at sunnypilot's store
 (`.lfsconfig`), so pushes use `--no-verify` to skip the LFS hook. Each library commit is followed by an
 opendbc pointer commit and a bluepilot pointer commit.
 
 **Trade-off.** Not upstream-shaped: upstream would take plain files in `opendbc/car/ford` and
-`opendbc/safety` (4.3). Not checked: bp-7.1-dev itself on Jacob's trucks (BluePilotDev/bluepilot#226).
+`opendbc/safety` (4.3). Not checked: bp-7.1-dev itself on a drive (BluePilotDev/bluepilot#226).
 
 ## 3. The low level
 
@@ -445,12 +448,11 @@ refused frame it restarts from the measured curvature. The review's flag-only fi
 
 ### 3.3 How a row is made from firmware
 
-The pipeline lives in the research repo:
+The pipeline lives in the project's research notes (to be published):
 
 1. **Files.** The module's VBF files (program, data file, calibration) for a strategy come from Ford's
    service-software archive, collected per VIN (`notes/sourcing/`; what's missing is in
-   `notes/sourcing/wanted.md`). Raw files and decompiles stay under `research/pscm/firmware-raw/`, apart
-   from notes.
+   `notes/sourcing/wanted.md`). Raw files and decompiles are kept apart from the notes.
 2. **Read the control law.** Decompile (Ghidra: RH850 on the 2021–23 F-150's module, PowerPC VLE on the
    2020–24 Explorer's) and write a per-strategy note: path law, preview T and d tables, integrator, slews, a_y limit,
    authority, latches (`firmware-core.md` for ML3V-BD; `rl14-firmware.md`, `explorer-firmware.md`,
@@ -458,7 +460,7 @@ The pipeline lives in the research repo:
    row.
 3. **Compare data files** (`cfg-diff.md`): which data files hold the same lane-centering numbers and can
    share a row.
-4. **Check against a model** (`twin.md`). `research/pscm/twin/` is the module's lateral controller in
+4. **Check against a model** (`twin.md`). `twin/` is the module's lateral controller in
    Python, block for block. It was checked against the firmware itself in an emulator: 595,165 block
    calls, no mismatches after fixes (`twin-vs-firmware.md`). Against drives, its angle target matches the
    measured pinion angle to 0.41° RMS on BD trucks. §10 covers the older library. A row checked this way,
@@ -483,20 +485,20 @@ angle switch needs a confirming drive. Unverified numbers err toward a high K2 a
   any plan mismatch ("BluePilot lane message plan").
 - Every frame: `controllerStateBP.lateral` (request, command, both signals, measured curvature, limited,
   module state, limit, capability, health).
-- `research/pscm/scripts/clean-build/drive_check.py <rlog or route dir>... [--json out.json]` (or
+- `scripts/clean-build/drive_check.py <rlog or route dir>... [--json out.json]` (or
   `--selftest`), in the tree's venv. Per speed band (5–12, 12–20, 20–45 m/s), hands off, it fits
   `measured(t + lag) = a·curvature + b·(commandedCurvature − curvature) + offset` at the best lag
   (0–0.8 s). It passes where |b − 1| ≤ 0.30 with at least 400 frames of path angle at work, and it also
   fits small and large path angle apart. The self-test recovers 1.0, 0.8 and 0.55 and fails 0.55. No
   route has these fields yet.
-- Replay: `research/pscm/scripts/replay/cleanreplay.py` (`run_clean.sh`, `analyze_clean.py`) runs these
+- Replay: `scripts/replay/cleanreplay.py` (`run_clean.sh`, `analyze_clean.py`) runs these
   files with the compiled panda in the loop. `--pscm` gives a what-if row.
 
 ### 3.5 Tests
 
 Python environment: `UV_PROJECT_ENVIRONMENT=~/tools/venvs/clean-build uv sync --frozen --extra testing
 --extra tools`, plus `pyyaml`, `pytest` and `cantools`. Then `scons -j9` at the root. Whole suites are
-heavy: run them in CI or on helios-agent, not on a shared small machine. From `opendbc_repo/` with
+heavy: run them in CI or on a large machine, not on a shared small one. From `opendbc_repo/` with
 `PYTHONPATH=$PWD`:
 
 ```
@@ -516,7 +518,7 @@ tools/test_runner.py bluepilot openpilot/sunnypilot/selfdrive/controls/tests ope
 ```
 
 That gives 545 passed, 1 skipped and 1 error. The error is `test_ui_frames`' harness: a `params.cc` log
-line lands on the child's result line. The counts are `clean-build.md` §14.4's, on helios-agent.
+line lands on the child's result line. The counts are `clean-build.md` §14.4's, on a build machine.
 
 What the main tests guard:
 
@@ -539,7 +541,7 @@ What the main tests guard:
 
 ### 4.1 Known gaps (`clean-build.md` §6, §14.6)
 
-- F10A and F124 on a real truck (issue #24). Without F10A every car is on the fallback.
+- F10A and F124 on a real truck (no vehicle read yet). Without F10A every car is on the fallback.
 - Coverage: 39 of 63 factory records and 25 of 67 logged vehicles have no exact row. Rows are wanted for
   PZ11-14D003-EA and the unread files; RZ1C and PZ11 need preview tables; calibrations aren't pinned yet.
 - No route exercises a row's own numbers yet. Path angle has never been sent on a drive by this build.
@@ -564,8 +566,8 @@ What the main tests guard:
 
 ### 4.3 The path upstream
 
-Jacob wants this upstreamable even if it means larger changes to comma's Ford code where the current
-implementation rests on faulty logic. Any submission waits for his approval. What it needs:
+The aim is a build that can go upstream, even if that means larger changes to comma's Ford code where
+the current implementation rests on faulty logic. What it needs:
 - the library as plain files in `opendbc/car/ford` and `opendbc/safety`, without host bindings;
 - the early commits squashed into safety / controller / tests / A′. A′'s panda change and controller
   change are already their own commits;

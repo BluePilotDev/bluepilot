@@ -222,7 +222,7 @@ the table says, and the support row says "The steering module didn't answer".
 
 ## 5. The release plan
 
-Jacob decided on two steps, documented, with one release after his first drive:
+The build ships in two steps, documented, with one release after the first confirming drive:
 
 1. **The base:** everything in section 3, with path angle switched off on every row. Every car steers
    by curvature.
@@ -231,7 +231,7 @@ Jacob decided on two steps, documented, with one release after his first drive:
    helps (below about 70 km/h). A low-speed turn released at the exit also has to show no lingering
    steer.
 
-Both steps are tested before anything ships. Jacob's own Explorer makes the first confirming drive.
+Both steps are tested before anything ships. A 2020–24 Explorer makes the first confirming drive.
 After it, the rows confirmed by then are switched on, and the build goes out as one release. Rows not
 confirmed by then ship with path angle off.
 
@@ -264,7 +264,7 @@ because one drive seldom holds several.
 - **One difference from comma's own Ford check:** comma's check also refuses a curvature far from what
   the car is measured doing. This build drops that check on BluePilot's steering, because the path angle
   needs the curvature to differ from the measurement on purpose. The limits on acceleration and its rate
-  of change still apply. Jacob chose this. "Disable BP Lateral Control" brings back comma's stock
+  of change still apply. "Disable BP Lateral Control" brings back comma's stock
   command and comma's stock check.
 - **What ends steering:** what ends it in openpilot (pressing the brake, cancelling, openpilot
   disengaging). The panda then refuses steering at once. The steering module can also stop on its own:
