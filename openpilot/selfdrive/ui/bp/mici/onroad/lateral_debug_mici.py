@@ -14,11 +14,6 @@ from openpilot.system.ui.lib.application import gui_app, FontWeight
 from openpilot.selfdrive.ui.ui_state import device, ui_state
 from bluepilot.ui.widgets.debug.debug_colors import DebugColors
 from bluepilot.ui.widgets.debug.debug_graph import TimeSeriesGraph, GraphConfig, GraphSeries
-from bluepilot.ui.widgets.debug.angle_factor_adjuster import AngleFactorAdjuster
-
-_ADJUSTER_WIDTH = 110
-_ADJUSTER_MARGIN_TOP = 5
-_ADJUSTER_MARGIN_RIGHT = 5
 
 # Hold the interactive timeout at 5 minutes while the debug screen is visible so
 # the onroad-inactivity timeout doesn't dismiss the screen mid-observation.
@@ -38,10 +33,8 @@ class LateralDebugMici(Widget):
 
   def __init__(self, back_callback):
     super().__init__()
-    # Any tap on this widget pops back to the menu, except taps on the angle-factor adjuster
+    # Any tap on this widget pops back to the menu
     self._back_callback = back_callback
-    self._adjuster = self._child(AngleFactorAdjuster(compact=True))
-    self._adjuster_rect = rl.Rectangle(0, 0, 0, 0)
 
     self._graph = TimeSeriesGraph(
       config=GraphConfig(
@@ -93,8 +86,6 @@ class LateralDebugMici(Widget):
       pass
 
   def _handle_mouse_release(self, mouse_pos):
-    if rl.check_collision_point_rec(mouse_pos, self._adjuster_rect):
-      return
     self._back_callback()
 
   def _render(self, rect: rl.Rectangle):
@@ -105,13 +96,6 @@ class LateralDebugMici(Widget):
     # Graph fills the whole screen — title, axes, legend are all drawn inside.
     # The legend is lifted via legend_y_offset so it doesn't overlap "tap to close" below.
     self._graph.render(rect)
-
-    # Angle-factor adjuster overlaps the graph's right edge (angle mode only)
-    adjuster_w = _ADJUSTER_WIDTH if self._adjuster.is_visible else 0
-    self._adjuster_rect = rl.Rectangle(rect.x + rect.width - adjuster_w - _ADJUSTER_MARGIN_RIGHT,
-                                       rect.y + _ADJUSTER_MARGIN_TOP,
-                                       adjuster_w, rect.height - _ADJUSTER_MARGIN_TOP)
-    self._adjuster.render(self._adjuster_rect)
 
     # Small dismiss hint at bottom-left, outside graph legend area
     font = gui_app.font(FontWeight.NORMAL)

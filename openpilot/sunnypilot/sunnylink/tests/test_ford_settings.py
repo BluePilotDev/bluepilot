@@ -11,43 +11,24 @@ from pathlib import Path
 from opendbc.bluepilot_lateral.params.manifest import SETTINGS
 
 SETTINGS_UI = Path(__file__).resolve().parents[1] / "settings_ui.json"
-OFFROAD_ONLY = ("FordPrefLateralControl", "FordPrefSteerAngleCurvature")
 
 
 class TestFordSettingsMatchManifest(unittest.TestCase):
-  """BluePilot: sunnylink's Ford section holds every setting the lateral library reads (bp-sunnypilot #12),
-  with the manifest's limits. The disable toggle stays out: BluePilot is always on in bp-sunnypilot."""
+  """BluePilot: sunnylink's Ford section holds every setting the lateral library reads, with the
+  manifest's label and text. Each is read once at car start, so each is marked as needing a restart."""
 
   @classmethod
   def setUpClass(cls):
     cls.items = {i["key"]: i for i in json.loads(SETTINGS_UI.read_text())["vehicle_settings"]["ford"]["items"]}
-    cls.manifest = {s.key: s for s in SETTINGS if s.key != "disable_BP_lat_UI"}
 
-  def test_same_keys(self):
-    self.assertEqual(set(self.items), set(self.manifest))
-
-  def test_limits_match_the_manifest(self):
-    for key, item in self.items.items():
-      rng = self.manifest[key].range
-      with self.subTest(key=key):
-        if item["widget"] == "option":
-          self.assertEqual((item["min"], item["max"]), rng)
-        elif item["widget"] == "multiple_button":
-          values = [o["value"] for o in item["options"]]
-          self.assertEqual((min(values), max(values)), rng)
-
-  def test_mode_and_pinion_are_offroad_only(self):
-    for key in OFFROAD_ONLY:
-      with self.subTest(key=key):
-        assert {"type": "offroad_only"} in self.items[key].get("enablement", [])
-
-  def test_mode_settings_show_only_for_their_mode(self):
-    for key, item in self.items.items():
-      mode = 0 if key.endswith("_curv") else 1 if key.endswith("_ang") else None
-      if mode is None:
-        continue
-      with self.subTest(key=key):
-        assert {"type": "param", "key": "FordPrefLateralControl", "equals": mode} in item.get("visibility", [])
+  def test_every_manifest_setting_is_listed(self):
+    for setting in SETTINGS:
+      with self.subTest(key=setting.key):
+        item = self.items[setting.key]
+        self.assertEqual(item["widget"], "toggle")
+        self.assertTrue(item["title"].endswith(setting.label))
+        self.assertEqual(item["description"], setting.description)
+        self.assertTrue(item["needs_onroad_cycle"])
 
 
 if __name__ == "__main__":

@@ -35,14 +35,6 @@ macros:
   mici_only:
     - {type: capability, field: device_type, equals: mici}
 
-  # FORD_EDGE_MK2's pinion sensor only reports a relative angle -- the safety/control
-  # layers already no-op FordPrefSteerAngleCurvature there (see
-  # opendbc/sunnypilot/car/ford/values_ext.py FORD_PINION_GEOMETRY_INDEX), so grey the
-  # toggle out too rather than leaving a live-looking control that silently does nothing.
-  not_ford_edge_mk2:
-    - type: not
-      condition: {type: capability, field: platform, equals: FORD_EDGE_MK2}
-
   # Mirrors selfdrive/ui/sunnypilot/layouts/.../mads_settings.py:_mads_limited_settings()
   # Rivian + Tesla-without-vehicle-bus get the limited MADS UI (3-toggle subset).
   # On those platforms these toggles are disabled — full MADS settings are

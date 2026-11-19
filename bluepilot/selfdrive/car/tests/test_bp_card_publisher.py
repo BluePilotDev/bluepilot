@@ -71,10 +71,10 @@ class TestControllerStateBP(OpenpilotTestCase):
     self.assertFalse(_controller_state_bp(_ford(fingerprint_source="fw")).controllerStateBP.bmsFingerprintForced)
 
   def test_settings_snapshot(self):
-    # the 48 bms* fields of ControllerStateBP: 46 settings plus the two fingerprint fields
+    # the bms* fields of ControllerStateBP still in use: 33 settings plus the two fingerprint fields
     snapshot = bp_card_publisher._refresh_settings_cache()
-    bms_fields = {f for f in custom.ControllerStateBP.schema.fields if f.startswith("bms")}
-    self.assertEqual(len(bms_fields), 48)
+    bms_fields = {f for f in custom.ControllerStateBP.schema.fields if f.startswith("bms") and not f.startswith("bmsRemovedSpare")}
+    self.assertEqual(len(bms_fields), 35)
     self.assertEqual(set(snapshot) | {"bmsFingerprintForced", "bmsFingerprint"}, bms_fields)
     cs = _controller_state_bp(_ford()).controllerStateBP
     self.assertAlmostEqual(cs.bmsTwelveVBatteryLimit, snapshot["bmsTwelveVBatteryLimit"], places=5)

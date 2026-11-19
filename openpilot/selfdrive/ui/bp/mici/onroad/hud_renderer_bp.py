@@ -1,6 +1,5 @@
 import pyray as rl
 from openpilot.common.params import Params
-from opendbc.bluepilot_lateral.core.lateral_curv_ext import PrimaryLateralControl
 from openpilot.cereal import custom
 from openpilot.selfdrive.ui.mici.onroad.hud_renderer import (
   FONT_SIZES, KM_TO_MILE, CRUISE_DISABLED_CHAR, SET_SPEED_PERSISTENCE,
@@ -44,10 +43,6 @@ class MiciHudRendererBP(HudRendererSP):
     self.show_lateral_control = False
     # BluePilot: actual mode from controllerStateBP (None = not published, e.g. non-Ford)
     self.lateral_mode = None
-    # BluePilot: Track overlay hit-area for click-to-toggle
-    self._overlay_center_x = 0
-    self._overlay_center_y = 0
-    self._overlay_size = 0
 
   def _update_state(self) -> None:
     super()._update_state()
@@ -180,13 +175,9 @@ class MiciHudRendererBP(HudRendererSP):
   def _draw_lateral_control_overlay(self, center_x: int, center_y: int, wheel_size: int) -> None:
     """Draw a letter overlay indicating current lateral control mode (only when wheel is visible)."""
     if not self.show_lateral_control or self._wheel_alpha_filter.x <= 0 or self.lateral_mode is None:
-      self._overlay_size = 0
       return
 
     text_size = int(wheel_size * 0.65)
-    self._overlay_center_x = center_x
-    self._overlay_center_y = center_y
-    self._overlay_size = text_size
 
     if self.lateral_mode == LateralMode.angle:
       letter, color = "A", rl.Color(50, 100, 255, 220)  # Blue-ish
@@ -204,20 +195,3 @@ class MiciHudRendererBP(HudRendererSP):
     draw_shader_circle_gradient(center_x, center_y, text_size / 2, top, bottom)
 
     rl.draw_text_ex(self._font_bold, letter, rl.Vector2(text_x, text_y), text_size, 0, color)
-
-  def _handle_mouse_press(self, mouse_pos):
-    """Toggle FordPrefLateralControl between PrimaryLateralControl.curvature and .angle on overlay click."""
-    if self._overlay_size <= 0 or self.lateral_mode not in (LateralMode.curvature, LateralMode.angle):
-      return
-
-    hit_rect = rl.Rectangle(
-      self._overlay_center_x - self._overlay_size/2,
-      self._overlay_center_y - self._overlay_size/2,
-      self._overlay_size,
-      self._overlay_size,
-    )
-    if rl.check_collision_point_rec(mouse_pos, hit_rect):
-      gui_app._mouse_events.clear()
-      current = PrimaryLateralControl(self._bp_params.get("FordPrefLateralControl") or 0)
-      new_value = PrimaryLateralControl.curvature if current == PrimaryLateralControl.angle else PrimaryLateralControl.angle
-      self._bp_params.put("FordPrefLateralControl", int(new_value))

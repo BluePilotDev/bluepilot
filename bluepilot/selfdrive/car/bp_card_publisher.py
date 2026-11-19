@@ -99,24 +99,9 @@ def _refresh_settings_cache() -> dict:
     "bmsDisableFordRadarVisionOnly":   _get_bool(p, "disable_ford_radar_UI"),
     # --- Lateral Tuning ---
     "bmsDisableBpLateralControl":      _get_bool(p, "disable_BP_lat_UI"),
-    "bmsPrimaryControlVariable":       _get_int(p, "FordPrefLateralControl", 0),
     "bmsDisableLaneChangeUnderSpeed":  _get_bool(p, "BlinkerPauseLaneChange"),
     "bmsMinimumSpeedToPauseLaneChange": _get_int(p, "BlinkerMinLateralControlSpeed", 20),
     "bmsShowLateralControlMode":       _get_bool(p, "BpShowLateralControl"),
-    # --- Angle Tuning ---
-    "bmsLowSpeedAdjustmentFactor":     _get_float(p, "FordLowSpeedFactor_ang", 1.0),
-    "bmsHighSpeedAdjustmentFactor":    _get_float(p, "FordHighSpeedFactor_ang", 1.0),
-    "bmsLaneChangeFactorHighAngle":    _get_float(p, "lane_change_factor_high_ang", 1.0),
-    # --- Curvature Tuning ---
-    "bmsEnableHumanTurnDetection":     _get_bool(p, "enable_human_turn_detection_curv", True),
-    "bmsLaneChangeFactorHighCurvature": _get_float(p, "lane_change_factor_high_curv", 0.85),
-    "bmsEnableLanePositioning":        _get_bool(p, "enable_lane_positioning_curv"),
-    "bmsInLaneOffset":                 _get_float(p, "custom_path_offset_curv", 0.0),
-    "bmsEnableLanefullMode":           _get_bool(p, "enable_lane_full_mode_curv"),
-    "bmsUseCustomTuningProfile":       bool(_get_int(p, "custom_profile_curv", 0)),
-    "bmsPredictedCurvatureBlendRatioHigh": _get_float(p, "pc_blend_ratio_high_C_UI_curv", 0.4),
-    "bmsPredictedCurvatureBlendRatioLow":  _get_float(p, "pc_blend_ratio_low_C_UI_curv", 0.4),
-    "bmsCenteringPidGain":             _get_float(p, "LC_PID_gain_UI_curv", 3.0),
   }
 
 

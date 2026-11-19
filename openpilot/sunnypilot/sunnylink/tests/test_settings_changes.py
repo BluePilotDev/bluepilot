@@ -231,10 +231,3 @@ class TestBluePilotVehicleVisuals(OpenpilotTestCase):
     assert item["title"] == "[Visuals] Rainbow Lane Lines"
     assert item["description"] == "Inner lane lines become rainbow colored when longitudinal control is active."
 
-
-class TestBluePilotLateralToggle(OpenpilotTestCase):
-  def test_disable_toggle_leads_the_lateral_settings(self, schema):
-    keys = [item["key"] for item in schema["vehicle_settings"]["ford"]["items"]]
-    assert keys.index("disable_BP_lat_UI") + 1 == keys.index("FordPrefLateralControl")
-    assert keys.index("disable_BP_lat_UI") < keys.index("FordLowSpeedFactor_ang")
-    assert keys.index("disable_BP_lat_UI") < keys.index("enable_human_turn_detection_curv")

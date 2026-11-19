@@ -17,30 +17,18 @@ class VehicleLayoutMici(NavScroller):
     self._params = Params()
 
     self.show_hands_free_ui = BigParamControlBP("Show BlueCruise UI on Cluster", "send_hands_free_cluster_msg")
-    # Init-time param (read once at car init, mirrored into panda safety); takes effect after restart.
-    # FORD_EDGE_MK2's pinion sensor only reports a relative angle -- the safety/control
-    # layers already no-op this toggle there, so grey it out too (see values_ext.py
-    # FORD_PINION_GEOMETRY_INDEX).
-    self.steer_angle_curvature = BigParamControlBP("Use Pinion Yaw Sensor", "FordPrefSteerAngleCurvature")
-    self.steer_angle_curvature.set_enabled(self._pinion_yaw_sensor_supported)
     self.vbatt_pause_charging = BigParamFloatControl("12V Battery Limit", "vbatt_pause_charging", min=11.0, max=14.0, step=0.1)
 
     self._scroller.add_widgets([
       self.show_hands_free_ui,
-      self.steer_angle_curvature,
       self.vbatt_pause_charging,
     ])
 
     self._refresh_toggles = (
       ("send_hands_free_cluster_msg", self.show_hands_free_ui),
-      ("FordPrefSteerAngleCurvature", self.steer_angle_curvature),
     )
 
     ui_state.add_offroad_transition_callback(self._update_toggles)
-
-  @staticmethod
-  def _pinion_yaw_sensor_supported() -> bool:
-    return ui_state.CP is None or ui_state.CP.carFingerprint != "FORD_EDGE_MK2"
 
   def show_event(self):
     super().show_event()

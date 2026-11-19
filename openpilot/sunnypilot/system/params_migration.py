@@ -103,52 +103,6 @@ def _migrate_model_bundle_slots(_params):
     cloudlog.exception(f"Error migrating model bundle slots: {e}")
 
 
-BP_LATERAL_SCHEME_PARAMS_MIGRATION_VERSION: str = "1"
-
-# (old key, new key) -- old keys stay declared in common/params_keys.h (harmless orphans) so their
-# stored values are still readable here. lane_change_factor_high intentionally has no _ang entry:
-# the old curvature-tuned default (0.85) is the wrong direction for angle mode, so _ang just takes
-# its own fresh params_keys.h default instead of inheriting a stale value.
-_BP_LATERAL_SCHEME_PARAM_RENAMES = (
-  ("enable_human_turn_detection", "enable_human_turn_detection_curv"),
-  ("lane_change_factor_high", "lane_change_factor_high_curv"),
-  ("pc_blend_ratio_high_C_UI", "pc_blend_ratio_high_C_UI_curv"),
-  ("pc_blend_ratio_low_C_UI", "pc_blend_ratio_low_C_UI_curv"),
-  ("enable_lane_positioning", "enable_lane_positioning_curv"),
-  ("custom_path_offset", "custom_path_offset_curv"),
-  ("enable_lane_full_mode", "enable_lane_full_mode_curv"),
-  ("custom_profile", "custom_profile_curv"),
-  ("LC_PID_gain_UI", "LC_PID_gain_UI_curv"),
-  ("FordAngleLowSpeedFactor", "FordLowSpeedFactor_ang"),
-  ("FordAngleHighSpeedFactor", "FordHighSpeedFactor_ang"),
-)
-
-
-def _migrate_bp_lateral_scheme_params(_params):
-  # Marker is a STRING param (like the OnroadScreenOff*Migrated flags above): the original BOOL
-  # declaration made put("1") raise a type error inside the except below, so the marker never
-  # stuck and this re-ran (and re-seeded, clobbering user-tuned values) on every boot.
-  if _params.get("BPLateralSchemeParamsMigratedV1") == BP_LATERAL_SCHEME_PARAMS_MIGRATION_VERSION:
-    return
-
-  try:
-    for old_key, new_key in _BP_LATERAL_SCHEME_PARAM_RENAMES:
-      # Never overwrite a value that has already been written (by a previous migration run or by
-      # the user tuning the new key) -- makes re-runs harmless, and lets in-field devices that hit
-      # the every-boot re-seed keep whatever they have now instead of taking one final clobber.
-      if _params.get(new_key) is not None:
-        cloudlog.info(f"params_migration: {new_key} already set, not re-seeding")
-        continue
-      old_val = _params.get(old_key, return_default=True)
-      _params.put(new_key, old_val, block=True)
-      cloudlog.info(f"params_migration: seeded {new_key} from {old_key} ({old_val})")
-
-    _params.put("BPLateralSchemeParamsMigratedV1", BP_LATERAL_SCHEME_PARAMS_MIGRATION_VERSION, block=True)
-    cloudlog.info("params_migration: BP lateral scheme param split complete")
-  except Exception as e:
-    cloudlog.exception(f"Error migrating BP lateral scheme params: {e}")
-
-
 def run_migration(_params):
   # migrate OnroadScreenOffBrightness
   if _params.get("OnroadScreenOffBrightnessMigrated") != ONROAD_BRIGHTNESS_MIGRATION_VERSION:
@@ -188,6 +142,3 @@ def run_migration(_params):
 
   # seed the chestnut model slot from the pre-split single slot
   _migrate_model_bundle_slots(_params)
-
-  # BluePilot: split lateral-tuning params by control scheme (curvature vs angle)
-  _migrate_bp_lateral_scheme_params(_params)

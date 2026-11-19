@@ -30,6 +30,7 @@ def _published(params, bluepilot: bool) -> dict[str, bytes]:
   ext._bp_unknown_keys_logged = set()
   ext.CP_SP = custom.CarParamsSP.new_message(lateralInputsRequired=True)
   sm = _SM({s: getattr(messaging.new_message(s), s) for s in ('radarState', 'selfdriveStateSP', 'modelV2', 'vehicleParameters')})
+  sm['pandaStates'] = messaging.new_message('pandaStates', 0).pandaStates
   with mock.patch("openpilot.common.bluepilot.is_bluepilot", return_value=bluepilot):
     CC_SP = ext.state_control_ext(sm)
   return {p.key: p.value for p in CC_SP.params}

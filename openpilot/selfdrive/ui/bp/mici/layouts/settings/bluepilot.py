@@ -5,7 +5,7 @@ from collections.abc import Callable
 from openpilot.common.params import Params
 from openpilot.common.swaglog import cloudlog
 from openpilot.selfdrive.ui.bp.mici.widgets.button_bp import (
-  BigButtonBP, BigParamControlBP, BigMultiParamToggleBP,
+  BigButtonBP, BigParamControlBP,
 )
 from openpilot.selfdrive.ui.bp.mici.widgets.web_server_qr_dialog import WebServerQRDialog
 from openpilot.selfdrive.ui.bp.mici.widgets.preferred_network_select import PreferredNetworkSelectMici
@@ -70,11 +70,6 @@ class BluePilotLayoutMici(NavScroller):
     self.restore_dongle_btn.set_click_callback(self._restore_dongle_id)
     self.restore_dongle_btn.set_enabled(self._has_recoverable_dongle_id)
 
-    # Primary lateral control selector lives above the lat sub-panel
-    self.primary_lateral_control = BigMultiParamToggleBP(
-      "Primary Control Variable", "FordPrefLateralControl", ["curvature", "angle"],
-    )
-
     # Sub-panels
     vehicle_panel = VehicleLayoutMici()
     vehicle_btn = BluePilotBigButton(
@@ -113,7 +108,6 @@ class BluePilotLayoutMici(NavScroller):
       vehicle_btn,
       audio_btn,
       visuals_btn,
-      self.primary_lateral_control,
       lat_btn,
       long_btn,
       self.ui_debug_log,

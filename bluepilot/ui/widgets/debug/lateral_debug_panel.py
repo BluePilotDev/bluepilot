@@ -10,13 +10,9 @@ from openpilot.system.ui.widgets import Widget
 from openpilot.selfdrive.ui.ui_state import ui_state
 from bluepilot.ui.widgets.debug.debug_colors import DebugColors
 from bluepilot.ui.widgets.debug.debug_graph import TimeSeriesGraph, GraphConfig, GraphSeries
-from bluepilot.ui.widgets.debug.angle_factor_adjuster import AngleFactorAdjuster
 
 # Match Qt update rate: 20Hz = 50ms between data pushes
 DATA_PUSH_INTERVAL = 0.05
-ADJUSTER_WIDTH = 170
-ADJUSTER_MARGIN_TOP = 15
-ADJUSTER_MARGIN_RIGHT = 15
 
 
 class LateralDebugPanel(Widget):
@@ -42,7 +38,6 @@ class LateralDebugPanel(Widget):
     )
     self._steer_delay = 0.0
     self._last_push_time = 0.0
-    self._adjuster = self._child(AngleFactorAdjuster())
 
   def _update_state(self):
     sm = ui_state.sm
@@ -87,9 +82,3 @@ class LateralDebugPanel(Widget):
 
   def _render(self, rect: rl.Rectangle):
     self._graph.render(rect)
-    # Angle-factor adjuster overlaps the graph's right edge (angle mode only)
-    if self._adjuster.is_visible:
-      adjuster_rect = rl.Rectangle(rect.x + rect.width - ADJUSTER_WIDTH - ADJUSTER_MARGIN_RIGHT,
-                                   rect.y + ADJUSTER_MARGIN_TOP,
-                                   ADJUSTER_WIDTH, rect.height - ADJUSTER_MARGIN_TOP)
-      self._adjuster.render(adjuster_rect)

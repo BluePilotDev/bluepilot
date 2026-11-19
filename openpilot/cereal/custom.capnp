@@ -577,26 +577,24 @@ struct ControllerStateBP @0xcd96dafb67a082d0 {
 
   # --- Lateral Tuning ---
   bmsDisableBpLateralControl @35 :Bool;  # disable_BP_lat_UI
-  bmsPrimaryControlVariable @36 :UInt8;  # FordPrefLateralControl: 0=curvature, 1=angle
+  bmsRemovedSpare01 @36 :UInt8;
   bmsDisableLaneChangeUnderSpeed @37 :Bool;  # BlinkerPauseLaneChange
   bmsMinimumSpeedToPauseLaneChange @38 :UInt8;  # BlinkerMinLateralControlSpeed
   bmsShowLateralControlMode @39 :Bool;  # BpShowLateralControl
 
-  # --- Angle Tuning (angle-mode-only menu items) ---
-  bmsLowSpeedAdjustmentFactor @40 :Float32;  # FordLowSpeedFactor_ang
-  bmsHighSpeedAdjustmentFactor @41 :Float32;  # FordHighSpeedFactor_ang
-  bmsLaneChangeFactorHighAngle @42 :Float32;  # lane_change_factor_high_ang
-
-  # --- Curvature Tuning (curvature-mode-only menu items) ---
-  bmsEnableHumanTurnDetection @43 :Bool;  # enable_human_turn_detection_curv
-  bmsLaneChangeFactorHighCurvature @44 :Float32;  # lane_change_factor_high_curv
-  bmsEnableLanePositioning @45 :Bool;  # enable_lane_positioning_curv
-  bmsInLaneOffset @46 :Float32;  # custom_path_offset_curv
-  bmsEnableLanefullMode @47 :Bool;  # enable_lane_full_mode_curv
-  bmsUseCustomTuningProfile @48 :Bool;  # custom_profile_curv
-  bmsPredictedCurvatureBlendRatioHigh @49 :Float32;  # pc_blend_ratio_high_C_UI_curv
-  bmsPredictedCurvatureBlendRatioLow @50 :Float32;  # pc_blend_ratio_low_C_UI_curv
-  bmsCenteringPidGain @51 :Float32;  # LC_PID_gain_UI_curv
+  # --- retired with the Ford steering rebuild (angle and curvature tuning) ---
+  bmsRemovedSpare02 @40 :Float32;
+  bmsRemovedSpare03 @41 :Float32;
+  bmsRemovedSpare04 @42 :Float32;
+  bmsRemovedSpare05 @43 :Bool;
+  bmsRemovedSpare06 @44 :Float32;
+  bmsRemovedSpare07 @45 :Bool;
+  bmsRemovedSpare08 @46 :Float32;
+  bmsRemovedSpare09 @47 :Bool;
+  bmsRemovedSpare10 @48 :Bool;
+  bmsRemovedSpare11 @49 :Float32;
+  bmsRemovedSpare12 @50 :Float32;
+  bmsRemovedSpare13 @51 :Float32;
 
   # --- Fingerprint (not a menu item, but requested alongside the settings snapshot) ---
   bmsFingerprintForced @52 :Bool;  # true when CarParams.fingerprintSource == fixed (CarPlatformBundle / FINGERPRINT env)
