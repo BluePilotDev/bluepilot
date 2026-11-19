@@ -617,7 +617,7 @@ struct ControllerStateBP @0xcd96dafb67a082d0 {
 
   struct Lateral {
     active @0 :Bool;                 # BluePilot's controller ran (false: openpilot's stock Ford command)
-    supportLevel @1 :UInt8;          # 0 fallback, 1 curvature, 2 full
+    supportLevel @1 :UInt8;          # 0 fallback, 1 curvature, 2 full, 3 not supported (dashcam only)
     supportReason @2 :Text;
     strategy @3 :Text;               # the steering module's part numbers as read this start; "" = no answer
     dataFile @4 :Text;

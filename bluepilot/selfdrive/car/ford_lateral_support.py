@@ -22,7 +22,8 @@ SUPPORT_PARAM = "FordLateralSupport"
 NOTICE_ALERT = "Offroad_FordLateralSupport"  # cleared by the next onroad transition (params_keys.h)
 
 PART_NUMBERS = ("strategy", "dataFile", "calibration")
-LEVEL_NAMES = {SupportLevel.fallback: "Fallback", SupportLevel.curvature: "Curvature", SupportLevel.full: "Full"}
+LEVEL_NAMES = {SupportLevel.fallback: "Fallback", SupportLevel.curvature: "Curvature", SupportLevel.full: "Full",
+               SupportLevel.not_supported: "Not supported"}
 MATCHED_BY = {"can": "CAN messages", "fw": "module software", "fixed": "your selection"}
 
 _stored: dict | None = None  # this start's record as record_start stored it, for record_degraded
