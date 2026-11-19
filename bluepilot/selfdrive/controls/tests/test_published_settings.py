@@ -15,7 +15,7 @@ class _SM(dict):
 
 
 class _Written:
-  """Params with some keys written, layered over Params (as test_lateral_params.py does)."""
+  """Params with some keys written, layered over Params ."""
   def __init__(self, params: Params, **written):
     self._params, self._written = params, written
 
@@ -56,7 +56,7 @@ class TestBluePilotSettingsPublished(OpenpilotTestCase):
     published = _published(self.params, bluepilot=False)
     for key in SETTINGS:
       self.assertNotIn(key, published)
-    self.assertEqual(published["disable_BP_lat_UI"], b"0")  # the lateral settings still are
+    self.assertEqual(published, {})  # the lateral library reads no setting while driving
 
 
 class TestWithoutBpxCarCode(OpenpilotTestCase):
@@ -71,7 +71,7 @@ class TestWithoutBpxCarCode(OpenpilotTestCase):
 
 
 class TestPublishedSettingsAreCached(OpenpilotTestCase):
-  def test_bpx_settings_are_cached_with_the_lateral_ones(self):
+  def test_bpx_settings_are_cached(self):
     calls = []
 
     class Counting(_Written):

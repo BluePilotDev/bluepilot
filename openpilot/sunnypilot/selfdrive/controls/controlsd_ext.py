@@ -28,14 +28,14 @@ class ControlsExt(ModelStateBase):
     self.CP = CP
     self.params = params
     self._param_update_time: float = 0.0
-    self._bp_unknown_keys_logged: set[str] = set()  # BluePilot: see read_lateral_params
+    self._bp_unknown_keys_logged: set[str] = set()  # BluePilot: see read_params
     self.blinker_pause_lateral = BlinkerPauseLateral()
 
     cloudlog.info("controlsd_ext is waiting for CarParamsSP")
     self.CP_SP = messaging.log_from_bytes(params.get("CarParamsSP", block=True), custom.CarParamsSP)
     cloudlog.info("controlsd_ext got CarParamsSP")
 
-    self.sm_services_ext = ['radarState', 'selfdriveStateSP']
+    self.sm_services_ext = ['radarState', 'selfdriveStateSP', 'pandaStates']  # BluePilot: pandaStates for the Ford lateral
     self.pm_services_ext = ['carControlSP']
 
   def initialize_lateral_control(self, lac, CI, dt):
@@ -108,8 +108,8 @@ class ControlsExt(ModelStateBase):
     CC_SP.intelligentCruiseButtonManagement.sendButton = icbm_src.sendButton
     CC_SP.intelligentCruiseButtonManagement.vTarget = icbm_src.vTarget
 
-    # BluePilot: per-frame inputs and settings for a car that asks for them (the library sets
-    # lateralInputsRequired for every Ford); other cars leave them empty
+    # BluePilot: per-frame inputs for a car that asks for them (the library sets lateralInputsRequired
+    # for every Ford), and the BPx settings; other cars leave them empty
     if self.CP_SP.lateralInputsRequired:
       self.fill_lateral_inputs(CC_SP.lateralInputs, sm)
       CC_SP.params = self.published_params()
@@ -122,7 +122,7 @@ class ControlsExt(ModelStateBase):
     now = time.monotonic()
     cached = getattr(self, "_bp_params_cache", None)
     if cached is None or now - getattr(self, "_bp_params_cache_time", 0.0) > BP_PARAMS_REFRESH_PERIOD:
-      cached = self.read_lateral_params() + self.read_bpx_params()  # BluePilot: the BPx settings too
+      cached = self.read_bpx_params()  # BluePilot: the lateral library reads no setting while driving
       self._bp_params_cache = cached
       self._bp_params_cache_time = now
     return cached
@@ -142,18 +142,14 @@ class ControlsExt(ModelStateBase):
       from opendbc.sunnypilot.car.ford.bluepilot.longitudinal_ext import BPX_LONG_PARAMS
     except ImportError:  # an opendbc without the BPx car code: it has no reader for these either
       return []
-    return self.read_lateral_params([*BPX_LONG_PARAMS, *HUD_PARAMS])
+    return self.read_params([*BPX_LONG_PARAMS, *HUD_PARAMS])
 
-  def read_lateral_params(self, keys: list[str] | None = None) -> list[dict]:
-    """BluePilot: UI-tunable lateral params for the opendbc lateral, as CarControlSP.params entries.
-    A key never written on the device publishes its params_keys.h default, so the lateral runs
-    the value the settings UI shows (#6 in ford-op/bg-opendbc). ~18 Params reads, so callers go
-    through published_params(), which caches them."""
-    # imported here, not at module level: the key list lives in the opendbc submodule and only
-    # Ford needs it, so a submodule on another layout must not break controlsd for other brands
-    from opendbc.bluepilot_lateral.core.values_ext import BP_LATERAL_PARAMS
+  def read_params(self, keys: list[str]) -> list[dict]:
+    """BluePilot: settings for the opendbc car code, as CarControlSP.params entries. A key never
+    written on the device publishes its params_keys.h default, so the car code runs the value the
+    settings UI shows (#6 in ford-op/bg-opendbc). Callers go through published_params(), which caches them."""
     entries = []
-    for key in BP_LATERAL_PARAMS if keys is None else keys:
+    for key in keys:
       try:
         value = self.params.get(key, return_default=True)
       except UnknownKeyName:
@@ -171,6 +167,13 @@ class ControlsExt(ModelStateBase):
 
   @staticmethod
   def fill_lateral_inputs(li, sm: messaging.SubMaster) -> None:
+    # what the panda allows and has blocked: the controller sends nothing the panda would refuse, and
+    # counts what it refused anyway. Filled whether or not the model fields below are.
+    panda_states = sm['pandaStates']
+    if sm.seen['pandaStates'] and len(panda_states) > 0:
+      li.pandaLateralAllowed = all(ps.controlsAllowed or ps.controlsAllowedLateral for ps in panda_states)
+      li.safetyTxBlocked = sum(ps.safetyTxBlocked for ps in panda_states)
+
     md = sm['modelV2']
     lp = sm['vehicleParameters']
     # valid = both sources seen AND every field below filled from a full-shape modelV2 (33-point

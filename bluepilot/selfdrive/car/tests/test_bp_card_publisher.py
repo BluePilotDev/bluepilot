@@ -1,3 +1,4 @@
+import dataclasses
 from types import SimpleNamespace
 
 import openpilot.cereal.messaging as messaging
@@ -36,28 +37,28 @@ def _controller_state_bp(CI):
 
 class TestControllerStateBP(OpenpilotTestCase):
   def test_carries_the_lateral_status(self):
-    msg = _controller_state_bp(_ford(LateralStatus(lateralUncertainty=0.25, angleRateLimited=True, curvatureRateLimited=True,
-                                                   curvatureDeviationLimited=True, humanTurnLateralPaused=True,
-                                                   stallBlipActive=True, primary_lateral_control=1)))
+    status = LateralStatus(active=True, supportLevel=2, supportReason="matched", strategy="ML3V-14D003-BD",
+                           dataFile="ML34-14D007-EDL", laneMessage="path", requestState=2, pscmState=2, pscmLimit=0,
+                           pscmCapability=1, commandedCurvature=0.004, pathAngle=0.01, limited=True, degraded=True,
+                           degradedReason="why", pandaTxBlocked=3)
+    msg = _controller_state_bp(_ford(status))
     self.assertTrue(msg.valid)
-    cs = msg.controllerStateBP
-    self.assertAlmostEqual(cs.lateralUncertainty, 0.25)
-    self.assertTrue(cs.angleRateLimited)
-    self.assertTrue(cs.curvatureRateLimited)
-    self.assertTrue(cs.curvatureDeviationLimited)
-    self.assertTrue(cs.humanTurnLateralPaused)
-    self.assertTrue(cs.stallBlipActive)
+    lateral = msg.controllerStateBP.lateral
+    for field, value in dataclasses.asdict(status).items():
+      published = getattr(lateral, field)
+      if isinstance(value, float):
+        self.assertAlmostEqual(published, value, places=6, msg=field)
+      else:
+        self.assertEqual(published, value, field)
 
-  def test_flags_default_off(self):
-    cs = _controller_state_bp(_ford()).controllerStateBP
-    self.assertFalse(cs.angleRateLimited or cs.curvatureRateLimited or cs.curvatureDeviationLimited
-                     or cs.humanTurnLateralPaused or cs.stallBlipActive)
+  def test_every_status_field_has_a_slot(self):
+    """The schema's Lateral struct and the library's LateralStatus carry the same fields."""
+    self.assertEqual(set(custom.ControllerStateBP.Lateral.schema.fields), {f.name for f in dataclasses.fields(LateralStatus)})
 
   def test_lateral_mode(self):
     cases = [
-      (LateralStatus(disable_BP_lat_UI=True, primary_lateral_control=1), LateralMode.openpilot),
-      (LateralStatus(primary_lateral_control=1), LateralMode.angle),
-      (LateralStatus(primary_lateral_control=0), LateralMode.curvature),
+      (LateralStatus(active=False), LateralMode.openpilot),
+      (LateralStatus(active=True), LateralMode.curvature),
     ]
     for status, mode in cases:
       with self.subTest(status=status):

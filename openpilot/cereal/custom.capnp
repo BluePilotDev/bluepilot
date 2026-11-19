@@ -65,6 +65,8 @@ struct LateralInputs {
   roll @14 :Float32;
   angleOffsetDeg @15 :Float32;
   lateralDelay @16 :Float32;         # lateralDelay.lateralDelay
+  pandaLateralAllowed @17 :Bool = true;  # pandaStates: every panda allows lateral control
+  safetyTxBlocked @18 :UInt32;       # pandaStates.safetyTxBlocked, summed over the pandas
 }
 
 # Same struct as Log.RadarState.LeadData
@@ -607,7 +609,40 @@ struct ControllerStateBP @0xcd96dafb67a082d0 {
   enum LateralMode {
     openpilot @0;  # BP lateral bypassed (disable_BP_lat_UI)
     curvature @1;
-    angle @2;
+    angle @2;      # retired with angle mode; never published
+  }
+
+  # BluePilot: the Ford lateral controller's status, one field per field of
+  # opendbc/bluepilot_lateral/host_types.py LateralStatus (same names, same meaning). The six
+  # diagnostics at @0-@5 belonged to the controllers this one replaced and are no longer written.
+  lateral @55 :Lateral;
+
+  struct Lateral {
+    active @0 :Bool;                 # BluePilot's controller ran (false: openpilot's stock Ford command)
+    supportLevel @1 :UInt8;          # 0 fallback, 1 curvature, 2 full
+    supportReason @2 :Text;
+    strategy @3 :Text;               # the steering module's part numbers as read this start; "" = no answer
+    dataFile @4 :Text;
+    calibration @5 :Text;
+    requestState @6 :UInt8;          # 0 off, 1 requesting, 2 active, 3 waiting for the module, 4 waiting for the panda, 5 denied
+    pscmState @7 :Int8;              # LatCtlSte_D_Stat; -1 on a car that doesn't report it
+    pscmLimit @8 :Int8;              # LatCtlLim_D_Stat
+    pscmCapability @9 :Int8;         # LatCtlCpblty_D_Stat
+    requestedCurvature @10 :Float32;
+    commandedCurvature @11 :Float32;
+    curvature @12 :Float32;
+    pathAngle @13 :Float32;
+    measuredCurvature @14 :Float32;
+    limited @15 :Bool;
+    lateralAccelLimit @16 :Float32;
+    degraded @17 :Bool;
+    degradedReason @18 :Text;
+    curvatureGain @19 :Float32;
+    limitedShare @20 :Float32;
+    pandaTxBlocked @21 :UInt32;
+    standstillYawRate @22 :Float32;
+    standstillSteeringTorque @23 :Float32;
+    laneMessage @24 :Text;           # the lane-message variant the frames are built by
   }
 }
 

@@ -5,6 +5,7 @@ Centralizes controllerStateBP and carStateBP message publishing so that
 card.py only needs a single function call instead of inline BP blocks.
 """
 
+import dataclasses
 import time
 
 import openpilot.cereal.messaging as messaging
@@ -129,19 +130,12 @@ def publish_controller_state_bp(CI, pm):
   cs_bp_send = messaging.new_message('controllerStateBP')
   cs_bp_send.valid = True
   cs_bp = cs_bp_send.controllerStateBP
-  cs_bp.lateralUncertainty = float(st.lateralUncertainty)
-  cs_bp.angleRateLimited = bool(st.angleRateLimited)
-  cs_bp.curvatureRateLimited = bool(st.curvatureRateLimited)
-  cs_bp.curvatureDeviationLimited = bool(st.curvatureDeviationLimited)
-  cs_bp.humanTurnLateralPaused = bool(st.humanTurnLateralPaused)
-  cs_bp.stallBlipActive = bool(st.stallBlipActive)
-  # BluePilot: mode the controller actually ran, straight off the car controller (not Params).
-  if st.disable_BP_lat_UI:
-    cs_bp.activeLateralMode = custom.ControllerStateBP.LateralMode.openpilot
-  elif st.primary_lateral_control == 1:
-    cs_bp.activeLateralMode = custom.ControllerStateBP.LateralMode.angle
-  else:
-    cs_bp.activeLateralMode = custom.ControllerStateBP.LateralMode.curvature
+  # BluePilot: the lateral controller's status, field for field (custom.capnp ControllerStateBP.Lateral)
+  for field, value in dataclasses.asdict(st).items():
+    setattr(cs_bp.lateral, field, value)
+  # the mode the controller ran, straight off the car controller (not Params)
+  LateralMode = custom.ControllerStateBP.LateralMode
+  cs_bp.activeLateralMode = LateralMode.curvature if st.active else LateralMode.openpilot
 
   # BluePilot: settings snapshot -- refreshed at most every _SETTINGS_INTERVAL s so Params
   # reads don't add latency to every card.py tick.

@@ -5,107 +5,59 @@ This file is part of sunnypilot and is licensed under the MIT License.
 See the LICENSE.md file in the root directory for more details.
 """
 from pathlib import Path
+from types import SimpleNamespace
 
-from openpilot.common.params import Params
+from openpilot.cereal import custom
 from openpilot.common.test import OpenpilotTestCase
 from openpilot.sunnypilot.selfdrive.controls.controlsd_ext import ControlsExt
-from opendbc.bluepilot_lateral.core.values_ext import BP_LATERAL_PARAMS
 from opendbc.bluepilot_lateral.params.manifest import params_keys_lines
 
 PARAMS_KEYS_H = Path(__file__).resolve().parents[4] / "common" / "params_keys.h"
 
 
-def _published(params) -> dict[str, bytes]:
-  ext = ControlsExt.__new__(ControlsExt)  # read_lateral_params only needs params and the log set
-  ext.params = params
-  ext._bp_unknown_keys_logged = set()
-  return {e["key"]: e["value"] for e in ext.read_lateral_params()}
+def _registered(text: str) -> set[str]:
+  """Every entry of params_keys.h, whitespace normalised."""
+  return {" ".join(line.split()) for line in text.splitlines() if line.strip().startswith("{")}
 
 
-class _Written:
-  """Params with some keys written. Writes inside the test's isolated params directory did not
-  persist on a device, so written values are layered over Params instead of put()."""
-  def __init__(self, params: Params, **written):
-    self._params, self._written = params, written
+class TestParamsKeysHoldTheManifest(OpenpilotTestCase):
+  """Every setting the lateral library reads is registered in params_keys.h with its type and default."""
 
-  def get(self, key, return_default=False):
-    return self._written[key] if key in self._written else self._params.get(key, return_default=return_default)
-
-
-class TestReadLateralParams(OpenpilotTestCase):
-  """BluePilot (#6): the Ford lateral gets the value the settings UI shows, including for a param
-  that was never written on the device."""
-
-  def setup_method(self):
-    self.params = Params()
-    for key in BP_LATERAL_PARAMS:
-      self.params.remove(key)
-
-  def test_unset_keys_publish_the_registry_default(self):
-    published = _published(self.params)
-    self.assertEqual(set(published), set(BP_LATERAL_PARAMS))
-    self.assertEqual(published["enable_human_turn_detection_curv"], b"1")
-    self.assertEqual(published["LC_PID_gain_UI_curv"], b"1.0")
-
-  def test_decided_defaults(self):
-    self.assertTrue(self.params.get("enable_human_turn_detection_curv", return_default=True))
-    self.assertEqual(self.params.get("LC_PID_gain_UI_curv", return_default=True), 1.0)
-
-  def test_written_value_wins(self):
-    published = _published(_Written(self.params, LC_PID_gain_UI_curv=2.5, enable_human_turn_detection_curv=False))
-    self.assertEqual(published["LC_PID_gain_UI_curv"], b"2.5")
-    self.assertEqual(published["enable_human_turn_detection_curv"], b"0")
+  def test_manifest_lines_are_registered(self):
+    registered = _registered(PARAMS_KEYS_H.read_text())
+    for line in params_keys_lines():
+      self.assertIn(" ".join(line.split()), registered, "paste the lines `python -m opendbc.bluepilot_lateral.params.manifest` prints")
 
 
-def _bluepilot_block(text: str) -> set[str]:
-  """The entries under params_keys.h's BluePilot comment, up to the next blank line or the map's end."""
-  lines = text.splitlines()
-  start = next(i for i, line in enumerate(lines) if line.strip().startswith("// BluePilot Ford lateral control"))
-  block = set()
-  for line in lines[start + 1:]:
-    entry = line.strip()
-    if not entry or entry == "};":
-      break
-    if entry.startswith("{"):
-      block.add(" ".join(entry.split()))
-  return block
+class _SM(dict):
+  """The parts of a SubMaster fill_lateral_inputs reads."""
+  def __init__(self, panda_states, seen=True):
+    model = SimpleNamespace(laneLines=[], laneLineProbs=[], laneLineStds=[])
+    super().__init__(pandaStates=panda_states, modelV2=model, vehicleParameters=None, lateralDelay=None)
+    self.seen = {"pandaStates": seen, "modelV2": False, "vehicleParameters": False}
 
 
-class TestParamsKeysMatchManifest(OpenpilotTestCase):
-  """BluePilot's params_keys.h entries are the library manifest's, both ways: every setting registered
-  with its type and default, and nothing the manifest dropped."""
-
-  def test_block_matches_manifest(self):
-    block = _bluepilot_block(PARAMS_KEYS_H.read_text())
-    manifest = {" ".join(line.split()) for line in params_keys_lines()}
-    self.assertEqual(block, manifest, "paste the lines `python -m opendbc.bluepilot_lateral.params.manifest` prints")
+def _panda(controls_allowed=False, lateral=False, blocked=0):
+  return SimpleNamespace(controlsAllowed=controls_allowed, controlsAllowedLateral=lateral, safetyTxBlocked=blocked)
 
 
-class TestPublishedParams(OpenpilotTestCase):
-  def _ext(self, params):
-    ext = ControlsExt.__new__(ControlsExt)
-    ext.params = params
-    ext._bp_unknown_keys_logged = set()
-    return ext
+class TestPandaInputs(OpenpilotTestCase):
+  """What the panda allows and has blocked reaches the Ford lateral controller every frame."""
 
-  def test_publishes_what_read_lateral_params_returns(self):
-    published = {e["key"]: e["value"] for e in self._ext(Params()).published_params()}
-    self.assertTrue(set(BP_LATERAL_PARAMS) <= set(published))
+  def _fill(self, sm):
+    li = custom.LateralInputs.new_message()
+    ControlsExt.fill_lateral_inputs(li, sm)
+    return li
 
-  def test_reads_are_cached_between_refreshes(self):
-    calls = []
+  def test_allowed_until_a_panda_state_was_seen(self):
+    self.assertTrue(self._fill(_SM([], seen=False)).pandaLateralAllowed)
+    self.assertTrue(self._fill(_SM([])).pandaLateralAllowed)
 
-    class Counting(_Written):
-      def get(self, key, return_default=False):
-        calls.append(key)
-        return super().get(key, return_default=return_default)
+  def test_every_panda_must_allow(self):
+    self.assertTrue(self._fill(_SM([_panda(controls_allowed=True)])).pandaLateralAllowed)
+    self.assertTrue(self._fill(_SM([_panda(lateral=True)])).pandaLateralAllowed)
+    self.assertFalse(self._fill(_SM([_panda()])).pandaLateralAllowed)
+    self.assertFalse(self._fill(_SM([_panda(controls_allowed=True), _panda()])).pandaLateralAllowed)
 
-    ext = self._ext(Counting(Params()))
-    first = ext.published_params()
-    n = len(calls)
-    for _ in range(20):
-      self.assertIs(ext.published_params(), first)
-    self.assertEqual(len(calls), n)
-    ext._bp_params_cache_time -= 1.0
-    ext.published_params()
-    self.assertEqual(len(calls), 2 * n)
+  def test_blocked_messages_are_summed(self):
+    self.assertEqual(self._fill(_SM([_panda(blocked=2), _panda(blocked=3)])).safetyTxBlocked, 5)
