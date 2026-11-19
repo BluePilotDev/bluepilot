@@ -207,3 +207,30 @@ class TestSmartCruiseControlVision(OpenpilotTestCase):
       assert self.scc_v.state == VisionState.enabled
 
   # TODO-SP: mock modelV2 data to test other states
+
+
+class TestSteeringLimitSetsTheCurveSpeed(OpenpilotTestCase):
+  """BluePilot: the curve speed is planned for no more lateral acceleration than the car's steering
+  gives (the Ford lateral library's limit), where that is below SCC-V's own."""
+
+  def _target(self, reported, subscribed=True):
+    from openpilot.sunnypilot.selfdrive.controls.lib.smart_cruise_control import vision_controller as vc
+    sm = {'modelV2': generate_modelV2().modelV2, 'carState': generate_carState().carState,
+          'controlsState': generate_controlsState().controlsState}
+    if subscribed:
+      state = custom.ControllerStateBP.new_message()
+      state.lateral.lateralAccelLimit = reported
+      sm['controllerStateBP'] = state
+    scc_v = vc.SmartCruiseControlVision()
+    scc_v.update(sm, True, False, 30., 0., 50.)
+    max_curve = scc_v.max_pred_lat_acc / 30. ** 2
+    return scc_v.v_target, max_curve, vc._A_LAT_REG_MAX
+
+  def test_a_lower_steering_limit_lowers_the_target(self):
+    v, max_curve, _ = self._target(1.2)
+    self.assertAlmostEqual(v, (1.2 / max_curve) ** 0.5, places=4)
+
+  def test_sccvs_own_limit_otherwise(self):
+    for reported, subscribed in ((2.6, True), (0., True), (1.2, False)):
+      v, max_curve, own = self._target(reported, subscribed)
+      self.assertAlmostEqual(v, (own / max_curve) ** 0.5, places=4)

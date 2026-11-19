@@ -97,7 +97,20 @@ class SmartCruiseControlVision:
       max_curve = self.max_pred_lat_acc / (v_ego**2)
 
       # Get the target velocity for the maximum curve
-      self.v_target = (_A_LAT_REG_MAX / max_curve) ** 0.5
+      # BluePilot: no faster than the car's steering takes the curve round (lateral_accel_max)
+      self.v_target = (self.lateral_accel_max(sm) / max_curve) ** 0.5
+
+  @staticmethod
+  def lateral_accel_max(sm) -> float:
+    """BluePilot: the lateral acceleration to plan a curve's speed for, m/s^2: _A_LAT_REG_MAX, or less
+    where the Ford lateral library reports that the steering module, or the panda, gives less at this
+    speed (controllerStateBP.lateral.lateralAccelLimit, the limit the plan's curvature clip holds too).
+    The limit falls with speed, so the one at the car's speed holds at the lower target speed."""
+    try:
+      limit = sm['controllerStateBP'].lateral.lateralAccelLimit
+    except KeyError:  # not subscribed (tests)
+      return _A_LAT_REG_MAX
+    return min(_A_LAT_REG_MAX, limit) if limit > 0. else _A_LAT_REG_MAX
 
   def _update_state_machine(self) -> tuple[bool, bool]:
     # ENABLED, ENTERING, TURNING, LEAVING, OVERRIDING
