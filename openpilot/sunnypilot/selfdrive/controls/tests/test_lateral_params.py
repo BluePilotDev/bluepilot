@@ -72,15 +72,13 @@ class TestLateralAccelLimit(OpenpilotTestCase):
     state.lateral.lateralAccelLimit = reported
     return ControlsExt.lateral_accel_limit(_Limits(state, seen))
 
-  def test_lower_limit_is_used(self):
+  def test_reported_limit_is_used(self):
     self.assertAlmostEqual(self._limit(2.0), 2.0, places=5)
-
-  def test_never_above_openpilots_own(self):
-    self.assertEqual(self._limit(3.6), MAX_LATERAL_ACCEL_NO_ROLL)
+    self.assertAlmostEqual(self._limit(3.6), 3.6, places=5)
 
   def test_nothing_reported_is_openpilots_own(self):
-    self.assertEqual(self._limit(0.), MAX_LATERAL_ACCEL_NO_ROLL)   # the stock path, or before the first steering frame
-    self.assertEqual(self._limit(2.0, seen=False), MAX_LATERAL_ACCEL_NO_ROLL)  # not a Ford
+    self.assertIsNone(self._limit(0.))   # the stock path, or before the first steering frame
+    self.assertIsNone(self._limit(2.0, seen=False))  # not a Ford
 
   def test_clip_holds_the_plan_to_the_limit(self):
     v = 20.
@@ -94,6 +92,28 @@ class TestLateralAccelLimit(OpenpilotTestCase):
       curvature, limited = clip_curvature(v, curvature, wanted, 0.)
     self.assertAlmostEqual(curvature, wanted)
     self.assertFalse(limited)
+
+  def test_road_roll_does_not_widen_the_steering_limit(self):
+    """openpilot widens its own limit by the road's roll on the side the bank helps; the steering
+    module's and the panda's limits are on the command itself, so the plan stays inside them on a
+    banked curve, and the car controller has nothing left to clip."""
+    v, roll = 20., 0.05  # 0.49 m/s^2 of the bank toward the turn
+    for wanted in (3.4 / v ** 2, -3.4 / v ** 2):
+      curvature = 0.
+      for _ in range(300):
+        curvature, limited = clip_curvature(v, curvature, wanted, roll, 2.0)
+      self.assertAlmostEqual(abs(curvature), 2.0 / v ** 2)
+      self.assertTrue(limited)
+    # without a steering limit, openpilot's own roll-compensated clip, as upstream
+    curvature = 0.
+    for _ in range(300):
+      curvature, _ = clip_curvature(v, curvature, 3.8 / v ** 2, roll)
+    self.assertAlmostEqual(curvature, (MAX_LATERAL_ACCEL_NO_ROLL + roll * 9.81) / v ** 2, places=6)
+    # where the bank works against the turn, openpilot's own limit is the lower one and still holds
+    curvature = 0.
+    for _ in range(300):
+      curvature, _ = clip_curvature(v, curvature, -3.8 / v ** 2, roll, 2.9)
+    self.assertAlmostEqual(curvature, (-MAX_LATERAL_ACCEL_NO_ROLL + roll * 9.81) / v ** 2, places=6)
 
 
 class _Limits(dict):

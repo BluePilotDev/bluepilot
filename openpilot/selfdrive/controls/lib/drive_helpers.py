@@ -24,8 +24,9 @@ def smooth_value(val, prev_val, tau, dt=DT_MDL):
   alpha = 1 - np.exp(-dt/tau) if tau > 0 else 1
   return alpha * val + (1 - alpha) * prev_val
 
-# BluePilot: max_lat_accel_no_roll, for a car whose steering gives less than the ISO value (controlsd_ext.lateral_accel_limit)
-def clip_curvature(v_ego, prev_curvature, new_curvature, roll, max_lat_accel_no_roll=MAX_LATERAL_ACCEL_NO_ROLL) -> tuple[float, bool]:
+# BluePilot: steering_lat_accel, the most curvature * v^2 a car's steering takes whatever the road's roll
+# (controlsd_ext.lateral_accel_limit); None for openpilot's own clip alone
+def clip_curvature(v_ego, prev_curvature, new_curvature, roll, steering_lat_accel=None) -> tuple[float, bool]:
   # This function respects ISO lateral jerk and acceleration limits + a max curvature
   v_ego = max(v_ego, MIN_SPEED)
   max_curvature_rate = MAX_LATERAL_JERK / (v_ego ** 2)  # inexact calculation, check https://github.com/commaai/openpilot/pull/24755
@@ -34,8 +35,11 @@ def clip_curvature(v_ego, prev_curvature, new_curvature, roll, max_lat_accel_no_
                           prev_curvature + max_curvature_rate * DT_CTRL)
 
   roll_compensation = roll * ACCELERATION_DUE_TO_GRAVITY
-  max_lat_accel = max_lat_accel_no_roll + roll_compensation
-  min_lat_accel = -max_lat_accel_no_roll + roll_compensation
+  max_lat_accel = MAX_LATERAL_ACCEL_NO_ROLL + roll_compensation
+  min_lat_accel = -MAX_LATERAL_ACCEL_NO_ROLL + roll_compensation
+  if steering_lat_accel is not None:
+    max_lat_accel = min(max_lat_accel, steering_lat_accel)
+    min_lat_accel = max(min_lat_accel, -steering_lat_accel)
   new_curvature, limited_accel = clamp(new_curvature, min_lat_accel / v_ego ** 2, max_lat_accel / v_ego ** 2)
 
   new_curvature, limited_max_curv = clamp(new_curvature, -MAX_CURVATURE, MAX_CURVATURE)

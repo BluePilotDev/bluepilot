@@ -168,13 +168,14 @@ class ControlsExt(ModelStateBase):
     return entries
 
   @staticmethod
-  def lateral_accel_limit(sm: messaging.SubMaster) -> float:
-    """BluePilot: the most lateral acceleration to plan for, m/s^2 on a flat road: openpilot's own, or
-    less where the Ford lateral library reports that the steering module, or the panda, gives less at
-    this speed. A request above it is clipped here, where it counts as the steering reaching its
-    limit, instead of silently in the car controller."""
+  def lateral_accel_limit(sm: messaging.SubMaster) -> float | None:
+    """BluePilot: the most curvature * v^2 the Ford lateral library reports the steering module, or the
+    panda, takes at this speed, m/s^2; None when nothing is reported. The plan's clip holds it beside
+    openpilot's own roll-compensated limit: the module's and the panda's limits are on the command,
+    so a banked road doesn't widen them. A request above it is clipped there, where it counts as the
+    steering reaching its limit, instead of silently in the car controller."""
     limit = sm['controllerStateBP'].lateral.lateralAccelLimit if sm.seen['controllerStateBP'] else 0.
-    return min(MAX_LATERAL_ACCEL_NO_ROLL, limit) if limit > 0. else MAX_LATERAL_ACCEL_NO_ROLL
+    return limit if limit > 0. else None
 
   @staticmethod
   def fill_lateral_inputs(li, sm: messaging.SubMaster) -> None:
