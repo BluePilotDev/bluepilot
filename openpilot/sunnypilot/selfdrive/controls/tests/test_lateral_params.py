@@ -9,6 +9,7 @@ from types import SimpleNamespace
 
 from openpilot.cereal import custom
 from openpilot.common.test import OpenpilotTestCase
+from openpilot.selfdrive.controls.lib.drive_helpers import MAX_LATERAL_ACCEL_NO_ROLL, clip_curvature
 from openpilot.sunnypilot.selfdrive.controls.controlsd_ext import ControlsExt
 from opendbc.bluepilot_lateral.params.manifest import params_keys_lines
 
@@ -61,3 +62,41 @@ class TestPandaInputs(OpenpilotTestCase):
 
   def test_blocked_messages_are_summed(self):
     self.assertEqual(self._fill(_SM([_panda(blocked=2), _panda(blocked=3)])).safetyTxBlocked, 5)
+
+
+class TestLateralAccelLimit(OpenpilotTestCase):
+  """The Ford steering module's own lateral acceleration limit reaches the plan's curvature clip."""
+
+  def _limit(self, reported, seen=True):
+    state = custom.ControllerStateBP.new_message()
+    state.lateral.lateralAccelLimit = reported
+    return ControlsExt.lateral_accel_limit(_Limits(state, seen))
+
+  def test_lower_limit_is_used(self):
+    self.assertAlmostEqual(self._limit(2.0), 2.0, places=5)
+
+  def test_never_above_openpilots_own(self):
+    self.assertEqual(self._limit(3.6), MAX_LATERAL_ACCEL_NO_ROLL)
+
+  def test_nothing_reported_is_openpilots_own(self):
+    self.assertEqual(self._limit(0.), MAX_LATERAL_ACCEL_NO_ROLL)   # the stock path, or before the first steering frame
+    self.assertEqual(self._limit(2.0, seen=False), MAX_LATERAL_ACCEL_NO_ROLL)  # not a Ford
+
+  def test_clip_holds_the_plan_to_the_limit(self):
+    v = 20.
+    wanted = 2.8 / v ** 2
+    curvature = 0.
+    for _ in range(300):
+      curvature, limited = clip_curvature(v, curvature, wanted, 0., 2.0)
+    self.assertAlmostEqual(curvature, 2.0 / v ** 2)
+    self.assertTrue(limited)
+    for _ in range(300):
+      curvature, limited = clip_curvature(v, curvature, wanted, 0.)
+    self.assertAlmostEqual(curvature, wanted)
+    self.assertFalse(limited)
+
+
+class _Limits(dict):
+  def __init__(self, state, seen):
+    super().__init__(controllerStateBP=state)
+    self.seen = {"controllerStateBP": seen}

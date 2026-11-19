@@ -641,6 +641,7 @@ struct ControllerStateBP @0xcd96dafb67a082d0 {
     standstillYawRate @22 :Float32;
     standstillSteeringTorque @23 :Float32;
     laneMessage @24 :Text;           # the lane-message variant the frames are built by
+    lag @25 :Float32;                # the table row's lag at this speed, s; 0 where it has none
   }
 }
 

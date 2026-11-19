@@ -12,6 +12,7 @@ from openpilot.cereal import log, custom
 from opendbc.car import structs
 from openpilot.common.params import Params, UnknownKeyName
 from openpilot.common.swaglog import cloudlog
+from openpilot.selfdrive.controls.lib.drive_helpers import MAX_LATERAL_ACCEL_NO_ROLL  # BluePilot
 from openpilot.sunnypilot import PARAMS_UPDATE_PERIOD
 from openpilot.sunnypilot.livedelay.helpers import get_lat_delay
 from openpilot.sunnypilot.modeld_v2.modeld_base import ModelStateBase
@@ -35,7 +36,8 @@ class ControlsExt(ModelStateBase):
     self.CP_SP = messaging.log_from_bytes(params.get("CarParamsSP", block=True), custom.CarParamsSP)
     cloudlog.info("controlsd_ext got CarParamsSP")
 
-    self.sm_services_ext = ['radarState', 'selfdriveStateSP', 'pandaStates']  # BluePilot: pandaStates for the Ford lateral
+    # BluePilot: pandaStates for the Ford lateral, controllerStateBP for the steering module's own limit
+    self.sm_services_ext = ['radarState', 'selfdriveStateSP', 'pandaStates', 'controllerStateBP']
     self.pm_services_ext = ['carControlSP']
 
   def initialize_lateral_control(self, lac, CI, dt):
@@ -164,6 +166,15 @@ class ControlsExt(ModelStateBase):
       encoded = (b"1" if value else b"0") if isinstance(value, bool) else str(value).encode()
       entries.append({"key": key, "value": encoded})
     return entries
+
+  @staticmethod
+  def lateral_accel_limit(sm: messaging.SubMaster) -> float:
+    """BluePilot: the most lateral acceleration to plan for, m/s^2 on a flat road: openpilot's own, or
+    less where the Ford lateral library reports that the steering module, or the panda, gives less at
+    this speed. A request above it is clipped here, where it counts as the steering reaching its
+    limit, instead of silently in the car controller."""
+    limit = sm['controllerStateBP'].lateral.lateralAccelLimit if sm.seen['controllerStateBP'] else 0.
+    return min(MAX_LATERAL_ACCEL_NO_ROLL, limit) if limit > 0. else MAX_LATERAL_ACCEL_NO_ROLL
 
   @staticmethod
   def fill_lateral_inputs(li, sm: messaging.SubMaster) -> None:
