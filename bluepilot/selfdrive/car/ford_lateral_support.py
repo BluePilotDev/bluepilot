@@ -12,8 +12,11 @@ param, FordLateralSupport, so that:
     at the next start, seen or not, so the fallback is told on its first FALLBACK_NOTICE_STARTS
     starts; the settings row says it for as long as it applies.
 
-card calls record_start once per start and the publisher calls record_degraded when the library's
-health check changes its mind during a drive.
+  - the health check's gain windows carry over to the next drive of the same car with the same
+    steering software (the library's health.carry and health.restore).
+
+card calls record_start once per start. During a drive the publisher calls record_degraded when the
+library's health check changes its mind, and record_health now and then.
 """
 from openpilot.common.params import Params
 from openpilot.common.swaglog import cloudlog
@@ -103,7 +106,14 @@ def record_start(CI, params: Params) -> None:
   if bp is None or not hasattr(bp, "status"):
     return
   record = start_record(CI.CP, bp.status())
-  stored, notice = compare_with_last(record, params.get(SUPPORT_PARAM))
+  last = params.get(SUPPORT_PARAM)
+  stored, notice = compare_with_last(record, last)
+  health = getattr(bp, "health", None)
+  if health is not None:
+    # the same car answering the same part numbers as on the last start: its gain windows continue
+    if last and last.get("health") and all(last.get(k) == record[k] for k in ("vin", *PART_NUMBERS)):
+      health.restore(last["health"])
+    stored["health"] = health.carry()
   if stored["changedFrom"] is not None:
     cloudlog.event("BluePilot steering module changed", old=stored["changedFrom"],
                    new={k: record[k] for k in PART_NUMBERS}, otaCounter=record["otaCounter"])
@@ -123,6 +133,14 @@ def record_degraded(params: Params, reason: str) -> dict | None:
     _stored["degradedReason"] = reason
     params.put(SUPPORT_PARAM, _stored)
   return _stored
+
+
+def record_health(params: Params, carried: dict) -> None:
+  """During a drive, now and then: the health check's carry-over for the next start. As
+  record_degraded, the write doesn't wait for the disk."""
+  if _stored is not None and _stored.get("health") != carried:
+    _stored["health"] = carried
+    params.put(SUPPORT_PARAM, _stored)
 
 
 def support_row(record: dict | None) -> tuple[str, str]:

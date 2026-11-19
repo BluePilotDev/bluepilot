@@ -11,12 +11,14 @@ import time
 import openpilot.cereal.messaging as messaging
 from openpilot.cereal import custom
 from openpilot.common.params import Params
-from openpilot.bluepilot.selfdrive.car.ford_lateral_support import record_degraded
+from openpilot.bluepilot.selfdrive.car.ford_lateral_support import record_degraded, record_health
 
 _SETTINGS_INTERVAL = 5.0  # re-read params at most every 5 s
 _settings_last_read: float = 0.0
 _settings_cache: dict = {}
 _degraded_reason: str = ""  # the health check's last reason handed to record_degraded
+_HEALTH_INTERVAL = 30.0  # the health check's carry-over is stored at most this often
+_health_last_stored: float = 0.0
 
 
 def _get_bool(p: Params, key: str, default: bool = False) -> bool:
@@ -109,7 +111,7 @@ def _refresh_settings_cache() -> dict:
 
 def publish_controller_state_bp(CI, pm):
   """Publish controllerStateBP from the BluePilot car controller's status() (every Ford on bp-full)."""
-  global _settings_last_read, _settings_cache, _degraded_reason
+  global _settings_last_read, _settings_cache, _degraded_reason, _health_last_stored
   status = getattr(getattr(CI.CC, "bp", None), "status", None)
   if status is None:
     return
@@ -131,6 +133,11 @@ def publish_controller_state_bp(CI, pm):
   # BluePilot: settings snapshot -- refreshed at most every _SETTINGS_INTERVAL s so Params
   # reads don't add latency to every card.py tick.
   now = time.monotonic()
+  # the health check's gain windows, kept for the next drive
+  health = getattr(CI.CC.bp, "health", None)
+  if health is not None and now - _health_last_stored >= _HEALTH_INTERVAL:
+    _health_last_stored = now
+    record_health(Params(), health.carry())
   if not _settings_cache or now - _settings_last_read >= _SETTINGS_INTERVAL:
     try:
       _settings_cache = _refresh_settings_cache()

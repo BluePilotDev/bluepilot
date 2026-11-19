@@ -64,6 +64,22 @@ class TestStartRecordWithTheCarInterface(OpenpilotTestCase):
     self.assertIn(strategy.UNKNOWN_STRATEGY, text)
     self.assertIn(strategy.UNKNOWN_STRATEGY, self.params.get(support.NOTICE_ALERT)["extra"])
 
+  def test_the_gain_windows_carry_to_the_next_start_of_the_same_software(self):
+    CI = _real_ci(harness.F150_2021)
+    support.record_start(CI, self.params)
+    carried = dict(CI.CC.bp.health.carry(), badWindows=2, windowFrames=700)
+    support.record_health(self.params, carried)
+    self.assertEqual(support._stored["health"], carried)
+    self.params.put(support.SUPPORT_PARAM, support._stored, block=True)  # record_health's write doesn't wait for the disk
+
+    CI = _real_ci(harness.F150_2021)  # the next start, the same part numbers
+    support.record_start(CI, self.params)
+    self.assertEqual(CI.CC.bp.health.carry(), carried)
+
+    CI = _real_ci(harness.F150_2024)  # the module's software changed: its windows start again
+    support.record_start(CI, self.params)
+    self.assertEqual(CI.CC.bp.health.carry()["badWindows"], 0)
+
   def test_the_setting_reads_off(self):
     support.record_start(_real_ci(harness.F150_2021, [{"disable_BP_lat_UI": "1"}]), self.params)
     stored = self.params.get(support.SUPPORT_PARAM)
