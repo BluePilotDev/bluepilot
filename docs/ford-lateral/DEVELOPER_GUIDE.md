@@ -375,8 +375,8 @@ angle, in comma's vocabulary:
   the module allows; a path angle that takes away may come back toward zero meanwhile, under the same end.
   That needs the frames on time: a late frame finds the module sitting where the last one put it. So from the first
   such frame on, the c2 copy must be within 1.5 frames (`BP_BACK_SLACK`) of where it would be had a frame come every
-  frame; a sender's lateness uses that up once, and then its frames are refused. The controller puts the frame two
-  frames of the rate under the copy (`BACK_LEAD_FRAMES`), so one lost frame uses none of it;
+  frame; a sender's lateness uses that up once, and then its frames are refused. The controller puts the frame 1.75
+  frames of the rate under the copy (`BACK_LEAD_FRAMES`), so one lost frame uses a quarter of a frame of it at most;
 - **jerk:** comma's, on c2 and on the implied curvature.
 
 Without path angle it is comma's check without its band. The controller keeps the same position, moved one
