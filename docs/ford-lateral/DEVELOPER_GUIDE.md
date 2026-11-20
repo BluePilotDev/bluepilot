@@ -301,14 +301,16 @@ the Explorer's 0.0475 with a 10 % margin, rounded up. (It was 0.147 while the Ma
 was not run and taken as 0.) The single curve was 1.2 to 5.5 times each switched-on row's own gain before
 that floor (1.27 to 5.47 times now, at 0.053), so it held path angle back. Each module's own curve replaces it (Choice). One read data file, on a
 row with path angle off, is above the single curve at 15 km/h (the 2025-26 Corsair's, 0.340 against 0.26).
-The single curve bounds the modules with a path-angle row, not every module read.
+The single curve bounds the modules with a path-angle row, not every module read. It is gone: without its
+module's own curve the panda now accepts no path angle (2.4, the module's copies).
 
 **The wire is not what the module steers for.** The module moves its own copies of c2 and c1 toward each
 frame at its own rates: c2 at the row's rate (0.003 1/m/s, 0.01 on the Maverick), c1 at 0.1 rad/s. Below
 about 125 km/h comma's jerk limit is faster than that c2 rate. So a sender could walk c2 to the opposite
 cap at the jerk step while raising c1 so `c2 + K2max·c1` never moved: the panda accepted every frame, and
 the module held the old c2 with the new c1, 1.4 to 2.4 times the cap. A per-module gain made that larger,
-because it removed the single curve's slack (`verify-mythos-clean-build.md` finding 1).
+because it removed the single curve's slack (`verify-mythos-clean-build.md` finding 1). The check below
+keeps the wire within the module's own rate of its copies, which closes this.
 
 **Choice.** The two bounds, because the band is incompatible with A′ and the single sum bound is unsound.
 BluePilot's paths have no measured band, the fallback included. bp-dev's pinion yaw source (an
@@ -323,16 +325,15 @@ in the second safety param (`current_safety_param_sp`):
 - **bits 0 to 2, `BP_PATH_ANGLE_GAIN`:** which module's own gain curve bounds the path angle
   (`StrategyRow.panda_gain_curve`). Set with bit 6.
 
-**The gain curves.** The panda holds five, one per module family with path angle on. F-150 2021-23,
-Lightning and BC share one, because the F-150's and Lightning's firmware hold the same numbers and BC
-takes BD's. Each is generated from that module's flash (`safety/ford_gain_curves.h`, written by the same
+**The gain curves.** The panda holds four, one per module family with path angle on: the 2021-23 F-150 (BD),
+the 2020-24 Explorer, the 2022-24 Maverick and LX6C. Each is generated from that module's flash (`safety/ford_gain_curves.h`, written by the same
 script and from the same reading as `core/module_tables.py`; `core/limits.py` `GAIN_CURVES` is built from
 the Python file, and `test_limits.py` pins the two): its c2 rate, its shortest preview time (taken no
 higher than its T when the module starts, below), the two
 preview-distance clamps by speed (past the upper the distance is the upper, the module's own order), and
 its K2 table by distance, read straight between the table's points as the module reads it. The bound is
-that module's largest K2 at the speed, times a margin of 1.10, and no higher than the single curve (which is
-above every curve with its margin, so it caps none). A module may start or restart at any time, and it previews
+that module's largest K2 at the speed, times a margin of 1.10. Each curve also carries the module's two rates,
+c2 and c1, which the check holds the wire to. A module may start or restart at any time, and it previews
 from its T at power-up until T reaches its floor, so each curve takes that T as its floor where it is lower
 (`FORD_BP_PREVIEW_TIME_AT_START` in `safety/ford.h`, `PREVIEW_TIME_AT_START` in `core/limits.py`; not generated,
 because it is what the start-up code does, not a table in the flash): 0 on the Explorer's (executed) and the
@@ -342,19 +343,30 @@ within 25 s of the module starting, the Explorer's gain was up to 1.23 times the
 (`test_a_module_start_at_highway_speed`). The panda reads the gain at its lowest recent speed
 sample, which is right only if the curve never rises with speed, so each distance point is held to the
 least of the later ones. That moves one point, on the strict side: the F-150's lower distance at
-100 km/h, from 50 m to 46.9 m. With no curve, or bits 6 or 7, the panda keeps the single curve. Bits 0
+100 km/h, from 50 m to 46.9 m. With no curve index, or 5 to 7 (no curve there), no path angle is accepted. Bits 0
 to 4 once carried a measurement source, in builds that never set bit 6. Bits 3 and 4 stay unused. Three
 bits fit StarPilot, whose adapter carries seven.
 
-**The module's copies.** The panda keeps the range each copy can be in (`FordBpModuleCopies`): moved
-toward the last frame sent, for the time since, at the slowest rate any read module has (which only
-widens it), and always including the frame itself, for a module that takes it at once. A frame is
-refused when, once sent, the most the copies can steer for passes both the cap and what they could
-already steer for: at the largest gain for a path angle that adds, none for one that takes away. So a
-curvature-only frame is judged as before, a frame that makes nothing worse passes (the copies lagging
-above a cap that fell as the car sped up included), and only frames that pass move the copies' target.
-The controller keeps the same range twice, moved for 0.8 and for 1.25 of a frame, and fits each frame
-inside it, so its frames pass whatever time the panda counts between them.
+**The module's copies.** The module moves its copies toward each frame at its rates and takes an inactive
+frame at once (executed on BD, M1MC-AC, P1MC-AA, NZ6C-AL and LX6C-AL; `notes/clean-build.md` §16.4). So the
+panda keeps one position per signal (`FordBpLateralState`, the check's only state): moved toward the last
+frame it let through, at the curve's own rates, for the time since, and zero after an inactive frame. On a
+car with path angle, in comma's vocabulary:
+
+- **rate:** each signal within two and a half frames of the module's rate of its position, and half a wire
+  step (two frames: one lost on the way reached neither the panda nor the module; half a frame: when the
+  frames arrive). The wire never outruns the module, so comma's jerk limit on the wire bounds what the module
+  does;
+- **maximum:** the cap on what the module steers for anywhere between its copies and the frame, each signal
+  at its worse end, at the largest gain for a path angle that adds and none for one that takes away;
+- **a cap that fell** below that (the car sped up): the frame must bring the copies back, c2 toward zero by
+  half of what it may move in a frame (the module's rate, or the jerk step where less), and add no path angle;
+- **jerk:** comma's, on c2 and on the implied curvature.
+
+Without path angle it is comma's check without its band. The controller keeps the same position, moved one
+frame at a time, and keeps a quarter of a frame of the module's rate inside the panda's limits for the
+difference between the panda's clock and its own (`core/limits.py` `FRAME_TIMING`). Before this, the panda
+kept the range each copy could be in, and the controller kept it twice (0.8 and 1.25 of a frame).
 
 Path offset and curvature rate must be inactive on every module.
 
@@ -364,8 +376,7 @@ Path offset and curvature rate must be inactive on every module.
   biased yaw signal that 1.2 describes. A stricter choice would keep comma's check for unknown modules.
 - The bound is only as right as the row's match and the firmware read behind its curve. A wrong curve
   index would loosen it to another module's gain. `test_limits.py` holds every curve at or above what its
-  module steers for at that speed and every higher one, and at or under the single curve. For BC the
-  curve is BD's by choice (2.11).
+  module steers for at that speed and every higher one.
 - The floor at power-up holds path angle back on two curves for the whole drive, not only its first
   25 s, because the panda can't tell when the module started. On the Explorer the bound is the 85 m gain
   (0.0475) at every speed, 1.62 times its gain at T max (0.0293) from 100 km/h; against the bound before
@@ -600,16 +611,17 @@ the build doesn't support them.
 **Release-notes wording** (`clean-build.md` §14.5 item 5): engaging in a curve starts from straight and
 builds in at the module's own rate on a row without path angle, about 5 to 6 s at 30 km/h and about 2 s
 at 60 km/h. On a row with path angle it is faster: the twin of the 2021-23 F-150's module puts it at about
-2.7 s at 30 km/h and about 1 s at 60 km/h. The other rows haven't been modelled for this case. Hold the
+2.7 s at 30 km/h and about 1 s at 60 km/h (measured with the quick engage, which is gone: about 0.1 to
+0.2 s slower now at 30-60 km/h, `simplify-plan.md` step 4). The other rows haven't been modelled for this case. Hold the
 wheel through the first seconds. These figures come from a model whose steering servo is read from the
 module's code and not yet run, with a lag fitted to drives. For BC: "steers with BD's path-angle numbers, with timing measured on
 BC trucks."
 
 **Why engaging in a curve is slow.** comma's rule says the inactive frame must be all zero, so the
 module's copy of c2 starts at zero, and the panda's check restarts from zero too. Any controller that
-obeys the rule starts from straight. On newer-library rows, frames before the module reports control
-move at the panda's step, not the module's rate (`follows_at_once_before_control`, `firmware-core.md`
-§4.2), which shortens this on the rows with path angle on.
+obeys the rule starts from straight. The frames move at the module's rate from the first one: the panda
+holds the wire to it. (Newer-library rows once sent the panda's step until the module reported control,
+because that module takes the frame at once until then; the rate check refuses those frames.)
 
 ### 2.11 The BC row, from fleet behaviour
 
@@ -753,15 +765,18 @@ bits into `CP_SP.safetyParam`; `lateralInputsRequired`; and `steerActuatorDelay`
 `ford_tx_hook` decodes each steering message. If `ford_bp_lateral` (bit 5) is set, `ford_bp_lmc_tx`
 runs:
 
-- curvature rate and path offset must be inactive. Path angle must be inactive unless
-  `ford_bp_path_angle` (bit 6) is set;
+- curvature rate and path offset must be inactive. Path angle must be inactive unless bit 6 and a gain
+  curve in bits 0 to 2 are set (`ford_bp_state.curve`);
 - `ford_bp_path_cmd_checks` runs while lateral control is allowed and the request is on:
   - signal ranges: ±0.02 1/m and ±0.5 rad;
-  - the lateral-acceleration cap on the curvature signal **and** on the implied curvature
-    `c2 + K2max·c1`, with K2max the module's own gain curve (bits 0 to 2) or the single curve, read at
-    the lowest recent speed sample, and the cap at that speed minus 1 m/s;
-  - the cap on what the module's copies can steer for once the frame is sent (2.4);
-  - comma's lateral jerk limit (about 3.6 m/s³) on both, against the last command;
+  - without path angle, the lateral-acceleration cap on the curvature signal, at the lowest recent speed
+    sample minus 1 m/s;
+  - with path angle, each signal within the module's rate of its copies, and the cap on what the module
+    steers for between its copies and the frame, `c2 + K2max·c1` with K2max the module's own gain curve
+    read at the lowest recent speed sample, or the frame bringing the copies back under a cap that fell
+    (2.4);
+  - comma's lateral jerk limit (about 3.6 m/s³) on the curvature signal and the implied curvature, against
+    the last command;
   - comma's real-time rate check and the speed-mismatch check;
 - while not steering, both signals must be zero, and there is no steering while controls aren't
   allowed;
