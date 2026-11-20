@@ -59,7 +59,7 @@ class TestBluePilotAssets(unittest.TestCase):
     resolved = {os.path.relpath(_resolve(ref), BASEDIR) for _, ref in _image_refs()}
     for new in MOVED.values():
       self.assertTrue(os.path.isfile(os.path.join(BASEDIR, new)), new)
-      self.assertIn(new, resolved)
+      self.assertTrue(new in resolved, new)
 
   def test_no_reference_to_an_old_path_remains(self):
     stale = []
