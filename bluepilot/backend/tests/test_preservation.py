@@ -5,6 +5,7 @@ import unittest
 from unittest import mock
 
 from openpilot.system.loggerd.deleter import PRESERVE_ATTR_NAME, PRESERVE_ATTR_VALUE
+from openpilot.system.loggerd import xattr_cache
 from openpilot.system.loggerd.xattr_cache import setxattr
 
 from bluepilot.backend.routes import segments  # before storage: the two packages import each other
@@ -33,6 +34,7 @@ class TestPreserveMarkerIsRead(unittest.TestCase):
     segments.get_route_segments.cache_clear()
     self.addCleanup(segments.get_route_segments.cache_clear)
     self.all_segments = sorted(os.listdir(tmp.name))
+    self.tmp = tmp.name
 
   def test_marked_route_is_reported_preserved(self):
     self.assertTrue(preservation.check_route_preserve_status(MARKED))
@@ -40,7 +42,14 @@ class TestPreserveMarkerIsRead(unittest.TestCase):
   def test_unmarked_route_is_not_reported_preserved(self):
     self.assertFalse(preservation.check_route_preserve_status(UNMARKED))
 
-  def test_marked_segment_and_the_one_before_it_are_held_back_from_deletion(self):
+  def test_marker_set_after_the_first_look_is_seen(self):
+    # loggerd marks a segment from another process, possibly after the portal already listed the route
+    self.assertFalse(preservation.check_route_preserve_status(UNMARKED))
+    setxattr(os.path.join(self.tmp, f"{UNMARKED}--0"), PRESERVE_ATTR_NAME, PRESERVE_ATTR_VALUE)
+    xattr_cache._cached_attributes[(os.path.join(self.tmp, f"{UNMARKED}--0"), PRESERVE_ATTR_NAME)] = None  # what another process's write leaves behind
+    self.assertTrue(preservation.check_route_preserve_status(UNMARKED))
+
+  def test_marked_segment_and_the_ones_before_it_are_held_back_from_deletion(self):
     self.assertEqual(preservation.get_preserved_segments_set(self.all_segments),
                      {f"{MARKED}--0", f"{MARKED}--1"})
 

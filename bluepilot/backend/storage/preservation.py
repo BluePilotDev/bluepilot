@@ -22,7 +22,7 @@ except ImportError:
 
 # openpilot's own helpers for reading its preserve marker
 try:
-    from openpilot.system.loggerd.xattr_cache import getxattr
+    from openpilot.system.loggerd.xattr_cache import _getxattr
     from openpilot.system.loggerd.deleter import PRESERVE_ATTR_NAME, PRESERVE_ATTR_VALUE, PRESERVE_COUNT, DELETE_LAST
     XATTR_AVAILABLE = True
 except ImportError:
@@ -57,6 +57,18 @@ except ImportError:
 from bluepilot.backend.routes import (
     get_route_segments,
 )
+
+
+def getxattr(path: str, attr_name: str) -> bytes | None:
+    """Read an xattr without openpilot's cache
+
+    openpilot's getxattr keeps each answer for the life of the process, and loggerd sets the
+    preserve marker from another process, so the portal has to read the file system every time.
+    """
+    try:
+        return _getxattr(path, attr_name)
+    except OSError:
+        return None
 
 
 def has_preserve_xattr_segment(segment_path: str) -> bool:

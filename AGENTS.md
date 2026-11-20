@@ -143,7 +143,7 @@ BluePilotDev/
 │   │   ├── cache/               # LRU metrics/thumbnail/remux caching
 │   │   ├── logs/                # Cereal message parsing
 │   │   ├── network/             # WiFi IP detection, onroad checks
-│   │   ├── storage/             # xattr-based route preservation
+│   │   ├── storage/             # preserve marker reading, deletion risk
 │   │   ├── system/              # CPU/memory/disk metrics
 │   │   ├── params/              # Parameter manager with fallback
 │   │   ├── handlers/            # HTTP endpoint handlers
