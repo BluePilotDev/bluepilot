@@ -20,11 +20,10 @@ except ImportError:
     # Fallback for testing
     ROUTES_DIR = os.path.expanduser("~/comma_data/media/0/realdata")
 
-# Import xattr for preserve marker support
+# openpilot's own helpers for reading its preserve marker
 try:
-    from openpilot.system.loggerd.xattr_cache import getxattr, setxattr
+    from openpilot.system.loggerd.xattr_cache import getxattr
     from openpilot.system.loggerd.deleter import PRESERVE_ATTR_NAME, PRESERVE_ATTR_VALUE, PRESERVE_COUNT, DELETE_LAST
-    import xattr as xattr_module
     XATTR_AVAILABLE = True
 except ImportError:
     XATTR_AVAILABLE = False
@@ -57,8 +56,6 @@ except ImportError:
 # Import route utilities
 from bluepilot.backend.routes import (
     get_route_segments,
-    format_size,
-    get_disk_space_info,
 )
 
 
@@ -350,98 +347,10 @@ def check_route_preserve_status(route_base):
         return False
 
 
-def set_route_preserve(route_base, preserve=True):
-    """Set or remove preserve xattr on all segments of a route
-
-    Args:
-        route_base: Route base name (e.g., "2025-10-22--14-30-15")
-        preserve: True to preserve, False to unpreserve
-
-    Returns:
-        dict with success status and message:
-        - success: bool
-        - message: str (on success)
-        - error: str (on failure)
-        - affected_segments: int (on success)
-        - total_segments: int (on success)
-        - disk_space: dict (if space check fails)
-        - details: str (additional info)
-        - hint: str (suggestion for user)
-    """
-    if not XATTR_AVAILABLE:
-        return {
-            'success': False,
-            'error': 'xattr support not available'
-        }
-
-    try:
-        segments = get_route_segments(route_base)
-        if not segments:
-            return {
-                'success': False,
-                'error': 'Route not found'
-            }
-
-        # Before preserving, check disk space
-        if preserve:
-            disk_info = get_disk_space_info()
-
-            # Don't allow preserving if we can't safely record the next route
-            if not disk_info['can_record']:
-                return {
-                    'success': False,
-                    'error': 'Insufficient disk space to preserve route',
-                    'details': f"Need {format_size(MIN_BYTES * 2)} free to safely record next drive. Currently: {disk_info['formatted']['available']}",
-                    'disk_space': disk_info,
-                    'hint': 'Delete some routes first to free up space'
-                }
-
-            # Warn if disk space is getting low
-            if disk_info['warning_level'] in ('low', 'medium'):
-                logger.warning(f"Preserving route {route_base} with {disk_info['warning_level']} disk space: {disk_info['formatted']['available']} free")
-
-        # Set or remove preserve xattr on all segments
-        affected_segments = 0
-        for seg in segments:
-            try:
-                if preserve:
-                    setxattr(seg['path'], PRESERVE_ATTR_NAME, PRESERVE_ATTR_VALUE)
-                    affected_segments += 1
-                else:
-                    # Remove xattr
-                    try:
-                        xattr_module.removexattr(seg['path'], PRESERVE_ATTR_NAME)
-                        affected_segments += 1
-                    except OSError:
-                        # Attribute doesn't exist - that's fine
-                        pass
-            except Exception as e:
-                logger.warning(f"Error setting preserve on {seg['name']}: {e}")
-
-        # Clear caches so next scan picks up the change
-        get_route_segments.cache_clear()
-        clear_deletion_data_cache()
-
-        action = 'preserved' if preserve else 'unpreserved'
-        return {
-            'success': True,
-            'message': f'Route {action} successfully',
-            'affected_segments': affected_segments,
-            'total_segments': len(segments)
-        }
-
-    except Exception as e:
-        logger.error(f"Error setting preserve on route {route_base}: {e}", exc_info=True)
-        return {
-            'success': False,
-            'error': str(e)
-        }
-
-
 def clear_deletion_data_cache():
     """Clear the deletion data cache
 
-    Call this when the deletion queue may have changed (e.g., after preserving/unpreserving routes)
+    Call this when the deletion queue may have changed (e.g., after deleting a route)
     """
     global _deletion_data_cache, _deletion_data_cache_time
     _deletion_data_cache = None
