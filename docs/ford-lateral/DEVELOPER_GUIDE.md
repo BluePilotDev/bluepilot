@@ -350,11 +350,12 @@ bits fit StarPilot, whose adapter carries seven.
 P1MC-AA, L1MC-AL, NZ6C-AL and LX6C-AL; `notes/clean-build.md` §16.4, §16.11). It zeroes them once it has held an
 inactive frame for a few of its 4 ms ticks (two on BD, one on the Explorer, three on the Maverick and LX6C), and
 one tick of it already makes it take the next frame at once (executed on BD). It reads the bus in its own period
-(BD: Com in the 10 ms task, read; the PowerPC programs: not established). So the panda keeps one position per
+(BD: Com in the 10 ms task; the Explorer about 4 ms to the law's cells, the Maverick and LX6C about 11 ms; all
+read, not executed). So the panda keeps one position per
 signal (`FordBpLateralState`): moved toward the last frame it let through, at the curve's own rates, for the time
 since, and at zero only once the inactive frames it let through span the module's settle time and receive period
-(the curve's `inactive_span`, generated: 18 ms on BD's curve, 54 ms on the Explorer's, 62 ms on the Maverick's and
-LX6C's, with the PowerPC programs' receive period taken as one frame, 50 ms, a hypothesis). On a car with path
+(the curve's `inactive_span`, generated: 18 ms on BD's curve, 24 ms on the Explorer's, 32 ms on the Maverick's and
+LX6C's, the PowerPC programs' receive period taken as 20 ms, about twice what was read). On a car with path
 angle, in comma's vocabulary:
 
 - **settling:** no active frame until then, so the module has always zeroed its copies when the next one comes
@@ -371,7 +372,11 @@ angle, in comma's vocabulary:
 - **a cap that fell** below that (the car sped up): the frame must bring the copies back as fast as the module
   moves them, c2 a whole frame of the module's rate (or the jerk step where less) nearer zero than its copy, and
   add no path angle. What the module steers for then stays under that end of the copies, which falls as fast as
-  the module allows; a path angle that takes away may come back toward zero meanwhile, under the same end;
+  the module allows; a path angle that takes away may come back toward zero meanwhile, under the same end.
+  That needs the frames on time: a late frame finds the module sitting where the last one put it. So from the first
+  such frame on, the c2 copy must be within 1.5 frames (`BP_BACK_SLACK`) of where it would be had a frame come every
+  frame; a sender's lateness uses that up once, and then its frames are refused. The controller puts the frame two
+  frames of the rate under the copy (`BACK_LEAD_FRAMES`), so one lost frame uses none of it;
 - **jerk:** comma's, on c2 and on the implied curvature.
 
 Without path angle it is comma's check without its band. The controller keeps the same position, moved one
@@ -415,8 +420,8 @@ Path offset and curvature rate must be inactive on every module.
   the tracking error at 60 km/h falls from 0.0025 to 0.0015 1/m on the F-150 and from 0.0021 to 0.0012
   on the Ranger (figures from before the start-up floor; not re-run). The cap and the jerk limit are unchanged.
 - The position assumes a module never moves its copies slower than the rates above (executed on every program
-  with path angle). After a disengage the panda takes no active frame for the curve's inactive span, so a restart
-  on the Explorer, Maverick and LX6C rows costs one frame more than on the F-150 (100 ms against 50 ms).
+  with path angle). After a disengage the panda takes no active frame for the curve's inactive span, one inactive
+  frame on every curve (50 ms).
 - "Disable BP Lateral Control" is read at car init only, because that is when the panda is told which
   check to run.
 

@@ -183,10 +183,11 @@ steering numbers. Guessing from the model name would use the wrong numbers.
 ### The fallback
 
 If your module doesn't answer, or its part numbers aren't in the table, the build uses the
-**fallback**. It steers by curvature alone with comma's own settings, including the smoothing comma's
-code adds on the 2021-23 F-150 and the Bronco Sport. That is how stock openpilot steers a Ford, with two
-differences: it doesn't hold the command to the yaw sensor, and on CAN FD cars it keeps BluePilot's lower
-limit on how hard the car turns (next part). It is the approach tested on the most Fords.
+**fallback**. It is stock openpilot's Ford steering, as it is: comma's own car controller, steering by
+curvature alone, including the smoothing comma's code adds on the 2021-23 F-150 and the Bronco Sport, and
+the panda's stock check for your car. So it holds the command close to what the yaw sensor measures (as
+earlier BluePilot did, above), and on CAN FD cars it uses comma's limit on how hard the car turns, 3.6 m/s²
+rather than BluePilot's 2.4. It is the approach tested on the most Fords.
 
 ### A health check
 
