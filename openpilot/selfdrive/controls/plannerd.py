@@ -49,3 +49,4 @@ def main():
 
 if __name__ == "__main__":
   main()
+# test for #224: a change to an upstream file that is not on the hook list
