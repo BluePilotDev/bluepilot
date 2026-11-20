@@ -22,6 +22,7 @@ library's health check changes its mind, and record_health now and then.
 """
 from openpilot.common.params import Params
 from openpilot.common.swaglog import cloudlog
+from opendbc.bluepilot_lateral.core.health import NOT_CONFIGURED_REASON
 from opendbc.bluepilot_lateral.core.strategy import PscmIdentity, UNKNOWN_DATA_FILE, UNKNOWN_STRATEGY
 from opendbc.bluepilot_lateral.host_types import SupportLevel
 
@@ -167,7 +168,11 @@ def support_row(record: dict | None) -> tuple[str, str]:
     lines = [record["reason"] + "."]
     if record["level"] in (SupportLevel.curvature, SupportLevel.full):
       lines.append("Steers by curvature and path angle." if record.get("pathAngle") else "Steers by curvature.")
-  if record.get("degradedReason"):
+  if record.get("degradedReason") == NOT_CONFIGURED_REASON:
+    # the module answered Denied: whatever the table says, this truck doesn't take lane centering as built
+    value = "Not configured on this truck"
+    lines.append(f"On the last drive: {record['degradedReason']}.")
+  elif record.get("degradedReason"):
     value += ", degraded"
     lines.append(f"Degraded on the last drive: {record['degradedReason']}.")
   lines.append(f"Steering module: {_parts(record)}.")
