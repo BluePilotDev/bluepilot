@@ -230,6 +230,9 @@ class Car:
     CS.vCruise = float(self.v_cruise_helper.v_cruise_kph)
     CS.vCruiseCluster = float(self.v_cruise_helper.v_cruise_cluster_kph)
 
+    if self.CP.brand == "ford":  # test for #224: change the Ford replay output only
+      CS.vEgoCluster += 0.01
+
     return CS, CS_SP, RD
 
   def state_publish(self, CS: car.CarState, CS_SP: custom.CarStateSP, RD: structs.RadarDataT | None):
