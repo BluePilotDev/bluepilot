@@ -124,7 +124,7 @@ class VehicleModelSelectMici(NavScroller):
     )
     dlg = BigConfirmationDialog(
       title,
-      "icons_mici/settings/car_icon.png",
+      "../../../bluepilot/assets/icons_mici/settings/car_icon.png",
       red=False,
       confirm_callback=on_confirmed,
     )
