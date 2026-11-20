@@ -169,8 +169,8 @@ def support_row(record: dict | None) -> tuple[str, str]:
     if record["level"] in (SupportLevel.curvature, SupportLevel.full):
       lines.append("Steers by curvature and path angle." if record.get("pathAngle") else "Steers by curvature.")
   if record.get("degradedReason") == NOT_CONFIGURED_REASON:
-    # the module answered Denied: whatever the table says, this truck doesn't take lane centering as built
-    value = "Not configured on this truck"
+    # the module answered Denied: lane centering not configured on this truck, or a fault the module latched for that drive
+    value = "Lane centering denied by the steering module"
     lines.append(f"On the last drive: {record['degradedReason']}.")
   elif record.get("degradedReason"):
     value += ", degraded"

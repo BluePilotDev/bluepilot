@@ -347,10 +347,11 @@ Path offset and curvature rate must be inactive on every module.
   index would loosen it to another module's gain. `test_limits.py` holds every curve at or above what its
   module steers for at that speed and every higher one, and at or under the single curve. For BC the
   curve is BD's by choice (2.11).
-- The margin is for what the panda can't see, and it is derived (`core/limits.py`). The module reads its
+- The margin is for what the panda can't see, and it is worked out from one firmware input and one
+  chosen one (`core/limits.py`). The module reads its
   K2 table in fixed point, at most 0.45 % above the float lookup (BD's own lookups, executed; the older
-  library's not run), and at its own speed reading, from a signal not yet traced in its code. With a 6 %
-  allowance for that reading, the least margin over every curve is 1.0955, so 1.10; with it every curve
+  library's not run), and at its own speed reading, from a signal not yet traced in its code. The 6 %
+  allowance for that reading is this project's choice, not a firmware number, until that signal is traced. With it, the least margin over every curve is 1.0955, so 1.10; with it every curve
   covers a module speed reading at least 6.3 % under the panda's lowest sample. Without the margin, a speed
   reading 1 % under the panda's would put the module's gain about 1 % above the bound. It costs a few % of
   path angle in sharp entries at the cap.
@@ -752,7 +753,8 @@ The pipeline lives in the project's research notes (to be published):
    share a row.
 4. **Check against the firmware run in an emulator.** For the 2021-23 F-150's software BD the twin was
    checked against the firmware's own code in an emulator: 595,165 block calls, no mismatches. The
-   Ranger's controller chain was checked the same way. No other module's code has been run. A row's
+   Ranger's and the 2024 Mustang's controller chains were checked the same way. No other module's code
+   has been run; the Lightning's is BD's instruction for instruction, but its own image has not been run. A row's
    evidence level says which: **executed**, **read** or **unread** (3.6). Every number in a row is
    generated from the module's files by one script, into `L/core/module_tables.py`, with the SHA-256 of
    each file block it was read from, and a check re-reads the files (`gain_tables.py --check`). The
@@ -881,8 +883,8 @@ read from code but never run, or fitted to drives, is labelled that way and coun
 | Level | Means | Numbers in this build |
 |---|---|---|
 | **Generated from firmware bytes** | a script reads it from the module's flash at its address; a check re-reads it | every row's preview (T, both distance clamps, the K2 table), its curvature and path-angle rates, and its lateral-acceleration limit on its own speed axis (`L/core/module_tables.py`, with the SHA-256 of each source block); the panda's per-module gain curves and module rates (`L/safety/ford_gain_curves.h`) |
-| **Executed** | the module's own code was run in an emulator, and the model or the build is held to that run | the 2021-23 F-150 BD library: its eight control blocks, the mode machine, the limiter, the input scalings and the wire's ranges; the order of the two distance clamps; the request rule (ask only while Available or Active); `K2 = f(d)` read straight between points, with the module's fixed point 0.45 % at most; the copies following at once before control. The Ranger's controller chain. The Lightning by identity: its code is BD's instruction for instruction, its parameters byte for byte, its own image not yet run |
-| **Read, not run** | a person or agent read the decompiled code; nobody has run it | every other row's control law (RL14, V1MC, R1MC, SR3C, the Mach-Es, the C2 programs, the Explorer 2020-24, the Maverick 2022-24, LX6C, PR3C, the Transit, the Super Duty); the 2026 Maverick and Explorer rows; the steering servo behind the module's angle target; the panda's single gain curve, an envelope over the models' sweeps |
+| **Executed** | the module's own code was run in an emulator, and the model or the build is held to that run | the 2021-23 F-150 BD library: its eight control blocks, the mode machine, the limiter, the input scalings and the wire's ranges; the order of the two distance clamps; the request rule (ask only while Available or Active); `K2 = f(d)` read straight between points, with the module's fixed point 0.45 % at most; the copies following at once before control. The Ranger's and the 2024 Mustang's (PR3C) controller chains |
+| **Read, not run** | a person or agent read the decompiled code; nobody has run it | every other row's control law (RL14, V1MC, R1MC, SR3C, the Mach-Es, the C2 programs, the Explorer 2020-24, the Maverick 2022-24, LX6C, the Transit, the Super Duty); the Lightning, whose code is BD's instruction for instruction and whose parameters are BD's byte for byte, but whose own image has not been run; the 2026 Maverick and Explorer rows; the steering servo behind the module's angle target; the panda's single gain curve, an envelope over the models' sweeps |
 | **Measured on drives** | from logged drives: allowed for what no firmware holds (the vehicle), and as a check | the delay learner's start per row; the health check's thresholds; the BC row's whole basis (no BC file was read); per-vehicle gain spread; the path-angle gains on the two driven rows (2.10) |
 | **Ours, or outside** | a design choice of this project, or a number from comma or a standard | comma's caps and jerk limit; the lower CAN FD cap; path angle's unwind time, dead band and restart hold-off; the controller's copy timing (0.8 and 1.25 frames); the 6 % speed allowance in the panda's margin; openpilot's default delay |
 

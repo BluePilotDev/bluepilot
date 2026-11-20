@@ -100,8 +100,8 @@ steers by curvature alone.
 **Why it is on.** The BluePilot developers' 50,000+ miles of steering by path angle alone show that it
 steers Fords well. Each row's numbers are read from that module's software files by a script, not typed
 in. For the 2021-23 F-150 on software BD the module's own steering code was also run in an emulator, and
-the computer model matches it; the Lightning runs the same code, and for the Ranger the main part of it
-was run. For the other rows the code has been read, not run, and BC's software has not been read at all.
+the computer model matches it; the Lightning runs the same code, though its own copy hasn't been run yet. For the Ranger and the
+2024 Mustang the main part of it was run. For the other rows the code has been read, not run, and BC's software has not been read at all.
 On two rows they have also been measured on the road with earlier BluePilot versions. On
 the 2020-24 Explorer the truck turned 0.95 to 0.97 times what the model predicts. On the 2021-23 F-150
 with software BD it turned 0.93 to 1.01 times what the row predicts, which passes the release check
@@ -215,7 +215,7 @@ shows one of these:
 |---|---|
 | **Full** | Your module's exact software is in the table, and its row was compared with a computer model of the module or a drive. For most modules that model is a reading of their code, not checked against the code running. Steers by curvature with the row's numbers. Seven of these rows also send path angle (section 3). |
 | **Curvature** | Your module's software is in the table, but its row hasn't been compared with a model or a drive. Steers by curvature with the row's numbers. |
-| **Not configured on this truck** | On the last drive your module answered that lane centering isn't set up on this truck (or it stopped for a fault for that drive). The build can't steer a truck built without it. |
+| **Lane centering denied by the steering module** | On the last drive your module refused lane centering. Either lane centering isn't set up on this truck, and the build can't steer a truck built without it, or the module stopped for a fault for that drive, which the next start clears. |
 | **Fallback** | Your module didn't answer, or its software isn't in the table. Steers by curvature with comma's settings. |
 | **Not supported** | The software is known and this build can't steer it, so the car only records, as a dashcam. No software is marked this way today. |
 | **Off** | You switched on **Disable BP Lateral Control**. Stock openpilot steering runs. |
