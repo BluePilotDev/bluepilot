@@ -543,7 +543,14 @@ where that is lower. controlsd's curvature clip uses it where it is below openpi
 request beyond it shows as "turn exceeds steering limit". Road roll can't widen it
 (`test_road_roll_does_not_widen_the_steering_limit`). sunnypilot's vision curve speed (SCC-V) plans for
 it where it is below its own 2.0 m/s² (`B/openpilot/sunnypilot/selfdrive/controls/controlsd_ext.py`,
-`.../smart_cruise_control/vision_controller.py`).
+`.../smart_cruise_control/vision_controller.py`). On the fallback (no row of the module's own, or a row kept on
+the fallback or not supported), SCC-V's flat 2.0 is replaced by the lowest of every held module's mode-1 limit
+at the car's speed (`L/core/module_tables.py` `LIMIT_FALLBACK_CURVE_SPEED`, generated from the files with the
+others; `strategy.fallback_curve_speed_lat_accel`): 2.0 to 100 km/h, 1.75 at 130, 1.2 at 160, 0.4 at 200,
+because a module whose own limit is unknown may have the lowest one held. Modules without a limit (the 2020-24
+Explorer, LX6C) don't enter it; rows with a module keep their own. The curvature clip on the fallback is
+unchanged (the panda's cap). At 220 km/h and above the minimum is 0, which SCC-V reads as no limit (as it does
+for a row's 0 there) and plans for 2.0.
 
 **Cost.** Most rows' limits drop under 2.0 only from about 130 to 160 km/h, so at legal speeds curve
 speed changes nothing there. The exception is the 2022-24 Maverick row, under 2.0 from about 116 km/h

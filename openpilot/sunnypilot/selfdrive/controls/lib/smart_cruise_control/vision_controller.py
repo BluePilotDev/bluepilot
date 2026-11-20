@@ -13,6 +13,8 @@ from openpilot.common.realtime import DT_MDL
 from openpilot.selfdrive.car.cruise import V_CRUISE_UNSET
 from openpilot.sunnypilot import PARAMS_UPDATE_PERIOD
 from openpilot.sunnypilot.selfdrive.controls.lib.smart_cruise_control import MIN_V
+from opendbc.bluepilot_lateral.core.strategy import fallback_curve_speed_lat_accel  # BluePilot
+from opendbc.bluepilot_lateral.host_types import SupportLevel  # BluePilot
 
 VisionState = custom.LongitudinalPlanSP.SmartCruiseControl.VisionState
 
@@ -98,19 +100,26 @@ class SmartCruiseControlVision:
 
       # Get the target velocity for the maximum curve
       # BluePilot: no faster than the car's steering takes the curve round (lateral_accel_max)
-      self.v_target = (self.lateral_accel_max(sm) / max_curve) ** 0.5
+      self.v_target = (self.lateral_accel_max(sm, v_ego) / max_curve) ** 0.5
 
   @staticmethod
-  def lateral_accel_max(sm) -> float:
+  def lateral_accel_max(sm, v_ego: float) -> float:
     """BluePilot: the lateral acceleration to plan a curve's speed for, m/s^2: _A_LAT_REG_MAX, or less
     where the Ford lateral library reports that the steering module, or the panda, gives less at this
     speed (controllerStateBP.lateral.lateralAccelLimit, the limit the plan's curvature clip holds too).
+    On a Ford steered on the fallback (no row of its module's own), _A_LAT_REG_MAX is replaced by the
+    lowest of every held module's limit at this speed (strategy.fallback_curve_speed_lat_accel).
     The limit falls with speed, so the one at the car's speed holds at the lower target speed."""
     try:
-      limit = sm['controllerStateBP'].lateral.lateralAccelLimit
+      lateral = sm['controllerStateBP'].lateral
     except KeyError:  # not subscribed (tests)
       return _A_LAT_REG_MAX
-    return min(_A_LAT_REG_MAX, limit) if limit > 0. else _A_LAT_REG_MAX
+    own = _A_LAT_REG_MAX
+    if lateral.active and lateral.supportLevel in (SupportLevel.fallback, SupportLevel.not_supported):
+      fallback = fallback_curve_speed_lat_accel(v_ego)
+      own = fallback if fallback > 0. else own
+    limit = lateral.lateralAccelLimit
+    return min(own, limit) if limit > 0. else own
 
   def _update_state_machine(self) -> tuple[bool, bool]:
     # ENABLED, ENTERING, TURNING, LEAVING, OVERRIDING

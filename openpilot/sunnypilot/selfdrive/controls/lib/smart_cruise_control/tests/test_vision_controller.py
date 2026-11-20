@@ -213,13 +213,15 @@ class TestSteeringLimitSetsTheCurveSpeed(OpenpilotTestCase):
   """BluePilot: the curve speed is planned for no more lateral acceleration than the car's steering
   gives (the Ford lateral library's limit), where that is below SCC-V's own."""
 
-  def _target(self, reported, subscribed=True):
+  def _target(self, reported, subscribed=True, level=2, active=True):
     from openpilot.sunnypilot.selfdrive.controls.lib.smart_cruise_control import vision_controller as vc
     sm = {'modelV2': generate_modelV2().modelV2, 'carState': generate_carState().carState,
           'controlsState': generate_controlsState().controlsState}
     if subscribed:
       state = custom.ControllerStateBP.new_message()
       state.lateral.lateralAccelLimit = reported
+      state.lateral.supportLevel = level
+      state.lateral.active = active
       sm['controllerStateBP'] = state
     scc_v = vc.SmartCruiseControlVision()
     scc_v.update(sm, True, False, 30., 0., 50.)
@@ -229,6 +231,20 @@ class TestSteeringLimitSetsTheCurveSpeed(OpenpilotTestCase):
   def test_a_lower_steering_limit_lowers_the_target(self):
     v, max_curve, _ = self._target(1.2)
     self.assertAlmostEqual(v, (1.2 / max_curve) ** 0.5, places=4)
+
+  def test_the_fallback_plans_for_the_lowest_module_limit(self):
+    """A Ford steered on the fallback plans for the lowest of every held module's limit at its speed, not
+    SCC-V's flat 2.0: at 30 m/s (108 km/h) that is 1.933, between 2.0 at 100 km/h and 1.75 at 130. The panda's
+    cap (reported, 2.4 on CAN FD) is above it. A module with a row, or stock steering, keeps SCC-V's own."""
+    from opendbc.bluepilot_lateral.core.strategy import fallback_curve_speed_lat_accel
+    want = fallback_curve_speed_lat_accel(30.)
+    self.assertAlmostEqual(want, 2.0 - 0.25 * 8 / 30, places=4)
+    for level in (0, 3):  # fallback, not supported
+      v, max_curve, _ = self._target(2.4, level=level)
+      self.assertAlmostEqual(v, (want / max_curve) ** 0.5, places=4)
+    for level, active in ((2, True), (1, True), (0, False)):
+      v, max_curve, own = self._target(2.4, level=level, active=active)
+      self.assertAlmostEqual(v, (own / max_curve) ** 0.5, places=4)
 
   def test_sccvs_own_limit_otherwise(self):
     for reported, subscribed in ((2.6, True), (0., True), (1.2, False)):
