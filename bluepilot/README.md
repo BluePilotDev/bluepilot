@@ -161,7 +161,6 @@ bluepilot/
 - `routes_updated` - Route list changed
 - `route_added` - New route detected
 - `route_deleted` - Route removed
-- `route_preserved` - Route marked as preserved
 - `processing_update` - Processing progress for a route
 - `processing_started` - Batch processing started
 - `processing_completed` - Batch processing finished
@@ -244,12 +243,6 @@ bluepilot/
   - Returns JSON array of decoded messages
 
 ### Modification Endpoints
-
-#### Route Preservation
-- `POST /api/preserve/:baseName` - Toggle route preservation
-  - Uses xattr metadata to mark routes as preserved
-  - Preserved routes survive cleanup/deletion
-  - Broadcasts WebSocket event: `route_preserved` / `route_unpreserved`
 
 #### Cache Management
 - `POST /api/clear-cache` - Clear all cached data
@@ -355,10 +348,9 @@ Set via Comma device UI (Routes panel) or params API:
 - `BPPortalCellularTimeout` (int) - Cellular access timeout in minutes (default: 30)
 - `BPPortalCellularEnabledTime` (int) - Timestamp when cellular was enabled
 
-**Route Preservation:**
-- Uses xattr filesystem attributes (not params)
-- Preserved status stored in file metadata
-- Survives server restarts and device reboots
+**Preserved Routes (read-only):**
+- openpilot marks a bookmarked segment with its own `user.preserve` attribute, and its deleter holds the newest marked segments back
+- The portal only reads that marker (Preserved badge, storage breakdown, deletion order); it cannot set or clear it
 
 ### File Locations
 
@@ -477,7 +469,7 @@ Set via Comma device UI (Routes panel) or params API:
 - [x] Route filtering and proper date/time formatting
 - [x] Background route preprocessing
 - [x] Cross-process WebSocket broadcasting
-- [x] Route preservation with xattr metadata
+- [x] Shows routes openpilot preserved (read-only)
 - [x] Cellular access control (time-limited)
 - [x] Onroad safety checks
 - [x] Detailed system metrics API

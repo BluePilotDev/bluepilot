@@ -90,10 +90,6 @@ export const routesAPI = {
     await api.delete(`/api/delete/${routeId}`)
   },
 
-  preserve: async (routeId: string): Promise<void> => {
-    await api.post(`/api/preserve/${routeId}`)
-  },
-
   clearCache: async (): Promise<void> => {
     await api.post('/api/clear-cache')
   },
