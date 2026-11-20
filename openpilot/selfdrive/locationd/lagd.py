@@ -15,6 +15,11 @@ from openpilot.common.realtime import config_realtime_process
 from openpilot.common.swaglog import cloudlog
 from openpilot.selfdrive.locationd.helpers import PoseCalibrator, Pose, fft_next_good_size, parabolic_peak_interp
 from openpilot.sunnypilot.livedelay.lagd_toggle import LagdToggle
+# BluePilot: a Ford's steering module with other software learns its delay again
+from openpilot.common.bluepilot import is_bluepilot
+if is_bluepilot():
+  from openpilot.bluepilot.selfdrive.car.ford_lateral_support import steering_software_changed
+# End BluePilot
 
 BLOCK_SIZE = 100
 BLOCK_NUM = 50
@@ -372,6 +377,10 @@ def retrieve_initial_lag(params: Params, CP: car.CarParams):
         ld = last_lag_msg.lateralDelay
         if last_CP.carFingerprint != CP.carFingerprint:
           raise Exception("Car model mismatch")
+        # BluePilot
+        if is_bluepilot() and steering_software_changed(last_CP, CP):
+          raise Exception("Steering module software changed")
+        # End BluePilot
 
         lag, valid_blocks, status, version = ld.lateralDelayEstimate, ld.validBlocks, ld.status, ld.version
         assert valid_blocks <= BLOCK_NUM, "Invalid number of valid blocks"

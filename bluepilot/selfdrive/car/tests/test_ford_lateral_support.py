@@ -184,3 +184,35 @@ class TestSupportRow(OpenpilotTestCase):
   def test_disabled_reads_off(self):
     ci = _ci(parts=F150, active=False)
     self.assertEqual(support.support_row(support.start_record(ci.CP, ci.CC.bp.status()))[0], "Off")
+
+
+class TestDelayLearnerAfterASteeringSoftwareChange(OpenpilotTestCase):
+  """openpilot's delay learner (lagd) keeps its learnt delay while the car model is the same. When the
+  steering module answers another strategy or data file than at the last start, it starts again from
+  the row's start: a delay learnt on the old software would otherwise stay for about 20 minutes of
+  highway turning (BC to BD: about 0.16 s short)."""
+
+  def _restored(self, last_module, module):
+    from openpilot.cereal import messaging
+    from openpilot.selfdrive.locationd.lagd import VERSION, retrieve_initial_lag
+    params = Params()
+    msg = messaging.new_message('lateralDelay')
+    msg.lateralDelay.lateralDelayEstimate = 0.375
+    msg.lateralDelay.validBlocks = 50
+    msg.lateralDelay.version = VERSION
+    params.put("LiveDelay", msg.to_bytes(), block=True)
+    params.put("CarParamsPrevRoute", harness.car_params(CAR.FORD_F_150_MK14, last_module).to_bytes(), block=True)
+    return retrieve_initial_lag(params, harness.car_params(CAR.FORD_F_150_MK14, module))
+
+  def test_another_strategy_or_data_file_starts_again(self):
+    for last in (("ML3V-14D003-BC", "ML34-14D007-BDH"), ("ML3V-14D003-BD", "ML34-14D007-BDL")):
+      with self.subTest(last=last):
+        self.assertIsNone(self._restored(last, harness.F150_2021))
+        self.assertIsNone(Params().get("LiveDelay"))
+
+  def test_the_same_software_keeps_its_delay(self):
+    self.assertEqual(self._restored(harness.F150_2021, harness.F150_2021), (0.375, 50))
+
+  def test_a_start_without_an_answer_is_not_a_change(self):
+    self.assertEqual(self._restored(None, harness.F150_2021), (0.375, 50))
+    self.assertEqual(self._restored(harness.F150_2021, None), (0.375, 50))

@@ -13,7 +13,9 @@ param, FordLateralSupport, so that:
     starts; the settings row says it for as long as it applies.
 
   - the health check's gain windows carry over to the next drive of the same car with the same
-    steering software (the library's health.carry and health.restore).
+    steering software (the library's health.carry and health.restore);
+  - openpilot's delay learner starts again from the row's start when the module's software changed
+    (steering_software_changed, from lagd's retrieve_initial_lag).
 
 card calls record_start once per start. During a drive the publisher calls record_degraded when the
 library's health check changes its mind, and record_health now and then.
@@ -63,6 +65,15 @@ def start_record(CP, status) -> dict:
     "otaCounter": identity.ota_counter,
     "degradedReason": "",
   }
+
+
+def steering_software_changed(last_CP, CP) -> bool:
+  """Whether the steering module answered another strategy or data file at this start than at the
+  last one (CarParamsPrevRoute). A start without an answer isn't a change. lagd keeps its learnt delay
+  while the car model is the same; after a change it starts again from the row's start."""
+  last, now = PscmIdentity.from_car_fw(last_CP.carFw), PscmIdentity.from_car_fw(CP.carFw)
+  answered = all((last.strategy, last.data_file, now.strategy, now.data_file))
+  return answered and (last.strategy, last.data_file) != (now.strategy, now.data_file)
 
 
 def compare_with_last(record: dict, last: dict | None) -> tuple[dict, str]:
