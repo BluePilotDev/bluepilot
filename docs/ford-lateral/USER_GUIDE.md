@@ -151,7 +151,7 @@ With path angle off, a row can change up to three things compared with the fallb
 the number:
 
 - the build never asks for more turning than your module allows;
-- openpilot starts from your module's own reaction time;
+- openpilot starts from the reaction time measured on logged drives of your module's software;
 - on most rows, the build asks for the same ramp-out (how the module eases off its steering) that
   earlier BluePilot used. Not every module uses it.
 
