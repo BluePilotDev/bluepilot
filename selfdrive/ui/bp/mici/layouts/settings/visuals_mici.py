@@ -14,6 +14,7 @@ from openpilot.selfdrive.ui.bp.lib.dm_icon_style import (
   get_dm_icon_style,
 )
 from openpilot.selfdrive.ui.bp.mici.widgets.button_bp import (
+  BigButtonBP,
   BigParamControlBP,
   BigMultiParamToggleBP,
   BigMultiParamToggleBoolBP,
@@ -23,6 +24,8 @@ from openpilot.selfdrive.ui.bp.mici.widgets.button_bp import (
 from openpilot.selfdrive.ui.bp.lib import theme_pack
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.system.ui.widgets.scroller import NavScroller
+from openpilot.system.ui.lib.application import gui_app
+from openpilot.selfdrive.ui.bp.mici.layouts.settings.dcam_mici import DcamParamControlBP
 
 
 class VisualsLayoutMici(NavScroller):
@@ -36,7 +39,7 @@ class VisualsLayoutMici(NavScroller):
       ["off", "lead car speed", "speed", "lead car distance", "time to lead car"],
     )
     self.rainbow_mode = BigParamControlBP("Rainbow Mode", "RainbowMode")
-    # BluePilot: one theme selector for everything (8-Bit Racer + seasonal packs),
+    # BluePilot: one theme selector for everything (code themes + seasonal packs),
     # same entries and param as the C3X page — see theme_pack.selector_entries().
     _theme_entries = theme_pack.selector_entries()
     self.theme_pack_sel = BigMultiParamToggleStrBP(
@@ -50,9 +53,22 @@ class VisualsLayoutMici(NavScroller):
     self.hide_fade = BigParamControlBP("Hide Onroad Fade", "mici_hide_onroad_fade")
     self.hide_border = BigParamControlBP("Hide Onroad Border", "BPHideOnroadBorder")
     self.hide_camera_view = BigParamControlBP("Minimal Driving View", "BPHideCameraView")
+    self.model_path_color = BigMultiParamToggleBP(
+      "Model Path Color", "BPModelPathColor", ["Green (Default)", "Ford"],
+    )
+    self.curve_path_highlight = BigParamControlBP("Curve Path Highlight", "BPCurvaturePathEdges")
+    self.ford_acc_path_feedback = BigParamControlBP("Ford ACC Path Feedback", "BPFordACCPathFeedback")
     self.rainbow_lane_lines = BigParamControlBP("Rainbow Lane Lines", "BPRainbowLines")
     self.show_blindspot_ui = BigParamControlBP("Show Blindspot Overlay", "ShowBlindspotOverlay")
     self.show_brake_status = BigParamControlBP("Show Brake Status", "ShowBrakeStatus")
+    self.lane_center_indicator = BigParamControlBP("Lane Positioning Confidence Indicator", "BPLaneCenterIcon")
+    self.hide_dm_icon = BigParamControlBP("Hide Driver Monitoring Icon", "BPHideDMicon")
+    self.hide_wheel_icon = BigParamControlBP("Hide Steering Wheel Icon", "BPHideWheelIcon")
+    self.experimental_dcam = DcamParamControlBP("Enable Experimental DCam Features", "BPCroppedDcam")
+    self.dcam_triggers = BigButtonBP("DCam Activation Options", "SELECT")
+    self.dcam_triggers.set_click_callback(self._open_dcam_triggers)
+    self.dcam_triggers.set_enabled(lambda: self.experimental_dcam.params.get_bool("BPCroppedDcam"))
+    self.automatic_camera_view = BigParamControlBP("Automatic Camera View", "BPCameraAngleAuto")
     self.animate_steering_wheel = BigParamControlBP("Animate Steering Wheel", "BPAnimateSteeringWheel")
     ensure_steering_wheel_icon_style_initialized(Params(), SteeringWheelIconStyle.COMMA_4)
     self.wheel_icon_style = BigMultiParamToggleBP(
@@ -75,9 +91,18 @@ class VisualsLayoutMici(NavScroller):
       self.hide_fade,
       self.hide_border,
       self.hide_camera_view,
+      self.model_path_color,
+      self.curve_path_highlight,
+      self.ford_acc_path_feedback,
       self.rainbow_lane_lines,
       self.show_blindspot_ui,
       self.show_brake_status,
+      self.lane_center_indicator,
+      self.hide_dm_icon,
+      self.hide_wheel_icon,
+      self.automatic_camera_view,
+      self.experimental_dcam,
+      self.dcam_triggers,
       self.animate_steering_wheel,
       self.wheel_icon_style,
       self.dm_icon_style,
@@ -92,8 +117,15 @@ class VisualsLayoutMici(NavScroller):
       ("BPHideCameraView", self.hide_camera_view),
       ("BPThemeAutoSeasonal", self.theme_auto_seasonal),
       ("BPRainbowLines", self.rainbow_lane_lines),
+      ("BPCurvaturePathEdges", self.curve_path_highlight),
+      ("BPFordACCPathFeedback", self.ford_acc_path_feedback),
       ("ShowBlindspotOverlay", self.show_blindspot_ui),
       ("ShowBrakeStatus", self.show_brake_status),
+      ("BPLaneCenterIcon", self.lane_center_indicator),
+      ("BPHideDMicon", self.hide_dm_icon),
+      ("BPHideWheelIcon", self.hide_wheel_icon),
+      ("BPCameraAngleAuto", self.automatic_camera_view),
+      ("BPCroppedDcam", self.experimental_dcam),
       ("BPAnimateSteeringWheel", self.animate_steering_wheel),
       ("FordPrefHybridPowerFlow", self.show_hybrid_power_flow),
     )
@@ -103,6 +135,7 @@ class VisualsLayoutMici(NavScroller):
   def _update_state(self):
     super()._update_state()
     self.show_lead_vehicle._load_value()
+    self.model_path_color._load_value()
     self.hybrid_power_flow_style._load_value()
     self._update_buttons()
 
@@ -124,3 +157,7 @@ class VisualsLayoutMici(NavScroller):
     self.wheel_icon_style.set_value(self.wheel_icon_style._options[int(wheel_style)])
     dm_style = get_dm_icon_style(ui_state.params, DMIconStyle.COMMA_4)
     self.dm_icon_style.set_value(self.dm_icon_style._options[int(dm_style)])
+
+  def _open_dcam_triggers(self):
+    from openpilot.selfdrive.ui.bp.mici.layouts.settings.dcam_mici import DcamTriggersLayoutMici
+    gui_app.push_widget(DcamTriggersLayoutMici())

@@ -1,6 +1,39 @@
 {
   "params": [
     {
+      "name": "BPCroppedDcam",
+      "default": false,
+      "type": "bool",
+      "flags": [
+        "PERSISTENT",
+        "BACKUP"
+      ],
+      "create_default": true,
+      "enabled": true
+    },
+    {
+      "name": "BPCroppedDcamTurnSignal",
+      "default": true,
+      "type": "bool",
+      "flags": [
+        "PERSISTENT",
+        "BACKUP"
+      ],
+      "create_default": true,
+      "enabled": true
+    },
+    {
+      "name": "BPCroppedDcamBSM",
+      "default": true,
+      "type": "bool",
+      "flags": [
+        "PERSISTENT",
+        "BACKUP"
+      ],
+      "create_default": true,
+      "enabled": true
+    },
+    {
       "name": "FordSelectedVehicleModel",
       "default": "",
       "type": "string",

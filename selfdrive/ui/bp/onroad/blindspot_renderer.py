@@ -50,10 +50,9 @@ class BlindspotRendererMixin:
       return
 
     car_state = sm['carState']
-    bp_ui_log.state("Blindspot", "left", car_state.leftBlindspot)
-    bp_ui_log.state("Blindspot", "right", car_state.rightBlindspot)
-    left_blindspot = car_state.leftBlindspot
-    right_blindspot = car_state.rightBlindspot
+    left_blindspot, right_blindspot = (bool(car_state.leftBlindspot), bool(car_state.rightBlindspot))
+    bp_ui_log.state("Blindspot", "left", left_blindspot)
+    bp_ui_log.state("Blindspot", "right", right_blindspot)
 
     # Update alpha filters for smooth fade in/out
     self._blindspot_left_alpha_filter.update(1.0 if left_blindspot else 0.0)

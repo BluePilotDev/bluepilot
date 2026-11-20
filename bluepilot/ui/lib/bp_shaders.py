@@ -7,12 +7,12 @@ Preserved here as BP-only features (rainbow driving path, confidence ball).
 
 import pyray as rl
 import numpy as np
-from typing import Any, Optional
+from typing import Any
 
 from openpilot.system.ui.lib.application import gui_app, GL_VERSION
 from openpilot.system.ui.lib.shader_polygon import (
-  VERTEX_SHADER, ShaderState, Gradient, triangulate,
-  UNIFORM_INT, UNIFORM_FLOAT, UNIFORM_VEC2, UNIFORM_VEC4,
+  VERTEX_SHADER, triangulate,
+  UNIFORM_FLOAT, UNIFORM_VEC2, UNIFORM_VEC4,
 )
 
 # ── Rainbow animated HSV shader ──────────────────────────────────────────────
@@ -220,16 +220,34 @@ void main()
     self.initialized = False
 
 
+def circle_shader_screen_space(center_x: float, center_y: float, radius: float,
+                               scale: float, scaled_height: float) -> tuple[float, float, float]:
+  """Convert logical UI circle geometry to the shader's physical framebuffer space."""
+  render_scale = max(0.0, float(scale))
+  return (
+    float(center_x) * render_scale,
+    float(scaled_height) - float(center_y) * render_scale,
+    float(radius) * render_scale,
+  )
+
+
 def draw_shader_circle_gradient(center_x: float, center_y: float, radius: float,
                                 top_color: rl.Color, bottom_color: rl.Color) -> None:
   """Draw a gradient circle using a GPU shader. Produces a clean anti-aliased circle."""
   state = CircleShaderState.get_instance()
   state.initialize()
 
-  # Shader uses bottom-left origin for gl_FragCoord, so flip Y
-  state.center_ptr[0] = center_x
-  state.center_ptr[1] = gui_app.height - center_y
-  state.radius_ptr[0] = radius
+  # The UI's model matrix scales logical drawing commands, while gl_FragCoord
+  # remains in physical framebuffer pixels. Convert the shader uniforms too so
+  # gradient lamps remain full-sized in SCALE=0.5 C3X simulator captures.
+  shader_x, shader_y, shader_radius = circle_shader_screen_space(
+    center_x, center_y, radius,
+    getattr(gui_app, "_scale", 1.0),
+    getattr(gui_app, "_scaled_height", gui_app.height),
+  )
+  state.center_ptr[0] = shader_x
+  state.center_ptr[1] = shader_y
+  state.radius_ptr[0] = shader_radius
   state.top_color_ptr[0:4] = [top_color.r / 255.0, top_color.g / 255.0, top_color.b / 255.0, top_color.a / 255.0]
   state.bottom_color_ptr[0:4] = [bottom_color.r / 255.0, bottom_color.g / 255.0, bottom_color.b / 255.0, bottom_color.a / 255.0]
 

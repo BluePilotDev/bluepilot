@@ -5,6 +5,7 @@ from openpilot.common.params import Params
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.selfdrive.ui.sunnypilot.onroad.chevron_metrics import ChevronMetrics, ChevronOptions
 from openpilot.system.ui.lib.text_measure import measure_text_cached
+from openpilot.system.ui.lib.application import gui_app
 from openpilot.selfdrive.ui.bp.lib.ui_debug_logger import bp_ui_log
 # BluePilot: seasonal theme packs (LeadMarker recolors the vision-lead box border)
 from openpilot.selfdrive.ui.bp.lib import theme_pack
@@ -36,6 +37,9 @@ class ChevronMetricsBP(ChevronMetrics):
     self.ford_overlay_enabled: bool = False
     self.lead_is_radar: list[bool] = [False, False]
     self.overlay_scale: float = 1.0
+    # Restore the original Qt overlay's source symbols; cache GPU textures once.
+    self._radar_source_icon = gui_app.texture("img_radar.png", 64, 64)
+    self._vision_source_icon = gui_app.texture("img_vision.png", 64, 64)
 
   def should_render(self) -> bool:
     # Render if chevron metrics is enabled OR if Ford overlay is enabled
@@ -95,7 +99,8 @@ class ChevronMetricsBP(ChevronMetrics):
                             sz: float, rect: rl.Rectangle, is_radar: bool, inverted: bool = False):
     """Render text lines with horizontal boxed layout when Ford overlay is active.
     When inverted (close proximity), overlay moves to top and chevron flips upside down."""
-    CHEVRON_H = 40
+    # Leave enough room for the restored source symbol at every overlay size.
+    CHEVRON_H = max(72, int(128 * self.overlay_scale))
 
     margin = 20
     alpha = int(255 * self._lead_status_alpha)
@@ -199,9 +204,10 @@ class ChevronMetricsBP(ChevronMetrics):
           # Offset base below box bottom so outline doesn't overlap into box
           base_y = y + box_height + tri_gap
           apex_y = base_y + CHEVRON_H
+          # Keep the same winding as the upward triangle so the GPU draws its fill.
           chevron = [rl.Vector2(center_x, apex_y),
-                     rl.Vector2(box.x, base_y),
-                     rl.Vector2(box.x + box.width, base_y)]
+                     rl.Vector2(box.x + box.width, base_y),
+                     rl.Vector2(box.x, base_y)]
         else:
           # Normal: apex above (point toward lead), base above box top
           # Offset base above box top so outline doesn't overlap into box
@@ -222,6 +228,24 @@ class ChevronMetricsBP(ChevronMetrics):
       rl.draw_circle_v(chevron[0], r, glow_color)
       rl.draw_circle_v(chevron[1], r, glow_color)
       rl.draw_circle_v(chevron[2], r, glow_color)
+
+      # The centroid stays inside the triangle in both close-range and normal layouts.
+      icon_size = min(90 * scale, CHEVRON_H * 0.70)
+      icon_center = rl.Vector2(
+        sum(point.x for point in chevron) / 3,
+        sum(point.y for point in chevron) / 3,
+      )
+      if is_radar:
+        icon_center.y += (6 if inverted else -6) * scale
+      texture = self._radar_source_icon if is_radar else self._vision_source_icon
+      rl.draw_texture_pro(
+        texture,
+        rl.Rectangle(0, 0, texture.width, texture.height),
+        rl.Rectangle(icon_center.x, icon_center.y, icon_size, icon_size),
+        rl.Vector2(icon_size / 2, icon_size / 2),
+        90 if is_radar else 0,
+        rl.Color(255, 255, 255, alpha),
+      )
 
     else:
       # Fall back to base vertical stack rendering

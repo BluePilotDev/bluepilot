@@ -102,13 +102,52 @@ sections:
     widget: toggle
     title: '[Visuals] Minimal Driving View'
     description: Disable camera feed & only show lane lines and model path.
-  - key: BPRadRacerTheme
+  - key: BPModelPathColor
+    widget: multiple_button
+    title: '[Visuals] Model Path Color'
+    description: Choose between the default green model path and a Ford-style blue model path.
+    options:
+    - value: 0
+      label: Green (Default)
+    - value: 1
+      label: Ford
+  - key: BPThemePack
+    widget: multiple_button
+    title: '[Visuals] Theme'
+    description: Choose 8-Bit Racer, Tesla, or a seasonal theme pack.
+    options:
+    - value: ''
+      label: 'Off'
+    - value: rad_racer
+      label: 8-Bit Racer
+    - value: tesla
+      label: Tesla
+    - value: april_fools
+      label: April Fools
+    - value: christmas_week
+      label: Christmas
+    - value: cinco_de_mayo
+      label: Cinco de Mayo
+    - value: easter_week
+      label: Easter
+    - value: fourth_of_july
+      label: Fourth of July
+    - value: halloween_week
+      label: Halloween
+    - value: new_years
+      label: New Year's
+    - value: st_patricks_day
+      label: St. Patrick's
+    - value: thanksgiving_week
+      label: Thanksgiving
+    - value: valentines_day
+      label: Valentine's
+    - value: veterans_day
+      label: Veterans Day
+  - key: BPThemeAutoSeasonal
     widget: toggle
-    title: '[Visuals] 8-Bit Racer Theme (C3X)'
-    description: 'Retro 8-bit racing game onroad view: hides the camera feed, draws the road as green game lines, and moves
-      all metrics into a gauge cluster at the bottom of the screen.'
-    visibility:
-    - $ref: '#/macros/hide_on_mici'
+    title: '[Visuals] Auto Seasonal Theme'
+    description: During a holiday week, switch to that seasonal theme pack automatically. Outside holiday weeks the Theme selection applies.
   - key: BPRainbowLines
     widget: toggle
     title: '[Visuals] Rainbow Lane Lines'
@@ -127,6 +166,44 @@ sections:
     description: Display the confidence ball on the left side of the driving view.
     visibility:
     - $ref: '#/macros/hide_on_mici'
+  - key: BPHideDMicon
+    widget: toggle
+    title: '[Visuals] Hide Driver Monitoring Icon'
+    description: Removes DM silhouette icon from UI.
+  - key: BPHideWheelIcon
+    widget: toggle
+    title: '[Visuals] Hide Steering Wheel Icon'
+    description: Removes steering wheel icon from UI.
+  - key: BPShowNetworkStatus
+    widget: toggle
+    title: '[Visuals] Show Network Status (C3X)'
+    description: Show network connectivity bars on bottom-left of screen
+    visibility:
+    - $ref: '#/macros/hide_on_mici'
+  - key: BPCameraAngleAuto
+    widget: toggle
+    title: '[Visuals] Automatic Camera View'
+    description: Automatically switch between wide-angle view at low speeds and normal view at higher speeds, without requiring Experimental Mode.
+  - key: BPCroppedDcam
+    widget: toggle
+    title: '[Visuals] Enable Experimental DCam Features'
+    description: Show cropped driver-camera side views using the selected activation options.
+  - key: BPCroppedDcamTurnSignal
+    widget: toggle
+    title: '[Visuals] When Turn Signal Active'
+    description: Show DCam view when turn signal active
+    enablement:
+    - type: param
+      key: BPCroppedDcam
+      equals: true
+  - key: BPCroppedDcamBSM
+    widget: toggle
+    title: '[Visuals] When BSM Active'
+    description: Show DCam view when vehicle Blind-Spot Monitoring System active
+    enablement:
+    - type: param
+      key: BPCroppedDcam
+      equals: true
   - key: BPAnimateSteeringWheel
     widget: toggle
     title: '[Visuals] Animate Steering Wheel'

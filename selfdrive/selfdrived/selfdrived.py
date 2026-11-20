@@ -31,6 +31,7 @@ from openpilot.sunnypilot.selfdrive.car.cruise_helpers import CruiseHelper
 from openpilot.sunnypilot.selfdrive.car.intelligent_cruise_button_management.controller import IntelligentCruiseButtonManagement
 from openpilot.sunnypilot.selfdrive.selfdrived.events import EventsSP
 
+
 REPLAY = "REPLAY" in os.environ
 SIMULATION = "SIMULATION" in os.environ
 TESTING_CLOSET = "TESTING_CLOSET" in os.environ
@@ -54,6 +55,8 @@ IGNORED_SAFETY_MODES = (SafetyModel.silent, SafetyModel.noOutput)
 # BluePilot: debounce for the generic commIssue catch-all, see the comment at its use site
 # (update_events) for why. 20 frames @ 100Hz = 200ms.
 COMM_ISSUE_DEBOUNCE_FRAMES = 20
+# Optional enhancements must fail closed without becoming engagement blockers.
+NON_CRITICAL_PROCESSES = {"mapd"}
 # End BluePilot
 
 
@@ -155,7 +158,7 @@ class SelfdriveD(CruiseHelper):
     self.state_machine = StateMachine()
     self.rk = Ratekeeper(100, print_delay_threshold=None)
 
-    self.ignored_processes = {'mapd', }
+    self.ignored_processes = NON_CRITICAL_PROCESSES
 
     # Determine startup event
     is_remote = build_metadata.openpilot.comma_remote or build_metadata.openpilot.sunnypilot_remote
@@ -326,12 +329,16 @@ class SelfdriveD(CruiseHelper):
       self.events.add(EventName.excessiveActuation)
     # ******************************************************************************************
 
+    left_blindspot, right_blindspot = bool(CS.leftBlindspot), bool(CS.rightBlindspot)
+
     # Handle lane change
     if self.sm['modelV2'].meta.laneChangeState == LaneChangeState.preLaneChange:
       direction = self.sm['modelV2'].meta.laneChangeDirection
-      if (CS.leftBlindspot and direction == LaneChangeDirection.left) or \
-         (CS.rightBlindspot and direction == LaneChangeDirection.right):
+
+      if (left_blindspot and direction == LaneChangeDirection.left) or \
+         (right_blindspot and direction == LaneChangeDirection.right):
         self.events.add(EventName.laneChangeBlocked)
+      # End BluePilot
       else:
         if direction == LaneChangeDirection.left:
           self.events.add(EventName.preLaneChangeLeft)

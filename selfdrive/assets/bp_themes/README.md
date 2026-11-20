@@ -2,8 +2,8 @@
 
 Asset-only theme packs loaded by `selfdrive/ui/bp/lib/theme_pack.py` and selected with
 the `BPThemePack` param (Settings → Visuals → Theme, on both the comma 3X and comma
-four UIs). The same selector also carries the built-in 8-Bit Racer code theme, so one
-param controls all theming.
+four UIs). The same selector also carries the built-in 8-Bit Racer and automatic
+Tesla Light/Dark driving-environment code themes, so one param controls all theming.
 
 ```
 <pack_name>/

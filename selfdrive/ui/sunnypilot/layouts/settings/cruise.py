@@ -8,6 +8,7 @@ from enum import IntEnum
 
 from openpilot.selfdrive.ui.sunnypilot.layouts.settings.cruise_sub_layouts.speed_limit_settings import SpeedLimitSettingsLayout
 from openpilot.selfdrive.ui.ui_state import ui_state
+from openpilot.sunnypilot.selfdrive.car.intelligent_cruise_button_management.helpers import icbm_with_op_long
 from openpilot.system.ui.lib.multilang import tr, tr_noop
 from openpilot.system.ui.sunnypilot.widgets.list_view import toggle_item_sp, option_item_sp, simple_button_item_sp
 from openpilot.system.ui.widgets import Widget
@@ -123,7 +124,7 @@ class CruiseLayout(Widget):
       has_icbm = ui_state.has_icbm
       has_long = ui_state.has_longitudinal_control
 
-      if ui_state.CP_SP.intelligentCruiseButtonManagementAvailable and not has_long:
+      if ui_state.CP_SP.intelligentCruiseButtonManagementAvailable and (not has_long or icbm_with_op_long(ui_state.CP)):
         self.icbm_toggle.action_item.set_enabled(ui_state.is_offroad())
         self.icbm_toggle.set_description(tr(ICBM_DESC))
       else:

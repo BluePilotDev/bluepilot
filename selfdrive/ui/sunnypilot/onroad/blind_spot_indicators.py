@@ -11,6 +11,7 @@ from openpilot.system.ui.lib.application import gui_app
 from openpilot.common.filter_simple import FirstOrderFilter
 
 
+
 class BlindSpotIndicators:
   def __init__(self):
     self._txt_blind_spot_left: rl.Texture = gui_app.texture('icons_mici/onroad/blind_spot_left.png', 108, 128)
@@ -23,8 +24,11 @@ class BlindSpotIndicators:
     sm = ui_state.sm
     CS = sm['carState']
 
-    self._blind_spot_left_alpha_filter.update(1.0 if CS.leftBlindspot else 0.0)
-    self._blind_spot_right_alpha_filter.update(1.0 if CS.rightBlindspot else 0.0)
+    left_blindspot, right_blindspot = (bool(CS.leftBlindspot), bool(CS.rightBlindspot))
+
+    self._blind_spot_left_alpha_filter.update(1.0 if left_blindspot else 0.0)
+    self._blind_spot_right_alpha_filter.update(1.0 if right_blindspot else 0.0)
+    # End BluePilot
 
   @property
   def detected(self) -> bool:

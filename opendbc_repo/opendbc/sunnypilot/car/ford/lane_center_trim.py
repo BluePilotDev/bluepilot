@@ -83,9 +83,13 @@ _CORRECTION_ROC_PER_TICK = 0.00015
 class LaneCenterTrim:
   def __init__(self):
     self._correction = 0.0
+    self._lane_line_strength = 0.0
+    self._active = False
 
   def reset(self) -> None:
     self._correction = 0.0
+    self._lane_line_strength = 0.0
+    self._active = False
 
   def update(self, kappa_cmd: float, model, v_ego: float, enabled: bool, offset: float,
              gain: float, lat_active: bool, lane_change: bool) -> float:
@@ -95,7 +99,7 @@ class LaneCenterTrim:
     curvature mode's ``custom_path_offset_curv``). Applied whether or not lane lines are usable
     -- see module docstring.
     ``gain`` (0.0-1.0): user-tunable authority -- how much of the (already magnitude-clipped)
-    raw correction is actually applied. 0 disables the trim's effect without disabling detection.
+    raw correction is actually applied. 0 disables the trim and its active-state indication.
 
     The applied correction is both exponentially smoothed (_SMOOTH_TAU_S) and rate-limited
     (_CORRECTION_ROC_PER_TICK) -- see the constants above -- so a lane-line-confidence
@@ -114,7 +118,7 @@ class LaneCenterTrim:
       self.reset()
       return kappa_cmd
 
-    valid, raw = self._raw_correction(model, v_ego, offset)
+    valid, raw, lane_line_strength = self._raw_correction(model, v_ego, offset)
     if not valid:
       # Only true failure case now: model.position itself is unusable, so there's no baseline
       # to offset from at all (see _raw_correction). Lane-line-only failures fall back to the
@@ -122,6 +126,11 @@ class LaneCenterTrim:
       self.reset()
       return kappa_cmd
 
+    self._lane_line_strength = lane_line_strength
+    # This state intentionally describes confident *lane-based centering*, not the offset-only
+    # fallback. It remains active when no correction is presently required because the vehicle
+    # is already centered, and turns off whenever lane confidence blends to zero.
+    self._active = lane_line_strength > 0.0 and gain > 0.0
     target = float(np.clip(raw, -_MAX_RAW_CORRECTION, _MAX_RAW_CORRECTION)) * float(np.clip(gain, 0.0, 1.0)) * speed_factor
     alpha = 1.0 - np.exp(-0.05 / _SMOOTH_TAU_S)  # BluePilot lateral tick is 20 Hz (dt=0.05s)
     filtered = float(alpha * target + (1.0 - alpha) * self._correction)
@@ -137,19 +146,29 @@ class LaneCenterTrim:
     """Telemetry: last applied correction (1/m)."""
     return self._correction
 
-  def _raw_correction(self, model, v_ego: float, offset: float) -> tuple[bool, float]:
+  @property
+  def active(self) -> bool:
+    """Telemetry: confident lane-line centering is contributing to the active controller."""
+    return self._active
+
+  @property
+  def lane_line_strength(self) -> float:
+    """Telemetry: current 0..1 lane-line blend strength used by Lane Positioning."""
+    return self._lane_line_strength
+
+  def _raw_correction(self, model, v_ego: float, offset: float) -> tuple[bool, float, float]:
     try:
       pos_x = np.asarray(model.position.x, dtype=float)
       pos_y = np.asarray(model.position.y, dtype=float)
       if pos_x.size < 2 or pos_x.size != pos_y.size:
-        return False, 0.0
+        return False, 0.0, 0.0
       if not (np.isfinite(pos_x).all() and np.isfinite(pos_y).all() and np.all(np.diff(pos_x) > 0)):
-        return False, 0.0
+        return False, 0.0, 0.0
 
       lookahead = float(np.clip(v_ego, _LOOKAHEAD_MIN_M, _LOOKAHEAD_MAX_M))
       model_y = float(np.interp(lookahead, pos_x, pos_y))
     except (AttributeError, IndexError, TypeError, ValueError):
-      return False, 0.0
+      return False, 0.0, 0.0
 
     # Laneline contribution, blended in by confidence. scale=0 (model-position-only, i.e. just
     # the user's offset bias) whenever lines are missing, low-confidence, or structurally bad --
@@ -159,7 +178,7 @@ class LaneCenterTrim:
 
     error = (target_y + offset) - model_y
     raw = 2.0 * error / (lookahead ** 2)
-    return True, float(raw)
+    return True, float(raw), scale
 
   def _laneline_blend(self, model, lookahead: float) -> tuple[float, float]:
     """Returns (scale, laneline_center_y). scale=0 whenever lanelines can't be trusted (missing,

@@ -27,10 +27,18 @@ class ModelParser:
     return download_uri
 
   @staticmethod
+  def _parse_chunk(chunk_data) -> custom.ModelManagerSP.Chunk:
+    chunk = custom.ModelManagerSP.Chunk()
+    chunk.fileName = chunk_data.get("file_name")
+    chunk.sha256 = chunk_data.get("sha256")
+    return chunk
+
+  @staticmethod
   def _parse_artifact(artifact_data) -> custom.ModelManagerSP.Artifact:
     artifact = custom.ModelManagerSP.Artifact()
     artifact.fileName = artifact_data.get("file_name")
     artifact.downloadUri = ModelParser._parse_download_uri(artifact_data.get("download_uri", {}))
+    artifact.chunks = [ModelParser._parse_chunk(chunk) for chunk in artifact_data.get("chunks", [])]
     return artifact
 
   @staticmethod
@@ -116,7 +124,7 @@ class ModelCache:
 
 class ModelFetcher:
   """Handles fetching and caching of model data from remote source"""
-  MODEL_URL = "https://raw.githubusercontent.com/sunnypilot/sunnypilot-models/refs/heads/gh-pages/docs/driving_models_v17.json"
+  MODEL_URL = "https://raw.githubusercontent.com/sunnypilot/sunnypilot-models/refs/heads/gh-pages/docs/driving_models_v22.json"
 
   def __init__(self, params: Params):
     self.params = params
@@ -159,8 +167,11 @@ class ModelFetcher:
     cached_data, is_expired = self.model_cache.get()
 
     if cached_data and not is_expired:
-      cloudlog.debug("Using valid cached models data")
-      return self.model_parser.parse_models(cached_data)
+      cached_bundles = self.model_parser.parse_models(cached_data)
+      if cached_bundles:
+        cloudlog.debug("Using valid cached models data")
+        return cached_bundles
+      cloudlog.warning("Cached model catalog has no version-compatible bundles; refetching")
 
     fetched_bundles = self._fetch_and_cache_models()
     if fetched_bundles is not None:

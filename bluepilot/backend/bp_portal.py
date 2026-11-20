@@ -186,8 +186,6 @@ from bluepilot.backend.handlers.log_downloads import (
 # Params - import from params_manager to get fallback support
 from bluepilot.backend.params.params_manager import Params
 params = Params()
-
-
 def restart_ui_process():
     """Attempt to restart the UI process by signaling the running binary."""
     process_names = {'ui', 'bluepilot-ui', 'bp-ui'}
@@ -520,6 +518,15 @@ class WebRoutesHandler(BaseHTTPRequestHandler):
                 data['success'] = True
 
         self.wfile.write(json.dumps(data).encode())
+
+    def send_bytes_response(self, data, mime_type, status=200):
+        self.send_response(status)
+        self.send_header('Content-Type', mime_type)
+        self.send_header('Content-Length', str(len(data)))
+        self.send_header('Cache-Control', 'no-store')
+        self.send_cors_headers()
+        self.end_headers()
+        self.wfile.write(data)
 
     def send_file_response(self, filepath, mime_type=None, download_filename=None):
         """Send file response with optional byte-range support"""

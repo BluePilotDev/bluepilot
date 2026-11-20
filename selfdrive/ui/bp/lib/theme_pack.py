@@ -8,8 +8,8 @@ A theme pack is a directory of plain assets — no code:
 
 Packs are discovered in BUNDLED_DIR (shipped with the repo) and USER_DIR (device-local,
 drop packs in over SSH). Selection is the BPThemePack string param holding the pack's
-directory name; empty/missing/unknown means no theme pack, and the special value
-RAD_RACER selects the built-in 8-Bit Racer code theme instead of a pack.
+directory name; empty/missing/unknown means no theme pack. The special values
+RAD_RACER and TESLA select built-in code themes instead of packs on disk.
 
 This module is imported by soundd as well as the UI, so pyray is only imported inside
 the texture/color helpers, never at module level.
@@ -25,6 +25,10 @@ from openpilot.common.params import Params
 PARAM_KEY = "BPThemePack"
 AUTO_PARAM_KEY = "BPThemeAutoSeasonal"
 RAD_RACER = "rad_racer"  # param value: the built-in 8-Bit Racer code theme (not a pack on disk)
+TESLA = "tesla"
+_TESLA_DARK_LEGACY = "tesla_dark"
+TESLA_THEME_VALUES = frozenset((TESLA, _TESLA_DARK_LEGACY))
+BUILTIN_CODE_THEME_VALUES = frozenset((RAD_RACER, *TESLA_THEME_VALUES))
 BUNDLED_DIR = os.path.join(BASEDIR, "selfdrive", "assets", "bp_themes")
 USER_DIR = "/data/bp_themes"
 _PARAM_POLL_S = 2.0
@@ -94,7 +98,7 @@ def list_packs() -> list[str]:
   for base in (BUNDLED_DIR, USER_DIR):
     if os.path.isdir(base):
       for entry in sorted(os.listdir(base)):
-        if entry not in names and os.path.isdir(os.path.join(base, entry)):
+        if entry.lower() not in BUILTIN_CODE_THEME_VALUES and entry not in names and os.path.isdir(os.path.join(base, entry)):
           names.append(entry)
   return names
 
@@ -112,6 +116,11 @@ def _param_value(params: Params | None = None) -> str:
   if isinstance(raw, bytes):
     raw = raw.decode("utf-8", errors="replace")
   return raw.strip()
+
+
+def normalize_selector_value(name: str) -> str:
+  """Map retired built-in values to the selector value that replaces them."""
+  return TESLA if name.lower() == _TESLA_DARK_LEGACY else name
 
 
 def _easter(year: int) -> datetime.date:
@@ -199,10 +208,10 @@ def _effective_name(params: Params | None = None) -> str:
   """Selector value, overridden by the date-matched pack while Auto Seasonal is on.
 
   Outside holiday windows (or if the seasonal pack is missing on disk) the manual
-  selection — including Off and Rad Racer — applies unchanged.
+  selection — including Off, Rad Racer, and Tesla — applies unchanged.
   """
   p = params or Params()
-  name = _param_value(p)
+  name = normalize_selector_value(_param_value(p))
   if p.get_bool(AUTO_PARAM_KEY):
     season = seasonal_pack()
     if season and _resolve(season) is not None:
@@ -219,6 +228,11 @@ def rad_racer_active(params: Params | None = None) -> bool:
   return _effective_name(params).lower() == RAD_RACER
 
 
+def tesla_active(params: Params | None = None) -> bool:
+  """True when the automatically day/night-adjusted Tesla environment is active."""
+  return _effective_name(params).lower() == TESLA
+
+
 def selector_entries() -> list[tuple[str, str]]:
   """(label, param value) pairs for the theme selector — the single source of truth for
   both the C3X and MICI settings pages, so the toggle behaves identically on each.
@@ -233,7 +247,9 @@ def selector_entries() -> list[tuple[str, str]]:
       return (1, 0, 0, name)
     return (0, win[0].month, win[0].day, name)
 
-  return [("Off", ""), ("8-Bit Racer", RAD_RACER)] + [(name, name) for name in sorted(list_packs(), key=_calendar_key)]
+  return [("Off", ""), ("8-Bit Racer", RAD_RACER), ("Tesla", TESLA)] + [
+    (name, name) for name in sorted(list_packs(), key=_calendar_key)
+  ]
 
 
 _cache: dict = {"checked_at": 0.0, "name": None, "pack": None}
@@ -249,7 +265,7 @@ def get_active_pack(force: bool = False) -> ThemePack | None:
   name = _effective_name()
   if name != _cache["name"]:
     _cache["name"] = name
-    _cache["pack"] = _resolve(name) if name else None
+    _cache["pack"] = _resolve(name) if name and name.lower() not in BUILTIN_CODE_THEME_VALUES else None
   return _cache["pack"]
 
 
@@ -259,15 +275,19 @@ def active_pack_name() -> str:
 
 
 if __name__ == "__main__":
-  # CLI for scripts/launchers: python3 -m openpilot.selfdrive.ui.bp.lib.theme_pack [pack|off|rad_racer] [minimal|camera]
+  # CLI: python3 -m openpilot.selfdrive.ui.bp.lib.theme_pack [pack|off|rad_racer|tesla] [minimal|camera]
   # The optional second arg toggles BPHideCameraView, for previewing over rlog-only replays
   # where the camera feed is black.
   import sys
   _name = sys.argv[1] if len(sys.argv) > 1 else ""
   if _name.lower() == "off":
     _name = ""
-  if _name and _name.lower() != RAD_RACER and _resolve(_name) is None:
-    print(f"unknown pack '{_name}' (available: {', '.join(list_packs()) or 'none'}, or '{RAD_RACER}')")
+  _name = normalize_selector_value(_name)
+  if _name and _name.lower() not in BUILTIN_CODE_THEME_VALUES and _resolve(_name) is None:
+    print(
+      f"unknown pack '{_name}' (available: {', '.join(list_packs()) or 'none'}, " +
+      f"'{RAD_RACER}', or '{TESLA}')"
+    )
     sys.exit(1)
   params = Params()
   # block: launchers start the UI right after this process — the value must be on disk
