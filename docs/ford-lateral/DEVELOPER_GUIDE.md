@@ -107,7 +107,8 @@ can be supported. The logic is meant to be fit for upstream; the packaging isn't
    command without its clip to measured curvature.
    With path angle off, a row can change up to three things against the fallback, where it has the
    value: the lateral-acceleration limit (2.9), lagd's starting delay (2.8), and the ramp type (2 on
-   most rows, 0 on the fallback and BC). The health check also delays the command by the row's lag (2.7).
+   most rows, 0 on the fallback and BC). The health check delays the command by lagd's learnt delay, else the
+   row's lag, else 0.4 s (2.7).
 3. **Path angle (approach A′)** on rows whose preview is known. Curvature moves at the module's rate,
    and path angle carries what that rate still holds back, in the module's own K2. It is a per-row
    switch, **off on every row** in this build.
@@ -172,6 +173,9 @@ trucks. Path angle is a constant in each row (`StrategyRow.path_angle`), off eve
 - Older-firmware rows hold K2 as 4.17/d, the most the modules' own K2 table (ten points over distance)
   reaches over the rows' distances. Against the twin, the row's gain is 1.001 to 1.045 times the module's, never below
   (`clean-build.md` §5).
+- The 2021-23 F-150 and Lightning rows carry the module's K2 table itself (`Preview.k2_table`): 1.96/d at
+  its points, read straight between them, so 2.205/d at the 15 m of town speeds. A single 1.96/d held K2
+  11 % low there (research note `pathangle-route`).
 
 ### 2.2 Exact F188 + F10A pairs, not families
 
@@ -194,7 +198,9 @@ generations never shares a row (`test_the_mach_e_generations_never_share_a_row`)
 is pinned yet: F124 hasn't been read from a truck, and the 2022-24 Maverick's module has none.
 
 **One exception, the BC row (2.11).** It uses `ANY_DATA_FILE`, which a test allows only on a curvature
-row with stock constants, where the data file can't change what is sent. Even there the module must
+row with comma's stock ramp type and precision. The row still carries BD's limit table and BC's lag, which
+change what is sent above about 105 km/h on CAN FD and where lagd starts, so it holds only while every BC
+data file has those numbers; none has been read. Even there the module must
 answer F10A: `match_strategy` returns "didn't answer" before it looks at any row when either key is
 empty.
 
@@ -210,8 +216,8 @@ and 6 have no row (`clean-build.md` §14.3, from `scripts/clean-build/table_cove
 
 **Evidence.** For an unread strategy, its rate is unknown. A 0.003 limiter fits the Maverick and
 Explorer fleet data worse than no limiter (`verify-cross-vehicle.md` §6, via `change-analysis.md` §3).
-comma's command is the one with fleet evidence: gain 0.97 to 1.05 on 102 vehicles of 11 platforms
-(`cross-vehicle.md`).
+comma's command is the one with fleet evidence: gain 0.97 to 1.05 by platform median on 102 vehicles of 11
+platforms (`cross-vehicle.md`); per vehicle 0.90 to 1.18 (`assumptions-audit.md` item 19).
 
 **Choice.** comma's command, because it is the only one with fleet evidence. `FALLBACK_ROW` is curvature
 only, ramp type 0, precision 1, with nothing of a module's own. It is a row like any other, so the
@@ -327,7 +333,8 @@ log will show which. DE01 isn't decoded: where its fields sit is a hypothesis fo
 **Problem.** Tell the owner, and us, when a car doesn't steer as its row says, without changing the
 command.
 
-**Evidence.** Every Ford measured follows curvature at 0.97 to 1.05 (`verify-cross-vehicle.md`). The
+**Evidence.** Logged Fords follow comma's curvature command at 0.90 to 1.18 per vehicle, platform medians
+0.96 to 1.05 (`verify-cross-vehicle.md`, `assumptions-audit.md` item 19). The
 review of the first version found that its gain check couldn't reach the "degraded" threshold and gave
 noisy readings (`clean-build.md` §14.1). A yaw zero of
 0.025 rad/s moved one-minute gains between 0.9 and 1.6 on a car that follows its command.
@@ -335,14 +342,18 @@ noisy readings (`clean-build.md` §14.1). A yaw zero of
 **Choice** (`L/core/health.py`). Read-only signals, because the check must never change the steering:
 
 - **Curvature gain.** A window is at least a minute of hands-off driving above 9 m/s with enough steering
-  in it (`MIN_EXCITATION`). The command is delayed by the row's lag, and the yaw zero measured at
-  standstill is removed. No window counts until that zero is known. A window is out of range outside
+  in it (`MIN_EXCITATION`). The command is delayed by lagd's learnt delay (`LateralInputs.lateralDelay`),
+  else the row's lag, else 0.4 s, and the yaw zero measured at standstill is removed. With a delay of 0 s,
+  as the fallback once had, one logged Lightning on the fallback read 0.59 to 0.90 and went degraded; with
+  lagd's delay no logged vehicle of 84 does (`assumptions-audit.md` §3.5). No window counts until that zero is known. A window is out of range outside
   0.85 to 1.15, and three out-of-range windows in a row mean degraded. Windows carry across drives of
   the same car and software (`health.carry` and `restore`, stored in `FordLateralSupport`). On the
   seven recorded routes, the seven windows read 0.94 to 1.03
   (`logs-derived/clean-build/health_on_routes.json`).
-- **The module's capability signal reads Faulty** while BluePilot is steering. The module reports its
-  status on CAN FD only, so a CAN car has no such signal.
+- **The module's capability signal reads Faulty** while BluePilot is steering. The module reports that
+  whenever its lane-centering inputs fail its own check: our steering frames, or another input such as
+  a vehicle sensor, or a module fault (`assumptions-audit.md` §3.9). The module reports its status on
+  CAN FD only, so a CAN car has no such signal.
 - **The panda blocked messages** while steering and allowed. One counts only after 30 frames of
   "allowed", so an ordinary disengage, which the controller hears up to 100 ms late, doesn't latch
   "degraded" (`clean-build.md` §14.1). A single blocked message is enough.
@@ -367,13 +378,24 @@ steering ones, so a refused non-steering message can show "degraded".
 the rate limit not acting. The Explorer's, Ranger's and Maverick's are measured behind the module's own slewed
 command, 0.1 to 0.2 s short of what lagd measures (`clean-build.md` §6 item 4).
 
-**Choice.** Start lagd from the row's lag at 100 km/h, because a learnt value still takes over and only
-the starting point changes. 100 km/h is where lagd measures (above 50 mph). The mechanism is
-`steerActuatorDelay = start − 0.2 s` (`StrategyRow.delay_learner_start`, set in
-`L/hosts/sunnypilot/safety_param.py`), so lagd starts at the row's lag, and with the learner off the
-fixed delay is the row's lag too. The rejected option would have bypassed `steerActuatorDelay`. That gives 0.39 s on the 2021-23 F-150 BD row, 0.28 s on BC, 0.25 s on the 2021-24
-Mach-E, 0.44 s on the Escape 2025 and 0.26 s on LX6C. Rows with `lag_behind_slewed_command`, the
-fallback and the stock path keep openpilot's start.
+lagd's own estimator, run over logged drives with its own gates, learns another number again: 0.50 s on
+BD, where the twin's 63 % time is 0.39 s, and 0.34 s on BC, where the fleet's delay fit is 0.28 s
+(`assumptions-audit.md` §3.4).
+
+**Choice.** Start lagd from what lagd itself learns on logged drives of the row's strategy (median over
+vehicles), because a learnt value still takes over and only the starting point changes. The mechanism is
+`steerActuatorDelay = start − 0.2 s` (`StrategyRow.learner_start`, returned by `delay_learner_start` and
+set in `L/hosts/sunnypilot/safety_param.py`), and with the learner off that start is the fixed delay. The
+rejected option would have bypassed `steerActuatorDelay`. Starts: 0.50 s on the 2021-23 F-150 BD row,
+0.34 s on BC, 0.43 s on the Lightning, 0.27 s and 0.31 s on the 2021-22 and 2023-24 Mach-E, 0.30 s on
+LX6C, 0.41 s on the Explorer and 0.32 s on the Maverick. Rows with no logged drive (the Bronco Sport and
+Escape 2025 among them), the fallback and the stock path keep openpilot's start.
+
+lagd keeps its learnt delay across drives while the car model is the same. After the steering module's
+software changes on the same car (another F188 or F10A than the last start's), BluePilot has lagd start
+again from the row's start (`steering_software_changed` in `bluepilot/selfdrive/car/ford_lateral_support.py`,
+called from `lagd.retrieve_initial_lag`); otherwise a BC → BD update would run about 0.16 s short for
+about 20 minutes of highway turning.
 
 **Not run:** a model replay. The delay reaches the driving model as an input, and a replay needs a
 route's video.

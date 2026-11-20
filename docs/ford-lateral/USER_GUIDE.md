@@ -276,8 +276,8 @@ steering. If it finds a problem, Steering Support shows ", degraded" and one of 
 
 | Message | What it means | What to do |
 |---|---|---|
-| "The car isn't following the steering command as expected" | The check measures one-minute stretches of driving above about 32 km/h (20 mph) where openpilot steered and you didn't turn the wheel. In three such stretches in a row, the car turned more than 15 % more or less than it was asked. Every Ford measured so far stays within about 5 %. | Report it with a route (section 9). A worn or misaligned car, a yaw sensor that reads off, or a wrong table row can cause it. |
-| "The steering module is rejecting BluePilot's steering messages" | The module reported that it is refusing the messages it receives. | Report it with a route. |
+| "The car isn't following the steering command as expected" | The check measures one-minute stretches of driving above about 32 km/h (20 mph) where openpilot steered and you didn't turn the wheel. In three such stretches in a row, the car turned more than 15 % more or less than it was asked. On 84 logged Fords the check flagged none. | Report it with a route (section 9). A worn or misaligned car, a yaw sensor that reads off, or a wrong table row can cause it. |
+| "The steering module reports its lane-centering inputs as invalid (our steering messages or a vehicle sensor)" | The module reported that an input it needs for lane centering failed its own check: BluePilot's steering messages, or a signal from another part of the car. | Report it with a route. |
 | "The panda blocked messages while BluePilot was steering" | The panda (section 8) refused messages while it was allowing steering. That should never happen. | Report it with a route. |
 
 A stretch only counts if it has enough steering in it, so a long straight road takes longer to fill
