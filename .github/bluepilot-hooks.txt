@@ -1,0 +1,55 @@
+# BluePilot: the upstream files full BluePilot may change (#224). "Upstream" is this repo's bp-sunnypilot
+# branch. Every file that exists there and differs from it in a PR's merge result must be listed here,
+# with the reason; anything else fails the bluepilot-hooks check. Prefer moving code into a BluePilot file
+# (bluepilot/, openpilot/selfdrive/ui/bp/) to adding a line.
+
+.gitattributes                                                                         # BluePilot's own binaries are plain git files, not LFS
+.gitignore                                                                             # local agent docs and tools
+README.md                                                                              # BluePilot's README
+launch_chffrplus.sh                                                                    # boot logo, EGL/GLES library fix
+launch_env.sh                                                                          # connect backend (comma / Konik / offline)
+opendbc_repo                                                                           # points at ford-op/opendbc bp-full (BluePilot's Ford car code), not bp-opendbc
+openpilot/cereal/custom.capnp                                                          # controllerStateBP, carStateBP and BluePilot's other structs
+openpilot/cereal/log.capnp                                                             # controllerStateBP, carStateBP in customReserved13/14
+openpilot/cereal/services.py                                                           # controllerStateBP, carStateBP services
+openpilot/common/hardware/comma/hardware.py                                            # no core frequency cap (thermal framework throttles)
+openpilot/common/params_keys.h                                                         # BluePilot params
+openpilot/selfdrive/car/card.py                                                        # publishes controllerStateBP / carStateBP; crash reporting
+openpilot/selfdrive/car/cruise.py                                                      # ICBM target follows the Ford cluster set speed (#232)
+openpilot/selfdrive/controls/lib/desire_helper.py                                      # blinker lane change pause
+openpilot/selfdrive/selfdrived/selfdrived.py                                           # commIssue debounce
+openpilot/selfdrive/ui/layouts/main.py                                                 # BluePilot sidebar, home, onroad view, debug panel
+openpilot/selfdrive/ui/mici/layouts/main.py                                            # BluePilot home and onroad view (comma four)
+openpilot/selfdrive/ui/mici/layouts/settings/device/prime.py                           # pairing on the selected connect backend
+openpilot/selfdrive/ui/sunnypilot/layouts/settings/settings.py                         # BluePilot and portal settings panels
+openpilot/selfdrive/ui/sunnypilot/layouts/settings/vehicle/__init__.py                 # BluePilot platform selector
+openpilot/selfdrive/ui/sunnypilot/mici/layouts/settings.py                             # BluePilot settings button (comma four)
+openpilot/selfdrive/ui/sunnypilot/ui_state.py                                          # subscribes to controllerStateBP
+openpilot/selfdrive/ui/ui.py                                                           # UI at CTRL_LOW priority (reverts comma #37984)
+openpilot/selfdrive/ui/ui_state.py                                                     # subscribes to carStateBP
+openpilot/selfdrive/ui/widgets/pairing_dialog.py                                       # pairing on the selected connect backend
+openpilot/sunnypilot/mapd/mapd_installer.py                                            # crash reporting
+openpilot/sunnypilot/modeld_v2/modeld.py                                               # crash reporting
+openpilot/sunnypilot/selfdrive/car/intelligent_cruise_button_management/controller.py  # ICBM target cap at the cluster set speed
+openpilot/sunnypilot/selfdrive/controls/controlsd_ext.py                               # publishes the BPx settings to the car code
+openpilot/sunnypilot/selfdrive/controls/lib/blinker_pause_lateral.py                   # enable param can be chosen
+openpilot/sunnypilot/sunnylink/capabilities.py                                         # platform capability for the settings schema
+openpilot/sunnypilot/sunnylink/docs/README.md                                          # platform capability
+openpilot/sunnypilot/sunnylink/settings_ui.json                                        # compiled from the settings_ui_src changes below
+openpilot/sunnypilot/sunnylink/settings_ui_src/_macros.yaml                            # comma-four-only and Edge MK2 rules
+openpilot/sunnypilot/sunnylink/settings_ui_src/pages/vehicle.yaml                      # BluePilot's Ford settings
+openpilot/sunnypilot/sunnylink/tests/test_settings_changes.py                          # tests for BluePilot's Ford settings page
+openpilot/sunnypilot/system/params_migration.py                                        # BluePilot lateral param renames
+openpilot/system/athena/registration.py                                                # dongle ID per connect backend
+openpilot/system/hardware/fan_controller.py                                            # fan setpoint 77C
+openpilot/system/manager/build.py                                                      # re-syncs the venv when uv.lock changes
+openpilot/system/manager/manager.py                                                    # crash reporting
+openpilot/system/manager/process.py                                                    # crash reporting
+openpilot/system/manager/process_config.py                                             # BluePilot soundd, portal and route preprocessor
+openpilot/system/qcomgpsd/qcomgpsd.py                                                  # all GNSS constellations, diag-port fault recovery
+openpilot/system/tombstoned.py                                                         # crash reporting
+openpilot/system/ui/lib/application.py                                                 # guard against 0x0 images
+openpilot/system/ui/lib/networkmanager.py                                              # WPA2/WPA3 cipher flags
+openpilot/system/ui/lib/wifi_manager.py                                                # WPA2/WPA3 networks
+pyproject.toml                                                                         # lint and spelling skip bluepilot/vendor
+tools/test_runner.py                                                                   # also collects bluepilot/ (#238)
