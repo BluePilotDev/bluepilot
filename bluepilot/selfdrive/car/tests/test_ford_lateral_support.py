@@ -3,7 +3,7 @@ from types import SimpleNamespace
 from openpilot.common.params import Params
 from openpilot.common.test import OpenpilotTestCase
 from opendbc.bluepilot_lateral.core import strategy
-from opendbc.bluepilot_lateral.core.pscm_read import pscm_fw_entries
+from opendbc.bluepilot_lateral.tests.harness import ford_fw_entries
 from opendbc.bluepilot_lateral.host_types import LateralStatus, SupportLevel
 from opendbc.bluepilot_lateral.tests import harness
 from opendbc.car import structs
@@ -24,7 +24,7 @@ def _ci(parts=None, vin="1FTFW1E80MFA00001", active=True):
   CP.fingerprintSource = structs.CarParams.FingerprintSource.fw
   dids = (strategy.DID_STRATEGY, strategy.DID_DATA_FILE, strategy.DID_CALIBRATION)
   answers = {} if parts is None else {did: part.encode() for did, part in zip(dids, parts, strict=False)}
-  CP.carFw = pscm_fw_entries(answers)
+  CP.carFw = ford_fw_entries(answers)
   match = strategy.match_car(CP)
   status = LateralStatus(active=active, supportLevel=int(match.level), supportReason=match.reason)
   return SimpleNamespace(CP=CP, CC=SimpleNamespace(bp=SimpleNamespace(status=lambda: status)))
