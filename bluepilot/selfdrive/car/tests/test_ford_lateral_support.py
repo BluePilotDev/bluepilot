@@ -55,7 +55,7 @@ class TestStartRecordWithTheCarInterface(OpenpilotTestCase):
     self.assertEqual((stored["active"], stored["level"], stored["reason"]), (True, SupportLevel.full, strategy.MATCHED))
     value, text = support.support_row(stored)
     self.assertEqual(value, "Full")
-    self.assertIn("Steers by curvature.", text)  # path angle is off on every row until a drive confirms it
+    self.assertIn("Steers by curvature and path angle.", text)  # the BD row has path angle on in this version
     self.assertIsNone(self.params.get(support.NOTICE_ALERT))
 
   def test_the_fallback_is_named_and_told_before_the_first_frame(self):
