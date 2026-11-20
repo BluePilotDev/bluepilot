@@ -192,7 +192,11 @@ BluePilot dev group's 50,000+ miles of path-angle-only control, and the two rows
   show with this controller.
 - The controller keeps its own copy of the module's preview time. Where the copy differs from the
   module's, it errs to a higher K2: less path angle and a little less tracking, not overshoot
-  (`L/core/strategy.py` `Preview`). That holds only where the row's K2 itself isn't low. The F-150 and
+  (`L/core/strategy.py` `Preview`). The copy starts where the module's start-up leaves T, when the build
+  starts (at or after the module), and rises at the module's rate whether or not it steers: the 2020-24
+  Explorer's T is 0 at power-up and takes about 25 s to reach 5 s, so until then it previews its lower
+  distance at every speed (executed); the 2021-23 F-150's and the Ranger's start at T max (executed); the
+  rows whose start-up was not run (BC, the Lightning, the 2022-24 Maverick, LX6C) start at 0. That holds only where the row's K2 itself isn't low. The F-150 and
   Lightning rows' K2 was 11 % low at a 15 m preview, the overshoot side, until they took the module's
   K2 table (below).
 - Every row with path angle carries its module's own K2 table, generated from the module's files, and
@@ -286,8 +290,12 @@ the panda doesn't know a module's K2.
 **Evidence.** comma bounds its angle-steered cars the same way, by acceleration and jerk with no
 measured band (`steer_angle_cmd_checks_vm`). K2max was first 0.155 at low speed. The twin then showed
 the early 2024 Mustang (PR3C) at 0.25 and the Ranger at 0.167 (`scripts/clean-build/k2_envelope.py`), so
-it is now `min(0.26, max(1.7/v, 0.03))` per rad. The floor of 0.03 is there because above 205 km/h,
-`1.7/v` fell under the Explorer row. That single curve is 1.2 to 5.3 times each switched-on row's own
+it became `min(0.26, max(1.7/v, 0.03))` per rad, with the floor because above 205 km/h `1.7/v` fell under
+the Explorer row. The modules' start then raised the floor. A module previews from its T at power-up: 0 on the
+2020-24 Explorer (executed: its 85 m lower distance for about 25 s, 0.0475 per rad, above `1.7/v` from
+129 km/h), and taken as 0 where the start-up was not run, so the 2022-24 Maverick and LX6C may preview their
+30 m lower distance, 0.1333 at every speed. The curve is now `min(0.26, max(1.7/v, 0.147))`, 0.147 being
+that 0.1333 with a 10 % margin. The single curve was already 1.2 to 5.3 times each switched-on row's own
 gain, so it held path angle back. Each module's own curve replaces it (Choice). One read data file, on a
 row with path angle off, is above the single curve at 15 km/h (the 2025-26 Corsair's, 0.340 against 0.26).
 The single curve bounds the modules with a path-angle row, not every module read.
@@ -316,11 +324,19 @@ in the second safety param (`current_safety_param_sp`):
 Lightning and BC share one, because the F-150's and Lightning's firmware hold the same numbers and BC
 takes BD's. Each is generated from that module's flash (`safety/ford_gain_curves.h`, written by the same
 script and from the same reading as `core/module_tables.py`; `core/limits.py` `GAIN_CURVES` is built from
-the Python file, and `test_limits.py` pins the two): its c2 rate, its shortest preview time, the two
+the Python file, and `test_limits.py` pins the two): its c2 rate, its shortest preview time (taken no
+higher than its T when the module starts, below), the two
 preview-distance clamps by speed (past the upper the distance is the upper, the module's own order), and
 its K2 table by distance, read straight between the table's points as the module reads it. The bound is
-that module's largest K2 at the speed, times a margin of 1.10, and no higher than the single curve (which
-binds only on the Explorer, from about 190 km/h, where the bound is still at least 1.02 times its gain). The panda reads the gain at its lowest recent speed
+that module's largest K2 at the speed, times a margin of 1.10, and no higher than the single curve (which is
+above every curve with its margin, so it caps none). A module may start or restart at any time, and it previews
+from its T at power-up until T reaches its floor, so each curve takes that T as its floor where it is lower
+(`FORD_BP_PREVIEW_TIME_AT_START` in `safety/ford.h`, `PREVIEW_TIME_AT_START` in `core/limits.py`; not generated,
+because it is what the start-up code does, not a table in the flash): 0 on the Explorer's (executed), the
+Maverick's and LX6C's (not run) and the F-150's (BD loads T max, executed, but the curve also serves BC and the
+Lightning, whose start-up was not run); the Ranger's T max (executed), above its floor. Before, at 140 km/h within
+25 s of the module starting, the Explorer's gain was up to 1.23 times the bound and the Maverick's and LX6C's up
+to 4.1 times (`test_a_module_start_at_highway_speed`). The panda reads the gain at its lowest recent speed
 sample, which is right only if the curve never rises with speed, so each distance point is held to the
 least of the later ones. That moves one point, on the strict side: the F-150's lower distance at
 100 km/h, from 50 m to 46.9 m. With no curve, or bits 6 or 7, the panda keeps the single curve. Bits 0
@@ -347,6 +363,10 @@ Path offset and curvature rate must be inactive on every module.
   index would loosen it to another module's gain. `test_limits.py` holds every curve at or above what its
   module steers for at that speed and every higher one, and at or under the single curve. For BC the
   curve is BD's by choice (2.11).
+- The floor at power-up holds path angle back on three curves for the whole drive, not only its first
+  25 s, because the panda can't tell when the module started: on the Explorer the bound is the 85 m gain
+  (0.0475) at every speed, against 0.0293 at T max above 100 km/h; on the Maverick and LX6C the 30 m gain
+  (0.1333), against 0.027 to 0.04 above 100 km/h. On the F-150's curve it is up to 5 % stricter above 120 km/h.
 - The margin is for what the panda can't see, and it is worked out from one firmware input and one
   chosen one (`core/limits.py`). The module reads its
   K2 table in fixed point, at most 0.45 % above the float lookup (BD's own lookups, executed; the older
