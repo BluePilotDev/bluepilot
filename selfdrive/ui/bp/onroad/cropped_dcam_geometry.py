@@ -180,3 +180,16 @@ def low_light_enhancement(light_sensor: float) -> float:
   span = LOW_LIGHT_ENHANCEMENT_START - LOW_LIGHT_ENHANCEMENT_FULL
   strength = (LOW_LIGHT_ENHANCEMENT_START - light_sensor) / span
   return ease_visibility_alpha(strength)
+
+
+def compact_panel_region(content: Region, side: Side) -> Region:
+  """Fixed landscape C4 crops below the top HUD and above the lower wheel/torque UI.
+
+  The caller supplies the camera content area, excluding the 60px side panel.
+  Companion activation never changes either panel's size or position.
+  """
+  margin = content.width * 0.038
+  width = content.width * 0.30
+  height = min(width / 1.6, content.height * 0.38)
+  x = content.x + margin if side == "left" else content.x + content.width - margin - width
+  return Region(x, content.y + content.height * 0.27, width, height)

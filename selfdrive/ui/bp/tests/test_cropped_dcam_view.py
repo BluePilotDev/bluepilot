@@ -2,6 +2,7 @@ from types import SimpleNamespace
 
 from openpilot.selfdrive.ui.bp.onroad.cropped_dcam_geometry import (
   POST_TRIGGER_HOLD_SECONDS,
+  compact_panel_region,
   PostTriggerHold,
   Region,
   active_dcam_sides,
@@ -69,17 +70,28 @@ def test_wedge_canvas_maps_the_complete_crop_across_its_top_edge() -> None:
   assert 0.70 < local_bottom < 0.72
 
 
-def test_comma_four_dual_wedges_have_a_center_gap_at_every_height() -> None:
-  # Native 536x240 screen minus MICI's fixed 60px side-control strip.
+def test_comma_four_boxes_keep_center_hud_and_side_panel_clear() -> None:
   content = Region(0, 0, 476, 240)
-  top, bottom = wedge_insets(content, 1.0)
+  left = compact_panel_region(content, "left")
+  right = compact_panel_region(content, "right")
+  assert left.width == right.width
+  assert left.height == right.height
+  assert left.y == right.y
+  assert left.width / left.height == 1.6
+  assert left.x > content.x
+  assert left.x + left.width < right.x
+  assert right.x + right.width < 476  # C4 side-control strip starts here.
+  assert left.y >= 60  # Upper driver-monitoring icon remains clear.
+  assert left.y + left.height < 175  # Lower steering wheel and torque UI remain clear.
 
-  assert top == 0.58
-  assert bottom == 0.86
-  for y in (0.0, 0.25, 0.5, 0.75, 1.0):
-    right_inner_edge = wedge_edge_x(content, y, 1.0)
-    left_inner_edge = 1.0 - right_inner_edge
-    assert left_inner_edge < right_inner_edge
+
+def test_comma_four_boxes_follow_content_origin_and_scale() -> None:
+  content = Region(20, 10, 476, 240)
+  left = compact_panel_region(content, "left")
+  original = compact_panel_region(Region(0, 0, 476, 240), "left")
+  assert left.x == original.x + 20
+  assert left.y == original.y + 10
+  assert left.width == original.width
 
 
 def test_companion_fade_continuously_contracts_each_wedge() -> None:

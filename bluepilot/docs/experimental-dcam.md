@@ -16,9 +16,11 @@ its enabled trigger sources. BSM uses the vehicle's native `leftBlindspot` and
 
 The original final design is restored from commit `f2103dcd9c`: mirrored,
 calibration-aware side-window crops, smoothly feathered wedge masks, low-light
-shadow enhancement, fade-in/out and a one-second post-trigger hold. C4 uses its
-compact wedge profile and preserves the 60-pixel side panel. Both cameras can
-appear together, leaving a central corridor. The overlay is drawn above scene
+shadow enhancement, fade-in/out and a one-second post-trigger hold. C3x retains
+the wedge design. C4 uses two fixed 1.6:1 landscape boxes with thin dark-blue
+borders, below the top HUD and above the lower steering/torque UI, preserving
+the 60-pixel side panel. One or both boxes retain the same size and position.
+Both cameras can appear together, leaving a central corridor. The overlay is drawn above scene
 geometry and below the HUD, blindspot warnings, and alerts.
 
 The independent driver-stream client is allocated only on the first selected

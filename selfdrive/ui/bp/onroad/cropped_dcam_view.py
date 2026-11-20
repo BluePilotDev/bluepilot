@@ -18,6 +18,7 @@ from openpilot.selfdrive.ui.onroad.cameraview import (
 )
 from openpilot.selfdrive.ui.bp.onroad.cropped_dcam_geometry import (
   DEFAULT_WINDOW_CENTER_Y,
+  compact_panel_region,
   PostTriggerHold,
   Region,
   Side,
@@ -204,14 +205,17 @@ class _CroppedDcamMixin:
         continue
       companion_side = "right" if side == "left" else "left"
       companion_alpha = side_alpha[companion_side]
-      destination = wedge_canvas_rect(content_rect, side, companion_alpha)
+      destination, mask_insets = self._crop_layout(content_rect, side, companion_alpha)
       crop = source_crop(self.frame.width, self.frame.height, destination.width, destination.height, side,
                          calibration_rpy, self._window_center_y if self._has_window_landmark else None, focal_length)
-      mask_insets = wedge_local_insets(
-        Region(content_rect.x, content_rect.y, content_rect.width, content_rect.height),
-        companion_alpha,
-      )
       self._draw_crop(content_rect, destination, crop, alpha, low_light, side, mask_insets)
+
+  def _crop_layout(self, content_rect: rl.Rectangle, side: Side, companion_alpha: float):
+    destination = wedge_canvas_rect(content_rect, side, companion_alpha)
+    insets = wedge_local_insets(
+      Region(content_rect.x, content_rect.y, content_rect.width, content_rect.height), companion_alpha,
+    )
+    return destination, insets
 
   def _draw_crop(self, content_rect: rl.Rectangle, destination: rl.Rectangle,
                  crop: Region, alpha: float, low_light: float, side: Side,
@@ -285,3 +289,20 @@ class CroppedDcamViewBP(_CroppedDcamMixin, TiciCameraView):
 class MiciCroppedDcamViewBP(_CroppedDcamMixin, MiciCameraView):
   CROP_VERTEX_SHADER = MICI_VERTEX_SHADER
   CROP_FRAGMENT_SHADER = _with_crop_effects(MICI_FRAME_FRAGMENT_SHADER)
+
+  def _crop_layout(self, content_rect: rl.Rectangle, side: Side, companion_alpha: float):
+    region = compact_panel_region(
+      Region(content_rect.x, content_rect.y, content_rect.width, content_rect.height), side,
+    )
+    # Move the wedge boundary outside the viewport for a complete rectangular crop.
+    return rl.Rectangle(region.x, region.y, region.width, region.height), (-0.02, -0.02)
+
+  def _draw_crop(self, content_rect: rl.Rectangle, destination: rl.Rectangle,
+                 crop: Region, alpha: float, low_light: float, side: Side,
+                 mask_insets: tuple[float, float]) -> None:
+    border = 1.5
+    frame = rl.Rectangle(destination.x - border, destination.y - border,
+                         destination.width + border * 2, destination.height + border * 2)
+    rl.draw_rectangle_rec(frame, rl.Color(0, 0, 0, int(230 * alpha)))
+    super()._draw_crop(content_rect, destination, crop, alpha, low_light, side, mask_insets)
+    rl.draw_rectangle_lines_ex(frame, border, rl.Color(0, 52, 120, int(245 * alpha)))
