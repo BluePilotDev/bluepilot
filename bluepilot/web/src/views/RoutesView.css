@@ -156,44 +156,6 @@
   color: var(--bp-text-primary);
 }
 
-.route-preserve-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  border-radius: 8px;
-  background: rgba(33, 150, 243, 0.16);
-  border: 1px solid rgba(33, 150, 243, 0.3);
-  color: var(--bp-accent-blue);
-  font-size: 12px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  flex-shrink: 0;
-}
-
-.route-preserve-btn svg {
-  flex-shrink: 0;
-}
-
-.route-preserve-btn:hover {
-  background: rgba(33, 150, 243, 0.25);
-  border-color: rgba(33, 150, 243, 0.45);
-}
-
-.route-preserve-btn.active {
-  background: rgba(255, 152, 0, 0.2);
-  border-color: rgba(255, 152, 0, 0.45);
-  color: var(--bp-warning);
-  box-shadow: 0 8px 20px rgba(255, 152, 0, 0.2);
-}
-
-.route-preserve-btn.active:hover {
-  background: rgba(255, 152, 0, 0.28);
-}
-
 .route-actions {
   display: flex;
   align-items: center;

@@ -397,21 +397,6 @@
   border-color: rgba(244, 67, 54, 0.5);
 }
 
-.route-actions-info {
-  margin-top: 12px;
-  padding: 12px;
-  background: rgba(33, 150, 243, 0.1);
-  border-left: 3px solid var(--bp-accent-blue);
-  border-radius: 4px;
-  font-size: 12px;
-  line-height: 1.5;
-  color: var(--bp-text-secondary);
-}
-
-.route-actions-info strong {
-  color: var(--bp-accent-blue);
-}
-
 /* Player Footer - Camera Selector and Segment Info */
 .player-footer {
   background: var(--bp-bg-primary);

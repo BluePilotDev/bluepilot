@@ -154,7 +154,6 @@ from bluepilot.backend.cache import (
 # Storage and preservation
 from bluepilot.backend.storage import (
     get_cached_deletion_data,
-    check_route_preserve_status, set_route_preserve,
     clear_deletion_data_cache,
 )
 
@@ -2994,47 +2993,6 @@ class WebRoutesHandler(BaseHTTPRequestHandler):
                 payload, _ = self.build_route_export_status(route_base, camera)
                 self.send_json_response(payload)
                 return
-
-            elif path.startswith('/api/preserve/'):
-                # Preserve/unpreserve a route using preserve xattr with disk space checking
-                route_base = path.split('/api/preserve/')[1].strip('/')
-
-                # Check current preserve status
-                currently_preserved = check_route_preserve_status(route_base)
-
-                # Toggle preserve status
-                preserve = not currently_preserved
-
-                # Set or remove preserve xattr (includes disk space checks)
-                result = set_route_preserve(route_base, preserve)
-
-                if result['success']:
-                    is_preserved = preserve
-
-                    # Include disk space info in response
-                    disk_info = get_disk_space_info()
-
-                    self.send_json_response({
-                        'success': True,
-                        'isPreserved': is_preserved,
-                        'affected_segments': result.get('affected_segments', 0),
-                        'message': result.get('message'),
-                        'disk_space': disk_info
-                    })
-
-                    # Broadcast WebSocket event
-                    event_type = WebSocketEvent.ROUTE_PRESERVED if is_preserved else WebSocketEvent.ROUTE_UNPRESERVED
-                    broadcast_websocket_event(event_type, {
-                        'route_base': route_base,
-                        'is_preserved': is_preserved,
-                        'disk_space': disk_info
-                    })
-
-                    # Broadcast disk space update (preserved segments changed)
-                    broadcast_websocket_event(WebSocketEvent.DISK_UPDATED, {})
-                else:
-                    # Return error from set_route_preserve
-                    self.send_json_response(result, 400 if 'disk space' in result.get('error', '').lower() else 500)
 
             elif path == '/api/params/set':
                 # Set parameter value
