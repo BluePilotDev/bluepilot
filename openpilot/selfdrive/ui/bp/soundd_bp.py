@@ -27,9 +27,9 @@ SOUND_PACK_FILES = {
     AudibleAlert.engage: os.path.join(BASEDIR, "openpilot", "selfdrive", "assets", "sounds", "engage.wav"),
     AudibleAlert.disengage: os.path.join(BASEDIR, "openpilot", "selfdrive", "assets", "sounds", "disengage.wav"),
   },
-  CustomSoundSelection.COMMA_3X: {
-    AudibleAlert.engage: os.path.join(BASEDIR, "openpilot", "selfdrive", "assets", "sounds", "engage_tizi.wav"),
-    AudibleAlert.disengage: os.path.join(BASEDIR, "openpilot", "selfdrive", "assets", "sounds", "disengage_tizi.wav"),
+  CustomSoundSelection.COMMA_3X: {  # the comma 3X sounds upstream removed in "new sounds for 3x" (#38404)
+    AudibleAlert.engage: os.path.join(CUSTOM_SOUND_DIR, "engage_tizi.wav"),
+    AudibleAlert.disengage: os.path.join(CUSTOM_SOUND_DIR, "disengage_tizi.wav"),
   },
   CustomSoundSelection.TESLA: {
     AudibleAlert.engage: os.path.join(CUSTOM_SOUND_DIR, "tesla_engage.wav"),
