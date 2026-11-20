@@ -481,7 +481,9 @@ def main() -> None:
     else:
       draw_mici_settings(layout, draw, attempt)
 
-  print("RESULTS " + json.dumps(results))
+  # flush: a line longer than the pipe buffer is written straight through while its newline stays buffered,
+  # and raylib's close_window log (flushed C stdout) would land on the same line
+  print("RESULTS " + json.dumps(results), flush=True)
   rl.close_window()
 
 
