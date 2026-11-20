@@ -2,13 +2,18 @@ name: install smoke
 on:
   pull_request:
   push:
-    branches: [bp-sunnypilot]
+    branches: [bp-sunnypilot, bp-7.1-dev, bp-dev]
   workflow_dispatch:
 
 jobs:
   install-smoke:
     name: install smoke
-    if: github.repository == 'ford-op/bp-sunnypilot'
+    # ford-op/bp-sunnypilot: every PR, and pushes to bp-sunnypilot. BluePilotDev/bluepilot (full BluePilot, its own
+    # install path): PRs into and pushes to its work branches only; its bp-sunnypilot branch is this repo's mirror.
+    if: >-
+      (github.repository == 'ford-op/bp-sunnypilot' && (github.event_name != 'push' || github.ref_name == 'bp-sunnypilot')) ||
+      (github.repository == 'BluePilotDev/bluepilot' &&
+       contains(fromJSON('["bp-7.1-dev", "bp-dev"]'), github.base_ref || github.ref_name))
     runs-on: ubuntu-latest
     steps:
       - name: Checkout without submodules (mimic the installer)
