@@ -68,14 +68,13 @@ class TestBluePilotAssets(unittest.TestCase):
         continue
       with open(os.path.join(BASEDIR, rel), encoding="utf-8", errors="ignore") as f:
         text = f.read()
-      stale += [f"{rel}: {old}" for old in MOVED if f'"{old}"' in text or f"/selfdrive/assets/{old}" in text]
+      stale += [f"{rel}: {old}" for old in MOVED if f'"{old}"' in text or f"'{old}'" in text or f"/selfdrive/assets/{old}" in text]
     self.assertEqual(stale, [])
 
-  def test_no_bluepilot_image_left_in_upstream_asset_folders(self):
+  def test_no_per_file_asset_rule_left_in_gitattributes(self):
     with open(os.path.join(BASEDIR, ".gitattributes"), encoding="utf-8") as f:
       per_file = [line.split()[0] for line in f if line.startswith("openpilot/selfdrive/assets/") and "*" not in line]
-    # spinner_bluepilot.png moves in BluePilotDev/bluepilot#258
-    self.assertEqual([p for p in per_file if not p.endswith("/spinner_bluepilot.png")], [])
+    self.assertEqual(per_file, [])
 
 
 if __name__ == "__main__":
