@@ -38,7 +38,7 @@ MINIMAL_VIEW_NEUTRAL_LANE_COLOR = rl.Color(185, 205, 225, 255)
 # BluePilot: Rad Racer 8-bit theme road styling
 # BluePilot: Rad Racer road constants + drawing methods moved to rad_racer_road.py so the
 # comma four (MICI) renderer can share them; values unchanged.
-from openpilot.selfdrive.ui.bp.onroad.rad_racer_road import (  # noqa: E402
+from openpilot.selfdrive.ui.bp.onroad.rad_racer_road import (
   RadRacerRoadMixin, RAD_RACER_ROAD_EDGE_WIDTH, RAD_RACER_DASH_LEN_M, RAD_RACER_GAP_LEN_M,
 )
 
@@ -124,7 +124,8 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
 
     if (sm.recv_frame["extrinsicsCalibration"] < ui_state.started_frame or
         sm.recv_frame["modelV2"] < ui_state.started_frame):
-      bp_ui_log.visibility("ModelRenderer", False, reason=f"stale calib={sm.recv_frame['extrinsicsCalibration']} model={sm.recv_frame['modelV2']} started={ui_state.started_frame}")
+      bp_ui_log.visibility("ModelRenderer", False, reason=f"stale calib={sm.recv_frame['extrinsicsCalibration']} model={sm.recv_frame['modelV2']} " +
+                                                          f"started={ui_state.started_frame}")
       return
 
     bp_ui_log.state("ModelRenderer", "render_active", True)

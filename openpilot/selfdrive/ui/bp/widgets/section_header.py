@@ -1,4 +1,5 @@
 """Section header widgets for TICI BluePilot settings menu."""
+from collections.abc import Sequence
 import pyray as rl
 from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.label import gui_label
@@ -56,11 +57,11 @@ class CollapsibleSectionHeader(Widget):
     # Nested CollapsibleSectionHeaders: a header's own managed_items only cover its direct
     # children, so collapsing it hides those children's *header lines* but not their
     # grandchildren (which the nested header manages independently). Cascade collapse to fix.
-    self._nested_headers: list["CollapsibleSectionHeader"] = []
+    self._nested_headers: list[CollapsibleSectionHeader] = []
     self.set_rect(rl.Rectangle(0, 0, SECTION_HEADER_WIDTH, COLLAPSIBLE_HEADER_HEIGHT))
     self.set_click_callback(self._toggle)
 
-  def set_items(self, items: list[Widget]) -> None:
+  def set_items(self, items: Sequence[Widget]) -> None:
     """Register the items this header controls and apply initial visibility."""
     self._managed_items = list(items)
     self._apply_visibility()

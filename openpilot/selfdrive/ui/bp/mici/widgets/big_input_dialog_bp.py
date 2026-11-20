@@ -20,7 +20,7 @@ class BigInputDialogBP(BigDialogBase):
                hint: str,
                default_text: str = "",
                minimum_length: int = 1,
-               confirm_callback: Callable[[str], None] = None,
+               confirm_callback: Callable[[str], None] | None = None,
                show_special_keys: bool = False):
     super().__init__()
     self._hint_label = UnifiedLabel(hint, font_size=35, text_color=rl.Color(255, 255, 255, int(255 * 0.35)),
@@ -118,7 +118,7 @@ class BigInputDialogBP(BigDialogBase):
     self._backspace_img_alpha.update(255 * bool(text))
     if self._backspace_img_alpha.x > 1:
       color = rl.Color(255, 255, 255, int(self._backspace_img_alpha.x))
-      rl.draw_texture(self._backspace_img, int(self._rect.width - self._backspace_img.width - 27), int(text_field_rect.y), color)
+      rl.draw_texture_ex(self._backspace_img, rl.Vector2(int(self._rect.width - self._backspace_img.width - 27), int(text_field_rect.y)), 0.0, 1.0, color)
 
     if not text and self._hint_label.text and not candidate_char:
       # draw description if no text entered yet and not drawing candidate char
@@ -133,9 +133,9 @@ class BigInputDialogBP(BigDialogBase):
     # draw enter button (enabled + disabled states, same as stock BigInputDialog)
     self._enter_img_alpha.update(255 if (len(text) >= self._minimum_length) else 0)
     color = rl.Color(255, 255, 255, int(self._enter_img_alpha.x))
-    rl.draw_texture(self._enter_img, int(self._rect.x + 15), int(text_field_rect.y), color)
+    rl.draw_texture_ex(self._enter_img, rl.Vector2(int(self._rect.x + 15), int(text_field_rect.y)), 0.0, 1.0, color)
     color = rl.Color(255, 255, 255, 255 - int(self._enter_img_alpha.x))
-    rl.draw_texture(self._enter_disabled_img, int(self._rect.x + 15), int(text_field_rect.y), color)
+    rl.draw_texture_ex(self._enter_disabled_img, rl.Vector2(int(self._rect.x + 15), int(text_field_rect.y)), 0.0, 1.0, color)
 
     # keyboard goes over everything
     self._keyboard.render(self._rect)

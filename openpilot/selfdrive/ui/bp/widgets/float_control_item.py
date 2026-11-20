@@ -2,12 +2,10 @@ import pyray as rl
 from collections.abc import Callable
 
 from openpilot.common.params import Params
-from openpilot.system.ui.widgets import Widget
 from openpilot.system.ui.widgets.list_view import ListItem, ItemAction
 from openpilot.system.ui.widgets.button import Button, ButtonStyle
 from openpilot.system.ui.widgets.label import gui_label
 from openpilot.system.ui.lib.application import FontWeight, gui_app, MousePos, TextAlignment, TextAlignmentVertical
-from openpilot.system.ui.lib.multilang import tr
 from openpilot.system.ui.lib.text_measure import measure_text_cached
 
 ITEM_TEXT_FONT_SIZE = 50
@@ -19,7 +17,7 @@ BUTTON_SPACING = 7  # Reduced from 20 to ~1/3 (33/3 ≈ 11, but we need some spa
 
 class FloatControlAction(ItemAction):
   """Action item for float controls with +/- buttons."""
-  
+
   def __init__(self, param: str, min_value: float, max_value: float, step: float,
                callback: Callable[[float], None] | None = None, enabled: bool | Callable[[], bool] = True,
                suffix: str = "", integer: bool = False):
@@ -32,7 +30,7 @@ class FloatControlAction(ItemAction):
     self.suffix = suffix
     self.integer = integer
     self.params = Params()
-    
+
     # Create +/- buttons
     self._minus_button = Button(
       "-",
@@ -48,16 +46,16 @@ class FloatControlAction(ItemAction):
       button_style=ButtonStyle.PRIMARY,
       border_radius=10
     )
-    
+
     self._font = gui_app.font(FontWeight.NORMAL)
-  
+
   def _get_value(self) -> float:
     """Get current parameter value."""
     try:
       return float(self.params.get(self.param, return_default=True))
     except (TypeError, ValueError):
       return self.min_value
-  
+
   def _set_value(self, value: float):
     """Set parameter value."""
     # Clamp to min/max
@@ -66,17 +64,17 @@ class FloatControlAction(ItemAction):
     self.params.put(self.param, stored, block=False)
     if self.callback:
       self.callback(value)
-  
+
   def _increment(self):
     """Increment value by step."""
     current = self._get_value()
     self._set_value(current + self.step)
-  
+
   def _decrement(self):
     """Decrement value by step."""
     current = self._get_value()
     self._set_value(current - self.step)
-  
+
   def _decimals(self) -> int:
     """Infer display precision from step size so small steps are shown correctly."""
     if self.integer:
@@ -97,32 +95,32 @@ class FloatControlAction(ItemAction):
     else:
       decimals = self._decimals()
       value_text = f"{current_value:.{decimals}f}{self.suffix}"
-    
+
     # Calculate layout - reduce spacing to 1/3 of original
     # Original was BUTTON_SIZE (80) + BUTTON_SPACING (20) = 100 per side
     # Target is ~33 per side, so BUTTON_SPACING reduced to ~7
     button_y = rect.y + (rect.height - BUTTON_SIZE) / 2
-    
+
     # Check if enabled (handle callable) - use the enabled property from ItemAction
     is_enabled = self.enabled
-    
+
     # Calculate total space needed: buttons + minimal spacing
     total_button_space = BUTTON_SIZE * 2 + BUTTON_SPACING * 2
     # Value width should be just enough for the text, not the full remaining space
     value_text_width = measure_text_cached(self._font, value_text, ITEM_TEXT_FONT_SIZE).x
     # Add small padding around text
     value_width = value_text_width + 20
-    
+
     # Right-justify the controls (like toggle switches)
     total_width = total_button_space + value_width
     RIGHT_PADDING = 20
     start_x = rect.x + rect.width - total_width - RIGHT_PADDING
-    
+
     # Minus button on left
     minus_rect = rl.Rectangle(start_x, button_y, BUTTON_SIZE, BUTTON_SIZE)
     self._minus_button.set_enabled(current_value > self.min_value and is_enabled)
     self._minus_button.render(minus_rect)
-    
+
     # Value in center
     value_rect = rl.Rectangle(
       start_x + BUTTON_SIZE + BUTTON_SPACING,
@@ -139,14 +137,14 @@ class FloatControlAction(ItemAction):
       alignment=TextAlignment.CENTER,
       alignment_vertical=TextAlignmentVertical.MIDDLE
     )
-    
+
     # Plus button on right
     plus_rect = rl.Rectangle(start_x + BUTTON_SIZE + BUTTON_SPACING + value_width + BUTTON_SPACING, button_y, BUTTON_SIZE, BUTTON_SIZE)
     self._plus_button.set_enabled(current_value < self.max_value and is_enabled)
     self._plus_button.render(plus_rect)
-    
+
     return False
-  
+
   def _handle_mouse_release(self, mouse_pos: MousePos):
     """Handle mouse clicks on buttons."""
     current_value = self._get_value()
@@ -155,9 +153,9 @@ class FloatControlAction(ItemAction):
     else:
       decimals = self._decimals()
       value_text = f"{current_value:.{decimals}f}{self.suffix}"
-    
+
     button_y = self._rect.y + (self._rect.height - BUTTON_SIZE) / 2
-    
+
     # Calculate button positions (same as in _render)
     value_text_width = measure_text_cached(self._font, value_text, ITEM_TEXT_FONT_SIZE).x
     value_width = value_text_width + 20
@@ -165,17 +163,17 @@ class FloatControlAction(ItemAction):
     total_width = total_button_space + value_width
     RIGHT_PADDING = 20
     start_x = self._rect.x + self._rect.width - total_width - RIGHT_PADDING
-    
+
     minus_rect = rl.Rectangle(start_x, button_y, BUTTON_SIZE, BUTTON_SIZE)
     if rl.check_collision_point_rec(mouse_pos, minus_rect):
       self._minus_button._handle_mouse_release(mouse_pos)
       return
-    
+
     plus_rect = rl.Rectangle(start_x + BUTTON_SIZE + BUTTON_SPACING + value_width + BUTTON_SPACING, button_y, BUTTON_SIZE, BUTTON_SIZE)
     if rl.check_collision_point_rec(mouse_pos, plus_rect):
       self._plus_button._handle_mouse_release(mouse_pos)
       return
-    
+
     super()._handle_mouse_release(mouse_pos)
 
 

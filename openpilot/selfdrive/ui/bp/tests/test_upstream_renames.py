@@ -14,7 +14,7 @@ class TestUpstreamRenames(unittest.TestCase):
     from openpilot.selfdrive.ui.bp.mici.onroad.cameraview_bp import MiciCameraViewBP
     for cls in (CameraViewBP, MiciCameraViewBP):
       view = cls.__new__(cls)  # no window: skip the GL setup in __init__
-      view.close = lambda: None  # and the GL teardown in __del__
+      view.close = lambda: None  # ty: ignore[invalid-assignment]  # and the GL teardown in __del__
       view._bp_hide_camera_view = True
       view._bp_rad_racer_theme = False
       with self.subTest(view=cls.__name__), mock.patch.object(ui_state, "is_onroad", return_value=True):

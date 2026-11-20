@@ -275,6 +275,7 @@ class RadRacerTheme:
   def render_cluster(self, rect: rl.Rectangle, torque_bar):
     self._ensure_loaded()
     font = self._font
+    assert font is not None  # _ensure_loaded sets it
 
     top = self.cluster_top(rect)
     panel = rl.Rectangle(rect.x, top, rect.width, CLUSTER_HEIGHT)

@@ -254,7 +254,7 @@ def feed(msgs: dict) -> None:
         sm.recv_time[service] = now
         sm.recv_frame[service] = sm.frame
     sm.frame += 1
-  sm.update = update
+  sm.update = update  # ty: ignore[invalid-assignment]  # synthetic messages instead of sockets
 
 
 def reset_theme_caches() -> None:
@@ -363,7 +363,7 @@ def main() -> None:
     def lane_center_polygon(*a, **k):
       calls["lane-center line polygon"] += 1
       return blendful_polygon(*a, **k)
-    blendful.draw_polygon = lane_center_polygon
+    blendful.draw_polygon = lane_center_polygon  # ty: ignore[invalid-assignment]  # counts the calls
     if FAMILY == "mici":  # textures the model-source (chestnut) icon really draws; the method returns early when there's none
       from openpilot.selfdrive.ui.mici.onroad.hud_renderer import HudRenderer
       draw_model_source = HudRenderer._draw_model_source
@@ -521,14 +521,14 @@ def draw_mici_settings(layout, draw, attempt) -> None:
 
   def press_and_collect(item) -> list:
     pushed: list = []
-    gui_app.push_widget = pushed.append
+    gui_app.push_widget = pushed.append  # ty: ignore[invalid-assignment]  # collect the pages a press opens
     try:
       if hasattr(item, "plus_clicked"):
         item.plus_clicked()
       else:
         item._handle_mouse_release(rl.Vector2(0, 0))
     finally:
-      gui_app.push_widget = real_push
+      gui_app.push_widget = real_push  # ty: ignore[invalid-assignment]
     return pushed
 
   def visit(widget, path: str, press_all: bool, depth: int = 0) -> None:

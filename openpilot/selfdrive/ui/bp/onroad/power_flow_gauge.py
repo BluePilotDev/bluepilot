@@ -445,7 +445,7 @@ class PowerFlowGauge(Widget):
     presets = SIZE_PRESETS_SIDEBAR if rect.width < FULL_CONTENT_WIDTH * 0.3 else SIZE_PRESETS
     preset = presets.get(self._gauge_size, presets[1])
     bar_h = int(rect.height * preset["bar_ratio"])
-    font_size = preset["font_size"]
+    font_size = int(preset["font_size"])
 
     text_y_start = rect.y + bar_h
     text_height = rect.height - bar_h

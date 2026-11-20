@@ -1,7 +1,7 @@
 import pyray as rl
 from openpilot.common import qrcode
 import subprocess
-from typing import Callable
+from collections.abc import Callable
 
 from openpilot.common.swaglog import cloudlog
 from openpilot.common.params import Params
@@ -21,13 +21,13 @@ class WebServerQRDialog(NavWidget):
     self._params = Params()
     self._qr_texture: rl.Texture | None = None
     self._last_url = ""
-    
+
     # Toggle to disable server (initially enabled since dialog shows when server is on)
     self._disable_toggle = BigParamControl("web routes server", "EnableWebRoutesServer",
                                            toggle_callback=self._handle_toggle)
     # Ensure toggle reflects current state
     self._disable_toggle.refresh()
-    
+
     # Labels (BluePilot: migrated from MiciLabel to UnifiedLabel after upstream removal)
     self._title_label = UnifiedLabel("web routes server", font_size=56, font_weight=FontWeight.BOLD,
                                      text_color=rl.Color(255, 255, 255, int(255 * 0.9)))
@@ -92,13 +92,13 @@ class WebServerQRDialog(NavWidget):
     if not url:
       self._qr_texture = None
       return
-    
+
     # Only regenerate if URL changed
     if url == self._last_url and self._qr_texture:
       return
-    
+
     self._last_url = url
-    
+
     try:
       if self._qr_texture and self._qr_texture.id != 0:
         rl.unload_texture(self._qr_texture)
@@ -140,7 +140,7 @@ class WebServerQRDialog(NavWidget):
       self._url_label.set_max_width(int(qr_size))
       self._url_label.set_position(qr_x, qr_y + qr_size + 16)
       self._url_label.render()
-      
+
       # Scan label
       self._scan_label.set_max_width(int(qr_size))
       self._scan_label.set_position(qr_x, qr_y + qr_size + 16 + 40)
@@ -148,19 +148,19 @@ class WebServerQRDialog(NavWidget):
     else:
       # No IP - message shown in _render_qr_code
       pass
-    
+
     # Render title and toggle on right
     title_y = self._rect.y + padding
     self._title_label.set_max_width(int(right_width))
     self._title_label.set_position(right_x, title_y)
     self._title_label.render()
-    
+
     # Toggle below title
     toggle_y = title_y + 80
     toggle_rect = rl.Rectangle(right_x, toggle_y, right_width, 60)
     self._disable_toggle.set_rect(toggle_rect)
     self._disable_toggle.render()
-    
+
     return -1
 
   def _render_qr_code(self, rect: rl.Rectangle, has_url: bool = True) -> None:
@@ -192,7 +192,7 @@ class WebServerQRDialog(NavWidget):
         # Refresh toggle state after click
         self._disable_toggle.refresh()
         return
-    
+
     super()._handle_mouse_release(mouse_pos)
 
   def __del__(self):
