@@ -295,8 +295,8 @@ the Explorer row. The modules' start then raised the floor. A module previews fr
 2020-24 Explorer (executed: its 85 m lower distance for about 25 s, 0.0475 per rad, above `1.7/v` from
 129 km/h), and taken as 0 where the start-up was not run, so the 2022-24 Maverick and LX6C may preview their
 30 m lower distance, 0.1333 at every speed. The curve is now `min(0.26, max(1.7/v, 0.147))`, 0.147 being
-that 0.1333 with a 10 % margin. The single curve was already 1.2 to 5.3 times each switched-on row's own
-gain, so it held path angle back. Each module's own curve replaces it (Choice). One read data file, on a
+that 0.1333 with a 10 % margin. The single curve was 1.2 to 5.5 times each switched-on row's own gain before
+that floor (1.5 to 6.6 times now), so it held path angle back. Each module's own curve replaces it (Choice). One read data file, on a
 row with path angle off, is above the single curve at 15 km/h (the 2025-26 Corsair's, 0.340 against 0.26).
 The single curve bounds the modules with a path-angle row, not every module read.
 
@@ -364,9 +364,14 @@ Path offset and curvature rate must be inactive on every module.
   module steers for at that speed and every higher one, and at or under the single curve. For BC the
   curve is BD's by choice (2.11).
 - The floor at power-up holds path angle back on three curves for the whole drive, not only its first
-  25 s, because the panda can't tell when the module started: on the Explorer the bound is the 85 m gain
-  (0.0475) at every speed, against 0.0293 at T max above 100 km/h; on the Maverick and LX6C the 30 m gain
-  (0.1333), against 0.027 to 0.04 above 100 km/h. On the F-150's curve it is up to 5 % stricter above 120 km/h.
+  25 s, because the panda can't tell when the module started. On the Explorer the bound is the 85 m gain
+  (0.0475) at every speed, 1.62 times its gain at T max (0.0293) from 100 km/h; against the bound before
+  the floor it moves only above 101 km/h (1.08 times at 110, 1.35 at 140). On the Maverick and LX6C it is
+  the 30 m gain (0.1333), 4.5 times the gain at T max at 100 km/h and 5.0 from 110 km/h; against the bound
+  before, it moves from 42 km/h (1.63 times at 50, 3.25 at 100, 4.43 at 140). Path angle is needed only
+  where a request can change faster than the module moves its curvature copy: below about 125 km/h, and
+  68 km/h on the Maverick; above that the curvature signal alone follows. On the F-150's curve the bound
+  is 5.6 % stricter at 132 km/h, and more from 160 km/h (17 % at 250 km/h).
 - The margin is for what the panda can't see (`core/limits.py`). The module reads its K2 table in fixed
   point, at most 0.45 % above the float lookup (BD's own lookups, executed; the older library's, run on the
   Explorer, Maverick and LX6C, are in float). It reads it at its own speed: on BD that is the larger of the
@@ -382,9 +387,9 @@ Path offset and curvature rate must be inactive on every module.
   path angle in sharp entries at the cap.
 - What each module's own curve buys over the single one (controller only, open loop, with the copies'
   bound and the margin): in sharp curve entries (2.4 m/s² over 0.5 s) at 45 to 60 km/h on the F-150,
-  Lightning and Ranger rows, the module gets 96 to 98 % of the path angle asked, against 94 to 96 %, and
+  Lightning and Ranger rows, the module got 96 to 98 % of the path angle asked, against 94 to 96 %, and
   the tracking error at 60 km/h falls from 0.0025 to 0.0015 1/m on the F-150 and from 0.0021 to 0.0012
-  on the Ranger. The cap and the jerk limit are unchanged.
+  on the Ranger (figures from before the start-up floor; not re-run). The cap and the jerk limit are unchanged.
 - The copies' range assumes a module never moves its copies slower than the rates above. After a
   disengage the panda lets them settle at those rates, so an engagement soon after one in a sharper curve
   can send less path angle for a second or two.
@@ -909,7 +914,7 @@ read from code but never run, or fitted to drives, is labelled that way and coun
 |---|---|---|
 | **Generated from firmware bytes** | a script reads it from the module's flash at its address; a check re-reads it | every row's preview (T, both distance clamps, the K2 table), its curvature and path-angle rates, and its lateral-acceleration limit on its own speed axis (on the newer library as the module applies it, in 1/4096 steps: 0.0998535 at 220 km/h where the table holds 0.0999756, executed on BD and RL14) (`L/core/module_tables.py`, with the SHA-256 of each source block); the panda's per-module gain curves and module rates (`L/safety/ford_gain_curves.h`) |
 | **Executed** | the module's own code was run in an emulator, and the model or the build is held to that run | the 2021-23 F-150 BD library: its eight control blocks, the mode machine, the limiter, the input scalings and the wire's ranges; the order of the two distance clamps; the request rule (ask only while Available or Active); `K2 = f(d)` read straight between points, with the module's fixed point 0.45 % at most; the copies following at once before control. The Ranger's and the 2024 Mustang's (PR3C) controller chains. The 2020-24 Explorer's start-up and whole lateral step (M1MC-AC with MB5C-BD; L1MC-AL's start-up and K2 lookup): its K2 table, distance clamps, preview time from 0 at power-up, rates, and no lateral-acceleration limit. The preview time at start on BD and the Ranger (T max). The 2024-26 F-150's (RL14-AC) library and limiter, ECD, BCD, CCD and BCA alike (BAD, EFD and EAD not run). The Maverick's and LX6C's K2 and distance lookups. BD's speed chain behind its K2 lookup (wheel and brake-module speeds, slew, 1/64 km/h) |
-| **Read, not run** | a person or agent read the decompiled code; nobody has run it | every other row's control law (V1MC, R1MC, SR3C, the Mach-Es, the C2 programs, the Maverick 2022-24 and LX6C beyond their lookups, the Transit, the Super Duty); the Lightning, whose code is BD's instruction for instruction and whose parameters are BD's byte for byte, but whose own image has not been run; the 2026 Maverick and Explorer rows; the steering servo behind the module's angle target; the panda's single gain curve, an envelope over the models' sweeps |
+| **Read, not run** | a person or agent read the decompiled code; nobody has run it | every other row's control law (V1MC, R1MC, SR3C, the Mach-Es, the C2 programs, the Maverick 2022-24 and LX6C beyond their lookups, the Transit, the Super Duty); the Lightning, whose code is BD's instruction for instruction and whose parameters are BD's byte for byte, but whose own image has not been run; the 2026 Maverick and Explorer rows; the steering servo behind the module's angle target; the panda's single gain curve, an envelope over the models' sweeps, except its floor from 42 km/h (0.147: the Maverick's and LX6C's 30 m gain from the bytes, 0.1333, with this project's 10 % margin) |
 | **Measured on drives** | from logged drives: allowed for what no firmware holds (the vehicle), and as a check | the delay learner's start per row; the health check's thresholds; the BC row's whole basis (no BC file was read); per-vehicle gain spread; the path-angle gains on the two driven rows (2.10) |
 | **Ours, or outside** | a design choice of this project, or a number from comma or a standard | comma's caps and jerk limit; the lower CAN FD cap; path angle's unwind time, dead band and restart hold-off; the controller's copy timing (0.8 and 1.25 frames); the 6 % speed allowance in the panda's margin, where the module's speed chain was not run (every program but BD), and the 30 ms sample age and 3 m/s² in BD's; openpilot's default delay |
 

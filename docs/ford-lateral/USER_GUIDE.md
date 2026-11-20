@@ -101,7 +101,7 @@ steers by curvature alone.
 steers Fords well. Each row's numbers are read from that module's software files by a script, not typed
 in. For the 2021-23 F-150 on software BD the module's own steering code was also run in an emulator, and
 the computer model matches it; the Lightning runs the same code, though its own copy hasn't been run yet. For the Ranger and the
-2024 Mustang the main part of it was run, and for the 2020-24 Explorer all of its steering code (though the data file
+2024 Mustang the main part of it was run, and for the 2020-24 Explorer its lane-centering code, from start-up (though the data file
 on some of these trucks, MB5C-14D007-BA, is not in our archive, so its numbers are still the other file's). For the
 other rows the code has been read, not run, and BC's software has not been read at all.
 On two rows they have also been measured on the road with earlier BluePilot versions. On
@@ -227,8 +227,9 @@ Full and Curvature rows without path angle steer the same way. Only Full rows ca
 
 How sure each row's numbers are is a separate question. Every row's numbers are read from its
 module's own files. For the 2021-23 F-150 on BD (and, through the same code, the Lightning and most of
-the Ranger's) and for the 2020-24 Explorer the module's steering code was also run and matches. For every other
-row the code has been read but not run, and for the F-150 on BC no file has been read at all.
+the Ranger's) and for the 2020-24 Explorer the module's steering code was also run and matches. For the 2024 Mustang
+its controller chain, and for the 2024-26 F-150 its steering library and limiter, were run too. For the
+other rows the code has been read but not run, and for the F-150 on BC no file has been read at all.
 
 The text under it (on a comma four, tap **steering support**) gives the reason, the part numbers your
 module answered, and how openpilot recognised your car. If it says **", degraded"** after the support level, the health check found a problem on
