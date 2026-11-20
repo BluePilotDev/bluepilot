@@ -98,14 +98,22 @@ module looks, and how fast it lets curvature and path angle change. Every other 
 steers by curvature alone.
 
 **Why it is on.** The BluePilot developers' 50,000+ miles of steering by path angle alone show that it
-steers Fords well. Each row's numbers come from reading that module's software and from a computer
-model of it. On two rows they have also been measured on the road with earlier BluePilot versions. On
+steers Fords well. Each row's numbers are read from that module's software files by a script, not typed
+in. For the 2021-23 F-150 on software BD the module's own steering code was also run in an emulator, and
+the computer model matches it; the Lightning runs the same code, and for the Ranger the main part of it
+was run. For the other rows the code has been read, not run, and BC's software has not been read at all.
+On two rows they have also been measured on the road with earlier BluePilot versions. On
 the 2020-24 Explorer the truck turned 0.95 to 0.97 times what the model predicts. On the 2021-23 F-150
 with software BD it turned 0.93 to 1.01 times what the row predicts, which passes the release check
 (section 6). What hasn't been driven yet is this build's own steering with path angle on.
 
 If a number were wrong, the car would turn a little more or less than planned in town curves until the
 curvature caught up. The drive checks in section 6 look for that.
+
+**Tight slow turns.** On the fallback and on every car without path angle, the car steers by curvature
+alone. Then it cannot make a turn tighter than about a 50 m radius, and it takes about 7 seconds to build a 50 m curve
+at 30 km/h (20 mph). That is the limit of the curvature signal and of the module's own pace, the same as
+with comma's stock code. Steer those turns yourself.
 
 ## 4. What this build changes
 
@@ -205,14 +213,20 @@ shows one of these:
 
 | Shown | What it means |
 |---|---|
-| **Full** | Your module's exact software is in the table, and its row was checked against a computer model of the module or a drive. Steers by curvature with the row's numbers. Seven of these rows also send path angle (section 3). |
-| **Curvature** | Your module's software is in the table, but its row hasn't been checked against a model or a drive. Steers by curvature with the row's numbers. |
+| **Full** | Your module's exact software is in the table, and its row was compared with a computer model of the module or a drive. For most modules that model is a reading of their code, not checked against the code running. Steers by curvature with the row's numbers. Seven of these rows also send path angle (section 3). |
+| **Curvature** | Your module's software is in the table, but its row hasn't been compared with a model or a drive. Steers by curvature with the row's numbers. |
+| **Not configured on this truck** | On the last drive your module answered that lane centering isn't set up on this truck (or it stopped for a fault for that drive). The build can't steer a truck built without it. |
 | **Fallback** | Your module didn't answer, or its software isn't in the table. Steers by curvature with comma's settings. |
 | **Not supported** | The software is known and this build can't steer it, so the car only records, as a dashcam. No software is marked this way today. |
 | **Off** | You switched on **Disable BP Lateral Control**. Stock openpilot steering runs. |
 | **Not read yet** | The car hasn't been started with this build yet. |
 
 Full and Curvature rows without path angle steer the same way. Only Full rows can have path angle.
+
+How sure each row's numbers are is a separate question. Every row's numbers are read from its
+module's own files. For the 2021-23 F-150 on BD (and, through the same code, the Lightning and most of
+the Ranger's) the module's steering code was also run and matches. For every other row the code has been
+read but not run, and for the F-150 on BC no file has been read at all.
 
 The text under it (on a comma four, tap **steering support**) gives the reason, the part numbers your
 module answered, and how openpilot recognised your car. If it says **", degraded"** after the support level, the health check found a problem on
@@ -247,6 +261,9 @@ A row applies only when your module answers exactly these part numbers. Steering
 2024-25, Mustang Mach-E 2025, Maverick and Bronco Sport 2025, Super Duty 2023 on, and Nautilus 2025 on.
 These are not supported by this build. openpilot runs them as a dashcam only, and so does this build. The
 same goes for any car openpilot doesn't support.
+
+The table also has rows for the 2026 Maverick (on the 2025 Bronco Sport's row) and the 2026 Explorer
+(R1MC-14D003-AH, curvature). openpilot doesn't steer either of them yet.
 
 **Known software, but openpilot can't recognise the car.** The table has rows for the Transit and
 E-Transit 2024 (KK21-14D003-AM), the 2025 Escape (PZ11-14D003-FC) and the Lincoln Corsair (LX6C-14D003-AL).
