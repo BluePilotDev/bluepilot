@@ -729,8 +729,6 @@ module's copy of the curvature never falls behind the controller's.
 
 ### 3.5 Tests
 
-(Counts as of the fix round that added `tests/test_module_tables.py`: library 122 OK.)
-
 Python environment: `UV_PROJECT_ENVIRONMENT=~/tools/venvs/clean-build uv sync --frozen --extra testing
 --extra tools`, then `pyyaml`, `pytest` and `cantools` installed into it. Then `scons -j9` at this
 repo's root. The commands below call that environment as `.venv/bin/python`. Whole suites are
@@ -738,8 +736,8 @@ heavy: run them in CI or on a large machine, not on a shared small one. From `op
 `PYTHONPATH=$PWD`:
 
 ```
-.venv/bin/python -m unittest discover -s opendbc/bluepilot_lateral/tests -t .          # library: 112 OK
-(cd opendbc/safety/tests && ../../../.venv/bin/python -m unittest test_ford test_bluepilot_lateral)  # 650 OK, 107 skipped
+.venv/bin/python -m unittest discover -s opendbc/bluepilot_lateral/tests -t .          # library: 122 OK
+(cd opendbc/safety/tests && ../../../.venv/bin/python -m unittest test_ford test_bluepilot_lateral)  # 652 OK, 107 skipped
 .venv/bin/python -m unittest opendbc.car.tests.test_car_interfaces opendbc.car.ford.tests.test_ford  # 284 OK
 bash opendbc/bluepilot_lateral/safety/tests/bluepilot_coverage.sh                       # 100 % of both headers and modes/ford.h
 ```
