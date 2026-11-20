@@ -1,3 +1,4 @@
+from openpilot.selfdrive.ui.bp.lib.camera_transition import AutomaticCameraFadeMixin
 import pyray as rl
 
 from msgq.visionipc import VisionStreamType
@@ -8,7 +9,7 @@ from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.selfdrive.ui.bp.lib import theme_pack
 
 
-class CameraViewBP(TiciCameraView):
+class CameraViewBP(AutomaticCameraFadeMixin, TiciCameraView):
   """BluePilot camera view overrides."""
 
   def __init__(self, *args, **kwargs):

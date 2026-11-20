@@ -211,6 +211,7 @@ class MiciAugmentedRoadViewBP(CroppedDcamOverlayMixin, MiciCameraViewBP, Augment
     if self._tesla_style_enabled:
       self._tesla_style_renderer.render_traffic(self._content_rect, self._model_renderer)
     # BluePilot: side-window camera sits above geometry and below HUD/warnings.
+    self._draw_camera_transition(self._content_rect)
     self._render_cropped_dcam(self._content_rect)
 
     # BluePilot: Rad Racer sprites (ego + leads) over the road; no gauge cluster on MICI,

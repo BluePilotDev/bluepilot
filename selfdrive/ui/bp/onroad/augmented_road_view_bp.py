@@ -213,6 +213,7 @@ class AugmentedRoadViewBP(CroppedDcamOverlayMixin, CameraViewBP, AugmentedRoadVi
     if self._tesla_style_enabled:
       self._tesla_style_renderer.render_traffic(self._content_rect, self.model_renderer)
     # BluePilot: side-window camera sits above geometry and below HUD/warnings.
+    self._draw_camera_transition(self._content_rect)
     self._render_cropped_dcam(self._content_rect)
 
     # SP fade overlay
@@ -328,6 +329,7 @@ class AugmentedRoadViewBP(CroppedDcamOverlayMixin, CameraViewBP, AugmentedRoadVi
 
     # Green game road (ModelRendererBP handles the 8-bit styling internally)
     self.model_renderer.render(content_rect)
+    self._draw_camera_transition(content_rect)
     self._render_cropped_dcam(content_rect)
 
     # Blindspot red edges stay on — safety overlay
