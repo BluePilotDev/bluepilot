@@ -53,8 +53,8 @@ and `B/` is this repo's root.
   in this guide means bluepilot-lateral, not these.
 - **The twin.** A Python model of a module's lateral controller. For the 2021-23 F-150 (software BD)
   and the Ranger's controller chain it is held to the firmware's own code run in an emulator. For every
-  other module it is a reading of the decompiled code that has not been run. Each claim below says
-  which (3.6).
+  other module it is a reading of the decompiled code (several modules' own code has been run since; the
+  twin is not held to those runs). Each claim below says which (3.6).
 - **The panda.** The comma device's safety microcontroller. It checks every message openpilot sends to
   the car and refuses those outside its rules. Its Ford rules are in `O/opendbc/safety/modes/ford.h`.
   At car init it is given a **safety param**, a number whose bits select which rules run; BluePilot's
@@ -175,10 +175,10 @@ is removed for now, because it feeds the module's integrator and its gains diffe
 trucks. Path angle is a constant in each row (`StrategyRow.path_angle`). It is on for every row whose
 module's preview, c2 rate and c1 rate were read from its files: F-150 2021-23 (BD), F-150 Lightning,
 Explorer 2020-24, Ranger 2024-25, Maverick 2022-24, and the Escape 2020-22 and Bronco Sport 2021-22
-(LX6C-14D003-AL). Of these, only BD's code (and through the same code the Lightning's) and the Ranger's
-controller chain have been run in an emulator; the others are read, not run (3.6). Two pairs take another
-module's numbers, by the project's choice: the F-150's level BC takes BD's (2.11), and the Explorer's
-second pair (L1MC-14D003-AL with MB5C-14D007-BA, a data file not in the archive) takes the first pair's. It is off on every other row and on the fallback
+(LX6C-14D003-AL). Each has had its module's code run in an emulator (3.6): BD's (and through the same code
+the Lightning's), the Ranger's controller chain, the Explorer's, the Maverick's and LX6C's whole lateral step.
+One row takes another module's numbers, by the project's choice: the F-150's level BC takes BD's (2.11). The
+Explorer's second pair's data file (MB5C-14D007-BA) has been read since: its preview numbers are the first pair's. It is off on every other row and on the fallback
 (`test_path_angle_is_on_for_every_row_that_can_use_it`). The evidence for switching it on is the
 BluePilot dev group's 50,000+ miles of path-angle-only control, and the two rows measured on a road
 (2.10).
@@ -195,8 +195,8 @@ BluePilot dev group's 50,000+ miles of path-angle-only control, and the two rows
   (`L/core/strategy.py` `Preview`). The copy starts where the module's start-up leaves T, when the build
   starts (at or after the module), and rises at the module's rate whether or not it steers: the 2020-24
   Explorer's T is 0 at power-up and takes about 25 s to reach 5 s, so until then it previews its lower
-  distance at every speed (executed); the 2021-23 F-150's and the Ranger's start at T max (executed); the
-  rows whose start-up was not run (BC, the Lightning, the 2022-24 Maverick, LX6C) start at 0. That holds only where the row's K2 itself isn't low. The F-150 and
+  distance at every speed (executed); the 2021-23 F-150's, the Ranger's, the 2022-24 Maverick's and LX6C's
+  start at T max (executed); the rows whose start-up was not run (BC, the Lightning) start at 0. That holds only where the row's K2 itself isn't low. The F-150 and
   Lightning rows' K2 was 11 % low at a 15 m preview, the overshoot side, until they took the module's
   K2 table (below).
 - Every row with path angle carries its module's own K2 table, generated from the module's files, and
@@ -260,7 +260,9 @@ differ from stock: no clip to measured curvature (and no measured-curvature band
 and BluePilot's lower cap on CAN FD (3.2).
 
 - **`not_supported`** makes car init set dashcam only, for a module that takes no lane message built
-  here. No row uses it today.
+  here, and its plan is the fallback's. The Transit's row uses it: KK21-14D003-AM has no 0x3D3 in its
+  receive table, and its feature word never holds lane centering (executed, `emu-vle.md` §9). Its reason
+  says so (`strategy.NOT_SUPPORTED`).
 - **Rows kept on the fallback** (Maverick 2025, Super Duty) are in the table so Steering Support can say
   "known, and not yet supported" instead of "not in the table".
 - **Replaced levels (`SUPERSEDED`)** carry a reason the owner can act on: the wording of Ford's service
@@ -293,9 +295,10 @@ the early 2024 Mustang (PR3C) at 0.25 and the Ranger at 0.167 (`scripts/clean-bu
 it became `min(0.26, max(1.7/v, 0.03))` per rad, with the floor because above 205 km/h `1.7/v` fell under
 the Explorer row. The modules' start then raised the floor. A module previews from its T at power-up: 0 on the
 2020-24 Explorer (executed: its 85 m lower distance for about 25 s, 0.0475 per rad, above `1.7/v` from
-129 km/h), and taken as 0 where the start-up was not run, so the 2022-24 Maverick and LX6C may preview their
-30 m lower distance, 0.1333 at every speed. The curve is now `min(0.26, max(1.7/v, 0.147))`, 0.147 being
-that 0.1333 with a 10 % margin. The single curve was 1.2 to 5.5 times each switched-on row's own gain before
+129 km/h). The 2022-24 Maverick and LX6C start at T max (executed), so their 30 m lower distance, 0.1333, is
+reached only below about 31 km/h, under `1.7/v`. The curve is now `min(0.26, max(1.7/v, 0.053))`, 0.053 being
+the Explorer's 0.0475 with a 10 % margin, rounded up. (It was 0.147 while the Maverick's and LX6C's start-up
+was not run and taken as 0.) The single curve was 1.2 to 5.5 times each switched-on row's own gain before
 that floor (1.5 to 6.6 times now), so it held path angle back. Each module's own curve replaces it (Choice). One read data file, on a
 row with path angle off, is above the single curve at 15 km/h (the 2025-26 Corsair's, 0.340 against 0.26).
 The single curve bounds the modules with a path-angle row, not every module read.
@@ -332,11 +335,11 @@ that module's largest K2 at the speed, times a margin of 1.10, and no higher tha
 above every curve with its margin, so it caps none). A module may start or restart at any time, and it previews
 from its T at power-up until T reaches its floor, so each curve takes that T as its floor where it is lower
 (`FORD_BP_PREVIEW_TIME_AT_START` in `safety/ford.h`, `PREVIEW_TIME_AT_START` in `core/limits.py`; not generated,
-because it is what the start-up code does, not a table in the flash): 0 on the Explorer's (executed), the
-Maverick's and LX6C's (not run) and the F-150's (BD loads T max, executed, but the curve also serves BC and the
-Lightning, whose start-up was not run); the Ranger's T max (executed), above its floor. Before, at 140 km/h within
-25 s of the module starting, the Explorer's gain was up to 1.23 times the bound and the Maverick's and LX6C's up
-to 4.1 times (`test_a_module_start_at_highway_speed`). The panda reads the gain at its lowest recent speed
+because it is what the start-up code does, not a table in the flash): 0 on the Explorer's (executed) and the
+F-150's (BD loads T max, executed, but the curve also serves BC and the Lightning, whose start-up was not run);
+the Ranger's, the Maverick's and LX6C's T max (executed), above their floor. Before the floor, at 140 km/h
+within 25 s of the module starting, the Explorer's gain was up to 1.23 times the bound
+(`test_a_module_start_at_highway_speed`). The panda reads the gain at its lowest recent speed
 sample, which is right only if the curve never rises with speed, so each distance point is held to the
 least of the later ones. That moves one point, on the strict side: the F-150's lower distance at
 100 km/h, from 50 m to 46.9 m. With no curve, or bits 6 or 7, the panda keeps the single curve. Bits 0
@@ -363,15 +366,14 @@ Path offset and curvature rate must be inactive on every module.
   index would loosen it to another module's gain. `test_limits.py` holds every curve at or above what its
   module steers for at that speed and every higher one, and at or under the single curve. For BC the
   curve is BD's by choice (2.11).
-- The floor at power-up holds path angle back on three curves for the whole drive, not only its first
+- The floor at power-up holds path angle back on two curves for the whole drive, not only its first
   25 s, because the panda can't tell when the module started. On the Explorer the bound is the 85 m gain
   (0.0475) at every speed, 1.62 times its gain at T max (0.0293) from 100 km/h; against the bound before
-  the floor it moves only above 101 km/h (1.08 times at 110, 1.35 at 140). On the Maverick and LX6C it is
-  the 30 m gain (0.1333), 4.5 times the gain at T max at 100 km/h and 5.0 from 110 km/h; against the bound
-  before, it moves from 42 km/h (1.63 times at 50, 3.25 at 100, 4.43 at 140). Path angle is needed only
-  where a request can change faster than the module moves its curvature copy: below about 125 km/h, and
-  68 km/h on the Maverick; above that the curvature signal alone follows. On the F-150's curve the bound
-  is 5.6 % stricter at 132 km/h, and more from 160 km/h (17 % at 250 km/h).
+  the floor it moves only above 101 km/h (1.08 times at 110, 1.35 at 140). Path angle is needed only
+  where a request can change faster than the module moves its curvature copy: below about 125 km/h; above
+  that the curvature signal alone follows. On the F-150's curve the bound is 5.6 % stricter at 132 km/h, and
+  more from 160 km/h (17 % at 250 km/h). The Maverick's and LX6C's start at T max (executed, NZ6C-AL from
+  power-up), so their bound reads their 3.5 s floor and their floor costs nothing.
 - The margin is for what the panda can't see (`core/limits.py`). The module reads its K2 table in fixed
   point, at most 0.45 % above the float lookup (BD's own lookups, executed; the older library's, run on the
   Explorer, Maverick and LX6C, are in float). It reads it at its own speed: on BD that is the larger of the
@@ -381,8 +383,8 @@ Path offset and curvature rate must be inactive on every module.
   age (at 3 m/s²); that the module's cell holds that very signal (read from its receive code); below about
   5 km/h (BD's curve is flat there); a truck configured without the brake module's speed (no stability
   control); every program but BD. Where the chain was not run the allowance stays this project's choice, 6 %:
-  BC and the Lightning share BD's curve, and the Ranger has its own. With it the least margin over every curve
-  is 1.0949, so 1.10. Without the margin, a speed reading 1 % under the panda's would put the module's gain
+  BC and the Lightning share BD's curve, and the Ranger, the Maverick and LX6C have their own. With it the least
+  margin over every curve is 1.0955 (LX6C's at about 153 km/h), so 1.10. Without the margin, a speed reading 1 % under the panda's would put the module's gain
   about 1 % above the bound. It costs a few % of
   path angle in sharp entries at the cap.
 - What each module's own curve buys over the single one (controller only, open loop, with the copies'
@@ -567,7 +569,7 @@ group's 50,000+ miles of path-angle-only control, and the two rows measured on a
   and the row's gain curve for that row.
 - **The window test** runs every switched-on row with path angle on: zero refused frames.
 - **The other two versions stay as they are.** The base, `clean/ford-lateral`, has every switch off. The
-  test branch `clean/ford-lateral-drive1` has path angle on for the Explorer row only, both its pairs.
+  test branch `clean/ford-lateral-drive1` has path angle on for the Explorer row only, all its pairs.
 
 **What has been on a road.** For each row a car can reach on this branch. "Logged" drives were steered
 by comma's stock command (curvature only); the path-angle measurements used earlier BluePilot builds.
@@ -577,15 +579,15 @@ by comma's stock command (curvature only); the path-angle measurements used earl
 | F-150 2021-23 BD | yes | yes: the twin is held to it | 1 truck | one truck, bp-7.0: 0.93, 1.01 and 1.00 of the row's at 5-12, 12-20 and 20-45 m/s (research note `pathangle-route`) |
 | F-150 2021-23 BC | no (no file) | no | 33 trucks | none |
 | F-150 Lightning | yes | its code is BD's instruction for instruction; its own image not run | 2 trucks | none |
-| Explorer 2020-24 | yes | yes: M1MC-AC with MB5C-BD's start-up and whole lateral step, on two emulators that agree on every tick; L1MC-AL's start-up and K2 lookup. MB5C-BA's numbers are still BD's | 9 trucks | one truck: 0.97 of the model's on an angle-mode drive, 0.95 with Ford's own camera (`twin.md` §10.4) |
-| Ranger 2024-25 | yes | its controller chain | 1 truck | none |
-| Maverick 2022-24 | yes | its K2 and distance lookups only, not its start-up or lateral step | 23 trucks | none |
-| Escape 2020-22, Bronco Sport 2021-22 (LX6C-AL) | yes | as the Maverick's | 3 cars | none |
-| Mach-E 2021-22, 2023-24 | yes | no | 6 cars | none (curvature rows) |
+| Explorer 2020-24 | yes | yes: M1MC-AC with MB5C-BD's start-up and whole lateral step, on two emulators that agree on every tick; L1MC-AL's start-up and K2 lookup; P1MC-AA with PB5C-NB from its own start-up, equal in every path number. MB5C-BA (read since) holds BD's preview numbers | 9 trucks | one truck: 0.97 of the model's on an angle-mode drive, 0.95 with Ford's own camera (`twin.md` §10.4) |
+| Ranger 2024-25 | yes | its controller chain, its applied limit and rates equal to the row | 1 truck | none |
+| Maverick 2022-24 | yes | yes: its whole lateral step from power-up on two emulators, with ABD (T max from the first step) | 23 trucks | none |
+| Escape 2020-22, Bronco Sport 2021-22 (LX6C-AL) | yes | yes: the Maverick's code with CAH | 3 cars | none |
+| Mach-E 2021-22, 2023-24 | yes | yes: GA, FA and HA from start-up to engaged torque | 6 cars | none (curvature rows) |
 
 The truck counts are those lagd's estimator found usable windows on (`assumptions-audit.md` §3.4), and
-33 for BC (`bc-fleet.md`). Rows for the Transit, the 2025 Escape and the cars the owner's guide lists as
-not steered can't be reached on this branch: openpilot here has no platform or fingerprint for them, or
+33 for BC (`bc-fleet.md`). Rows for the Transit (not supported: no lane centering), the 2025 Escape and the
+cars the owner's guide lists as not steered can't be reached on this branch: openpilot here has no platform or fingerprint for them, or
 the build doesn't support them.
 
 **Release-notes wording** (`clean-build.md` §14.5 item 5): engaging in a curve starts from straight and
@@ -672,7 +674,11 @@ commit.
    CAN, where there is no status, the rule follows openpilot and the panda. Otherwise the inactive frame
    is sent: all zero, ramp type 0, precision 1. The reasons: a module configured for Ford's hands-free
    driving stays Unavailable while it is asked, a refused frame is a missing frame to the module, and the inactive
-   frame always passes (`test_never_asks_through_unavailable`).
+   frame always passes (`test_never_asks_through_unavailable`). The driver's column torque (`steeringTorque`,
+   behind `steeringPressed`, the hands-on timer and the path-angle hold-off) is the DBC's decode plus 3/32 Nm:
+   the 2021-23 F-150's module sends trunc((torque + 7.9375) * 16) (its packer, read; other programs' packers not
+   read), so the decode sits 1/16 to 2/16 Nm under the torque, and the 1 Nm press was 1.125 Nm one way and
+   0.94 the other (`TestFordCarState`).
 4. **Limit** (`L/core/carcontroller_ext.py` `step_lateral`). On the fallback on the F-150 MK14 and
    Bronco Sport MK1 platforms, the request first goes through comma's `anti_overshoot`, every frame as
    stock does. Then it is clipped to `lat_accel_limit / v²`.
@@ -823,14 +829,15 @@ module's copy of the curvature never falls behind the controller's.
 | F-150 2021-23 BD (path angle) | ML3V-14D003-BD with ML34-14D007-EDL; -BDL holds the same lane-centering numbers | read; the twin held to the firmware's code run in an emulator; path-angle gain on a road, 0.93 to 1.01 of the row's up to 96 km/h | path angle above 96 km/h; a drive on -BDL | a drive above 100 km/h through `drive_check.py`; any drive on -BDL |
 | F-150 2021-23 BC (path angle) | no file of BC read: BD's numbers, by choice; BC's earlier response measured on 33 trucks | curvature gain and response, from those trucks | that BC's preview, rates, K2 and limiter are BD's; BC trucks reach their limiter at lower lateral acceleration than BD's table | reading ML34-14D007-BDH or -BKH, or the BC program; a BC drive with path angle through `drive_check.py` |
 | F-150 Lightning (path angle) | RL38-14D003-AA with RL38-14D007-DD or -AD | the F-150's code instruction for instruction and its values byte for byte, so the F-150's executed code and drive carry over | its own image run; no Lightning drive with path angle | a Lightning drive through `drive_check.py` |
-| Explorer 2020-24 (path angle) | M1MC-14D003-AC with MB5C-14D007-BD; L1MC-14D003-AL has the same code | executed: M1MC-AC with MB5C-BD's start-up and whole lateral step (two emulators), L1MC-AL's start-up and K2 lookup; path-angle gain on a road, 0.95 to 0.97 of the model's | MB5C-14D007-BA's numbers (not in the archive; still -BD's); the supplier code after the library | reading MB5C-14D007-BA; a drive with this build through `drive_check.py` |
-| Ranger 2024-25 (path angle) | RB3C-14D003-AA with RB3C-14D007-ECC | read; its controller chain run in the emulator | no drive. The row most sensitive to a gain error: 43 % off puts the car 0.5 to 0.7 m off in town curves | a Ranger drive through `drive_check.py` |
-| Maverick 2022-24 (path angle) | NZ6C-14D003-AL with NZ6C-14D007-ABD | read; not run (the twin for it is a translation of the same reading) | its path terms on a road (its path angle stays near zero: a fast curvature rate) | a drive through `drive_check.py` |
-| Escape 2020-22, Bronco Sport 2021-22 (path angle) | LX6C-14D003-AL with LX6C-14D007-CAH | read; not run (as the Maverick's); one public Escape on this level driven | that Escape's data file; no drive with this file known | a drive with LX6C-14D007-CAH known, through `drive_check.py` |
-| Bronco Sport 2025 (and the 2026 Maverick on its row), Escape 2025 | RZ1C-14D003-AC, PZ11-14D003-FC with their data files; SZ1C-14D003-AE with -AAG | read; not run | preview tables not in the row, so no path angle; no drive | the full preview tables from the firmware, then the window test and a drive |
-| Mach-E 2021-22, 2023-24 | LJ9C levels and data files in the rows | every lane-centering value read; the delay learner's start from logged drives | its path terms, in a model or on a drive | a model run of its path terms, and a drive |
-| F-150 2024-26, Explorer 2025 and 2026, Mustang 2025, Mach-E 2025, Mustang 2024, Transit 2024 | their programs and data files | the control law, read; the 2024-26 F-150's library and limiter executed, the 2024 Mustang's controller chain executed | no drive: curvature only | a twin run or a drive; then preview tables for path angle |
-| Maverick 2025, Super Duty 2023 and 2025 (fallback) | their programs | the program read | Maverick 2025: its data file; Super Duty: a model of its law | the SZ1C data files; a model of the Super Duty law |
+| Explorer 2020-24 (path angle) | M1MC-14D003-AC with MB5C-14D007-BD; L1MC-14D003-AL has the same code, with MB5C-14D007-BA (read since: -BD's preview numbers); P1MC-14D003-AA with PB5C-14D007-NB | executed: M1MC-AC with MB5C-BD's start-up and whole lateral step (two emulators), L1MC-AL's start-up and K2 lookup, P1MC-AA with PB5C-NB from its own start-up (equal in every path number); path-angle gain on a road, 0.95 to 0.97 of the model's | MB5C-14D007-BA run; the supplier code after the library | a drive with this build through `drive_check.py` |
+| Ranger 2024-25 (path angle) | RB3C-14D003-AA with RB3C-14D007-ECC | read; its controller chain run in the emulator, its applied limit and rates equal to the row | no drive. The row most sensitive to a gain error: 43 % off puts the car 0.5 to 0.7 m off in town curves | a Ranger drive through `drive_check.py` |
+| Maverick 2022-24 (path angle) | NZ6C-14D003-AL with NZ6C-14D007-ABD | executed: its whole lateral step from power-up on two emulators (T max from the first step, every preview number the row's) | its path terms on a road (its path angle stays near zero: a fast curvature rate) | a drive through `drive_check.py` |
+| Escape 2020-22, Bronco Sport 2021-22 (path angle) | LX6C-14D003-AL with LX6C-14D007-CAH | executed: the Maverick's code with CAH, as the Maverick's; one public Escape on this level driven | that Escape's data file; no drive with this file known | a drive with LX6C-14D007-CAH known, through `drive_check.py` |
+| Bronco Sport 2025 (and the 2026 Maverick on its row), Escape 2025 | RZ1C-14D003-AC, PZ11-14D003-FC with their data files; SZ1C-14D003-AE with -AAG | executed: their one program on each data file (start-up, path law, rates, preview, torque and lateral acceleration limits, mode rules); open loop | preview tables not in the row, so no path angle; no drive | the full preview tables from the firmware, then the window test and a drive |
+| Mach-E 2021-22, 2023-24 | LJ9C levels and data files in the rows | executed: GA, FA and HA from start-up to engaged torque (AMA, ARA, VBA by bytes); the delay learner's start from logged drives | its path terms on a drive | a drive |
+| F-150 2024-26, Explorer 2025 and 2026, Mustang 2025, Mach-E 2025 (and the 2026 Mach-E, SJ9C-14D003-BA with -CAA), Mustang 2024 | their programs and data files | the control law, read; executed: the 2024-26 F-150's library and limiter, the 2024 Mustang's controller chain (its applied limit the row's), the 2025 Mach-E's program on AAF, ABG, ADF and on BA with CAA | no drive: curvature only | a drive; then preview tables for path angle |
+| Transit 2024 (not supported) | KK21-14D003-AM with LK41-14D007-AH or NK41-14D007-BC | executed from power-up with LK41-AH: no 0x3D3 in its receive table, Denied on every tick | KK21-14D003-AL and other data files, not read | those files read |
+| Maverick 2025, Super Duty 2023 and 2025 (fallback) | their programs | Maverick 2025: the program read; Super Duty: executed on both pairs, torque limit 4.0 in the column frame (0.898 at the motor) | Maverick 2025: its data file; Super Duty: no row of its own | the SZ1C data files; a Super Duty row with its executed numbers |
 
 ### 3.4 Logs and the drive check
 
@@ -913,8 +920,8 @@ read from code but never run, or fitted to drives, is labelled that way and coun
 | Level | Means | Numbers in this build |
 |---|---|---|
 | **Generated from firmware bytes** | a script reads it from the module's flash at its address; a check re-reads it | every row's preview (T, both distance clamps, the K2 table), its curvature and path-angle rates, and its lateral-acceleration limit on its own speed axis (on the newer library as the module applies it, in 1/4096 steps: 0.0998535 at 220 km/h where the table holds 0.0999756, executed on BD and RL14) (`L/core/module_tables.py`, with the SHA-256 of each source block); the panda's per-module gain curves and module rates (`L/safety/ford_gain_curves.h`) |
-| **Executed** | the module's own code was run in an emulator, and the model or the build is held to that run | the 2021-23 F-150 BD library: its eight control blocks, the mode machine, the limiter, the input scalings and the wire's ranges; the order of the two distance clamps; the request rule (ask only while Available or Active); `K2 = f(d)` read straight between points, with the module's fixed point 0.45 % at most; the copies following at once before control. The Ranger's and the 2024 Mustang's (PR3C) controller chains. The 2020-24 Explorer's start-up and whole lateral step (M1MC-AC with MB5C-BD; L1MC-AL's start-up and K2 lookup): its K2 table, distance clamps, preview time from 0 at power-up, rates, and no lateral-acceleration limit. The preview time at start on BD and the Ranger (T max). The 2024-26 F-150's (RL14-AC) library and limiter, ECD, BCD, CCD and BCA alike (BAD, EFD and EAD not run). The Maverick's and LX6C's K2 and distance lookups. BD's speed chain behind its K2 lookup (wheel and brake-module speeds, slew, 1/64 km/h) |
-| **Read, not run** | a person or agent read the decompiled code; nobody has run it | every other row's control law (V1MC, R1MC, SR3C, the Mach-Es, the C2 programs, the Maverick 2022-24 and LX6C beyond their lookups, the Transit, the Super Duty); the Lightning, whose code is BD's instruction for instruction and whose parameters are BD's byte for byte, but whose own image has not been run; the 2026 Maverick and Explorer rows; the steering servo behind the module's angle target; the panda's single gain curve, an envelope over the models' sweeps, except its floor from 42 km/h (0.147: the Maverick's and LX6C's 30 m gain from the bytes, 0.1333, with this project's 10 % margin) |
+| **Executed** | the module's own code was run in an emulator, and the model or the build is held to that run | the 2021-23 F-150 BD library: its eight control blocks, the mode machine, the limiter, the input scalings and the wire's ranges; the order of the two distance clamps; the request rule (ask only while Available or Active); `K2 = f(d)` read straight between points, with the module's fixed point 0.45 % at most; the copies following at once before control. The Ranger's and the 2024 Mustang's (PR3C) controller chains. The 2020-24 Explorer's start-up and whole lateral step (M1MC-AC with MB5C-BD; L1MC-AL's start-up and K2 lookup): its K2 table, distance clamps, preview time from 0 at power-up, rates, and no lateral-acceleration limit. The preview time at start on BD, the Ranger, the 2022-24 Maverick and LX6C (T max). The 2024-26 F-150's (RL14-AC) library and limiter, ECD, BCD, CCD and BCA alike (BAD, EFD and EAD not run). The 2022-24 Maverick's whole lateral step from power-up (NZ6C-AL with ABD, and with LX6C's CAH). The Mach-E 2021-24 (LJ9C-GA, -FA, -HA) from start-up to engaged torque. The C2 program on the 2025 Bronco Sport's, Escape's and Mach-E's files, and SJ9C-BA with CAA. P1MC-AA with PB5C-NB. The Ranger's and 2024 Mustang's applied limits. The Super Duty (PC3C) on both pairs. The Transit (KK21-AM): no lane centering. BD's speed chain behind its K2 lookup (wheel and brake-module speeds, slew, 1/64 km/h) |
+| **Read, not run** | a person or agent read the decompiled code; nobody has run it | every other row's control law (V1MC, R1MC, SR3C); the Lightning, whose code is BD's instruction for instruction and whose parameters are BD's byte for byte, but whose own image has not been run; MB5C-14D007-BA (its preview numbers are -BD's by bytes); the 2026 Explorer row; the steering servo behind the module's angle target; the panda's single gain curve, an envelope over the models' sweeps, except its floor from 115 km/h (0.053: the Explorer's executed 85 m gain at its start, 0.0475, with this project's 10 % margin) |
 | **Measured on drives** | from logged drives: allowed for what no firmware holds (the vehicle), and as a check | the delay learner's start per row; the health check's thresholds; the BC row's whole basis (no BC file was read); per-vehicle gain spread; the path-angle gains on the two driven rows (2.10) |
 | **Ours, or outside** | a design choice of this project, or a number from comma or a standard | comma's caps and jerk limit; the lower CAN FD cap; path angle's unwind time, dead band and restart hold-off; the controller's copy timing (0.8 and 1.25 frames); the 6 % speed allowance in the panda's margin, where the module's speed chain was not run (every program but BD), and the 30 ms sample age and 3 m/s² in BD's; openpilot's default delay |
 

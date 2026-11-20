@@ -101,9 +101,11 @@ steers by curvature alone.
 steers Fords well. Each row's numbers are read from that module's software files by a script, not typed
 in. For the 2021-23 F-150 on software BD the module's own steering code was also run in an emulator, and
 the computer model matches it; the Lightning runs the same code, though its own copy hasn't been run yet. For the Ranger and the
-2024 Mustang the main part of it was run, and for the 2020-24 Explorer its lane-centering code, from start-up (though the data file
-on some of these trucks, MB5C-14D007-BA, is not in our archive, so its numbers are still the other file's). For the
-other rows the code has been read, not run, and BC's software has not been read at all.
+2024 Mustang the main part of it was run, and for the 2020-24 Explorer its lane-centering code, from start-up (the data file
+on some of these trucks, MB5C-14D007-BA, read since from a 2021 Explorer, holds the same numbers). For the 2022-24
+Maverick, the 2020-22 Escape and Bronco Sport, the Mach-E 2021-24 and the 2025 cars on one shared program (Bronco
+Sport, Escape, Mach-E) the lane-centering code was run too. For the other rows the code has been read, not run,
+and BC's software has not been read at all.
 On two rows they have also been measured on the road with earlier BluePilot versions. On
 the 2020-24 Explorer the truck turned 0.95 to 0.97 times what the model predicts. On the 2021-23 F-150
 with software BD it turned 0.93 to 1.01 times what the row predicts, which passes the release check
@@ -219,7 +221,7 @@ shows one of these:
 | **Curvature** | Your module's software is in the table, but its row hasn't been compared with a model or a drive. Steers by curvature with the row's numbers. |
 | **Lane centering denied by the steering module** | On the last drive your module refused lane centering. Either lane centering isn't set up on this truck, and the build can't steer a truck built without it, or the module stopped for a fault for that drive, which the next start clears. |
 | **Fallback** | Your module didn't answer, or its software isn't in the table. Steers by curvature with comma's settings. |
-| **Not supported** | The software is known and this build can't steer it, so the car only records, as a dashcam. No software is marked this way today. |
+| **Not supported** | The software is known and this build can't steer it, so the car only records, as a dashcam. The 2024 Transit's KK21-14D003-AM is marked this way: its module has no lane centering at all. |
 | **Off** | You switched on **Disable BP Lateral Control**. Stock openpilot steering runs. |
 | **Not read yet** | The car hasn't been started with this build yet. |
 
@@ -228,8 +230,10 @@ Full and Curvature rows without path angle steer the same way. Only Full rows ca
 How sure each row's numbers are is a separate question. Every row's numbers are read from its
 module's own files. For the 2021-23 F-150 on BD (and, through the same code, the Lightning and most of
 the Ranger's) and for the 2020-24 Explorer the module's steering code was also run and matches. For the 2024 Mustang
-its controller chain, and for the 2024-26 F-150 its steering library and limiter, were run too. For the
-other rows the code has been read but not run, and for the F-150 on BC no file has been read at all.
+its controller chain, and for the 2024-26 F-150 its steering library and limiter, were run too, and so was
+the code of the 2022-24 Maverick, the 2020-22 Escape and Bronco Sport, the Mach-E 2021-24, the 2025 Bronco
+Sport, Escape and Mach-E, the Super Duty and the Transit. For the 2025 Explorer and Mustang and the 2026
+Explorer the code has been read but not run, and for the F-150 on BC no file has been read at all.
 
 The text under it (on a comma four, tap **steering support**) gives the reason, the part numbers your
 module answered, and how openpilot recognised your car. If it says **", degraded"** after the support level, the health check found a problem on
@@ -248,6 +252,7 @@ A row applies only when your module answers exactly these part numbers. Steering
 | F-150 Lightning | RL38-14D003-AA | RL38-14D007-DD or -AD |
 | Explorer 2020-24 | M1MC-14D003-AC | MB5C-14D007-BD |
 | Explorer 2020-24 | L1MC-14D003-AL | MB5C-14D007-BA |
+| Explorer 2023 | P1MC-14D003-AA | PB5C-14D007-NB |
 | Ranger 2024-25 | RB3C-14D003-AA | RB3C-14D007-ECC |
 | Maverick 2022-24 | NZ6C-14D003-AL | NZ6C-14D007-ABD |
 | Escape 2020-22 and Bronco Sport 2021-22 | LX6C-14D003-AL | LX6C-14D007-CAH |
@@ -265,13 +270,15 @@ A row applies only when your module answers exactly these part numbers. Steering
 These are not supported by this build. openpilot runs them as a dashcam only, and so does this build. The
 same goes for any car openpilot doesn't support.
 
-The table also has rows for the 2026 Maverick (on the 2025 Bronco Sport's row) and the 2026 Explorer
-(R1MC-14D003-AH, curvature). openpilot doesn't steer either of them yet.
+The table also has rows for the 2026 Maverick (on the 2025 Bronco Sport's row), the 2026 Mach-E
+(SJ9C-14D003-BA with -CAA, on the 2025 Mach-E's row) and the 2026 Explorer (R1MC-14D003-AH, curvature).
+openpilot doesn't steer any of them yet.
 
-**Known software, but openpilot can't recognise the car.** The table has rows for the Transit and
-E-Transit 2024 (KK21-14D003-AM), the 2025 Escape (PZ11-14D003-FC) and the Lincoln Corsair (LX6C-14D003-AL).
-openpilot in this build has no Transit or Corsair, and its Escape is the 2020-22 and 2023-24 car, not the
-2025 one. So none of them can be steered by this build yet. **Not checked:** whether a 2025 Escape is
+**Known software, but openpilot can't recognise the car.** The table has rows for the 2025 Escape
+(PZ11-14D003-FC) and the Lincoln Corsair (LX6C-14D003-AL). openpilot in this build has no Corsair, and its
+Escape is the 2020-22 and 2023-24 car, not the 2025 one. So neither can be steered by this build yet. The
+Transit and E-Transit 2024 (KK21-14D003-AM) is in the table as **Not supported**: its module takes no lane
+centering request at all, so no build can steer it that way. **Not checked:** whether a 2025 Escape is
 recognised anyway.
 
 **2021-23 F-150s on version BC.** Most 2021-23 F-150s run software version BC (42 of the 45 in
