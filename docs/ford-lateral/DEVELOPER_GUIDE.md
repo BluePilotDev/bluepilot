@@ -11,8 +11,7 @@ this way. You don't need to know Ford steering already: section 1.1 defines the 
 
 The owner's version is [USER_GUIDE.md](USER_GUIDE.md). Installing is in [INSTALL.md](INSTALL.md).
 
-**Sources.** Code claims are as of the submodule commits `clean/ford-lateral` pins: opendbc `3a3df995`
-and the library `369ead8`. The code lives in one repository, bluepilot-clean, as three branches (2.12;
+**Sources.** Code claims are as of the submodule commits `clean/ford-lateral` pins. The code lives in one repository, bluepilot-clean, as three branches (2.12;
 INSTALL.md has the address). Research notes are cited by file name, for example `approach-comparison.md`. They are the
 project's research notes (to be published), and the scripts and twin they name are in the same set.
 Where a claim wasn't checked, it says so.
@@ -65,6 +64,12 @@ and `B/` is this repo's root.
   starts from (2.12).
 - **lagd.** openpilot's delay learner. It estimates the lateral delay from driving, and the driving
   model plans ahead by that delay.
+- **Lag and delay.** Two different measures, kept apart in this guide. A row's **lag**
+  (`StrategyRow.lag`) is the time from a command to 63 % of the car's response, at 30, 60, 100 and
+  130 km/h. Rows got it in different ways (2.8 lists which). It is published in the status and the
+  health check falls back on it; nothing steers by it. The **delay** is what lagd estimates: the time
+  shift that best lines up requested and measured lateral acceleration. The driving model plans with
+  the delay. A row's lag is not its delay.
 
 ### 1.2 The problem
 
@@ -77,7 +82,7 @@ the variation is **between vehicles, not within one truck**:
 - **Below about 80 km/h the binding limit is the module's own rate limit on its copy of c2:**
   0.003 1/m per second on the decoded F-150-family strategies. That is 0.2 m/s³ of lateral jerk at
   30 km/h. No sender that uses curvature alone can follow a town curve that builds faster than that,
-  whatever its lag or outer loop (`approach-comparison.md` §1-2, `firmware-core.md` §4.2).
+  whatever its delay or outer loop (`approach-comparison.md` §1-2, `firmware-core.md` §4.2).
 - **The module's path law is pure pursuit at its own preview distance.** It steers for
   `c2 + K2(d)·c1 + K1(d)·(c0 + I)`, where I is its integrator on the path offset. K1 and K2 are pure-pursuit gains on offset
   and angle (K2 as in 1.1), and d comes from per-module tables (`firmware-core.md` §4.3,
@@ -104,15 +109,17 @@ can be supported. The logic is meant to be fit for upstream; the packaging isn't
    settings.
 2. **A table keyed on the module's own answers:** exact (F188, F10A) pairs, read fresh at every start.
    A row carries that module's constants. A module without a row gets the **fallback**: comma's stock
-   command without its clip to measured curvature.
+   command, including its `anti_overshoot` smoothing on the 2021-23 F-150 and Bronco Sport platforms,
+   without its clip to measured curvature, and with BluePilot's lower cap on CAN FD (2.3).
    With path angle off, a row can change up to three things against the fallback, where it has the
    value: the lateral-acceleration limit (2.9), lagd's starting delay (2.8), and the ramp type (2 on
-   most rows, 0 on the fallback and BC). The health check delays the command by lagd's learnt delay, else the
-   row's lag, else 0.4 s (2.7).
+   most rows, 0 on the fallback and BC). Rows don't smooth the request. The health check delays the
+   command by lagd's delay, else the row's lag, else 0.4 s (2.7).
 3. **Path angle (approach A′)** on rows whose preview is known. Curvature moves at the module's rate,
    and path angle carries what that rate still holds back, in the module's own K2. It is a per-row
    switch, **off on every row** in this build.
-4. **The panda bounds the command by lateral acceleration and jerk** (comma's numbers), on the
+4. **The panda bounds the command by lateral acceleration and jerk** (comma's numbers, except a lower
+   cap of BluePilot's own on CAN FD, 3.2), on the
    curvature signal alone and on the implied curvature at the highest K2 any module has. A startup bit
    allows path angle only for a row that has it on.
 5. **A read-only health check** and a **Steering Support row** in the settings that say how the car is
@@ -125,12 +132,15 @@ can be supported. The logic is meant to be fit for upstream; the packaging isn't
 **Problem.** Curvature alone is slow in town because of the module's c2 rate (1.2). bp-dev's answer,
 angle mode, behaved differently on every vehicle line.
 
-**Background.** comma moved Ford to curvature in 2023 as the more universal interface. The BluePilot
-dev group's 50,000+ miles of path-angle-only control show that angle control without the module's
-curvature filter tracks better. The research explains both: c2 goes through the module's rate limit,
-and c1 doesn't, but c1's effect depends on each module's K2.
+**Background.** comma moved Ford to curvature in 2023; its PR says "Curvature allows for better control
+instead of path angle signal" (openpilot#27091). The BluePilot dev group's account is that the reason was
+universality, and its experience over 50,000+ miles of path-angle-only control is that angle control
+without the module's curvature filter tracks better. One such route is measured: steps below 60 km/h
+reach 63 % in 0.14 s, against 0.28 s on curvature trucks, on 10 steps against 50 (research note
+`pathangle-route`). The research explains both views: c2 goes through the module's rate limit, and c1
+doesn't, but c1's effect depends on each module's K2.
 
-**Options.** `approach-comparison.md` §3 scores 17 approaches (A to Q) on native feel, authority across
+**Options.** `approach-comparison.md` §3 scores 18 approaches (A, A′ and B to Q) on native feel, authority across
 speeds, sameness across Fords, fit with openpilot, robustness and cost. The main ones:
 
 - **A, the earlier plan:** curvature plus a lag value and c0/c1 lane positioning per row. c0 feeds the
@@ -168,8 +178,10 @@ trucks. Path angle is a constant in each row (`StrategyRow.path_angle`), off eve
   §14.3). Whether that feels responsive or twitchy is for the first drive to
   show. It is one reason path angle ships off.
 - The controller keeps its own copy of the module's preview time. Where the copy differs from the
-  module's, it errs to a higher K2: less path angle and a little less tracking, never overshoot
-  (`L/core/strategy.py` `Preview`).
+  module's, it errs to a higher K2: less path angle and a little less tracking, not overshoot
+  (`L/core/strategy.py` `Preview`). That holds only where the row's K2 itself isn't low. The F-150 and
+  Lightning rows' K2 was 11 % low at a 15 m preview, the overshoot side, until they took the module's
+  K2 table (below).
 - Older-firmware rows hold K2 as 4.17/d, the most the modules' own K2 table (ten points over distance)
   reaches over the rows' distances. Against the twin, the row's gain is 1.001 to 1.045 times the module's, never below
   (`clean-build.md` §5).
@@ -195,11 +207,12 @@ is no reason to share a row.
 lists its pairs (`StrategyRow.modules`). Several data files share a row only where the note shows equal
 lane-centering numbers (`test_data_files_with_the_same_numbers_share_a_row`). A level across
 generations never shares a row (`test_the_mach_e_generations_never_share_a_row`). No calibration (F124)
-is pinned yet: F124 hasn't been read from a truck, and the 2022-24 Maverick's module has none.
+is pinned yet: no F124 has been read with this code (the Explorer's, M1MC-14D004-AB, is known from
+Ford's records and a read with another tool), and the 2022-24 Maverick's module has none.
 
 **One exception, the BC row (2.11).** It uses `ANY_DATA_FILE`, which a test allows only on a curvature
 row with comma's stock ramp type and precision. The row still carries BD's limit table and BC's lag, which
-change what is sent above about 105 km/h on CAN FD and where lagd starts, so it holds only while every BC
+change what is sent above about 109 km/h on CAN FD and where lagd starts, so it holds only while every BC
 data file has those numbers; none has been read. Even there the module must
 answer F10A: `match_strategy` returns "didn't answer" before it looks at any row when either key is
 empty.
@@ -212,16 +225,24 @@ and 6 have no row (`clean-build.md` §14.3, from `scripts/clean-build/table_cove
 
 **Problem.** What to send to a module nobody has read.
 
-**Options.** A conservative guess at the module's rate and lag, or comma's stock command.
+**Options.** A conservative guess at the module's rate and delay, or comma's stock command.
 
 **Evidence.** For an unread strategy, its rate is unknown. A 0.003 limiter fits the Maverick and
 Explorer fleet data worse than no limiter (`verify-cross-vehicle.md` §6, via `change-analysis.md` §3).
-comma's command is the one with fleet evidence: gain 0.97 to 1.05 by platform median on 102 vehicles of 11
-platforms (`cross-vehicle.md`); per vehicle 0.90 to 1.18 (`assumptions-audit.md` item 19).
+comma's command is the one with fleet evidence: on 102 vehicles of 11 platforms, platform medians 0.96 to
+1.05 and per vehicle 0.83 to 1.18, on comma's clipped command (`cross-vehicle.md`,
+`verify-mythos-limits-guides.md` §1.1).
 
 **Choice.** comma's command, because it is the only one with fleet evidence. `FALLBACK_ROW` is curvature
 only, ramp type 0, precision 1, with nothing of a module's own. It is a row like any other, so the
-controller always reads exactly one row. The fallback has no measured-curvature band either (2.4).
+controller always reads exactly one row. On the platforms where comma's stock code smooths the request
+(`CAR.FORD_F_150_MK14` and `CAR.FORD_BRONCO_SPORT_MK1`), the fallback smooths it the same way
+(`anti_overshoot`, copied in `L/core/carcontroller_ext.py` and pinned to comma's body), because the
+fallback is for modules nobody has read. Our fits put most logged 2021-23 F-150s (level BC) and the
+one logged Bronco Sport at a damping of about 0.40, the least damped Fords logged
+(`assumptions-audit.md` §3.7). A row on a read module takes the request as it is. Two things still
+differ from stock: no clip to measured curvature (and no measured-curvature band in the panda, 2.4),
+and BluePilot's lower cap on CAN FD (3.2).
 
 - **`not_supported`** makes car init set dashcam only, for a module that takes no lane message built
   here. No row uses it today.
@@ -323,18 +344,24 @@ costs the start 0.1 s per identifier, plus 0.2 s more for each key identifier. O
 is read. Camera status and fault-code reads are future improvements, after a truck test
 (`clean-build.md` §10).
 
-**Not checked.** Whether F10A answers in the default session on a real truck; no truck has been read
-with this code. If it doesn't, every car is on the fallback. Which diagnostic session EE80 needs isn't known
-either. It is read anyway, because a module that refuses it simply gives no answer, and the first truck
-log will show which. DE01 isn't decoded: where its fields sit is a hypothesis for most modules.
+**From the firmware.** Each program's own read-identifier check allows F10A in the default session on
+every program with a row except the Super Duty's, which wasn't decoded and is on the fallback anyway.
+EE80 is allowed in the default session on every program decoded (`assumptions-audit.md` §3.1, item 47).
+BC's software was never read.
+
+**Not checked.** Whether F10A answers on a real truck; no truck has been read with this code. If it
+doesn't, that car is on the fallback. DE01 isn't decoded: where its fields sit is a hypothesis for most
+modules.
 
 ### 2.7 The health check and its gain windows
 
 **Problem.** Tell the owner, and us, when a car doesn't steer as its row says, without changing the
 command.
 
-**Evidence.** Logged Fords follow comma's curvature command at 0.90 to 1.18 per vehicle, platform medians
-0.96 to 1.05 (`verify-cross-vehicle.md`, `assumptions-audit.md` item 19). The
+**Evidence.** Logged Fords follow comma's clipped curvature command at 0.83 to 1.18 per vehicle, platform
+medians 0.96 to 1.05 (`verify-cross-vehicle.md`, `verify-mythos-limits-guides.md` §1.1). Run over the
+logged fleet with each car's lagd delay, the check puts 8 of 575 one-minute windows outside its range
+and flags no vehicle (`assumptions-audit.md` §3.5). The
 review of the first version found that its gain check couldn't reach the "degraded" threshold and gave
 noisy readings (`clean-build.md` §14.1). A yaw zero of
 0.025 rad/s moved one-minute gains between 0.9 and 1.6 on a car that follows its command.
@@ -342,8 +369,8 @@ noisy readings (`clean-build.md` §14.1). A yaw zero of
 **Choice** (`L/core/health.py`). Read-only signals, because the check must never change the steering:
 
 - **Curvature gain.** A window is at least a minute of hands-off driving above 9 m/s with enough steering
-  in it (`MIN_EXCITATION`). The command is delayed by lagd's learnt delay (`LateralInputs.lateralDelay`),
-  else the row's lag, else 0.4 s, and the yaw zero measured at standstill is removed. With a delay of 0 s,
+  in it (`MIN_EXCITATION`). The command is delayed by lagd's delay (`LateralInputs.lateralDelay`), else
+  the row's lag, else 0.4 s, and the yaw zero measured at standstill is removed. With a delay of 0 s,
   as the fallback once had, one logged Lightning on the fallback read 0.59 to 0.90 and went degraded; with
   lagd's delay no logged vehicle of 84 does (`assumptions-audit.md` §3.5). No window counts until that zero is known. A window is out of range outside
   0.85 to 1.15, and three out-of-range windows in a row mean degraded. Windows carry across drives of
@@ -358,7 +385,10 @@ noisy readings (`clean-build.md` §14.1). A yaw zero of
   "allowed", so an ordinary disengage, which the controller hears up to 100 ms late, doesn't latch
   "degraded" (`clean-build.md` §14.1). A single blocked message is enough.
 
-The panda and module signals are per drive. The gain signal clears when a window reads in range.
+Each signal clears in its own way. The module's is per frame, not latched: it shows only while the
+module reports Faulty (`L/core/health.py` `update`). The panda's count lasts the drive. The gain signal
+carries across drives and clears when a window reads in range. The stored reason in `FordLateralSupport`
+is cleared at every start and rewritten when the check changes its mind.
 
 Response time is not estimated. `commandedCurvature` and `measuredCurvature` are in the status every
 frame, for offline analysis.
@@ -368,19 +398,24 @@ steering ones, so a refused non-steering message can show "degraded".
 
 ### 2.8 Lag per row and the delay learner's start
 
-**Problem.** openpilot plans ahead by the lateral delay. lagd starts at `steerActuatorDelay + 0.2 s`
+**Problem.** openpilot plans ahead by the delay (1.1). lagd starts at `steerActuatorDelay + 0.2 s`
 (0.4 s on every Ford) and learns above 50 mph.
-"Lag" here is the time from command to 63 % of the response.
 
-**Options.** Put the row's lag in the driving model's delay directly, start lagd from it, or leave it.
+**Options.** Put the row's lag in the driving model's delay directly, start lagd from it, start lagd
+from the delay lagd learns on that module's drives, or leave it.
 
-**Evidence.** The rows' lags don't share one definition. The F-150's is from the command on the wire, with
-the rate limit not acting. The Explorer's, Ranger's and Maverick's are measured behind the module's own slewed
-command, 0.1 to 0.2 s short of what lagd measures (`clean-build.md` §6 item 4).
+**Evidence.** The rows' lags (1.1) were made four ways (`assumptions-audit.md` item 25):
 
-lagd's own estimator, run over logged drives with its own gates, learns another number again: 0.50 s on
-BD, where the twin's 63 % time is 0.39 s, and 0.34 s on BC, where the fleet's delay fit is 0.28 s
-(`assumptions-audit.md` §3.4).
+| Rows | How the lag was made |
+|---|---|
+| F-150 2021-23 BD, Lightning (BD's numbers), Bronco Sport 2025, Escape 2025 | the twin's time to 63 % of a step, from the command on the wire, rate limit not acting |
+| F-150 2021-23 BC | a delay fit, command to yaw, on 33 trucks' public drives (`bc-fleet.md`) |
+| Explorer 2020-24, Ranger, Maverick 2022-24 | the twin behind the module's own slewed command, matched to drives: 0.1 to 0.2 s short of lagd's delay (`clean-build.md` §6 item 4) |
+| Mach-E 2021-24, LX6C | dead time plus time constant on public drives (seven Mach-Es; one Escape) |
+
+None of these is lagd's delay. lagd's own estimator, run over logged drives with its own gates, learns
+another number again: 0.50 s on BD, where the row's lag at 100 km/h is 0.39 s, and 0.34 s on BC, where
+it is 0.28 s (`assumptions-audit.md` §3.4).
 
 **Choice.** Start lagd from what lagd itself learns on logged drives of the row's strategy (median over
 vehicles), because a learnt value still takes over and only the starting point changes. The mechanism is
@@ -402,8 +437,10 @@ route's video.
 
 ### 2.9 Curve speed, and the planner's clip from the module's limit
 
-**Problem** (approach I in 2.1). Above about 105 km/h the module's own lateral-acceleration table is the
-ceiling, and the only lever left is speed.
+**Problem** (approach I in 2.1). Where the module's own lateral-acceleration table is below the panda's
+cap, it is the ceiling, and the only lever left is speed. On the CAN FD F-150 rows that is above about
+109 km/h, where the table falls under the 2.41 m/s² cap. On a CAN row with a table it is every speed:
+the 2022-24 Maverick's 2.3 against 3.6.
 
 **Choice.** Tell the planner the limit, so a turn the module won't take shows as a warning instead of
 being clipped silently. The status publishes `lateralAccelLimit`: the panda's cap, or the row's limit
@@ -413,14 +450,16 @@ request beyond it shows as "turn exceeds steering limit". Road roll can't widen 
 it where it is below its own 2.0 m/s² (`B/openpilot/sunnypilot/selfdrive/controls/controlsd_ext.py`,
 `.../smart_cruise_control/vision_controller.py`).
 
-**Cost.** The rows' limits drop under 2.0 only from about 130 to 160 km/h, so at legal speeds curve
-speed changes nothing today. The limit is read at the car's speed, which errs low. Not checked on a
+**Cost.** Most rows' limits drop under 2.0 only from about 130 to 160 km/h, so at legal speeds curve
+speed changes nothing there. The exception is the 2022-24 Maverick row, under 2.0 from about 116 km/h
+(72 mph). The limit is read at the car's speed, which errs low. Not checked on a
 drive.
 
 ### 2.10 Two steps, one release
 
-**Problem.** Path angle's numbers rest on firmware reads and the twin, and no drive has sent it. The
-review found a busier wheel on real requests (`clean-build.md` §14.1).
+**Problem.** Path angle's numbers rest on firmware reads and the twin, and no drive has sent it with this
+build's controller. Two rows' gains have been measured on the road with earlier BluePilot (table below).
+The review found a busier wheel on real requests (`clean-build.md` §14.1).
 
 **Choice.** The base ships with path angle off, and a family switches on only after a drive confirms its
 row, because the numbers haven't been driven (`clean-build.md` §14.5).
@@ -433,10 +472,31 @@ row, because the numbers haven't been driven (`clean-build.md` §14.5).
    in the row, and it also sets bit 6 for that row.
 3. **The confirming drive needs path angle on,** and the switch is a constant, so the step-one build
    can't produce it. The first drive uses a test branch, **`clean/ford-lateral-drive1`**, identical
-   except that the Explorer row's L1MC-14D003-AL / MB5C-14D007-BA pair has path angle on. The window
-   test already runs that case with zero refused frames.
-4. **One release:** after the first confirming drive, on a 2020-24 Explorer, the rows confirmed by then
-   switch on and the build ships once. Unconfirmed rows ship off.
+   except that the Explorer row has path angle on. The switch is the row's, so both its pairs get it:
+   M1MC-14D003-AC / MB5C-14D007-BD and L1MC-14D003-AL / MB5C-14D007-BA. The window test already runs
+   that case with zero refused frames.
+4. **One release:** after the first confirming drive with this build, on a 2020-24 Explorer, the rows
+   confirmed by then switch on and the build ships once. Unconfirmed rows ship off. The BD F-150 route
+   in the table below counts as that row's confirming measurement of the gain.
+
+**What has been on a road.** For each row a car can reach on this branch. "Logged" drives were steered
+by comma's stock command (curvature only); the path-angle measurements used earlier BluePilot builds.
+
+| Row | Control law read | Twin | Logged drives, curvature | Path-angle gain on a road |
+|---|---|---|---|---|
+| F-150 2021-23 BD | yes | yes | 1 truck | one truck, bp-7.0: 0.93, 1.01 and 1.00 of the row's at 5-12, 12-20 and 20-45 m/s (research note `pathangle-route`) |
+| F-150 2021-23 BC | no (no file) | no | 33 trucks | none |
+| F-150 Lightning | yes | yes (BD's numbers) | 2 trucks | none |
+| Explorer 2020-24 | yes | yes | 9 trucks | one truck: 0.97 of the model's on an angle-mode drive, 0.95 with Ford's own camera (`twin.md` §10.4) |
+| Ranger 2024-25 | yes | yes | 1 truck | none |
+| Maverick 2022-24 | yes | yes | 23 trucks | none |
+| Escape 2020-22, Bronco Sport 2021-22 (LX6C-AL) | yes | yes | 3 cars | none |
+| Mach-E 2021-22, 2023-24 | yes | no | 6 cars | none (curvature rows) |
+
+The truck counts are those lagd's estimator found usable windows on (`assumptions-audit.md` §3.4), and
+33 for BC (`bc-fleet.md`). Rows for the Transit, the 2025 Escape and the cars the owner's guide lists as
+not steered can't be reached on this branch: openpilot here has no platform or fingerprint for them, or
+the build doesn't support them.
 
 **Release-notes wording** (`clean-build.md` §14.5 item 5): engaging in a curve starts from straight and
 builds in at the module's own rate, about 5 to 6 s at 30 km/h and about 2 s at 60 km/h. Only rows whose
@@ -455,14 +515,17 @@ move at the panda's step, not the module's rate (`follows_at_once_before_control
 found (`bc-sources.md`).
 
 **Evidence** (`bc-fleet.md`). BC trucks answer curvature at gain 1.00 to 1.02 by speed band (33 trucks),
-the same as BD, and engage the same way. They are **faster**: 0.27 s against 0.57 s from command to yaw
-at 60 to 75 mph, and the difference sits in the module, not the vehicle. Path angle, path offset and
+the same as BD, and engage the same way. They are **faster**: 0.27 s against 0.57 s at 60 to 75 mph, a
+delay fit from command to yaw on the fleet, and the difference sits in the module, not the vehicle. That
+0.57 s is the fleet's BD trucks on the same fit; the BD row's lag, 0.39 s at 100 km/h, is the twin's 63 %
+time, another measure (2.8). Path angle, path offset and
 curvature rate can't be tested from public data: every engaged second on every truck is curvature only.
 
 **Choice.** A curvature row, because the behaviour supports curvature and nothing else: comma's stock
-constants, the BD row's lateral-acceleration limit, BC's own lag (0.35, 0.33, 0.28 and 0.27 s at 30, 60,
-100 and 130 km/h), and `ANY_DATA_FILE` (2.2). BA, the level before BC, keeps "older than Ford's
-current level".
+ramp type and precision, the BD row's lateral-acceleration limit, BC's own lag (the fleet's delay fit:
+0.35, 0.33, 0.28 and 0.27 s at 30, 60, 100 and 130 km/h), lagd's start at 0.34 s, and `ANY_DATA_FILE`
+(2.2). Like every row it doesn't smooth the request, so it drops comma's `anti_overshoot`, which stock
+applies on these trucks (2.3). BA, the level before BC, keeps "older than Ford's current level".
 
 **Cost.** It rests on behaviour, not files, so it is the one curvature row without the control law read
 (3.3). It applies only once the module answers F10A.
@@ -504,7 +567,8 @@ commit.
    to `lateralAccelLimit` (2.9), and hands `CarControl.actuators.curvature` to card.
 2. **Host hook.** `O/opendbc/car/ford/carcontroller.py` builds one `BluePilotLateral` through the
    sunnypilot adapter (`L/hosts/sunnypilot/lateral.py`). Each frame, `bp.update(CC_SP)` passes
-   `LateralInputs`: `pandaLateralAllowed` and `safetyTxBlocked`, filled from `pandaStates` in
+   `LateralInputs`: `pandaLateralAllowed` and `safetyTxBlocked` from `pandaStates`, and `lateralDelay`
+   from lagd, filled in
    `B/openpilot/sunnypilot/selfdrive/controls/controlsd_ext.py`. If it returns False, the stock path
    runs. At `STEER_STEP` (20 Hz) it calls `bp.step_lateral(CC, CS)`.
 3. **Request rule** (`L/core/request.py`). Ask only while openpilot wants lateral control, the panda
@@ -514,8 +578,9 @@ commit.
    is sent: all zero, ramp type 0, precision 1. The reasons: a module configured for Ford's hands-free
    driving stays Unavailable while it is asked, a refused frame is a missing frame to the module, and the inactive
    frame always passes (`test_never_asks_through_unavailable`).
-4. **Limit** (`L/core/carcontroller_ext.py` `step_lateral`). The request is clipped to
-   `lat_accel_limit / v²`.
+4. **Limit** (`L/core/carcontroller_ext.py` `step_lateral`). On the fallback on the F-150 MK14 and
+   Bronco Sport MK1 platforms, the request first goes through comma's `anti_overshoot`, every frame as
+   stock does. Then it is clipped to `lat_accel_limit / v²`.
 5. **Path** (`_path`). Without path angle, `want` goes straight through. With it:
    - curvature moves toward `want` at the row's rate, so it always equals the module's own copy. The
      position is kept unrounded (`clean-build.md` §14.1);
@@ -581,7 +646,11 @@ runs:
 - after any violation, and while lateral control isn't allowed, the last command is zero, so the next
   ramp starts from zero. There is no latch; three tests pin that.
 
-The caps are about 3.6 m/s² on CAN and about 2.4 m/s² on CAN FD (`FORD_BP_LIMITS`).
+The caps are about 3.6 m/s² on CAN and about 2.4 m/s² on CAN FD (`FORD_BP_LIMITS`). The CAN one is
+comma's. The CAN FD one is BluePilot's own: comma's check in this branch has one cap, 3.6, for both
+(`O/opendbc/safety/lateral.h`). Its reason, more steering force on CAN FD, is an old comment of comma's
+that nothing of ours shows (`assumptions-audit.md` item 3). So "Disable BP Lateral Control" raises a CAN
+FD car's cap to 3.6.
 
 Without bit 5, the stock check runs: `ford_stock_curvature_checks`, a wrapper around comma's
 `steer_curvature_cmd_checks` with its band. The wrapper restarts the check from zero while lateral
@@ -627,7 +696,8 @@ The pipeline lives in the project's research notes (to be published):
 | the path-angle switch | a confirming drive |
 
 Unverified numbers err toward a high K2, so less path angle is sent, and a low c2 rate, so the
-module's copy of the curvature never falls behind the controller's.
+module's copy of the curvature never falls behind the controller's. Where a row has the module's own K2
+table it uses that; a K2 rule (4.17/d on the older library) is set at the top of the table's spread.
 
 ### 3.4 Logs and the drive check
 
@@ -639,11 +709,12 @@ module's copy of the curvature never falls behind the controller's.
   health check.
 - **The drive check:** `scripts/clean-build/drive_check.py <rlog or route dir>... [--json out.json]`, or
   `--selftest`, in the tree's venv. Per speed band (5-12, 12-20, 20-45 m/s), hands off, it fits
-  `measured(t + lag) = a·curvature + b·(commandedCurvature − curvature) + offset` at the best lag
+  `measured(t + delay) = a·curvature + b·(commandedCurvature − curvature) + offset` at the best delay
   (0-0.8 s). Here `curvature` is the c2 sent and `commandedCurvature` is `c2 + K2·c1`, both status
   fields, so b is the path-angle gain against the row's. It passes where |b − 1| ≤ 0.30 with at least 400 frames of path angle at work. It also
   fits small and large path angles separately. The self-test recovers gains of 1.0, 0.8 and 0.55, and
-  fails the 0.55 case. No route has these fields yet.
+  fails the 0.55 case. No route of this build exists yet. The BD route in 2.10 was checked with a variant
+  that builds the same arrays from the bus (research note `pathangle-route`).
 - **Replay:** `scripts/replay/cleanreplay.py` (with `run_clean.sh` and `analyze_clean.py`) runs these
   files with the compiled panda in the loop. `--pscm` gives a what-if row.
 
@@ -656,7 +727,7 @@ heavy: run them in CI or on a large machine, not on a shared small one. From `op
 `PYTHONPATH=$PWD`:
 
 ```
-.venv/bin/python -m unittest discover -s opendbc/bluepilot_lateral/tests -t .          # library: 108 OK
+.venv/bin/python -m unittest discover -s opendbc/bluepilot_lateral/tests -t .          # library: 112 OK
 (cd opendbc/safety/tests && ../../../.venv/bin/python -m unittest test_ford test_bluepilot_lateral)  # 650 OK, 107 skipped
 .venv/bin/python -m unittest opendbc.car.tests.test_car_interfaces opendbc.car.ford.tests.test_ford  # 284 OK
 bash opendbc/bluepilot_lateral/safety/tests/bluepilot_coverage.sh                       # 100 % of both headers and modes/ford.h
@@ -672,8 +743,9 @@ tools/test_runner.py bluepilot openpilot/sunnypilot/selfdrive/controls/tests ope
 ```
 
 That gives 545 passed, 1 skipped and 1 error. The error is in `test_ui_frames`' harness: a `params.cc`
-log line lands on the child's result line. All counts are from `clean-build.md` §14.4, on a build
-machine, at library `ca0b134`. The library has changed only its credits file since.
+log line lands on the child's result line. The library, safety and car counts above are from the second
+fix round; the bluepilot tree's and the others are from `clean-build.md` §14.4, at library `ca0b134`, and
+weren't re-run since.
 
 What the main tests guard against:
 
@@ -700,7 +772,8 @@ What the main tests guard against:
 - Coverage: 37 of 63 archive records and 25 of 67 logged vehicles have no exact row. Rows are wanted for
   PZ11-14D003-EA and the unread files. RZ1C and PZ11 need preview tables. Calibrations aren't pinned
   yet.
-- No route exercises a row's own numbers yet. This build has never sent path angle on a drive.
+- No route exercises a row's own numbers yet. This build has never sent path angle on a drive. Two rows'
+  path-angle gains are measured with earlier BluePilot (2.10).
 - The stock path ("Disable BP Lateral Control") still has 143 refused frames over seven routes, inside
   comma's band. That is outside this build's goal.
 - IQ.Pilot hasn't run its coverage step (it needs clang-18 and mull) and doesn't do the start-up read.
@@ -730,7 +803,8 @@ the current code rests on faulty logic. It needs:
 - the library as plain files in `opendbc/car/ford` and `opendbc/safety`, without host bindings;
 - the early commits squashed into safety, controller, tests and A′. A′'s panda change and controller
   change are already their own commits;
-- an argument for the fallback half, which is nearest to upstream: comma's command without the clip.
+- an argument for the fallback half, which is nearest to upstream: comma's command, its smoothing
+  included, without the clip, and with BluePilot's lower CAN FD cap.
   Removing the band is a relaxation that has to be argued with the acceleration-and-jerk bound;
 - for the path-angle half, comma accepting a c1 rule (the two-bound check in 2.4, with a K2max curve
   derived from read modules), and confirming drives;
