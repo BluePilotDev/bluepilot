@@ -115,7 +115,8 @@ class SmartCruiseControlVision:
     except KeyError:  # not subscribed (tests)
       return _A_LAT_REG_MAX
     own = _A_LAT_REG_MAX
-    if lateral.active and lateral.supportLevel in (SupportLevel.fallback, SupportLevel.not_supported):
+    # no row of its own (openpilot's stock Ford code steers it, whatever the setting), or not supported
+    if lateral.supportLevel in (SupportLevel.fallback, SupportLevel.not_supported):
       fallback = fallback_curve_speed_lat_accel(v_ego)
       own = fallback if fallback > 0. else own
     limit = lateral.lateralAccelLimit

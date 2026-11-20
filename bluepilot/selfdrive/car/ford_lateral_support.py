@@ -89,8 +89,9 @@ def compare_with_last(record: dict, last: dict | None) -> tuple[dict, str]:
   changed = answered and bool(known["strategy"]) and any(known[k] != record[k] for k in PART_NUMBERS)
 
   fallback = ""
-  if record["active"] and record["level"] == SupportLevel.fallback:
-    fallback = f"BluePilot is steering this car with its fallback: {record['reason']} ({_parts(record)})."
+  # a module without a row of its own runs comma's stock Ford code as it is, with or without the setting
+  if record["level"] == SupportLevel.fallback:
+    fallback = f"openpilot's stock Ford code is steering this car: {record['reason']} ({_parts(record)})."
     if record["reason"] in (UNKNOWN_STRATEGY, UNKNOWN_DATA_FILE):
       fallback += " Please upload a route from this drive so this software can be added."
 
@@ -160,7 +161,11 @@ def support_row(record: dict | None) -> tuple[str, str]:
   """The settings row: (value, description)."""
   if not record:
     return "Not read yet", "Shown after the car has been started once with this software."
-  if not record["active"]:
+  if record["level"] == SupportLevel.fallback:
+    # no row of its own: openpilot's stock Ford code steers, whatever the setting
+    value = LEVEL_NAMES[SupportLevel.fallback]
+    lines = [record["reason"] + ".", "openpilot's stock Ford code steers this car, as it is."]
+  elif not record["active"]:
     value = "Off"
     lines = ["BluePilot lateral control is disabled: openpilot's stock Ford command steers."]
   else:

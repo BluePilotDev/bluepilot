@@ -235,14 +235,14 @@ class TestSteeringLimitSetsTheCurveSpeed(OpenpilotTestCase):
   def test_the_fallback_plans_for_the_lowest_module_limit(self):
     """A Ford steered on the fallback plans for the lowest of every held module's limit at its speed, not
     SCC-V's flat 2.0: at 30 m/s (108 km/h) that is 1.933, between 2.0 at 100 km/h and 1.75 at 130. The panda's
-    cap (reported, 2.4 on CAN FD) is above it. A module with a row, or stock steering, keeps SCC-V's own."""
+    cap (reported, 2.4 on CAN FD) is above it. A module with a row keeps SCC-V's own, also with the setting off."""
     from opendbc.bluepilot_lateral.core.strategy import fallback_curve_speed_lat_accel
     want = fallback_curve_speed_lat_accel(30.)
     self.assertAlmostEqual(want, 2.0 - 0.25 * 8 / 30, places=4)
-    for level in (0, 3):  # fallback, not supported
-      v, max_curve, _ = self._target(2.4, level=level)
+    for level, active in ((0, True), (0, False), (3, True)):  # fallback (stock code, the setting on or off), not supported
+      v, max_curve, _ = self._target(2.4, level=level, active=active)
       self.assertAlmostEqual(v, (want / max_curve) ** 0.5, places=4)
-    for level, active in ((2, True), (1, True), (0, False)):
+    for level, active in ((2, True), (1, True), (2, False)):
       v, max_curve, own = self._target(2.4, level=level, active=active)
       self.assertAlmostEqual(v, (own / max_curve) ** 0.5, places=4)
 

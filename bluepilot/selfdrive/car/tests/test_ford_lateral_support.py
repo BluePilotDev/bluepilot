@@ -155,8 +155,9 @@ class TestStartRecord(OpenpilotTestCase):
     self._start(parts=F150)
     self.assertEqual(self._start(parts=("RL38-14D003-AA", "RL38-14D007-DD"), vin="1FT6W1EV0PWG00002"), "")
 
-  def test_stock_steering_is_not_the_fallback(self):
-    self.assertEqual(self._start(parts=UNKNOWN, active=False), "")
+  def test_a_module_without_a_row_is_told_with_the_setting_off_too(self):
+    """Software without a row runs openpilot's stock Ford code with the setting on or off: it is told either way."""
+    self.assertIn(strategy.UNKNOWN_STRATEGY, self._start(parts=UNKNOWN, active=False))
 
   def test_a_car_without_the_library_is_left_alone(self):
     support.record_start(SimpleNamespace(CP=structs.CarParams(), CC=SimpleNamespace()), self.params)
