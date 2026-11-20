@@ -16,18 +16,21 @@ OFFROAD_ONLY = ("FordPrefLateralControl", "FordPrefSteerAngleCurvature")
 
 class TestFordSettingsMatchManifest(unittest.TestCase):
   """BluePilot: sunnylink's Ford section holds every setting the lateral library reads (bp-sunnypilot #12),
-  with the manifest's limits. The disable toggle stays out: BluePilot is always on in bp-sunnypilot."""
+  with the manifest's limits. Full BluePilot also lists its own settings there (UI, longitudinal, hybrid
+  gauges) and the disable toggle, so the section is a superset of the manifest."""
 
   @classmethod
   def setUpClass(cls):
     cls.items = {i["key"]: i for i in json.loads(SETTINGS_UI.read_text())["vehicle_settings"]["ford"]["items"]}
-    cls.manifest = {s.key: s for s in SETTINGS if s.key != "disable_BP_lat_UI"}
+    cls.manifest = {s.key: s for s in SETTINGS}
 
-  def test_same_keys(self):
-    self.assertEqual(set(self.items), set(self.manifest))
+  def test_every_library_setting_is_listed(self):
+    self.assertEqual(set(self.manifest) - set(self.items), set())
 
   def test_limits_match_the_manifest(self):
     for key, item in self.items.items():
+      if key not in self.manifest:  # one of full BluePilot's own settings
+        continue
       rng = self.manifest[key].range
       with self.subTest(key=key):
         if item["widget"] == "option":
