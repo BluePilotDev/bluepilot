@@ -833,7 +833,7 @@ heavy: run them in CI or on a large machine, not on a shared small one. From `op
 `PYTHONPATH=$PWD`:
 
 ```
-.venv/bin/python -m unittest discover -s opendbc/bluepilot_lateral/tests -t .          # library: 136 OK
+.venv/bin/python -m unittest discover -s opendbc/bluepilot_lateral/tests -t .          # library: 137 OK
 (cd opendbc/safety/tests && ../../../.venv/bin/python -m unittest test_ford test_bluepilot_lateral)  # 661 OK, 107 skipped
 .venv/bin/python -m unittest opendbc.car.tests.test_car_interfaces opendbc.car.ford.tests.test_ford  # 284 OK
 bash opendbc/bluepilot_lateral/safety/tests/bluepilot_coverage.sh                       # 100 % of both headers and modes/ford.h
