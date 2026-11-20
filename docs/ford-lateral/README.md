@@ -2,7 +2,8 @@
 
 BluePilot's Ford steering, rebuilt as one controller that steers by curvature. It has a table of known
 Ford steering modules, a fallback for the rest, a panda check on lateral acceleration and jerk, and
-path angle as a per-row switch that is off on every row in this build.
+path angle as a per-row switch. In this version it is on for every row whose module's numbers were read,
+and for the F-150's software BC with BD's numbers. It is off on the others and on the fallback.
 
 - [USER_GUIDE.md](USER_GUIDE.md), for owners: how Ford steering works, what this build changes and why,
   what each message means and what to do.

@@ -11,7 +11,9 @@ They follow the repo's layout and the usual openpilot install by hand. Read each
   comma's guide: [docs/how-to/connect-to-comma.md](../how-to/connect-to-comma.md).
 - Access to the private repository **github.com/jrneulight/bluepilot-clean**. It holds all three parts
   of the build as branches: `clean/ford-lateral` (BluePilot, the default branch), `clean/opendbc` and
-  `clean/bluepilot-lateral`. A recursive clone of `clean/ford-lateral` fetches the other two.
+  `clean/bluepilot-lateral`. A recursive clone of `clean/ford-lateral` fetches the other two. The
+  version with path angle on is `clean/ford-lateral-pathangle` (with `clean/opendbc-pathangle` and
+  `clean/bluepilot-lateral-pathangle`): use it in place of `clean/ford-lateral` in the commands below.
 - Free space on the comma for a second copy of openpilot while you keep the old one. **Not checked:**
   how much space this needs.
 
