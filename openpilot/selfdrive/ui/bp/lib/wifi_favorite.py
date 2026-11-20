@@ -12,7 +12,7 @@ from jeepney import DBusAddress
 from jeepney.wrappers import Properties
 
 from openpilot.common.swaglog import cloudlog
-from openpilot.system.ui.lib.networkmanager import (NM, NM_ACTIVE_CONNECTION_IFACE, 
+from openpilot.system.ui.lib.networkmanager import (NM, NM_ACTIVE_CONNECTION_IFACE,
                                                     NM_ACCESS_POINT_IFACE)
 
 try:
@@ -48,30 +48,30 @@ class WifiFavoriteManager:
     """Main loop: scan WiFi, check for favorite network, and auto-connect."""
     startup_time = time.monotonic()
     last_check_time = 0.0
-    
+
     while not self._exit:
       current_time = time.monotonic()
-      
+
       # Wait 30 seconds after startup before first check
       if current_time - startup_time < INITIAL_CHECK_DELAY:
         time.sleep(1)
         continue
-      
+
       # Wait 30 seconds between checks
       if current_time - last_check_time < FAVORITE_CHECK_PERIOD_SECONDS:
         time.sleep(1)
         continue
-      
+
       last_check_time = current_time
-      
+
       try:
         if Params is None:
           continue
-        
+
         # Check if DBus is available
         if self._wifi_manager._router_main is None:
           continue
-        
+
         params = Params()
         favorite_value = params.get("WifiFavoriteSSID")
         favorite_ssid = ""
@@ -80,17 +80,17 @@ class WifiFavoriteManager:
             favorite_ssid = favorite_value.decode('utf-8', errors='replace').strip('\x00')
           else:
             favorite_ssid = str(favorite_value).strip('\x00')
-        
+
         if not favorite_ssid:
           # No favorite set, skip scanning
           continue
-        
+
         # Verify favorite network is saved in NetworkManager
         saved_connections = self._wifi_manager._connections
         if favorite_ssid not in saved_connections:
           cloudlog.debug(f"BluePilot: Favorite network '{favorite_ssid}' is not saved in NetworkManager")
           continue
-        
+
         # Request WiFi scan and update networks list
         cloudlog.debug(f"BluePilot: Scanning for networks (checking for favorite '{favorite_ssid}')...")
         try:
@@ -104,7 +104,7 @@ class WifiFavoriteManager:
         except Exception as e:
           cloudlog.warning(f"BluePilot: Failed to scan networks: {e}")
           continue
-        
+
         # Check NetworkManager's active connections directly
         active_connections = self._wifi_manager._get_active_connections()
         current_connected_ssid = None
@@ -121,12 +121,12 @@ class WifiFavoriteManager:
                 break
           except Exception:
             continue
-        
+
         # If favorite is already connected, nothing to do
         if current_connected_ssid == favorite_ssid:
           cloudlog.debug(f"BluePilot: Favorite network '{favorite_ssid}' is already connected")
           continue
-        
+
         # Check if favorite is in scan results with sufficient signal strength
         favorite_network = None
         favorite_signal_strength = 0
@@ -137,16 +137,16 @@ class WifiFavoriteManager:
               favorite_network = network
               favorite_signal_strength = network.strength
               break
-        
+
         # Only attempt connection if favorite is visible in scan results AND has sufficient signal strength
         if favorite_network is None:
           cloudlog.debug(f"BluePilot: Favorite network '{favorite_ssid}' not in scan results (out of range)")
           continue
-        
+
         if favorite_signal_strength < MIN_SIGNAL_STRENGTH:
           cloudlog.debug(f"BluePilot: Favorite network '{favorite_ssid}' signal strength ({favorite_signal_strength}%) below minimum ({MIN_SIGNAL_STRENGTH}%)")
           continue
-        
+
         # Favorite is available with good signal strength - attempt connection
         if current_connected_ssid:
           cloudlog.info(f"BluePilot: Connected to '{current_connected_ssid}', switching to favorite '{favorite_ssid}' (signal: {favorite_signal_strength}%)...")
@@ -159,15 +159,15 @@ class WifiFavoriteManager:
             continue
         else:
           cloudlog.info(f"BluePilot: Connecting to favorite network '{favorite_ssid}' (signal: {favorite_signal_strength}%)...")
-        
+
         # Try to activate favorite network
         try:
           self._wifi_manager.activate_connection(favorite_ssid, block=False)
         except Exception as e:
           cloudlog.warning(f"BluePilot: Failed to connect to favorite network '{favorite_ssid}': {e}")
-      
+
       except Exception as e:
         cloudlog.exception(f"BluePilot: Error checking favorite network: {e}")
-      
+
       # Small sleep to prevent tight loop
       time.sleep(1)

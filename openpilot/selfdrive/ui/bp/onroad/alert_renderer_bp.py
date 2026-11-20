@@ -1,4 +1,5 @@
-from typing import Optional
+from __future__ import annotations
+
 import pyray as rl
 from openpilot.cereal import log
 
@@ -68,7 +69,7 @@ class AlertRendererBP(AlertRenderer):
       )
       self._draw_text(text_rect, alert)
 
-  def _get_pill_rect(self, rect: rl.Rectangle, alert) -> Optional[rl.Rectangle]:
+  def _get_pill_rect(self, rect: rl.Rectangle, alert) -> rl.Rectangle | None:
     """Calculate pill-shaped notification rectangle at bottom of display, centered."""
     line1 = alert.text1 or ""
     line2 = alert.text2 or ""

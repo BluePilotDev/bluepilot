@@ -28,7 +28,7 @@ if [ "$MANAGER_COUNT" -gt 1 ]; then
     OLDEST_PID=$(echo "$MANAGER_PIDS" | head -1)
 
     # Kill all except oldest
-    echo "$MANAGER_PIDS" | tail -n +2 | while read pid; do
+    echo "$MANAGER_PIDS" | tail -n +2 | while read -r pid; do
         echo "  Killing duplicate manager PID: $pid"
         kill -15 "$pid" 2>/dev/null || true
     done

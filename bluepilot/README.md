@@ -86,7 +86,6 @@ bluepilot/
 │   │   ├── styles.css
 │   │   └── app.js
 │   └── public/                  # Deployed files (committed)
-├── test_web_routes.py           # Local testing script
 └── setup_web_routes.py          # Setup verification
 ```
 
@@ -304,7 +303,7 @@ No dependencies to install - uses Python standard library only:
 
 ```bash
 cd /data/openpilot  # or your openpilot directory
-python3 bluepilot/test_web_routes.py
+python3 -m bluepilot.backend.bp_portal
 ```
 
 Then open http://localhost:8088 in your browser.

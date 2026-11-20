@@ -40,7 +40,7 @@ class _CompactComma3XDriverStateRendererBP(DriverStateRendererSP):
     face_size = max(1, round(IMG_SIZE * self._scale))
     self.dm_img = gui_app.texture("icons/driver_face.png", face_size, face_size)
 
-  def _render(self, _rect: rl.Rectangle) -> None:
+  def _render(self, rect: rl.Rectangle) -> None:
     opacity = 0.65 if self.is_active else 0.2
     button_size = BTN_SIZE * self._scale
 

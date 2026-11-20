@@ -1,0 +1,29 @@
+# BluePilot: fail a PR to bp-7.1-dev or bp-dev whose merge result leaves an upstream file differing from this
+# repo's bp-sunnypilot branch without being on .github/bluepilot-hooks.txt (spec: #224). Full BluePilot only:
+# this file doesn't exist in ford-op/bp-sunnypilot. Required on the work branch as `bluepilot-hooks`: keep the
+# job name, and keep it running on every PR (a required check that doesn't run blocks the PR).
+name: bluepilot hooks
+
+on:
+  pull_request:
+    branches:
+      - bp-7.1-dev
+      - bp-dev
+
+permissions:
+  contents: read
+
+jobs:
+  bluepilot-hooks:
+    name: bluepilot-hooks
+    if: github.repository == 'BluePilotDev/bluepilot'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+    - uses: actions/checkout@v7
+      with:
+        fetch-depth: 0  # full history: the check diffs against the merge base with bp-sunnypilot
+        filter: blob:none  # commits and trees are enough to diff file names
+        persist-credentials: false
+    - run: git fetch --no-tags origin +refs/heads/bp-sunnypilot:refs/remotes/origin/bp-sunnypilot
+    - run: python3 .github/bluepilot_hooks.py origin/bp-sunnypilot

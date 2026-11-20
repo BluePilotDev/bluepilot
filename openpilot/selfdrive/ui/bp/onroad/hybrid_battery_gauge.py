@@ -10,7 +10,7 @@ Displays a horizontal battery gauge with:
 import traceback
 import pyray as rl
 from openpilot.common.filter_simple import FirstOrderFilter
-from openpilot.selfdrive.ui.sunnypilot.onroad.developer_ui import DeveloperUiState, get_bottom_dev_ui_offset
+from openpilot.selfdrive.ui.sunnypilot.onroad.developer_ui import get_bottom_dev_ui_offset
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.system.ui.lib.application import gui_app, FontWeight
 from openpilot.system.ui.lib.text_measure import measure_text_cached
@@ -173,7 +173,7 @@ class HybridBatteryGauge(Widget):
 
     return width_scale * size_scale
 
-  def render(self, rect: rl.Rectangle = None, left_offset: int = 0, y_offset: float = 0.0) -> None:
+  def render(self, rect: rl.Rectangle = None, left_offset: int = 0, y_offset: float = 0.0) -> bool | int | None:
     """Override render to accept left_offset and y_offset parameters."""
     if rect is not None:
       self.set_rect(rect)

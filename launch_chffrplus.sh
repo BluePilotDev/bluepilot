@@ -39,8 +39,8 @@ function fix_egl_adreno {
   # installer, so ldconfig's higher-versioned glvnd/Mesa libs win and magic.service (the
   # AGNOS display server) fails eglGetDisplay -> no UI. Re-point them like the installer does.
   local lib=/usr/lib/aarch64-linux-gnu
-  if [ "$(readlink $lib/libEGL.so.1)" != "libEGL.so.1.0.0" ] || \
-     [ "$(readlink $lib/libGLESv2.so.2)" != "libGLESv2.so.2.0.0" ]; then
+  if [ "$(readlink "$lib/libEGL.so.1")" != "libEGL.so.1.0.0" ] || \
+     [ "$(readlink "$lib/libGLESv2.so.2")" != "libGLESv2.so.2.0.0" ]; then
     sudo mount -o remount,rw /
     sudo ln -sf libEGL.so.1.0.0 "$lib/libEGL.so.1"
     sudo ln -sf libGLESv2.so.2.0.0 "$lib/libGLESv2.so.2"

@@ -735,7 +735,7 @@ pytest --cov=selfdrive --cov-report=html
 
 ### Test Locations
 - Process-specific tests in module directories
-- Portal testing: `bluepilot/test_web_routes.py` (uses mock Params for dev machines)
+- Portal testing: `python3 -m bluepilot.backend.bp_portal` (local server)
 - Integration tests in `selfdrive/test/`
 
 ### Writing Tests

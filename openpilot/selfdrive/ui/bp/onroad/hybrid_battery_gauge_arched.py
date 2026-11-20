@@ -142,7 +142,7 @@ class HybridBatteryGaugeArched(Widget):
     """Set whether the powerflow gauge is visible this frame (view calls before render)."""
     self._powerflow_visible = visible
 
-  def render(self, rect: rl.Rectangle = None, left_offset: int = 0, powerflow_visible: bool = True) -> None:
+  def render(self, rect: rl.Rectangle = None, left_offset: int = 0, powerflow_visible: bool = True) -> bool | int | None:
     if rect is not None:
       self.set_rect(rect)
     self._left_offset = left_offset

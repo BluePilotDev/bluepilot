@@ -45,8 +45,8 @@ class MiciComplication(Widget):
     self.params = Params()
 
   def _update_state(self):
-     self._render_type = self.params.get("mici_complication")
-     bp_ui_log.state("MiciComplication", "render_type", self._render_type)
+    self._render_type = self.params.get("mici_complication")
+    bp_ui_log.state("MiciComplication", "render_type", self._render_type)
 
   def _render(self, rect: rl.Rectangle) -> None:
     """Draw the first lead vehicle speed and unit."""
@@ -94,11 +94,11 @@ class MiciComplication(Widget):
 
     v_delta = np.clip(self.vRel, -COLOR_DELTA_MS, COLOR_DELTA_MS)
     if v_delta <= 0:
-        t = (v_delta + COLOR_DELTA_MS) / COLOR_DELTA_MS
-        result = (1 - t) * self._slower_color + t * self._color
+      t = (v_delta + COLOR_DELTA_MS) / COLOR_DELTA_MS
+      result = (1 - t) * self._slower_color + t * self._color
     else:
-        t = v_delta / COLOR_DELTA_MS
-        result = (1 - t) * self._color + t * self._faster_color
+      t = v_delta / COLOR_DELTA_MS
+      result = (1 - t) * self._color + t * self._faster_color
 
     color = result.astype(int)
     self._font_color = rl.Color(color[0], color[1], color[2], int(220 * fade_ratio))

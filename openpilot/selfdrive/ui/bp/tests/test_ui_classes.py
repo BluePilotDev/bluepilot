@@ -61,7 +61,7 @@ def bad_upstream_calls(func, cls) -> dict[str, str]:
         or any(isinstance(a, ast.Starred) for a in node.args) or any(k.arg is None for k in node.keywords)):
       continue
     try:
-      inspect.signature(target).bind(None, *node.args, **{k.arg: None for k in node.keywords})
+      inspect.signature(target).bind(None, *node.args, **{k.arg: None for k in node.keywords if k.arg is not None})
     except TypeError as e:
       bad[ast.unparse(node)] = f"{target.__qualname__}: {e}"
   return bad

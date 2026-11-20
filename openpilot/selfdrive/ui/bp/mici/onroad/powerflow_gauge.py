@@ -4,8 +4,6 @@ import math
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.system.ui.lib.application import gui_app
 from openpilot.system.ui.widgets import Widget
-from openpilot.selfdrive.ui.mici.onroad import blend_colors
-from openpilot.system.ui.lib.shader_polygon import draw_polygon, Gradient
 from openpilot.common.filter_simple import FirstOrderFilter
 from openpilot.selfdrive.ui.bp.lib.ui_debug_logger import bp_ui_log
 
@@ -35,8 +33,8 @@ class MiciPowerflowGauge(Widget):
     self._engine_on_reason_value = 0
     self._top_angle = -90
     if DEMO:
-       self._demo_value = 0.0
-       self._demo_inc = 0.01
+      self._demo_value = 0.0
+      self._demo_inc = 0.01
 
   def _update_state(self):
     """Update power flow state and animate changes"""
@@ -70,7 +68,7 @@ class MiciPowerflowGauge(Widget):
       return False
 
     if DEMO:
-       return True
+      return True
 
     sm = ui_state.sm
     try:
@@ -93,7 +91,7 @@ class MiciPowerflowGauge(Widget):
       return False
 
   def set_wheel_rect(self, rect: rl.Rectangle):
-     self._wheel_rect = rect
+    self._wheel_rect = rect
 
   def _render(self, rect: rl.Rectangle) -> None:
     """Render the powerflow gauge arch"""
@@ -137,114 +135,114 @@ class MiciPowerflowGauge(Widget):
 
     # --- Regen (left side) ---
     if value < 0:
-        active = abs(value)
-        for i in range(SEGMENTS):
-            t = i / (SEGMENTS - 1)
-            if t >= active:
-                break
+      active = abs(value)
+      for i in range(SEGMENTS):
+        t = i / (SEGMENTS - 1)
+        if t >= active:
+          break
 
-            angle = -TOP + t * (BOTTOM - TOP)
-            self.draw_arc_segment(angle, POWERFLOW_REGEN_COLOR)
+        angle = -TOP + t * (BOTTOM - TOP)
+        self.draw_arc_segment(angle, POWERFLOW_REGEN_COLOR)
 
     # --- Throttle (right side) ---
     if value > 0:
-        active = value
-        for i in range(SEGMENTS):
-            t = i / (SEGMENTS - 1)
-            if t >= active:
-                break
+      active = value
+      for i in range(SEGMENTS):
+        t = i / (SEGMENTS - 1)
+        if t >= active:
+          break
 
-            angle = BOTTOM + t * (TOP - BOTTOM)
-            self.draw_arc_segment(angle, POWERFLOW_DEMAND_COLOR)
+        angle = BOTTOM + t * (TOP - BOTTOM)
+        self.draw_arc_segment(angle, POWERFLOW_DEMAND_COLOR)
 
   def lerp(a, b, t):
     return a + (b - a) * t
 
   def draw_vertical_gauge(self, rect: rl.Rectangle, value):
-      bar_x = int(rect.x)
-      bar_y = int(rect.y)
-      bar_h = int(rect.height)
+    bar_x = int(rect.x)
+    bar_y = int(rect.y)
+    bar_h = int(rect.height)
 
-      segment_h = bar_h / LINES
-      mid = bar_h * 0.6
+    segment_h = bar_h / LINES
+    mid = bar_h * 0.6
 
+    rl.draw_rectangle(
+        bar_x,
+        bar_y,
+        BAR_W,
+        bar_h,
+        rl.Color(0,0,0,100)
+    )
+
+    demand_h = mid * abs(value)
+    regen_h = (bar_h - mid) * abs(value)
+    # --- Throttle side (above center) ---
+    if value > 0:
       rl.draw_rectangle(
           bar_x,
-          bar_y,
+          int(mid - demand_h),
           BAR_W,
-          bar_h,
-          rl.Color(0,0,0,100)
+          int(demand_h),
+          POWERFLOW_DEMAND_COLOR
       )
 
-      demand_h = mid * abs(value)
-      regen_h = (bar_h - mid) * abs(value)
-      # --- Throttle side (above center) ---
-      if value > 0:
-          rl.draw_rectangle(
-              bar_x,
-              int(mid - demand_h),
-              BAR_W,
-              int(demand_h),
-              POWERFLOW_DEMAND_COLOR
-          )
-
-      # --- Regen side (below center) ---
-      elif value < 0:
-          rl.draw_rectangle(
-              bar_x,
-              int(mid),
-              BAR_W,
-              int(regen_h),
-              POWERFLOW_REGEN_COLOR
-          )
-
-      line_color = rl.Color(255,255,255,150)
-      line_shadow = rl.Color(0,0,0,150)
-
-      for i in range(LINES):
-          y = int(segment_h * i)
-          rl.draw_line(
-              bar_x,
-              y,
-              bar_x + 5,
-              y,
-              line_color
-          )
-          rl.draw_line(
-              bar_x,
-              int(y-1),
-              bar_x + 5,
-              int(y-1),
-              line_shadow
-          )
-
-          rl.draw_line(
-              bar_x + BAR_W - 5,
-              y,
-              bar_x + BAR_W,
-              y,
-              line_color
-          )
-          rl.draw_line(
-              bar_x + BAR_W - 5,
-              int(y-1),
-              bar_x + BAR_W,
-              int(y-1),
-              line_shadow
-          )
-
+    # --- Regen side (below center) ---
+    elif value < 0:
       rl.draw_rectangle(
           bar_x,
           int(mid),
           BAR_W,
-          2,
-          rl.WHITE
+          int(regen_h),
+          POWERFLOW_REGEN_COLOR
+      )
+
+    line_color = rl.Color(255,255,255,150)
+    line_shadow = rl.Color(0,0,0,150)
+
+    for i in range(LINES):
+      y = int(segment_h * i)
+      rl.draw_line(
+          bar_x,
+          y,
+          bar_x + 5,
+          y,
+          line_color
+      )
+      rl.draw_line(
+          bar_x,
+          int(y-1),
+          bar_x + 5,
+          int(y-1),
+          line_shadow
       )
 
       rl.draw_line(
-          bar_x,
-          int(mid + 2),
+          bar_x + BAR_W - 5,
+          y,
           bar_x + BAR_W,
-          int(mid + 2),
+          y,
+          line_color
+      )
+      rl.draw_line(
+          bar_x + BAR_W - 5,
+          int(y-1),
+          bar_x + BAR_W,
+          int(y-1),
           line_shadow
       )
+
+    rl.draw_rectangle(
+        bar_x,
+        int(mid),
+        BAR_W,
+        2,
+        rl.WHITE
+    )
+
+    rl.draw_line(
+        bar_x,
+        int(mid + 2),
+        bar_x + BAR_W,
+        int(mid + 2),
+        line_shadow
+    )

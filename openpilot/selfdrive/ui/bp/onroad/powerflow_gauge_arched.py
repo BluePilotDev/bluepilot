@@ -115,7 +115,8 @@ class PowerflowGaugeArched(Widget):
       "outer_radius": outer_radius,
     }
 
-  def render(self, rect: rl.Rectangle = None, strip_drawn_by_view: bool = False, battery_visible: bool = False, **kwargs) -> None:
+  def render(self, rect: rl.Rectangle = None, strip_drawn_by_view: bool = False, battery_visible: bool = False,
+             **kwargs) -> bool | int | None:
     """Render the gauge. When strip_drawn_by_view is True, the view has already drawn the steering strip (combo span).
     When battery_visible is False, powerflow uses 0° rotation (original); when True, uses ARCH_ROTATION_DEG (2° CW)."""
     self._strip_drawn_by_view = strip_drawn_by_view
@@ -263,7 +264,7 @@ class PowerflowGaugeArched(Widget):
         if text_end_angle is None or powerflow_text_end_angle > text_end_angle:
           text_end_angle = powerflow_text_end_angle
         cumulative_width = 0
-        for i, char in enumerate(power_flow_text):
+        for char in power_flow_text:
           char_text = char
           char_size = measure_text_cached(self._font_bold, char_text, font_size)
           char_width = char_size.x
@@ -299,7 +300,7 @@ class PowerflowGaugeArched(Widget):
         if text_end_angle is None or engine_text_end_angle > text_end_angle:
           text_end_angle = engine_text_end_angle
         cumulative_width = 0
-        for i, char in enumerate(engine_reason_text):
+        for char in engine_reason_text:
           char_text = char
           char_size = measure_text_cached(self._font_bold, char_text, font_size)
           char_width = char_size.x

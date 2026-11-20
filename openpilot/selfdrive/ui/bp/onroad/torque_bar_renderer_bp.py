@@ -367,7 +367,7 @@ class TorqueBarRendererBP(TorqueBarStateBP):
   def render_strip_arched(self, rect: rl.Rectangle, cx: float, cy: float,
                          top_angle: float, start_angle: float, end_angle: float,
                          powerflow_outer_radius: float,
-                         fill_center_angle: float = None,
+                         fill_center_angle: float | None = None,
                          scale: float = 1.0) -> None:
     """Render the same steering/torque strip as an arc above the arched powerflow meter.
 

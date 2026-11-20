@@ -1,4 +1,3 @@
-import pyray as rl
 
 from openpilot.common.params import Params
 from openpilot.common.params import UnknownKeyName
@@ -125,7 +124,9 @@ class BluePilotLayout(Widget):
     # flip only takes effect after the next restart (safe to toggle any time).
     self._steer_angle_curvature = toggle_item(
       lambda: tr("Use Pinion Yaw Sensor"),
-      lambda: tr('Measures how the car is turning from the steering pinion angle sensor instead of a faulty RCM yaw sensor (symptoms: "Turn Exceeds Steering Limit" warnings, weak curve tracking, "Service AdvanceTrac"). Check with tools/ford_yaw_health_check.py. Applies the next time the car starts. Not available on the Edge.'),
+      lambda: tr('Measures how the car is turning from the steering pinion angle sensor instead of a faulty RCM yaw sensor ' +
+                 '(symptoms: "Turn Exceeds Steering Limit" warnings, weak curve tracking, "Service AdvanceTrac"). ' +
+                 'Check with tools/ford_yaw_health_check.py. Applies the next time the car starts. Not available on the Edge.'),
       initial_state=self._safe_get_bool(self._params, "FordPrefSteerAngleCurvature"),
       callback=lambda state: self._toggle_callback(state, "FordPrefSteerAngleCurvature"),
       icon="monitoring.png",
@@ -503,7 +504,8 @@ class BluePilotLayout(Widget):
     self._connect_backend_action.set_value(lambda: self._get_connect_backend_display())
     self._connect_backend_btn = ListItem(
       lambda: tr("Connect Backend"),
-      description=lambda: tr("Comma Connect uses stock servers. Konik Stable sends routes to stable.konik.ai (dongle ID switches automatically). Offline Mode points at unreachable hosts so uploads never succeed. Reboot to apply."),
+      description=lambda: tr("Comma Connect uses stock servers. Konik Stable sends routes to stable.konik.ai (dongle ID switches automatically). " +
+                             "Offline Mode points at unreachable hosts so uploads never succeed. Reboot to apply."),
       action_item=self._connect_backend_action,
       callback=self._select_connect_backend
     )
@@ -514,7 +516,8 @@ class BluePilotLayout(Widget):
     self._restore_dongle_action.set_value(lambda: self._get_recoverable_dongle_id_preview())
     self._restore_dongle_btn = ListItem(
       lambda: tr("Restore Cached Dongle ID"),
-      description=lambda: tr("If switching backends left this device unregistered, restore a previously registered ID found cached here. Only enabled when one is found."),
+      description=lambda: tr("If switching backends left this device unregistered, restore a previously registered ID found cached here. " +
+                             "Only enabled when one is found."),
       action_item=self._restore_dongle_action,
       callback=self._restore_dongle_id
     )
@@ -699,7 +702,7 @@ class BluePilotLayout(Widget):
     self._curv_header = curv_header
 
     # Lateral Tuning: outer section. Disable toggle and mode selector up top, then mode-agnostic
-    # lane-change items, then the two nested sub-sections (always visible, greyed by mode above).
+    # lane-change items, then the two nested sub-sections (always visible, grayed by mode above).
     lateral_items = [
       self._disable_BP_lat,
       self._primary_lateral_control_btn,
@@ -867,7 +870,7 @@ class BluePilotLayout(Widget):
     self._toggle_callback(state, "BlinkerPauseLaneChange")
     self._blinker_min_speed.action_item.set_enabled(state)
 
-  def _update_toggles(self, just_toggled: dict | None = None):
+  def _update_toggles(self, just_toggled: dict[str, bool] | None = None):
     """Update toggle states from params. just_toggled: {param: value} for params we just wrote (avoids refresh race)."""
     ui_state.update_params()
     fresh = just_toggled or {}
@@ -914,15 +917,17 @@ class BluePilotLayout(Widget):
     self._hybrid_gauge_style_btn.action_item.set_selected_button(style_idx)
     plat_idx = PrimaryLateralControl(ui_state.params.get("FordPrefLateralControl", return_default=True) or 0)
     self._primary_lateral_control_btn.action_item.set_selected_button(plat_idx)
-    custom_prof = fresh.get("custom_profile_curv") if "custom_profile_curv" in fresh else self._safe_get_bool(ui_state.params, "custom_profile_curv")
-    lane_pos = fresh.get("enable_lane_positioning_curv") if "enable_lane_positioning_curv" in fresh else self._safe_get_bool(ui_state.params, "enable_lane_positioning_curv")
-    lane_pos_ang = fresh.get("enable_lane_positioning_ang") if "enable_lane_positioning_ang" in fresh else self._safe_get_bool(ui_state.params, "enable_lane_positioning_ang")
-    pause_lc = fresh.get("BlinkerPauseLaneChange") if "BlinkerPauseLaneChange" in fresh else self._safe_get_bool(ui_state.params, "BlinkerPauseLaneChange")
+    custom_prof = fresh["custom_profile_curv"] if "custom_profile_curv" in fresh else self._safe_get_bool(ui_state.params, "custom_profile_curv")
+    lane_pos = (fresh["enable_lane_positioning_curv"] if "enable_lane_positioning_curv" in fresh
+                else self._safe_get_bool(ui_state.params, "enable_lane_positioning_curv"))
+    lane_pos_ang = (fresh["enable_lane_positioning_ang"] if "enable_lane_positioning_ang" in fresh
+                    else self._safe_get_bool(ui_state.params, "enable_lane_positioning_ang"))
+    pause_lc = fresh["BlinkerPauseLaneChange"] if "BlinkerPauseLaneChange" in fresh else self._safe_get_bool(ui_state.params, "BlinkerPauseLaneChange")
     is_angle = (plat_idx == PrimaryLateralControl.angle)
     is_curv = not is_angle
     # Conditional on BlinkerPauseLaneChange
     self._blinker_min_speed.action_item.set_enabled(pause_lc)
-    # Angle-mode items: always visible (Angle Tuning section), greyed out when curvature mode is active
+    # Angle-mode items: always visible (Angle Tuning section), grayed out when curvature mode is active
     self._low_speed_curv_factor.action_item.set_enabled(is_angle)
     self._high_speed_curv_factor.action_item.set_enabled(is_angle)
     self._high_speed_dampening.action_item.set_enabled(is_angle)
@@ -930,7 +935,7 @@ class BluePilotLayout(Widget):
     self._enable_lane_positioning_ang.action_item.set_enabled(is_angle)
     self._custom_path_offset_ang.action_item.set_enabled(is_angle and lane_pos_ang)
     self._lane_centering_strength_ang.action_item.set_enabled(is_angle and lane_pos_ang)
-    # Curvature-mode items: always visible (Curvature Tuning section), greyed out when angle mode is active
+    # Curvature-mode items: always visible (Curvature Tuning section), grayed out when angle mode is active
     self._lane_change_factor_high_curv.action_item.set_enabled(is_curv)
     self._enable_human_turn_detection.action_item.set_enabled(is_curv)
     self._enable_lane_positioning.action_item.set_enabled(is_curv)
