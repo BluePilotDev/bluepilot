@@ -299,7 +299,7 @@ the Explorer row. The modules' start then raised the floor. A module previews fr
 reached only below about 31 km/h, under `1.7/v`. The curve is now `min(0.26, max(1.7/v, 0.053))`, 0.053 being
 the Explorer's 0.0475 with a 10 % margin, rounded up. (It was 0.147 while the Maverick's and LX6C's start-up
 was not run and taken as 0.) The single curve was 1.2 to 5.5 times each switched-on row's own gain before
-that floor (1.5 to 6.6 times now), so it held path angle back. Each module's own curve replaces it (Choice). One read data file, on a
+that floor (1.27 to 5.47 times now, at 0.053), so it held path angle back. Each module's own curve replaces it (Choice). One read data file, on a
 row with path angle off, is above the single curve at 15 km/h (the 2025-26 Corsair's, 0.340 against 0.26).
 The single curve bounds the modules with a path-angle row, not every module read.
 
@@ -564,7 +564,7 @@ build's controller. Two rows' gains have been measured on the road with earlier 
 The review found a busier wheel on real requests (`clean-build.md` §14.1).
 
 **Choice.** This version switches path angle on for every row whose module's numbers were read from its
-files, for BC with BD's, and for the Explorer's second pair with the first pair's (2.1, 2.11). It is ready to release once testing is done. The reason is the BluePilot dev
+files, and for BC with BD's (2.1, 2.11); the Explorer's second pair's data file has been read since. It is ready to release once testing is done. The reason is the BluePilot dev
 group's 50,000+ miles of path-angle-only control, and the two rows measured on a road (table below).
 
 - **What testing checks, per family:** a drive where `drive_check.py` (3.4) finds the measured
@@ -682,10 +682,11 @@ commit.
    is sent: all zero, ramp type 0, precision 1. The reasons: a module configured for Ford's hands-free
    driving stays Unavailable while it is asked, a refused frame is a missing frame to the module, and the inactive
    frame always passes (`test_never_asks_through_unavailable`). The driver's column torque (`steeringTorque`,
-   behind `steeringPressed`, the hands-on timer and the path-angle hold-off) is the DBC's decode plus 3/32 Nm:
-   the 2021-23 F-150's module sends trunc((torque + 7.9375) * 16) (its packer, read; other programs' packers not
-   read), so the decode sits 1/16 to 2/16 Nm under the torque, and the 1 Nm press was 1.125 Nm one way and
-   0.94 the other (`TestFordCarState`).
+   behind `steeringPressed`, the hands-on timer and the path-angle hold-off) is the DBC's decode plus 3/32 Nm
+   on the F-150 MK14, Lightning and Ranger platforms only: the 2021-23 F-150's module sends
+   trunc((torque + 7.9375) * 16) (its packer, read, and byte for byte in the 2024-26 F-150's, the Lightning's and the
+   Ranger's), so the decode sits 1/16 to 2/16 Nm under the torque, and the 1 Nm press was 1.125 Nm one way and 0.94
+   the other. Every other platform's packer is not read, so its decode is taken as it is (`TestFordCarState`).
 4. **Limit** (`L/core/carcontroller_ext.py` `step_lateral`). On the fallback on the F-150 MK14 and
    Bronco Sport MK1 platforms, the request first goes through comma's `anti_overshoot`, every frame as
    stock does. Then it is clipped to `lat_accel_limit / v²`.
