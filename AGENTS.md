@@ -348,7 +348,6 @@ The BluePilot Portal is a web-based interface for managing routes, viewing syste
 - `GET /api/routes` - List all routes with metadata (location, distance, duration)
 - `GET /api/video/:baseName/:segment/:camera` - Stream video with byte-range support
 - `GET /api/thumbnail/:baseName` - Get route thumbnail image
-- `POST /api/preserve/:baseName` - Toggle route preservation (prevent auto-deletion)
 - `DELETE /api/delete/:baseName` - Delete route (blocked when driving)
 
 #### System Information
