@@ -101,7 +101,7 @@ else
 fi
 
 # Spinner logo (loading screen): source stored outside LFS; dest is what spinner.py loads
-readonly BLUEPILOT_SPINNER_SRC="/data/openpilot/openpilot/selfdrive/assets/images/spinner_bluepilot.png"
+readonly BLUEPILOT_SPINNER_SRC="/data/openpilot/bluepilot/assets/images/spinner_bluepilot.png"
 readonly SPINNER_DEST="/data/openpilot/openpilot/sunnypilot/selfdrive/assets/images/spinner_sunnypilot.png"
 
 ###############################################################################
