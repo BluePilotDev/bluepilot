@@ -367,13 +367,18 @@ Path offset and curvature rate must be inactive on every module.
   25 s, because the panda can't tell when the module started: on the Explorer the bound is the 85 m gain
   (0.0475) at every speed, against 0.0293 at T max above 100 km/h; on the Maverick and LX6C the 30 m gain
   (0.1333), against 0.027 to 0.04 above 100 km/h. On the F-150's curve it is up to 5 % stricter above 120 km/h.
-- The margin is for what the panda can't see, and it is worked out from one firmware input and one
-  chosen one (`core/limits.py`). The module reads its
-  K2 table in fixed point, at most 0.45 % above the float lookup (BD's own lookups, executed; the older
-  library's not run), and at its own speed reading, from a signal not yet traced in its code. The 6 %
-  allowance for that reading is this project's choice, not a firmware number, until that signal is traced. With it, the least margin over every curve is 1.0955, so 1.10; with it every curve
-  covers a module speed reading at least 6.3 % under the panda's lowest sample. Without the margin, a speed
-  reading 1 % under the panda's would put the module's gain about 1 % above the bound. It costs a few % of
+- The margin is for what the panda can't see (`core/limits.py`). The module reads its K2 table in fixed
+  point, at most 0.45 % above the float lookup (BD's own lookups, executed; the older library's, run on the
+  Explorer, Maverick and LX6C, are in float). It reads it at its own speed: on BD that is the larger of the
+  faster wheel of one axle and the brake module's speed the panda reads, truncated to 1/64 km/h (executed), so
+  the panda's over the module's is at most (v + a·age) / (v − 1/64 km/h): 1.068 at 5 km/h, 1.017 at 20,
+  1.003 at 120. With those executed inputs BD's curve needs a margin of 1.027. Not executed: the 30 ms sample
+  age (at 3 m/s²); that the module's cell holds that very signal (read from its receive code); below about
+  5 km/h (BD's curve is flat there); a truck configured without the brake module's speed (no stability
+  control); every program but BD. Where the chain was not run the allowance stays this project's choice, 6 %:
+  BC and the Lightning share BD's curve, and the Ranger has its own. With it the least margin over every curve
+  is 1.0949, so 1.10. Without the margin, a speed reading 1 % under the panda's would put the module's gain
+  about 1 % above the bound. It costs a few % of
   path angle in sharp entries at the cap.
 - What each module's own curve buys over the single one (controller only, open loop, with the copies'
   bound and the margin): in sharp curve entries (2.4 m/s² over 0.5 s) at 45 to 60 km/h on the F-150,
@@ -903,10 +908,10 @@ read from code but never run, or fitted to drives, is labelled that way and coun
 | Level | Means | Numbers in this build |
 |---|---|---|
 | **Generated from firmware bytes** | a script reads it from the module's flash at its address; a check re-reads it | every row's preview (T, both distance clamps, the K2 table), its curvature and path-angle rates, and its lateral-acceleration limit on its own speed axis (`L/core/module_tables.py`, with the SHA-256 of each source block); the panda's per-module gain curves and module rates (`L/safety/ford_gain_curves.h`) |
-| **Executed** | the module's own code was run in an emulator, and the model or the build is held to that run | the 2021-23 F-150 BD library: its eight control blocks, the mode machine, the limiter, the input scalings and the wire's ranges; the order of the two distance clamps; the request rule (ask only while Available or Active); `K2 = f(d)` read straight between points, with the module's fixed point 0.45 % at most; the copies following at once before control. The Ranger's and the 2024 Mustang's (PR3C) controller chains. The 2020-24 Explorer's start-up and whole lateral step (M1MC-AC with MB5C-BD; L1MC-AL's start-up and K2 lookup): its K2 table, distance clamps, preview time from 0 at power-up, rates, and no lateral-acceleration limit. The preview time at start on BD and the Ranger (T max). The Maverick's and LX6C's K2 and distance lookups |
+| **Executed** | the module's own code was run in an emulator, and the model or the build is held to that run | the 2021-23 F-150 BD library: its eight control blocks, the mode machine, the limiter, the input scalings and the wire's ranges; the order of the two distance clamps; the request rule (ask only while Available or Active); `K2 = f(d)` read straight between points, with the module's fixed point 0.45 % at most; the copies following at once before control. The Ranger's and the 2024 Mustang's (PR3C) controller chains. The 2020-24 Explorer's start-up and whole lateral step (M1MC-AC with MB5C-BD; L1MC-AL's start-up and K2 lookup): its K2 table, distance clamps, preview time from 0 at power-up, rates, and no lateral-acceleration limit. The preview time at start on BD and the Ranger (T max). The Maverick's and LX6C's K2 and distance lookups. BD's speed chain behind its K2 lookup (wheel and brake-module speeds, slew, 1/64 km/h) |
 | **Read, not run** | a person or agent read the decompiled code; nobody has run it | every other row's control law (RL14, V1MC, R1MC, SR3C, the Mach-Es, the C2 programs, the Maverick 2022-24 and LX6C beyond their lookups, the Transit, the Super Duty); the Lightning, whose code is BD's instruction for instruction and whose parameters are BD's byte for byte, but whose own image has not been run; the 2026 Maverick and Explorer rows; the steering servo behind the module's angle target; the panda's single gain curve, an envelope over the models' sweeps |
 | **Measured on drives** | from logged drives: allowed for what no firmware holds (the vehicle), and as a check | the delay learner's start per row; the health check's thresholds; the BC row's whole basis (no BC file was read); per-vehicle gain spread; the path-angle gains on the two driven rows (2.10) |
-| **Ours, or outside** | a design choice of this project, or a number from comma or a standard | comma's caps and jerk limit; the lower CAN FD cap; path angle's unwind time, dead band and restart hold-off; the controller's copy timing (0.8 and 1.25 frames); the 6 % speed allowance in the panda's margin; openpilot's default delay |
+| **Ours, or outside** | a design choice of this project, or a number from comma or a standard | comma's caps and jerk limit; the lower CAN FD cap; path angle's unwind time, dead band and restart hold-off; the controller's copy timing (0.8 and 1.25 frames); the 6 % speed allowance in the panda's margin, where the module's speed chain was not run (every program but BD), and the 30 ms sample age and 3 m/s² in BD's; openpilot's default delay |
 
 Each row says its program's level as data (`StrategyRow.evidence`: executed, read or unread), as the
 project's architecture audit has it. Nothing switches on it yet: a row's path-angle switch is a separate
