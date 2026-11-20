@@ -22,7 +22,7 @@ library's health check changes its mind, and record_health now and then.
 """
 from openpilot.common.params import Params
 from openpilot.common.swaglog import cloudlog
-from opendbc.bluepilot_lateral.core.health import NOT_CONFIGURED_REASON
+from opendbc.bluepilot_lateral.layer.health import NOT_CONFIGURED_REASON
 from opendbc.bluepilot_lateral.core.strategy import PscmIdentity, UNKNOWN_DATA_FILE, UNKNOWN_STRATEGY
 from opendbc.bluepilot_lateral.host_types import SupportLevel
 

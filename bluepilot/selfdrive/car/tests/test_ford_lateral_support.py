@@ -183,7 +183,7 @@ class TestSupportRow(OpenpilotTestCase):
 
   def test_a_module_that_answers_denied_says_so(self):
     """A truck built without lane centering: its module answers Denied. The row says so, whatever its level."""
-    from opendbc.bluepilot_lateral.core.health import NOT_CONFIGURED_REASON
+    from opendbc.bluepilot_lateral.layer.health import NOT_CONFIGURED_REASON
     params = Params()
     support.record_start(_ci(parts=F150), params)
     value, text = support.support_row(support.record_degraded(params, NOT_CONFIGURED_REASON))
