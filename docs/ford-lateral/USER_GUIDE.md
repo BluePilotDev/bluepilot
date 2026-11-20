@@ -200,7 +200,7 @@ that push may change, with one exception. On newer Fords with a faster internal 
 FD), such as the F-150, Mach-E and Ranger, BluePilot keeps a lower limit of its own: about 2.4 against
 comma's 3.6 (in m/s², sideways acceleration). An old comment in comma's code gave the reason as their
 steering having more force; nothing measured shows that. Switching on **Disable BP Lateral Control**
-gives a CAN FD car comma's 3.6 again. Where your module allows less than the limit, the build asks for
+gives a CAN FD car comma's 3.6 again, and so does the fallback (stock openpilot's code steers it). Where your module allows less than the limit, the build asks for
 no more than your module allows.
 
 openpilot is told the same limit. The comma's safety chip, the **panda**, checks it too (section 8). So when a curve needs more than that, you see openpilot's usual
@@ -328,7 +328,8 @@ What testing checks, for each group of cars, on a drive:
 - after a slow turn, when the driver lets go at the exit, no steering is left over.
 
 A drive with an earlier BluePilot on a 2021-23 F-150 with software BD already measured that row within
-that range. A row that fails goes back to curvature only. That is one line in the table.
+that range. A row that fails goes back to curvature only. That is one entry in the table's generator, with the
+test lists that name the rows.
 
 There are two other versions, and both stay as they are. The base has path angle off on every car. A
 test version has it on for the 2020-24 Explorer only, for a first drive with this build.
@@ -423,7 +424,7 @@ you tuned no longer apply.
 newer or older version, or another data file), or didn't answer. Steering Support shows what it answered.
 
 **Is the fallback worse?** On a row without path angle, the row differs from the fallback only in the
-things listed in section 4, under the table. The fallback is stock openpilot's way of steering, without holding
-the command to the yaw sensor, and with BluePilot's lower limit on CAN FD cars.
+things listed in section 4, under the table. The fallback is stock openpilot's Ford steering code and its own
+panda check, as they are: it holds the command to the yaw sensor, and on CAN FD cars it uses comma's limit.
 
 **Can I bring back the old settings or the angle mode?** Not in this build.

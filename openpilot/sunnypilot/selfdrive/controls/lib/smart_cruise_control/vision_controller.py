@@ -62,6 +62,8 @@ class SmartCruiseControlVision:
     self.is_enabled = False
     self.is_active = False
     self.enabled = self.params.get_bool("SmartCruiseControlVision")
+    # BluePilot: "Disable BP Lateral Control", which applies from the car's start (lateral_accel_max)
+    self.bp_lateral_off = self.params.get_bool("disable_BP_lat_UI")
     self.v_cruise_setpoint = 0.
 
     self.state = VisionState.disabled
@@ -100,23 +102,24 @@ class SmartCruiseControlVision:
 
       # Get the target velocity for the maximum curve
       # BluePilot: no faster than the car's steering takes the curve round (lateral_accel_max)
-      self.v_target = (self.lateral_accel_max(sm, v_ego) / max_curve) ** 0.5
+      self.v_target = (self.lateral_accel_max(sm, v_ego, self.bp_lateral_off) / max_curve) ** 0.5
 
   @staticmethod
-  def lateral_accel_max(sm, v_ego: float) -> float:
+  def lateral_accel_max(sm, v_ego: float, bp_lateral_off: bool = False) -> float:
     """BluePilot: the lateral acceleration to plan a curve's speed for, m/s^2: _A_LAT_REG_MAX, or less
     where the Ford lateral library reports that the steering module, or the panda, gives less at this
     speed (controllerStateBP.lateral.lateralAccelLimit, the limit the plan's curvature clip holds too).
-    On a Ford steered on the fallback (no row of its module's own), _A_LAT_REG_MAX is replaced by the
-    lowest of every held module's limit at this speed (strategy.fallback_curve_speed_lat_accel).
+    On a Ford steered on the fallback (no row of its module's own), with BluePilot's lateral control on (the
+    setting "Disable BP Lateral Control" off), _A_LAT_REG_MAX is replaced by the lowest of every held module's
+    limit at this speed (strategy.fallback_curve_speed_lat_accel).
     The limit falls with speed, so the one at the car's speed holds at the lower target speed."""
     try:
       lateral = sm['controllerStateBP'].lateral
     except KeyError:  # not subscribed (tests)
       return _A_LAT_REG_MAX
     own = _A_LAT_REG_MAX
-    # no row of its own (openpilot's stock Ford code steers it, whatever the setting), or not supported
-    if lateral.supportLevel in (SupportLevel.fallback, SupportLevel.not_supported):
+    # no row of its own (openpilot's stock Ford code steers it), or not supported; with the setting on, SCC-V's own
+    if not bp_lateral_off and lateral.supportLevel in (SupportLevel.fallback, SupportLevel.not_supported):
       fallback = fallback_curve_speed_lat_accel(v_ego)
       own = fallback if fallback > 0. else own
     limit = lateral.lateralAccelLimit

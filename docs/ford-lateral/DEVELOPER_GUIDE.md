@@ -111,8 +111,7 @@ can be supported. The logic is meant to be fit for upstream; the packaging isn't
    settings.
 2. **A table keyed on the module's own answers:** exact (F188, F10A) pairs, read fresh at every start.
    A row carries that module's constants. A module without a row gets the **fallback**: comma's stock
-   command, including its `anti_overshoot` smoothing on the 2021-23 F-150 and Bronco Sport platforms,
-   without its clip to measured curvature, and with BluePilot's lower cap on CAN FD (2.3).
+   Ford car controller and the host's stock panda check, as they are, with no BluePilot startup bit (2.3).
    With path angle off, a row can change up to three things against the fallback, where it has the
    value: the lateral-acceleration limit (2.9), lagd's starting delay (2.8), and the ramp type (2 on
    most rows, 0 on the fallback and BC). Rows don't smooth the request. The health check delays the
@@ -252,8 +251,8 @@ comma's command is the one with fleet evidence: on 102 vehicles of 11 platforms,
 only, ramp type 0, precision 1, with nothing of a module's own. It is a row like any other, so the
 controller always reads exactly one row. On the platforms where comma's stock code smooths the request
 (`CAR.FORD_F_150_MK14` and `CAR.FORD_BRONCO_SPORT_MK1`), the fallback smooths it the same way
-(`anti_overshoot`, copied in `L/core/carcontroller_ext.py` and pinned to comma's body), because the
-fallback is for modules nobody has read. Our fits put most logged 2021-23 F-150s (level BC) and the
+(comma's own `anti_overshoot`, since the fallback is comma's code), because the fallback is for modules nobody
+has read. Our fits put most logged 2021-23 F-150s (level BC) and the
 one logged Bronco Sport at a damping of about 0.40, the least damped Fords logged
 (`assumptions-audit.md` §3.7). A row on a read module takes the request as it is. Two things still
 differ from stock: no clip to measured curvature (and no measured-curvature band in the panda, 2.4),
@@ -313,7 +312,7 @@ because it removed the single curve's slack (`verify-mythos-clean-build.md` find
 keeps the wire within the module's own rate of its copies, which closes this.
 
 **Choice.** The two bounds, because the band is incompatible with A′ and the single sum bound is unsound.
-BluePilot's paths have no measured band, the fallback included. bp-dev's pinion yaw source (an
+BluePilot's check has no measured band; the fallback runs the host's stock check, band included. bp-dev's pinion yaw source (an
 alternative measured curvature) stays removed, since nothing reads it without the band. Startup bits go
 in the second safety param (`current_safety_param_sp`):
 
@@ -347,11 +346,21 @@ least of the later ones. That moves one point, on the strict side: the F-150's l
 to 4 once carried a measurement source, in builds that never set bit 6. Bits 3 and 4 stay unused. Three
 bits fit StarPilot, whose adapter carries seven.
 
-**The module's copies.** The module moves its copies toward each frame at its rates and takes an inactive
-frame at once (executed on BD, M1MC-AC, P1MC-AA, NZ6C-AL and LX6C-AL; `notes/clean-build.md` §16.4). So the
-panda keeps one position per signal (`FordBpLateralState`, the check's only state): moved toward the last
-frame it let through, at the curve's own rates, for the time since, and zero after an inactive frame. On a
-car with path angle, in comma's vocabulary:
+**The module's copies.** The module moves its copies toward each frame at its rates (executed on BD, M1MC-AC,
+P1MC-AA, L1MC-AL, NZ6C-AL and LX6C-AL; `notes/clean-build.md` §16.4, §16.11). It zeroes them once it has held an
+inactive frame for a few of its 4 ms ticks (two on BD, one on the Explorer, three on the Maverick and LX6C), and
+one tick of it already makes it take the next frame at once (executed on BD). It reads the bus in its own period
+(BD: Com in the 10 ms task, read; the PowerPC programs: not established). So the panda keeps one position per
+signal (`FordBpLateralState`): moved toward the last frame it let through, at the curve's own rates, for the time
+since, and at zero only once the inactive frames it let through span the module's settle time and receive period
+(the curve's `inactive_span`, generated: 18 ms on BD's curve, 54 ms on the Explorer's, 62 ms on the Maverick's and
+LX6C's, with the PowerPC programs' receive period taken as one frame, 50 ms, a hypothesis). On a car with path
+angle, in comma's vocabulary:
+
+- **settling:** no active frame until then, so the module has always zeroed its copies when the next one comes
+  (an inactive frame followed closely by an active one may never reach its law, and its copies would still be
+  where the curve left them). The controller sends inactive frames in runs that long (`core/limits.py`
+  `inactive_frames`: one on BD's curve, two on the others);
 
 - **rate:** each signal within two and a half frames of the module's rate of its position, and half a wire
   step (two frames: one lost on the way reached neither the panda nor the module; half a frame: when the
@@ -359,8 +368,10 @@ car with path angle, in comma's vocabulary:
   does;
 - **maximum:** the cap on what the module steers for anywhere between its copies and the frame, each signal
   at its worse end, at the largest gain for a path angle that adds and none for one that takes away;
-- **a cap that fell** below that (the car sped up): the frame must bring the copies back, c2 toward zero by
-  half of what it may move in a frame (the module's rate, or the jerk step where less), and add no path angle;
+- **a cap that fell** below that (the car sped up): the frame must bring the copies back as fast as the module
+  moves them, c2 a whole frame of the module's rate (or the jerk step where less) nearer zero than its copy, and
+  add no path angle. What the module steers for then stays under that end of the copies, which falls as fast as
+  the module allows; a path angle that takes away may come back toward zero meanwhile, under the same end;
 - **jerk:** comma's, on c2 and on the implied curvature.
 
 Without path angle it is comma's check without its band. The controller keeps the same position, moved one
@@ -372,8 +383,8 @@ Path offset and curvature rate must be inactive on every module.
 
 **Costs.**
 
-- This relaxes comma's Ford check, and it applies to the fallback too, because the band is the tie to a
-  biased yaw signal that 1.2 describes. A stricter choice would keep comma's check for unknown modules.
+- This relaxes comma's Ford check on the modules with a row, because the band is the tie to a biased yaw signal
+  that 1.2 describes. The fallback keeps comma's check, band included.
 - The bound is only as right as the row's match and the firmware read behind its curve. A wrong curve
   index would loosen it to another module's gain. `test_limits.py` holds every curve at or above what its
   module steers for at that speed and every higher one.
@@ -403,9 +414,9 @@ Path offset and curvature rate must be inactive on every module.
   Lightning and Ranger rows, the module got 96 to 98 % of the path angle asked, against 94 to 96 %, and
   the tracking error at 60 km/h falls from 0.0025 to 0.0015 1/m on the F-150 and from 0.0021 to 0.0012
   on the Ranger (figures from before the start-up floor; not re-run). The cap and the jerk limit are unchanged.
-- The copies' range assumes a module never moves its copies slower than the rates above. After a
-  disengage the panda lets them settle at those rates, so an engagement soon after one in a sharper curve
-  can send less path angle for a second or two.
+- The position assumes a module never moves its copies slower than the rates above (executed on every program
+  with path angle). After a disengage the panda takes no active frame for the curve's inactive span, so a restart
+  on the Explorer, Maverick and LX6C rows costs one frame more than on the F-150 (100 ms against 50 ms).
 - "Disable BP Lateral Control" is read at car init only, because that is when the panda is told which
   check to run.
 
@@ -432,34 +443,30 @@ post-lane-change limiter, the clip, the pinion source, and 18 of the 19 settings
 software over the air.
 
 **Choice.** Read the module fresh at every start, because a row must never be applied to software it
-wasn't read from. `L/core/pscm_read.py` reads these from the module at 0x730:
+wasn't read from. Ford's firmware query (`O/opendbc/car/ford/values.py` `FW_QUERY_CONFIG`) asks the steering
+module at 0x730, bus 0:
 
 | Identifier | What | Use |
 |---|---|---|
-| F188, F10A | strategy, data file | the table's key |
-| F124 | calibration | matching: superseded levels, and rows that pin one (none yet) |
-| D02B | over-the-air update counter | logged; not every module answers |
-| DE00-DE02 | As-Built configuration blocks | logged |
-| EE80 | version of Ford's lane-keeping software inside the module | logged |
+| F188 | strategy | the table's key; comma's matching too |
+| F10A | data file | the table's key; logged, never matched |
+| F124 | calibration | superseded levels, and rows that pin one (none yet); logged, never matched |
 
-It uses diagnostic service 0x22 (read data by identifier) after a tester-present message, the same
-request shape as
-openpilot's own Ford query (`test_reads_are_read_only`). Nothing is written. The answers go into
-`CarParams.carFw` under brand `ford_pscm_live`, so they are logged and never take part in fingerprint
-matching. F188 and F10A are asked up to three times, because one lost frame would otherwise put the car
-on the fallback for the whole drive (`test_a_lost_answer_to_the_key_is_asked_again`). A silent module
-costs the start 0.1 s per identifier, plus 0.2 s more for each key identifier. Only the steering module
-is read. Camera status and fault-code reads are future improvements, after a truck test
-(`clean-build.md` §10).
+`L/core/strategy.py` `PscmIdentity.from_car_fw` takes the three from `CarParams.carFw` under brand `ford`.
+F10A and F124 are each asked twice in the one query, as F188 is, so one lost answer doesn't put the car on the
+fallback for the drive (`test_a_lost_answer_to_the_key_is_asked_again`); each request costs a silent module
+0.1 s, and the query-time references in `test_fw_fingerprint.py` carry the +0.4 s. A Ford's firmware is never
+taken from openpilot's cache (`O/opendbc/car/car_helpers.py`), except under process replay (`REPLAY`), where no
+module answers and the route's own CarParams is all there is (`test_a_replayed_ford_route_takes_its_cached_firmware`).
+D02B, DE00-DE02 and EE80 are no longer read; the status's OTA field stays empty. Only the steering module is
+read.
 
 **From the firmware.** Each program's own read-identifier check allows F10A in the default session on
 every program with a row except the Super Duty's, which wasn't decoded and is on the fallback anyway.
-EE80 is allowed in the default session on every program decoded (`assumptions-audit.md` §3.1, item 47).
 BC's software was never read.
 
 **Not checked.** Whether F10A answers on a real truck; no truck has been read with this code. If it
-doesn't, that car is on the fallback. DE01 isn't decoded: where its fields sit is a hypothesis for most
-modules.
+doesn't, that car is on the fallback.
 
 ### 2.7 The health check and its gain windows
 
@@ -474,7 +481,7 @@ review of the first version found that its gain check couldn't reach the "degrad
 noisy readings (`clean-build.md` §14.1). A yaw zero of
 0.025 rad/s moved one-minute gains between 0.9 and 1.6 on a car that follows its command.
 
-**Choice** (`L/core/health.py`). Read-only signals, because the check must never change the steering:
+**Choice** (`L/layer/health.py`). Read-only signals, because the check must never change the steering:
 
 - **Curvature gain.** A window is at least a minute of hands-off driving above 9 m/s with enough steering
   in it (`MIN_EXCITATION`). The command is delayed by lagd's delay (`LateralInputs.lateralDelay`), else
@@ -497,7 +504,7 @@ noisy readings (`clean-build.md` §14.1). A yaw zero of
   configured on this truck" instead of the level.
 
 Each signal clears in its own way. The module's is per frame, not latched: it shows only while the
-module reports Faulty (`L/core/health.py` `update`). The panda's count lasts the drive. The gain signal
+module reports Faulty (`L/layer/health.py` `update`). The panda's count lasts the drive. The gain signal
 carries across drives and clears when a window reads in range. The stored reason in `FordLateralSupport`
 is cleared at every start and rewritten when the check changes its mind.
 
@@ -555,7 +562,8 @@ request beyond it shows as "turn exceeds steering limit". Road roll can't widen 
 (`test_road_roll_does_not_widen_the_steering_limit`). sunnypilot's vision curve speed (SCC-V) plans for
 it where it is below its own 2.0 m/s² (`B/openpilot/sunnypilot/selfdrive/controls/controlsd_ext.py`,
 `.../smart_cruise_control/vision_controller.py`). On the fallback (no row of the module's own, or a row kept on
-the fallback or not supported), SCC-V's flat 2.0 is replaced by the lowest of every held module's mode-1 limit
+the fallback or not supported), with "Disable BP Lateral Control" off, SCC-V's flat 2.0 is replaced by the lowest of
+every held module's mode-1 limit
 at the car's speed (`L/core/module_tables.py` `LIMIT_FALLBACK_CURVE_SPEED`, generated from the files with the
 others; `strategy.fallback_curve_speed_lat_accel`): 2.0 to 100 km/h, 1.75 at 130, 1.2 at 160, 0.4 at 200,
 because a module whose own limit is unknown may have the lowest one held. Modules without a limit (the 2020-24
@@ -699,9 +707,8 @@ commit.
    trunc((torque + 7.9375) * 16) (its packer, read, and byte for byte in the 2024-26 F-150's, the Lightning's and the
    Ranger's), so the decode sits 1/16 to 2/16 Nm under the torque, and the 1 Nm press was 1.125 Nm one way and 0.94
    the other. Every other platform's packer is not read, so its decode is taken as it is (`TestFordCarState`).
-4. **Limit** (`L/core/carcontroller_ext.py` `step_lateral`). On the fallback on the F-150 MK14 and
-   Bronco Sport MK1 platforms, the request first goes through comma's `anti_overshoot`, every frame as
-   stock does. Then it is clipped to `lat_accel_limit / v²`.
+4. **Limit** (`L/core/carcontroller_ext.py` `step_lateral`). The request is clipped to `lat_accel_limit / v²`.
+   (The fallback never reaches this controller: comma's stock code steers it, its `anti_overshoot` included.)
 5. **Path** (`_path`). Without path angle, `want` goes straight through. With it:
    - curvature moves toward `want` at the row's rate, so it always equals the module's own copy. The
      position is kept unrounded (`clean-build.md` §14.1);
@@ -716,24 +723,20 @@ commit.
    saw (zero after any inactive frame), it allows one jerk step either way within the cap, for the
    curvature signal and for the implied curvature. The controller reads K2max, from the same gain curve
    as the panda, 1 m/s below the car's speed, so its K2max is at or above the panda's, which reads it at
-   its lowest recent speed sample. It also keeps the panda's range of the module's copies (2.4). Curvature
+   its lowest recent speed sample. It also keeps the panda's position of the module's copies (2.4). Curvature
    is fitted first, then path angle into what is left. A car whose path angle is off never gets a
    path angle step from this fit, even when a jump in the speed reading leaves no whole step that fits.
    So every frame is inside the panda's check by construction, given that the panda saw the last one.
    **Restart:** if a frame is lost or refused, the panda restarts from zero and the controller doesn't.
-   When the host reports a rise in `safetyTxBlocked` while the panda allows steering, the next frame is
-   the inactive frame, so both restart from zero (`test_one_lost_frame_doesnt_stop_the_steering`).
-   Before, every later frame was refused until the request came back near zero. The panda never took the
-   refused frame, so its range of the module's copies holds only frames it accepted. On the restart the
-   controller's narrow copy starts again from the inactive frame, and its wide copy keeps everything and
-   takes back where it was over the last 0.4 s, without moving that frame: on a falling ramp it had followed
-   frames the panda refused, while the panda's stays with the last frame it took. So they stay inside and
-   around the panda's on a rising and on a falling ramp (`test_after_a_refused_frame_the_copies_match_the_pandas`,
-   `test_after_a_frame_lost_on_a_falling_ramp_the_copies_still_match_the_pandas`).
-7. **Pack** (`L/core/lane_message.py`, `L/can/fordcan_ext.py`). Each path signal is clamped to its DBC
-   range in the wire's sign (the wrap fix, `test_wire_clamp.py`). The library sets the
-   LateralMotionControl2 checksum itself. `lane_message.replaces(address)` tells the car controller
-   which camera messages it sends in the camera's place.
+   When the host reports a rise in `safetyTxBlocked` while the panda allows steering, the next frames are
+   inactive, as many as span the module's settle time (`limits.inactive_frames`), so both restart from zero
+   (`test_one_lost_frame_doesnt_stop_the_steering`, `test_a_restart_puts_the_copies_at_zero`). Before, every
+   later frame was refused until the request came back near zero. The controller's position of the copies is
+   the panda's to `FRAME_TIMING` after each restart (`test_the_controllers_copies_are_the_pandas`).
+7. **Pack** (`L/core/carcontroller_ext.py` `_frame`, `L/can/fordcan_ext.py`). Each path signal is clamped to its
+   DBC range in the wire's sign (the wrap fix, `test_wire_clamp.py`). The library sets the
+   LateralMotionControl2 checksum itself. Lane keeping and the cluster messages are sent by the host's car
+   controller as before; the library sends Ford's path message only.
 8. **Panda** (`O/opendbc/safety/modes/ford.h` `ford_tx_hook` → `L/safety/ford.h` `ford_bp_lmc_tx` →
    `L/safety/lateral.h` `ford_bp_path_cmd_checks`): section 3.2.
 9. **Module.** Steers for `c2 + K2·c1` with its own limits and driver override.
@@ -820,13 +823,18 @@ The pipeline lives in the project's research notes (to be published):
    rows refer to the generated tables and type none of their numbers (`tests/test_module_tables.py`).
    A row with path angle on also needs its module's gain curve and c2 rate in the panda's table, generated
    from the same reading into `L/safety/ford_gain_curves.h` and pinned to the Python tables (2.4).
-5. **Row in `strategy-table.md`,** with every value marked proven, supported or hypothesis. Then a
-   `StrategyRow` in `L/core/strategy.py` that cites its note.
+5. **Row in `strategy-table.md`,** with every value marked proven, supported or hypothesis. Then one entry in
+   the generator's `ROWS` (`scripts/pathangle-build/gain_tables.py` in the research notes): its pairs, level, note,
+   preview, limit, T at start, evidence and basis; `--write` makes `L/core/module_tables.py`, from which
+   `L/core/strategy.py` builds `STRATEGY_TABLE`. No part number or number is typed in `strategy.py`.
 6. **Tests:** a `test_strategy.py` case for its pairs and for what must not match it; the window test
    with the row, path angle on and off; and `table_coverage.py` re-run.
-7. **Path angle on:** when the row holds a preview with both distance clamps at all eight speed points,
-   a c2 rate and a c1 rate, and its module's gain curve is in the panda's table. A family's drive check
-   (2.10) can take it off again.
+7. **Path angle on:** only where the row's whole lateral step has run in an emulator, the inactive frame
+   included. It is one generator entry with three fields beside the row's: `path_angle_run` (the results that
+   show it), `t_start` (T at the module's start, executed) and `inactive` (its settle time after an inactive
+   frame, executed, and its receive period), with a preview; then `--write`, and the tests that list the rows
+   with path angle or the panda's curves (`test_strategy`, `test_safety_param_bits`, `test_controller`,
+   `test_limits`, the window tests) take the new row. A family's drive check (2.10) can take it off again.
 8. **The block above the row** in `L/core/strategy.py`, and its line in the table below: where the
    numbers come from, what is confirmed and how, what isn't, and what would confirm or change it.
 
@@ -928,7 +936,6 @@ What the main tests guard against:
 | `L/tests/test_recorded_turns.py` | path-angle wind-up on recorded low-speed turns (`tests/data/low_speed_turns.csv`) |
 | `L/tests/test_health.py` | a false "degraded" after a disengage; breaking the gain window's rules |
 | `L/tests/test_wire_clamp.py` | signals wrapping past their range (failed first against `f267286`) |
-| `L/tests/test_lane_message_plan.py` | the plan drifting from the panda's transmit table and the car controller |
 | `L/tests/test_safety_param_bits.py` | Python's bits drifting from `ford_bp_init`'s |
 | `L/tests/test_core_imports.py`, `test_bluepilot_upstream_copies.py` | absolute host imports; copies of upstream functions going stale |
 | `B/bluepilot/selfdrive/car/tests/test_ford_lateral_support.py` | the support row, notices and `record_start` breaking with the real Ford interface |
@@ -987,8 +994,6 @@ decision (2.10).
   True only when the row holds a preview, a c2 rate and a c1 rate and its module's gain curve is in the
   panda's table (`test_strategy.py` checks it), and add the row to the window test's `SWITCHED_ON`.
   Write its evidence block (3.3).
-- **A new way a module takes its lane message:** a new variant in `L/core/lane_message.py`, its own
-  check in `L/safety/`, and rows that name it. The controller and the table don't change.
 - **A new host:** an adapter against `BluePilotLateral(CP, safety_param, packer, CAN)`, `update`,
   `step_lateral` and `status` (`L/HOSTS.md`).
 - **Every change to the safety code:** the window test, coverage at 100 %, MISRA and mutation testing.

@@ -213,8 +213,9 @@ class TestSteeringLimitSetsTheCurveSpeed(OpenpilotTestCase):
   """BluePilot: the curve speed is planned for no more lateral acceleration than the car's steering
   gives (the Ford lateral library's limit), where that is below SCC-V's own."""
 
-  def _target(self, reported, subscribed=True, level=2, active=True):
+  def _target(self, reported, subscribed=True, level=2, active=True, bp_lateral_off=False):
     from openpilot.sunnypilot.selfdrive.controls.lib.smart_cruise_control import vision_controller as vc
+    Params().put_bool("disable_BP_lat_UI", bp_lateral_off)
     sm = {'modelV2': generate_modelV2().modelV2, 'carState': generate_carState().carState,
           'controlsState': generate_controlsState().controlsState}
     if subscribed:
@@ -235,16 +236,17 @@ class TestSteeringLimitSetsTheCurveSpeed(OpenpilotTestCase):
   def test_the_fallback_plans_for_the_lowest_module_limit(self):
     """A Ford steered on the fallback plans for the lowest of every held module's limit at its speed, not
     SCC-V's flat 2.0: at 30 m/s (108 km/h) that is 1.933, between 2.0 at 100 km/h and 1.75 at 130. The panda's
-    cap (reported, 2.4 on CAN FD) is above it. A module with a row keeps SCC-V's own, also with the setting off."""
+    cap (reported, 2.4 on CAN FD) is above it. A module with a row keeps SCC-V's own. With "Disable BP Lateral
+    Control" on, SCC-V's own too, as before the fallback became comma's stock code (verify-mythos-simplify 7)."""
     from opendbc.bluepilot_lateral.core.strategy import fallback_curve_speed_lat_accel
     want = fallback_curve_speed_lat_accel(30.)
     self.assertAlmostEqual(want, 2.0 - 0.25 * 8 / 30, places=4)
-    for level, active in ((0, True), (0, False), (3, True)):  # fallback (stock code, the setting on or off), not supported
-      v, max_curve, _ = self._target(2.4, level=level, active=active)
+    for level in (0, 3):  # fallback (openpilot's stock code steers), not supported; the setting off
+      v, max_curve, _ = self._target(2.4, level=level, active=False)
       self.assertAlmostEqual(v, (want / max_curve) ** 0.5, places=4)
-    for level, active in ((2, True), (1, True), (2, False)):
-      v, max_curve, own = self._target(2.4, level=level, active=active)
-      self.assertAlmostEqual(v, (own / max_curve) ** 0.5, places=4)
+    for level, active, off in ((2, True, False), (1, True, False), (2, False, True), (0, False, True), (3, False, True)):
+      v, max_curve, own = self._target(2.4, level=level, active=active, bp_lateral_off=off)
+      self.assertAlmostEqual(v, (own / max_curve) ** 0.5, places=4, msg=(level, off))
 
   def test_sccvs_own_limit_otherwise(self):
     for reported, subscribed in ((2.6, True), (0., True), (1.2, False)):
