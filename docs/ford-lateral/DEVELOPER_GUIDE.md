@@ -311,7 +311,8 @@ Lightning and BC share one, because the F-150's and Lightning's firmware hold th
 takes BD's. Each is read from that module's flash (`safety/ford.h` `FORD_BP_GAIN_CURVES`, the same numbers
 in `core/limits.py` `GAIN_CURVES`): its c2 rate, its shortest preview time, the two preview-distance clamps
 by speed, and its K2 table by distance, read straight between the table's points as the module reads it.
-The bound is that module's largest K2 at the speed. The panda reads the gain at its lowest recent speed
+The bound is that module's largest K2 at the speed, times a 10 % margin, and no higher than the single
+curve (which binds only on the Explorer above about 200 km/h). The panda reads the gain at its lowest recent speed
 sample, which is right only if the curve never rises with speed, so each distance point is held to the
 least of the later ones. That moves one point, on the strict side: the F-150's lower distance at
 100 km/h, from 50 m to 46.9 m. With no curve, or bits 6 or 7, the panda keeps the single curve. Bits 0
@@ -338,11 +339,15 @@ Path offset and curvature rate must be inactive on every module.
   index would loosen it to another module's gain. `test_limits.py` holds every curve at or above what its
   module steers for at that speed and every higher one, and at or under the single curve. For BC the
   curve is BD's by choice (2.11).
-- The module reads its K2 table at its own speed reading, in fixed point. A speed reading 1 % under the
-  panda's gives a gain about 1 % above the bound, on the path-angle share only.
-- What each module's own curve buys over the single one (controller only, open loop): in sharp curve
-  entries (2.4 m/s² over 0.5 s) at 45 to 60 km/h on the F-150, Lightning and Ranger rows, the module gets
-  99 % of the path angle asked, against 94 %. The cap and the jerk limit are unchanged.
+- The 10 % margin is for what the panda can't see: the module reads its K2 table at its own speed
+  reading and in fixed point, and a speed reading 1 % under the panda's gives a gain about 1 % above the
+  module's. Without it the bound had nothing to spare (`verify-mythos-clean-build.md` finding 5). It costs
+  a few % of path angle in sharp entries at the cap.
+- What each module's own curve buys over the single one (controller only, open loop, with the copies'
+  bound and the margin): in sharp curve entries (2.4 m/s² over 0.5 s) at 45 to 60 km/h on the F-150,
+  Lightning and Ranger rows, the module gets 96 to 98 % of the path angle asked, against 94 to 96 %, and
+  the tracking error at 60 km/h falls from 0.0025 to 0.0015 1/m on the F-150 and from 0.0021 to 0.0012
+  on the Ranger. The cap and the jerk limit are unchanged.
 - The copies' range assumes a module never moves its copies slower than the rates above. After a
   disengage the panda lets them settle at those rates, so an engagement soon after one in a sharper curve
   can send less path angle for a second or two.
@@ -637,7 +642,7 @@ commit.
    - the controller's copy of the module's preview time T drops at once when curvature rises and
      recovers at `t_rise` per second, as the module's does. `gain = K2(v, T)`;
    - path angle is `(want − c2)/gain`. It may cancel whatever the slow curvature still holds back,
-     plus at most what the row's path-angle rate can take back in 1 s. While the driver steers it gets
+     plus at most what the row's path-angle rate can take back in 3 s. While the driver steers it gets
      nothing beyond cancelling, so nothing is left over when they let go (the wind-up rule);
    - path angle stays at zero until it would be at least 1.5 wire steps, so it doesn't flip sign frame
      by frame (the dead band), and it moves at the row's path-angle rate.
@@ -652,7 +657,10 @@ commit.
    **Restart:** if a frame is lost or refused, the panda restarts from zero and the controller doesn't.
    When the host reports a rise in `safetyTxBlocked` while the panda allows steering, the next frame is
    the inactive frame, so both restart from zero (`test_one_lost_frame_doesnt_stop_the_steering`).
-   Before, every later frame was refused until the request came back near zero.
+   Before, every later frame was refused until the request came back near zero. The panda never took the
+   refused frame, so its range of the module's copies holds only frames it accepted. On the restart the
+   controller's narrow copy starts again from the inactive frame and its wide copy keeps everything, so
+   they stay inside and around the panda's (`test_after_a_refused_frame_the_copies_match_the_pandas`).
 7. **Pack** (`L/core/lane_message.py`, `L/can/fordcan_ext.py`). Each path signal is clamped to its DBC
    range in the wire's sign (the wrap fix, `test_wire_clamp.py`). The library sets the
    LateralMotionControl2 checksum itself. `lane_message.replaces(address)` tells the car controller
@@ -808,14 +816,14 @@ heavy: run them in CI or on a large machine, not on a shared small one. From `op
 `PYTHONPATH=$PWD`:
 
 ```
-.venv/bin/python -m unittest discover -s opendbc/bluepilot_lateral/tests -t .          # library: 122 OK
-(cd opendbc/safety/tests && ../../../.venv/bin/python -m unittest test_ford test_bluepilot_lateral)  # 657 OK, 107 skipped
+.venv/bin/python -m unittest discover -s opendbc/bluepilot_lateral/tests -t .          # library: 125 OK
+(cd opendbc/safety/tests && ../../../.venv/bin/python -m unittest test_ford test_bluepilot_lateral)  # 660 OK, 107 skipped
 .venv/bin/python -m unittest opendbc.car.tests.test_car_interfaces opendbc.car.ford.tests.test_ford  # 284 OK
 bash opendbc/bluepilot_lateral/safety/tests/bluepilot_coverage.sh                       # 100 % of both headers and modes/ford.h
 ```
 
 Also: `opendbc/sunnypilot/car/ford/tests` (75 OK), ruff and ty on the library, MISRA (`test_misra.sh`,
-passes), mutation testing (`L/safety/tests/bluepilot_mutation.py`, 124 of 124 killed, 6 not buildable), and the bluepilot
+passes), mutation testing (`L/safety/tests/bluepilot_mutation.py`, 126 of 126 killed, 6 not buildable), and the bluepilot
 tree on a built tree:
 
 ```
