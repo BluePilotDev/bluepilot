@@ -595,8 +595,13 @@ commit.
    saw (zero after any inactive frame), it allows one jerk step either way within the cap, for the
    curvature signal and for the implied curvature. The controller reads K2max 1 m/s below the car's
    speed, so its K2max is at or above the panda's, which reads it at its lowest recent speed sample. Curvature
-   is fitted first, then path angle into what is left. So every frame is inside the panda's check by
-   construction.
+   is fitted first, then path angle into what is left. A car whose path angle is off never gets a
+   path angle step from this fit, even when a jump in the speed reading leaves no whole step that fits.
+   So every frame is inside the panda's check by construction, given that the panda saw the last one.
+   **Restart:** if a frame is lost or refused, the panda restarts from zero and the controller doesn't.
+   When the host reports a rise in `safetyTxBlocked` while the panda allows steering, the next frame is
+   the inactive frame, so both restart from zero (`test_one_lost_frame_doesnt_stop_the_steering`).
+   Before, every later frame was refused until the request came back near zero.
 7. **Pack** (`L/core/lane_message.py`, `L/can/fordcan_ext.py`). Each path signal is clamped to its DBC
    range in the wire's sign (the wrap fix, `test_wire_clamp.py`). The library sets the
    LateralMotionControl2 checksum itself. `lane_message.replaces(address)` tells the car controller
