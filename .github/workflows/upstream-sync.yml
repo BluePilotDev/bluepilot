@@ -1,8 +1,10 @@
 # BluePilot: nightly upstream sync (spec: ford-op/bp-sunnypilot#6). Fast-forwards `sunnypilot-clean` to sunnypilot
 # `master` and keeps one PR open from it into `bp-sunnypilot`. When sunnypilot moves its opendbc
 # pin, it builds the resolve itself (ford-op/bp-sunnypilot#31): the PR then comes from a `sync/resolve-*` branch with
-# `opendbc_repo` at the ford-op/opendbc commit that has the pin. It never merges and never force-pushes: if
-# `sunnypilot-clean` is not a fast-forward of upstream it stops and opens an issue.
+# `opendbc_repo` at the ford-op/opendbc commit that has the pin. It never force-pushes: if `sunnypilot-clean` is not a
+# fast-forward of upstream it stops and opens an issue. It merges the PR itself (a merge commit) only when every
+# row of the PR's table is green, `opendbc_repo` doesn't move and the required checks pass; any other sync waits
+# for a maintainer.
 name: upstream sync
 
 on:
@@ -19,7 +21,7 @@ jobs:
   sync:
     if: github.repository == 'ford-op/bp-sunnypilot'
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 60  # the merge step waits for the PR's required checks
     steps:
     # GITHUB_TOKEN can't be used: pushes and PRs made with it don't start CI. The bluepilot-sync
     # App's PRs run CI normally.
@@ -193,6 +195,14 @@ jobs:
           overlap_row="| ✅ | Overlap | none |"
         fi
 
+        # BluePilot: the job merges the PR itself (the "Merge on green" step) when there is nothing for a maintainer
+        # to decide: a plain sync (opendbc_repo doesn't move, so no opendbc or library change comes with it), bp-opendbc
+        # has sunnypilot's pin, the library is the latest release, and nothing conflicts or overlaps.
+        automerge=no
+        if [ "$resolve" = no ] && [ "$ready" = yes ] && [ -z "$conflicts" ] && [ -z "$overlap" ] && [[ "$lateral_row" == "| ✅ |"* ]]; then
+          automerge=yes
+        fi
+
         # same-repo resolve PRs only: the repo is public, so anyone can open a PR from a fork's sync/resolve-x
         open_resolve() { gh pr list -R "$REPO" --base "$INTEGRATION" --state open --json number,headRefName,isCrossRepository \
           -q 'map(select((.headRefName | startswith("sync/resolve-")) and (.isCrossRepository | not))) | .[0] // empty | "\(.number) \(.headRefName)"'; }
@@ -232,6 +242,10 @@ jobs:
           echo "$conflicts_row"
           echo "$overlap_row"
           if [ "$resolve" = yes ]; then echo "$firmware_row"; echo "$library_row"; fi
+          if [ "$automerge" = yes ]; then
+            echo
+            echo "Every row is ✅ and \`opendbc_repo\` doesn't move, so the job merges this (a merge commit) once the required checks pass."
+          fi
           echo
           echo "### Upstream commits"
           git log -n 200 --format='- %h %s' "$integration..$up"
@@ -279,6 +293,7 @@ jobs:
         {
           echo "pr=$pr"; echo "base=$base"; echo "up=$up"; echo "integration=$integration"
           if [ -n "$conflicts$overlap" ]; then echo "review=yes"; fi
+          echo "automerge=$automerge"
           echo "files<<EOF"; sort -u <<<"$(printf '%s\n%s\n' "$conflicts" "$overlap")" | sed '/^$/d'; echo "EOF"
           echo "conflicts<<EOF"; echo "$conflicts"; echo "EOF"
           if [ "$resolve" = yes ]; then echo "resolved=$target"; echo "firmware=$(tr '\n' ' ' <<<"$fw_ford")"; fi
@@ -329,3 +344,38 @@ jobs:
         [ -s review.md ] || { echo "::error::the review came back empty"; exit 1; }
         { echo "$marker"; cat review.md; } > comment.md
         gh pr comment "$PR" -R "$REPO" --body-file comment.md
+    # BluePilot: merges the sync PR when the Sync step found nothing for a maintainer to decide (automerge above)
+    # and the required checks pass on upstream's commit. A merge commit, and the branch stays. A failed check or
+    # a timeout leaves the PR open with a warning: the job itself stays green.
+    - name: Merge on green
+      if: steps.sync.outputs.automerge == 'yes'
+      env:
+        GH_TOKEN: ${{ steps.app.outputs.token }}
+        REPO: ${{ github.repository }}
+        PR: ${{ steps.sync.outputs.pr }}
+        UP: ${{ steps.sync.outputs.up }}
+      run: |
+        set -euo pipefail
+        # required checks, mirrored from branch protection (keep in sync if that list changes)
+        REQ=("build release" "static analysis" "unit tests" "process replay" "install smoke")
+        for _ in $(seq 120); do  # 40 minutes
+          out=$(gh pr checks "$PR" -R "$REPO" --json name,bucket 2>/dev/null || true)
+          passed=0
+          for name in "${REQ[@]}"; do
+            if jq -e --arg n "$name" 'any(.[]; .name == $n and (.bucket == "fail" or .bucket == "cancel"))' <<<"${out:-[]}" >/dev/null; then
+              echo "::warning::#$PR stays open: required check \"$name\" failed"
+              exit 0
+            fi
+            if jq -e --arg n "$name" 'any(.[]; .name == $n and .bucket == "pass")' <<<"${out:-[]}" >/dev/null; then
+              passed=$((passed + 1))
+            fi
+          done
+          if [ "$passed" = "${#REQ[@]}" ]; then
+            # only upstream's commit, the one the table describes: a later push to the mirror isn't merged
+            gh pr merge "$PR" -R "$REPO" --merge --match-head-commit "$UP"
+            echo "merged #$PR at $UP"
+            exit 0
+          fi
+          sleep 20
+        done
+        echo "::warning::#$PR stays open: the required checks didn't finish in 40 minutes"
