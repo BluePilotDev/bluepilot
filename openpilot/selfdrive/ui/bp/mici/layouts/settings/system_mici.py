@@ -6,7 +6,6 @@ from openpilot.common.params import Params
 from openpilot.selfdrive.ui.bp.mici.widgets.button_bp import BigButtonBP
 from openpilot.selfdrive.ui.bp.mici.widgets.preferred_network_select import PreferredNetworkSelectMici
 from openpilot.selfdrive.ui.ui_state import ui_state
-from openpilot.system.ui import text as text_lib
 from openpilot.system.ui.lib.application import gui_app
 from openpilot.system.ui.lib.multilang import tr
 from openpilot.system.ui.lib.wifi_manager import WifiManager, Network

@@ -1,4 +1,3 @@
-import time
 import pyray as rl
 from opendbc.car.structs import car
 from openpilot.common.filter_simple import FirstOrderFilter
@@ -22,7 +21,7 @@ from openpilot.selfdrive.ui.bp.mici.onroad.lateral_debug_mici import LateralDebu
 from openpilot.selfdrive.ui.bp.mici.onroad.rad_racer_mici import RadRacerThemeMici
 from openpilot.system.ui.widgets import Widget
 # BluePilot: unified theme selector (BPThemePack param)
-from openpilot.selfdrive.ui.bp.lib import theme_pack, theme_scene
+from openpilot.selfdrive.ui.bp.lib import theme_scene
 
 # BluePilot: Margin to keep confidence ball inside the MICI rounded border
 MICI_BALL_BORDER_MARGIN = 25  # half of 50px MICI border thickness
@@ -117,7 +116,7 @@ class MiciAugmentedRoadViewBP(MiciCameraViewBP, AugmentedRoadView, BlindspotRend
     if not self._swipe_detector.interacting():
       super()._handle_mouse_release(mouse_pos)
 
-  def _render(self, _):
+  def _render(self, rect):
     """Override render to place confidence ball on left, offset driver state, and conditionally hide border."""
     bp_ui_log.tick()  # refresh BPUIDebugLog enabled state (mirrors TICI; MICI had no tick, so the toggle was inert)
     # Draw text if not onroad (upstream)
@@ -126,7 +125,6 @@ class MiciAugmentedRoadViewBP(MiciCameraViewBP, AugmentedRoadView, BlindspotRend
       self._offroad_label.render(self._rect)
       return
 
-    start_draw = time.monotonic()
     self._switch_stream_if_needed(ui_state.sm)
     self._update_calibration()
 

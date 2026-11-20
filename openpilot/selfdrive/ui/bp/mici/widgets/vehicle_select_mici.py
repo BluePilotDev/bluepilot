@@ -119,7 +119,7 @@ class VehicleModelSelectMici(NavScroller):
 
     title = (
       tr("slide to\napply now")
-      if ui_state.is_offroad
+      if ui_state.is_offroad()
       else tr("slide to\napply when offroad")
     )
     dlg = BigConfirmationDialog(

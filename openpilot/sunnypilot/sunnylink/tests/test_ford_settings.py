@@ -5,29 +5,38 @@ This file is part of sunnypilot and is licensed under the MIT License.
 See the LICENSE.md file in the root directory for more details.
 """
 import json
+import os
 import unittest
 from pathlib import Path
 
 from opendbc.bluepilot_lateral.params.manifest import SETTINGS
+from openpilot.common.basedir import BASEDIR
 
 SETTINGS_UI = Path(__file__).resolve().parents[1] / "settings_ui.json"
 OFFROAD_ONLY = ("FordPrefLateralControl", "FordPrefSteerAngleCurvature")
+FULL_BLUEPILOT = os.path.isfile(os.path.join(BASEDIR, "BPVERSION"))  # the tree decides, as in process_replay/bp_refs.py
 
 
 class TestFordSettingsMatchManifest(unittest.TestCase):
   """BluePilot: sunnylink's Ford section holds every setting the lateral library reads (bp-sunnypilot #12),
-  with the manifest's limits. The disable toggle stays out: BluePilot is always on in bp-sunnypilot."""
+  with the manifest's limits. In bp-sunnypilot the section is exactly the manifest without the disable toggle
+  (BluePilot is always on there). Full BluePilot also lists the toggle and its own settings (UI, longitudinal,
+  hybrid gauges), so there the section is a superset of the manifest."""
 
   @classmethod
   def setUpClass(cls):
     cls.items = {i["key"]: i for i in json.loads(SETTINGS_UI.read_text())["vehicle_settings"]["ford"]["items"]}
-    cls.manifest = {s.key: s for s in SETTINGS if s.key != "disable_BP_lat_UI"}
+    cls.manifest = {s.key: s for s in SETTINGS if FULL_BLUEPILOT or s.key != "disable_BP_lat_UI"}
 
   def test_same_keys(self):
-    self.assertEqual(set(self.items), set(self.manifest))
+    self.assertEqual(set(self.manifest) - set(self.items), set())
+    if not FULL_BLUEPILOT:
+      self.assertEqual(set(self.items) - set(self.manifest), set())
 
   def test_limits_match_the_manifest(self):
     for key, item in self.items.items():
+      if key not in self.manifest:  # one of full BluePilot's own settings
+        continue
       rng = self.manifest[key].range
       with self.subTest(key=key):
         if item["widget"] == "option":

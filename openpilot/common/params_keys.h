@@ -365,7 +365,7 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"BPHideOnroadBorder", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"BPHideCameraView", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"BPRadRacerTheme", {PERSISTENT | BACKUP, BOOL, "0"}},
-    {"BPThemePack", {PERSISTENT | BACKUP, STRING, ""}},
+    {"BPThemePack", {PERSISTENT | BACKUP, STRING}},
     {"BPThemeAutoSeasonal", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"BPRainbowLines", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"BPShowConfidenceBall", {PERSISTENT | BACKUP, BOOL, "1"}},

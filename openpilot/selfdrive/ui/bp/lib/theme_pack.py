@@ -141,7 +141,7 @@ def _season_window(root: str, year: int) -> tuple[datetime.date, datetime.date] 
   """The pack's holiday window for `year`, from <pack>/season.json, else None.
 
   Every discoverable pack — bundled or user-dropped — is treated the same: a pack
-  participates in auto-seasonal switching iff it ships a season.json. Two forms:
+  participates in auto-seasonal switching only if it ships a season.json. Two forms:
 
     {"start": "12-18", "end": "12-27"}                       fixed MM-DD, inclusive;
                                                              start > end wraps the year

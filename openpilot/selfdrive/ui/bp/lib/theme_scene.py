@@ -183,9 +183,9 @@ class _BurstLayer:
         cy = self.region[1] + rng.random() * self.region[3]
         tint = rng.randrange(len(self.tints))
         for _ in range(n):
-          ang = rng.uniform(0.0, 2.0 * math.pi)
+          angle = rng.uniform(0.0, 2.0 * math.pi)
           spd = rng.uniform(*self.radial_speed)
-          self.pool.append([cx, cy, math.cos(ang) * spd, math.sin(ang) * spd,
+          self.pool.append([cx, cy, math.cos(angle) * spd, math.sin(angle) * spd,
                             0.0, rng.uniform(*self.fade_s), tint,
                             rng.uniform(14.0, 26.0)])
     alive = []
@@ -576,7 +576,7 @@ class PackScene(SceneBase):
                                              pole_w, y_bot - y_top + size * 0.9),
                                 1.0, 4, rl.Color(pt[0], pt[1], pt[2], int(alpha * 0.8)))
       rl.draw_rectangle(int(px - size * 0.5), int(y_top - size * 0.62), int(size), max(2, int(pole_w * 0.7)),
-                        rl.Color(pt[0], pt[1], pt[2], int(alpha * 0.8)))   # finial crossbar
+                        rl.Color(pt[0], pt[1], pt[2], int(alpha * 0.8)))   # crossbar at the pole top
       cy = rect.y + rect.height * y_frac
       tex = build_sprite("orb")
       src = rl.Rectangle(0, 0, tex.width, tex.height)

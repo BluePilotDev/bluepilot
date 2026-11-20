@@ -1,7 +1,6 @@
-import time
 from enum import IntEnum
 import pyray as rl
-from openpilot.cereal import log, messaging
+from openpilot.cereal import log
 from openpilot.common.params import Params
 from openpilot.selfdrive.ui import UI_BORDER_SIZE
 from openpilot.selfdrive.ui.onroad.augmented_road_view import AugmentedRoadView
@@ -24,7 +23,7 @@ from openpilot.selfdrive.ui.sunnypilot.onroad.developer_ui import DeveloperUiSta
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.selfdrive.ui.bp.lib.ui_debug_logger import bp_ui_log
 # BluePilot: unified theme selector (BPThemePack param)
-from openpilot.selfdrive.ui.bp.lib import theme_pack, theme_scene
+from openpilot.selfdrive.ui.bp.lib import theme_scene
 
 
 class GaugeStyle(IntEnum):
@@ -91,7 +90,6 @@ class AugmentedRoadViewBP(CameraViewBP, AugmentedRoadView, BlindspotRendererMixi
 
   def update_fade_out_bottom_overlay(self, _content_rect):
     """BluePilot: Skip sunnypilot's 3X fade overlay (its texture is the comma four's) — causes unwanted black gradient at bottom."""
-    pass
 
   def _render(self, rect):
     """Override render to add blindspot, gauges, confidence ball on left."""

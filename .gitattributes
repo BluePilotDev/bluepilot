@@ -27,5 +27,3 @@ bluepilot/**/*.wav -filter -diff -merge
 bluepilot/**/*.onnx -filter -diff -merge
 openpilot/selfdrive/assets/bp_themes/** -filter -diff -merge
 openpilot/selfdrive/assets/sounds/bluepilot/*.wav -filter -diff -merge
-# BluePilot-added images inside upstream asset folders (to move under a BluePilot folder: BluePilotDev/bluepilot#223)
-openpilot/selfdrive/assets/images/spinner_bluepilot.png -filter -diff -merge

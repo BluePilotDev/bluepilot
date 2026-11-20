@@ -12,7 +12,7 @@ only build_sprite touches pyray, uploading via an in-memory PNG.
 import math
 import struct
 import zlib
-from functools import lru_cache
+from functools import cache
 
 import numpy as np
 
@@ -50,8 +50,8 @@ def _segment(x, y, ax_, ay, bx, by, w):
   return np.hypot(px - bx_ * h, py - by_ * h) - w
 
 
-def _rot(x, y, ang):
-  c, s = math.cos(ang), math.sin(ang)
+def _rot(x, y, angle) -> tuple[np.ndarray, np.ndarray]:
+  c, s = math.cos(angle), math.sin(angle)
   return c * x - s * y, s * x + c * y
 
 
@@ -66,10 +66,10 @@ def _snowflake(size: int, seed: int = 0):
   """Six-fold dendrite: folded polar space -> one stem + angled side branches."""
   x, y = _grid(size)
   r = np.hypot(x, y)
-  ang = np.arctan2(y, x)
+  angle = np.arctan2(y, x)
   # fold into one 30-degree sector (6-fold + mirror symmetry)
   sector = math.pi / 3.0
-  a = np.abs(((ang + sector / 2.0) % sector) - sector / 2.0)
+  a = np.abs(((angle + sector / 2.0) % sector) - sector / 2.0)
   fx, fy = r * np.cos(a), r * np.sin(a)
 
   rng = np.random.default_rng(11 + seed)
@@ -262,7 +262,7 @@ def _garland_tile(size: int):
   for i in range(34):
     t = -0.85 + 1.7 * (i / 33.0)
     side = 1.0 if i % 2 == 0 else -1.0
-    ang = side * (1.05 + rng.uniform(-0.15, 0.15)) - 0.42
+    rng.uniform(-0.15, 0.15)  # unused draw, kept so the seeded sequence (and the sprite) stays the same
     ln = 0.30 + rng.uniform(-0.05, 0.07)
     seg = _segment(x, y, t, 0.0, t + ln * 0.45, side * ln * 0.85, 0.030)
     d = np.minimum(d, seg)
@@ -416,11 +416,11 @@ def _turkey(size: int):
   rgb = np.zeros((size, size, 3), dtype=np.float32)
   alpha = np.zeros((size, size), dtype=np.float32)
   fan_bands = ((0.62, (0.72, 0.18, 0.10)), (0.50, (0.85, 0.48, 0.12)), (0.38, (0.92, 0.72, 0.22)))
-  ang = np.arctan2(-(y + 0.10), x)
-  in_fan_ang = (ang > 0.15) & (ang < math.pi - 0.15)
+  angle = np.arctan2(-(y + 0.10), x)
+  in_fan = (angle > 0.15) & (angle < math.pi - 0.15)
   r = np.hypot(x, y + 0.10)
   for radius, col in fan_bands:
-    band = in_fan_ang & (r < radius)
+    band = in_fan & (r < radius)
     rgb[band] = col
     alpha = np.maximum(alpha, band.astype(np.float32))
   body = _ellipse(x, y, 0.0, 0.22, 0.34, 0.30)
@@ -604,7 +604,7 @@ def _usflag(size: int):
   pole = _segment(x, y, -0.78, -0.72, -0.78, 0.85, 0.035)
   alpha = np.maximum(alpha, _aa(pole, size))
   rgb[pole < 0] = (0.62, 0.65, 0.72)
-  rgb[_circle(x, y, -0.78, -0.78, 0.06) < 0] = (0.85, 0.72, 0.35)   # gold finial
+  rgb[_circle(x, y, -0.78, -0.78, 0.06) < 0] = (0.85, 0.72, 0.35)   # gold ball on the pole top
   alpha = np.maximum(alpha, _aa(_circle(x, y, -0.78, -0.78, 0.06), size))
   # flag body: rows waved horizontally by a sine in y
   wave = 0.06 * np.sin(y * 7.0)
@@ -1029,7 +1029,7 @@ def _png_bytes(rgb: np.ndarray, alpha: np.ndarray) -> bytes:
           + chunk(b"IDAT", zlib.compress(raw, 6)) + chunk(b"IEND", b""))
 
 
-@lru_cache(maxsize=None)
+@cache
 def build_backdrop(style: str):
   """Backdrop band as a texture (bilinear). Requires GL."""
   import pyray as rl
@@ -1042,7 +1042,7 @@ def build_backdrop(style: str):
   return tex
 
 
-@lru_cache(maxsize=None)
+@cache
 def build_celestial(kind: str):
   import pyray as rl
   rgb, a = render_celestial(kind)
@@ -1054,7 +1054,7 @@ def build_celestial(kind: str):
   return tex
 
 
-@lru_cache(maxsize=None)
+@cache
 def build_rainbow():
   import pyray as rl
   rgb, a = render_rainbow()
@@ -1066,7 +1066,7 @@ def build_rainbow():
   return tex
 
 
-@lru_cache(maxsize=None)
+@cache
 def build_sprite(name: str, size: int = SPRITE_SIZE):
   """Sprite as an rl.Texture (bilinear — these are smooth art, not pixel art).
   Requires an active GL context. Cached per (name, size)."""

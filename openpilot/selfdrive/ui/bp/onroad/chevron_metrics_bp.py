@@ -165,7 +165,7 @@ class ChevronMetricsBP(ChevronMetrics):
       tri_gap = border_thickness / 2 + 1
 
       box_rects = []
-      for line, text_size in zip(text_lines, text_sizes):
+      for line, text_size in zip(text_lines, text_sizes, strict=True):
         box_width = text_size.x + (padding * 2)
 
         # Dark grey box
@@ -191,7 +191,7 @@ class ChevronMetricsBP(ChevronMetrics):
       elif len(box_rects) == 3:
         box = box_rects[1]
 
-      if box != None:
+      if box is not None:
         center_x = box.x + box.width / 2
         if inverted:
           # Chevron flipped: wide base at bottom of boxes, apex pointing down

@@ -117,7 +117,7 @@ def main():
         print("4. WebSocket server runs on port 8089 (auto-started)")
         print()
         print("For local testing:")
-        print("  python3 bluepilot/test_web_routes.py")
+        print("  python3 -m bluepilot.backend.bp_portal")
     else:
         print("✗ Setup incomplete - some files or dependencies are missing")
         print()

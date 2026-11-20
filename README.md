@@ -729,9 +729,7 @@ bluepilot/backend/
 
 **Backend testing:**
 ```bash
-python3 bluepilot/backend/test_backend_import.py   # Test backend imports
-python3 bluepilot/backend/test_modules_only.py     # Test modular components
-python3 bluepilot/test_web_routes.py               # Run local server for testing
+python3 -m bluepilot.backend.bp_portal   # Run local server for testing
 ```
 
 **Frontend development (React + Vite):**

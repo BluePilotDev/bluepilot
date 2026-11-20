@@ -67,7 +67,7 @@ pause_for_user() {
     if [ "$HEADLESS_MODE" = "true" ]; then
         return 0
     fi
-    read -p "Press enter to continue..."
+    read -r -p "Press enter to continue..."
 }
 
 ###############################################################################
@@ -101,7 +101,7 @@ else
 fi
 
 # Spinner logo (loading screen): source stored outside LFS; dest is what spinner.py loads
-readonly BLUEPILOT_SPINNER_SRC="/data/openpilot/openpilot/selfdrive/assets/images/spinner_bluepilot.png"
+readonly BLUEPILOT_SPINNER_SRC="/data/openpilot/bluepilot/assets/images/spinner_bluepilot.png"
 readonly SPINNER_DEST="/data/openpilot/openpilot/sunnypilot/selfdrive/assets/images/spinner_sunnypilot.png"
 
 ###############################################################################
@@ -147,7 +147,7 @@ clean_backups() {
         fi
     fi
 
-    if [ $files_removed -eq 0 ]; then
+    if [ "$files_removed" -eq 0 ]; then
         print_info "No backup files found to remove."
     else
         print_success "Cleaned up $files_removed backup file(s)."
@@ -327,7 +327,7 @@ display_main_menu() {
 }
 
 handle_menu_input() {
-    read -p "Enter your choice: " choice
+    read -r -p "Enter your choice: " choice
     case $choice in
         1)
             if check_custom_status >/dev/null 2>&1; then
@@ -336,7 +336,7 @@ handle_menu_input() {
                 if [ "$FORCE_MODE" = "true" ]; then
                     restore_boot_image
                 else
-                    read -p "Are you sure? (y/N): " confirm
+                    read -r -p "Are you sure? (y/N): " confirm
                     if [[ "$confirm" =~ ^[Yy]$ ]]; then
                         restore_boot_image
                     else
@@ -350,7 +350,7 @@ handle_menu_input() {
                 if [ "$FORCE_MODE" = "true" ]; then
                     update_boot_image
                 else
-                    read -p "Continue? (Y/n): " confirm
+                    read -r -p "Continue? (Y/n): " confirm
                     if [[ "$confirm" =~ ^[Nn]$ ]]; then
                         print_info "Operation cancelled."
                         pause_for_user
@@ -366,7 +366,7 @@ handle_menu_input() {
             if [ "$FORCE_MODE" = "true" ]; then
                 update_boot_image
             else
-                read -p "Continue? (y/N): " confirm
+                read -r -p "Continue? (y/N): " confirm
                 if [[ "$confirm" =~ ^[Yy]$ ]]; then
                     update_boot_image
                 else
@@ -381,7 +381,7 @@ handle_menu_input() {
             if [ "$FORCE_MODE" = "true" ]; then
                 restore_boot_image
             else
-                read -p "Continue? (y/N): " confirm
+                read -r -p "Continue? (y/N): " confirm
                 if [[ "$confirm" =~ ^[Yy]$ ]]; then
                     restore_boot_image
                 else
@@ -548,7 +548,7 @@ check_prerequisites() {
         errors=$((errors + 1))
     fi
 
-    return $errors
+    return "$errors"
 }
 
 ###############################################################################
