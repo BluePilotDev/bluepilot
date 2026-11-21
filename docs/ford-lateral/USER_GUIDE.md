@@ -183,7 +183,12 @@ the row has the number:
   firmware gives your module: a quicker one on the older modules that otherwise hold fading torque for
   seconds. On the newer modules every ramp-out is the same quick one.
 
-On the rows with path angle, the row also sends path angle (section 3).
+On the rows with path angle, the row also sends path angle (section 3). On a 2021-23 F-150 (level BD), a Lightning or a
+Ranger, lane centering also takes hold faster when you engage in a curve (and when it picks up again after a dropped
+frame): the first steering frame carries as much of the curve as the safety check allows, because those modules take
+that frame whole (shown on Ford's own code; not driven yet). On the other rows with path angle (level BA, the 2020-24
+Explorer, the Maverick, the 2020-22 Escape, Corsair and Bronco Sport) it builds in at the module's own pace as before:
+their modules do that themselves.
 
 **Why exact:** the research compared Ford's data files, and files that look alike can hold different
 steering numbers. Guessing from the model name would use the wrong numbers.

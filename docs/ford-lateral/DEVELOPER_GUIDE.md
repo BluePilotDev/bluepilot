@@ -683,11 +683,19 @@ wheel through the first seconds. These figures come from a model whose steering 
 module's code and not yet run, with a lag fitted to drives. For BC: "steers with BD's path-angle numbers, with timing measured on
 BC trucks."
 
-**Why engaging in a curve is slow.** comma's rule says the inactive frame must be all zero, so the
-module's copy of c2 starts at zero, and the panda's check restarts from zero too. Any controller that
-obeys the rule starts from straight. The frames move at the module's rate from the first one: the panda
-holds the wire to it. (Newer-library rows once sent the panda's step until the module reported control,
-because that module takes the frame at once until then; the rate check refuses those frames.)
+**Why engaging in a curve is slow, and quick engage.** comma's rule says the inactive frame must be all zero, so the
+module's copy of c2 starts at zero, and the panda's check restarts from zero too. Any controller that obeys the rule
+starts from straight. **Quick engage** (every engage, a restart's included): on a row whose module takes the first frame
+after an inactive one whole, that frame carries the request as far as the panda's window allows (a jerk step from zero:
+on BD 17 times one step of the module's rate at 30 km/h, 4 at 60, 1.5 at 100), then the module's rate from the second frame.
+Which rows (`StrategyRow.takes_frame_at_once`, generated from the executed check, research note clean-build 16.15
+FW-ROUND5 part 2): **BD (the 2021-23 F-150), the Lightning and the Ranger**, whose modules leave control on the inactive
+frame and take the next frame in one call on both phases of their tasks with the frame a steering period later. **BA,
+the 2024 Mustang, the 2020-24 Explorer, the Maverick and LX6C keep the ramp at the module's rate from the first frame**:
+their modules stay in control through an inactive frame and slew the next frame on at least one phase (the Explorer on
+both), so a whole first frame would put the controller ahead of the module. Option C has no rate rule on the wire, so
+the panda takes either. A frame 1-4 module ticks after the inactive one is taken whole by none of them while the
+path-angle copy is still falling; the build never sends one that soon.
 
 ### 2.11 The BC row, from fleet behaviour (removed)
 
@@ -796,16 +804,20 @@ commit.
    is fitted first, then path angle into what is left. A car whose path angle is off never gets a
    path angle step from this fit, even when a jump in the speed reading leaves no whole step that fits.
    So every frame is inside the panda's check by construction, given that the panda saw the last one.
-   **Restart:** if a frame is lost or refused, the panda restarts from zero and the controller doesn't.
-   When the car state's count of refused steering frames rises (`steering_tx_blocked`, from the frames pandad returns
-   on bus + 0xC0, each with its address; not `safetyTxBlocked`, which counts every refused message and names none: a
-   refused frame whose return is lost leaves the panda's last command at zero, and the next frame is refused and
-   returned unless it is within a step of zero) while the panda allows steering, the next frames are
-   one inactive frame, so both restart from zero; neither drops its ranges of the copies
-   (`test_one_lost_frame_doesnt_stop_the_steering`, `test_a_restart_takes_one_inactive_frame`). Before, every
-   later frame was refused until the request came back near zero. The controller's ranges of the copies are
-   the panda's to `FRAME_TIMING` once no frame has been lost or refused for 2 s
-   (`test_the_controllers_copies_are_the_pandas`).
+   **The ledger** (path-angle rows, `L/core/limits.py` `Ledger`): the panda returns every frame it put on the bus (bus
+   \+ 0x80) and every one it refused (bus + 0xC0) into one queue, in the order it handled them; the car state keeps the
+   steering frames among them with their bytes (`CarState.steering_returns`), and the controller rebuilds the panda's
+   own state from them each frame: its ranges of the module's copies, the last frame the module was sent, its last
+   command. A refused frame moves no range and leaves the last command zero; a frame sent before one that came back from
+   the bus, and never back itself, never reached the panda. A frame not back yet by the next frame: the window is what
+   the panda accepts in both its possible states (taken, or never seen: `limits.both`), so a lost frame costs no
+   refusal. A host whose pandad returns no frame from the bus keeps the old way (frames taken as sent).
+   **Restart:** if a frame is refused the panda restarts from zero. The controller knows at its next frame (from the
+   returned frame; else, on a host without returns, from the count `steering_tx_blocked` a frame later) and sends
+   one inactive frame then, so both restart from zero; neither drops its ranges of the copies
+   (`test_a_refused_frame_leaves_the_controllers_ranges_where_the_pandas_are`, `test_a_restart_takes_one_inactive_frame`).
+   With the ledger the controller's ranges are the panda's on every frame it takes
+   (`test_a_lost_frame_costs_no_refusal_and_leaves_the_ranges_the_pandas`, `test_the_controllers_copies_are_the_pandas`).
 7. **Pack** (`L/core/carcontroller_ext.py` `_frame`, `L/can/fordcan_ext.py`). Each path signal is clamped to its
    DBC range in the wire's sign (the wrap fix, `test_wire_clamp.py`). The library sets the
    LateralMotionControl2 checksum itself. Lane keeping and the cluster messages are sent by the host's car
