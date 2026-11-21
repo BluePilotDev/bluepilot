@@ -771,7 +771,7 @@ commit.
    **Restart:** if a frame is lost or refused, the panda restarts from zero and the controller doesn't.
    When the car state's count of refused steering frames rises (`steering_tx_blocked`, from the frames pandad returns
    on bus + 0xC0; not `safetyTxBlocked`, which counts every refused message, but a refusal that count shows and no
-   returned frame matches for two panda states is taken for one: its return was lost) while the panda allows steering, the next frames are
+   returned frame matches, the difference unchanged for 1 s, is taken for one: its return was lost) while the panda allows steering, the next frames are
    one inactive frame, so both restart from zero; neither drops its ranges of the copies
    (`test_one_lost_frame_doesnt_stop_the_steering`, `test_a_restart_takes_one_inactive_frame`). Before, every
    later frame was refused until the request came back near zero. The controller's ranges of the copies are
