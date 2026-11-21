@@ -3,8 +3,10 @@
 On a device whose AGNOS isn't the build's, agnos_init runs the bundled updater (a zipapp built from older source) in a
 loop. On a newer AGNOS that updater dies at once (its UI code needs pyray's raygui, which that AGNOS's pyray lacks), so
 the device looped for ever. The updater is only a screen around `agnos.py --swap`, which runs on its own: the loop now
-runs that when the updater fails, and reboots once it has swapped. agnos_init runs here against stub programs (sudo, the
-updater, agnos.py), the device's own commands never."""
+runs that when the updater fails, and reboots once it has swapped. `sudo reboot` only queues the reboot and returns, so
+after it the script must start nothing else: a second `agnos.py --swap` while the system shuts down would mark the slot
+it just switched to unbootable and start flashing again. agnos_init runs here against stub programs (sudo, the updater,
+agnos.py), the device's own commands never; the stub reboot returns, as the real one does."""
 import os
 import subprocess
 import tempfile
@@ -25,9 +27,9 @@ if [ "$1" = "--verify" ]; then exit 1; fi
 n=$(grep -c "agnos --swap" "$LOG")
 [ "$n" -gt "$SWAP_FAILS" ]
 """
-# agnos_init alone, with sudo and rm as shell functions (sudo reboot ends the run)
+# agnos_init alone, with sudo and rm as shell functions (sudo reboot is logged and returns, as the real one does)
 RUN = """
-sudo() { echo "sudo $*" >> "$LOG"; if [ "$1" = reboot ]; then exit 0; fi; }
+sudo() { echo "sudo $*" >> "$LOG"; }
 rm() { :; }
 source <(sed -n '/^function agnos_init/,/^}/p' "$SCRIPT")
 agnos_init
@@ -35,7 +37,7 @@ agnos_init
 
 
 class TestAgnosInit(unittest.TestCase):
-  def _run(self, updater_exit: int, swap_fails: int = 0, timeout: float = 10.) -> tuple[list[str], bool]:
+  def _run(self, updater_exit: int, swap_fails: int = 0, timeout: float = 3.) -> tuple[list[str], bool]:
     with tempfile.TemporaryDirectory() as d:
       comma = Path(d, "openpilot/common/hardware/comma")
       comma.mkdir(parents=True)
@@ -54,14 +56,17 @@ class TestAgnosInit(unittest.TestCase):
       return [line for line in log.read_text().splitlines() if not line.startswith(("sudo rm", "sudo abctl", "sudo chgrp", "sudo chmod"))], ended
 
   def test_an_updater_that_cant_start_flashes_without_its_screen(self):
+    # after the reboot request the script waits for the shutdown: nothing else starts
     log, ended = self._run(updater_exit=1)
-    self.assertTrue(ended, "the loop never ended: the device loops for ever")
-    self.assertEqual(log, ["agnos --verify", "updater", "agnos --swap", "sudo reboot"])
+    self.assertFalse(ended)
+    self.assertEqual(log, ["agnos --verify", "updater", "agnos --swap", "sudo reboot"],
+                     "something started after the reboot request")
 
   def test_a_failed_swap_goes_round_again(self):
     log, ended = self._run(updater_exit=1, swap_fails=1)
-    self.assertTrue(ended)
-    self.assertEqual(log, ["agnos --verify", "updater", "agnos --swap", "updater", "agnos --swap", "sudo reboot"])
+    self.assertFalse(ended)
+    self.assertEqual(log, ["agnos --verify", "updater", "agnos --swap", "updater", "agnos --swap", "sudo reboot"],
+                     "something started after the reboot request")
 
   def test_a_working_updater_runs_as_before(self):
     # its screen does the swap and reboots the device itself; the fallback never runs
