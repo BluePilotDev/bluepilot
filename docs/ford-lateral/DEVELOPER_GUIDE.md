@@ -862,9 +862,9 @@ The pipeline lives in the project's research notes (to be published):
    checked against the firmware's own code in an emulator: 595,165 block calls, no mismatches. The
    Ranger's and the 2024 Mustang's controller chains were checked the same way. Since then the module's own code has
    run in an emulator for every row whose evidence is **executed** in the generated table: the F-150 2021-23 (BD, BA),
-   the Lightning, the F-150 2024-26, the Explorer 2020-24, the Maverick 2022-24, LX6C, the Ranger, the 2024 Mustang,
+   the Lightning, the F-150 2024-26, the Explorer 2020-24, the Maverick 2022-24, LX6C, the Ranger, the 2024 and 2025 Mustang,
    the Mach-E 2021-25, the 2025 Bronco Sport and Escape, the Super Duty 2023 and 2025, and the Transit; read only: the
-   Explorer 2025 and 2026, the Mustang 2025 and the Maverick 2025. A row's
+   Explorer 2025 and 2026 and the Maverick 2025. A row's
    evidence level says which: **executed**, **read** or **unread** (3.6). Every number in a row is
    generated from the module's files by one script, into `L/core/module_tables.py`, with the SHA-256 of
    each file block it was read from, and a check re-reads the files (`gain_tables.py --check`). The
@@ -915,7 +915,7 @@ module's copy of the curvature never falls behind the controller's.
 | Escape 2020-22, Bronco Sport 2021-22 (path angle) | LX6C-14D003-AL with LX6C-14D007-CAH | executed: the Maverick's code with CAH, as the Maverick's; one public Escape on this level driven | that Escape's data file; no drive with this file known | a drive with LX6C-14D007-CAH known, through `drive_check.py` |
 | Bronco Sport 2025 (and the 2026 Maverick on its row), Escape 2025 | RZ1C-14D003-AC, PZ11-14D003-FC with their data files; SZ1C-14D003-AE with -AAG | executed: their one program on each data file (start-up, path law, rates, preview, torque and lateral acceleration limits, mode rules); open loop | preview tables not in the row, so no path angle; no drive | the full preview tables from the firmware, then the window test and a drive |
 | Mach-E 2021-22, 2023-24 | LJ9C levels and data files in the rows | executed: GA, FA and HA from start-up to engaged torque (AMA, ARA, VBA by bytes); the delay learner's start from logged drives | its path terms on a drive | a drive |
-| F-150 2024-26, Explorer 2025 and 2026, Mustang 2025, Mach-E 2025 (and the 2026 Mach-E, SJ9C-14D003-BA with -CAA), Mustang 2024 | their programs and data files | the control law, read; executed: the 2024-26 F-150's library and limiter, the 2024 Mustang's controller chain (its applied limit the row's), the 2025 Mach-E's program on AAF, ABG, ADF and on BA with CAA | no drive: curvature only | a drive; then preview tables for path angle |
+| F-150 2024-26, Explorer 2025 and 2026, Mustang 2025, Mach-E 2025 (and the 2026 Mach-E, SJ9C-14D003-BA with -CAA), Mustang 2024 | their programs and data files | the control law, read; executed: the 2024-26 F-150's library and limiter, the 2024 Mustang's controller chain (its applied limit the row's), the 2025 Mustang's lateral and limiter tasks, the 2025 Mach-E's program on AAF, ABG, ADF and on BA with CAA | no drive: curvature only | a drive; then preview tables for path angle |
 | Transit 2024 (not supported) | KK21-14D003-AM with LK41-14D007-AH or NK41-14D007-BC | executed from power-up with LK41-AH: no 0x3D3 in its receive table, Denied on every tick | KK21-14D003-AL and other data files, not read | those files read |
 | Maverick 2025, Super Duty 2023 and 2025 (fallback) | their programs | Maverick 2025: the program read; Super Duty: executed on both pairs, torque limit 4.0 in the column frame (0.898 at the motor) | Maverick 2025: its data file; Super Duty: no row of its own | the SZ1C data files; a Super Duty row with its executed numbers |
 
