@@ -10,10 +10,9 @@ pinned commit). **Not checked:** these steps on a comma four, and the clone comm
 - SSH access to the comma (Settings → Developer → Enable SSH, with your GitHub username's keys added).
   comma's guide: [docs/how-to/connect-to-comma.md](../how-to/connect-to-comma.md).
 - Read access to the private repository **github.com/jrneulight/bluepilot-clean** for the same GitHub
-  account. It holds all three parts of the build as branches: `clean/ford-lateral` (BluePilot, the
-  default branch), `clean/opendbc` and `clean/bluepilot-lateral`. One recursive clone fetches all three. This
-  version, with path angle on, is `wip/pathangle-c/ford-lateral` (with `wip/pathangle-c/opendbc` and
-  `wip/pathangle-c/bluepilot-lateral`): use it in place of `clean/ford-lateral` in the command below.
+  account. It holds all three parts of this build as branches: `clean/ford-lateral-pathangle`
+  (BluePilot), `clean/opendbc-pathangle` and `clean/bluepilot-lateral-pathangle`. One recursive clone
+  fetches all three. The build without path angle is `clean/ford-lateral`, the default branch.
 - The comma on Wi-Fi. The download is about 1 GB plus the driving models.
 
 ## Install
@@ -44,7 +43,7 @@ This is how you go back later. Don't delete it.
 On the comma, one line:
 
 ```
-git -c url."git@github.com:jrneulight/".insteadOf="https://github.com/jrneulight/" clone --recurse-submodules --depth 1 --shallow-submodules -b clean/ford-lateral git@github.com:jrneulight/bluepilot-clean.git openpilot
+git -c url."git@github.com:jrneulight/".insteadOf="https://github.com/jrneulight/" clone --recurse-submodules --depth 1 --shallow-submodules -b clean/ford-lateral-pathangle git@github.com:jrneulight/bluepilot-clean.git openpilot
 ```
 
 Answer `yes` if it asks whether to trust github.com. The `-c … insteadOf` part sends the build's two
