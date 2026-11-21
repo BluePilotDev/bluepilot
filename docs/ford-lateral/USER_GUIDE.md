@@ -85,11 +85,11 @@ So this build does both:
 
 **Path angle is switched on in this version for:**
 
-- F-150 2021-23 on software version BD;
-- F-150 2021-23 on version BA with data file ML34-14D007-BDE, with its own numbers;
+- F-150 2021-23 on software version BD (ML3V-14D003-BD);
+- F-150 2021-23 on version BA (ML3V-14D003-BA) with data file ML34-14D007-BDE, with its own numbers;
 - F-150 Lightning (RL38-14D003-AA), with the 2021-23 F-150's numbers, which its software holds bit for bit;
-- Explorer 2020-24;
-- Maverick 2022-24;
+- Explorer 2020-24 (M1MC-14D003-AC, L1MC-14D003-AL, P1MC-14D003-AA);
+- Maverick 2022-24 (NZ6C-14D003-AL);
 - Escape 2020-22 and Bronco Sport 2021-22 on LX6C-14D003-AL;
 - Ranger 2024-25 (RB3C-14D003-AA), with its own numbers. Its module takes no lane centering for the first 9
   seconds after the truck starts (its own software, run in an emulator), and in a curve whose measured sideways

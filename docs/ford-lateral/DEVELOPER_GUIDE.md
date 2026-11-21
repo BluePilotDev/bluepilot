@@ -240,13 +240,14 @@ and 6 have no row (`clean-build.md` §14.3, from `scripts/clean-build/table_cove
 
 **Options.** A conservative guess at the module's rate and delay, or comma's stock command.
 
-**Evidence.** For an unread strategy, its rate is unknown. A 0.003 limiter fits the Maverick and
-Explorer fleet data worse than no limiter (`verify-cross-vehicle.md` §6, via `change-analysis.md` §3).
-comma's command is the one with fleet evidence: on 102 vehicles of 11 platforms, platform medians 0.96 to
-1.05 and per vehicle 0.83 to 1.18, on comma's clipped command (`cross-vehicle.md`,
-`verify-mythos-limits-guides.md` §1.1).
+**Evidence.** For an unread strategy, its rate is unknown (0.003 1/m/s is BD's executed rate, not a property of an
+unread module). The fleet fits this choice once rested on (`cross-vehicle.md`, `change-analysis.md`) are history in the
+research notes, and no row rests on them now. What is executed is how comma's stock command behaves on the modules run:
+on executed BD and BDL behind the compiled panda it is refused 0 times in every scenario, its module never over
+3.6 m/s², and without `anti_overshoot` its curve entries follow at once (research note clean-build 16.15, FW-ROUND2
+part 1). Nothing executed says how it behaves on a module never read; that is the fallback's open question.
 
-**Choice.** comma's command, because it is the only one with fleet evidence. `FALLBACK_ROW` is curvature
+**Choice.** comma's command: it is comma's own, the safety code's stock check is built for it, and on every module run it is refused 0 times. `FALLBACK_ROW` is curvature
 only, ramp type 0, precision 1, with nothing of a module's own. It is a row like any other, so the
 controller always reads exactly one row. On the platforms where comma's stock code smooths the request
 (`CAR.FORD_F_150_MK14` and `CAR.FORD_BRONCO_SPORT_MK1`, comma's `anti_overshoot`), the fallback no longer does:
@@ -329,8 +330,9 @@ in the second safety param (`current_safety_param_sp`):
 - **bits 0 to 2, `BP_PATH_ANGLE_GAIN`:** which module's own gain curve bounds the path angle
   (`StrategyRow.panda_gain_curve`). Set with bit 6.
 
-**The gain curves.** The panda holds four, one per module family with path angle on: the 2021-23 F-150 (BD),
-the 2020-24 Explorer, the 2022-24 Maverick and LX6C. Each is generated from that module's flash (`safety/ford_gain_curves.h`, written by the same
+**The gain curves.** The panda holds six, one per module with path angle on, numbered as the startup bits name them:
+1 the 2021-23 F-150 (BD) and the Lightning (its numbers BD's bit for bit), 2 the 2020-24 Explorer, 3 the 2022-24
+Maverick, 4 LX6C, 5 the F-150's level BA, 6 the Ranger. Each is generated from that module's flash (`safety/ford_gain_curves.h`, written by the same
 script and from the same reading as `core/module_tables.py`; `core/limits.py` `GAIN_CURVES` is built from
 the Python file, and `test_limits.py` pins the two): its c2 rate, its shortest preview time (taken no
 higher than its T when the module starts, below), the two
@@ -339,15 +341,15 @@ its K2 table by distance, read straight between the table's points as the module
 that module's largest K2 at the speed, times a margin of 1.10. Each curve also carries the module's two rates,
 c2 and c1, at which the check moves its ranges of the module's copies. A module may start or restart at any time, and it previews
 from its T at power-up until T reaches its floor, so each curve takes that T as its floor where it is lower
-(`FORD_BP_PREVIEW_TIME_AT_START` in `safety/ford.h`, `PREVIEW_TIME_AT_START` in `core/limits.py`; not generated,
-because it is what the start-up code does, not a table in the flash): 0 on the Explorer's (executed) and the
-F-150's (BD loads T max, executed, but the curve also serves BC and the Lightning, whose start-up was not run);
-the Ranger's, the Maverick's and LX6C's T max (executed), above their floor. Before the floor, at 140 km/h
+(`preview_time_at_start` in each curve of `safety/ford_gain_curves.h`, `PANDA_CURVES_T_START` in
+`core/module_tables.py`; generated: the lowest of the curve's rows' executed start-up T): 0 on the Explorer's
+(executed); 2.0 s, its T max, on the F-150's (BD and the Lightning both load T max, executed); 5.0 s, T max, on the
+Maverick's, LX6C's, BA's and the Ranger's (executed), above their floor. Before the floor, at 140 km/h
 within 25 s of the module starting, the Explorer's gain was up to 1.23 times the bound
 (`test_a_module_start_at_highway_speed`). The panda reads the gain at its lowest recent speed
 sample, which is right only if the curve never rises with speed, so each distance point is held to the
 least of the later ones. That moves one point, on the strict side: the F-150's lower distance at
-100 km/h, from 50 m to 46.9 m. With no curve index, or 5 to 7 (no curve there), no path angle is accepted. Bits 0
+100 km/h, from 50 m to 46.9 m. With no curve index, or 7 (no curve there), no path angle is accepted. Bits 0
 to 4 once carried a measurement source, in builds that never set bit 6. Bits 3 and 4 stay unused. Three
 bits fit StarPilot, whose adapter carries seven.
 
@@ -407,14 +409,14 @@ Path offset and curvature rate must be inactive on every module.
 - The bound is only as right as the row's match and the firmware read behind its curve. A wrong curve
   index would loosen it to another module's gain. `test_limits.py` holds every curve at or above what its
   module steers for at that speed and every higher one.
-- The floor at power-up holds path angle back on two curves for the whole drive, not only its first
+- The floor at power-up holds path angle back on the Explorer's curve for the whole drive, not only its first
   25 s, because the panda can't tell when the module started. On the Explorer the bound is the 85 m gain
   (0.0475) at every speed, 1.62 times its gain at T max (0.0293) from 100 km/h; against the bound before
   the floor it moves only above 101 km/h (1.08 times at 110, 1.35 at 140). Path angle is needed only
   where a request can change faster than the module moves its curvature copy: below about 125 km/h; above
-  that the curvature signal alone follows. On the F-150's curve the bound is 5.6 % stricter at 132 km/h, and
-  more from 160 km/h (17 % at 250 km/h). The Maverick's and LX6C's start at T max (executed, NZ6C-AL from
-  power-up), so their bound reads their 3.5 s floor and their floor costs nothing.
+  that the curvature signal alone follows. Every other curve starts at its T max (executed), so its bound reads
+  its own floor and the start costs nothing (the F-150's figures of 5.6 % at 132 km/h and 17 % at 250 km/h were
+  computed with a start at 0, before its start-up was run, and no longer apply).
 - The margin is for what the panda can't see (`core/limits.py`). The module reads its K2 table in fixed
   point, at most 0.45 % above the float lookup (BD's own lookups, executed; the older library's, run on the
   Explorer, Maverick and LX6C, are in float). It reads it at its own speed: on BD that is the larger of the
@@ -424,15 +426,18 @@ Path offset and curvature rate must be inactive on every module.
   age (at 3 m/s²); that the module's cell holds that very signal (read from its receive code); below about
   5 km/h (BD's curve is flat there); a truck configured without the brake module's speed (no stability
   control); every program but BD. Where the chain was not run the allowance stays this project's choice, 6 %:
-  BC and the Lightning share BD's curve, and the Ranger, the Maverick and LX6C have their own. With it the least
-  margin over every curve is 1.0955 (LX6C's at about 153 km/h), so 1.10. Without the margin, a speed reading 1 % under the panda's would put the module's gain
+  the Lightning shares BD's curve (its speed chain is BD's code, read, not run), and the Maverick, LX6C, BA and the
+  Ranger have their own. With it the least margin over every curve is 1.0955 (LX6C's and BA's at about 153 and 178
+  km/h; the Ranger's 1.0847), so 1.10. The 2024 Mustang's curve would need 1.1164, so its path angle waits on a
+  margin per curve. Without the margin, a speed reading 1 % under the panda's would put the module's gain
   about 1 % above the bound. It costs a few % of
   path angle in sharp entries at the cap.
 - What each module's own curve buys over the single one (controller only, open loop, with the copies'
   bound and the margin): in sharp curve entries (2.4 m/s² over 0.5 s) at 45 to 60 km/h on the F-150,
   Lightning and Ranger rows, the module got 96 to 98 % of the path angle asked, against 94 to 96 %, and
   the tracking error at 60 km/h falls from 0.0025 to 0.0015 1/m on the F-150 and from 0.0021 to 0.0012
-  on the Ranger (figures from before the start-up floor; not re-run). The cap and the jerk limit are unchanged.
+  on the Ranger (figures from before the start-up floor, when the Ranger had a curve in an earlier build; not re-run
+  on its curve 6 now). The cap and the jerk limit are unchanged.
 - The ranges assume a module never moves a copy away from every frame it was sent and from zero, or slower than
   the rates above (executed on every program with path angle). After a disengage one inactive frame (50 ms)
   restarts the controller on every curve.
@@ -844,8 +849,11 @@ The pipeline lives in the project's research notes (to be published):
    share a row.
 4. **Check against the firmware run in an emulator.** For the 2021-23 F-150's software BD the twin was
    checked against the firmware's own code in an emulator: 595,165 block calls, no mismatches. The
-   Ranger's and the 2024 Mustang's controller chains were checked the same way. No other module's code
-   has been run; the Lightning's is BD's instruction for instruction, but its own image has not been run. A row's
+   Ranger's and the 2024 Mustang's controller chains were checked the same way. Since then the module's own code has
+   run in an emulator for every row whose evidence is **executed** in the generated table: the F-150 2021-23 (BD, BA),
+   the Lightning, the F-150 2024-26, the Explorer 2020-24, the Maverick 2022-24, LX6C, the Ranger, the 2024 Mustang,
+   the Mach-E 2021-25, the 2025 Bronco Sport and Escape, the Super Duty 2023 and 2025, and the Transit; read only: the
+   Explorer 2025 and 2026, the Mustang 2025 and the Maverick 2025. A row's
    evidence level says which: **executed**, **read** or **unread** (3.6). Every number in a row is
    generated from the module's files by one script, into `L/core/module_tables.py`, with the SHA-256 of
    each file block it was read from, and a check re-reads the files (`gain_tables.py --check`). The
