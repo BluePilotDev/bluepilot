@@ -190,8 +190,8 @@ steering numbers. Guessing from the model name would use the wrong numbers.
 ### The fallback
 
 If your module doesn't answer, or its part numbers aren't in the table, the build uses the
-**fallback**. It is stock openpilot's Ford steering, as it is: comma's own car controller, steering by
-curvature alone, including the smoothing comma's code adds on the 2021-23 F-150 and the Bronco Sport, and
+**fallback**. It is stock openpilot's Ford steering: comma's own car controller, steering by
+curvature alone (without the extra smoothing comma's code adds on the 2021-23 F-150 and the Bronco Sport), and
 the panda's stock check for your car. So it holds the command close to what the yaw sensor measures (as
 earlier BluePilot did, above), and on CAN FD cars it uses comma's limit on how hard the car turns, 3.6 m/s²
 rather than BluePilot's 2.4. It is the approach tested on the most Fords.
@@ -230,7 +230,7 @@ shows one of these:
 | **Lane centering denied by the steering module** | On the last drive your module refused lane centering. Either lane centering isn't set up on this truck, and the build can't steer a truck built without it, or the module stopped for a fault for that drive, which the next start clears. |
 | **Fallback** | Your module didn't answer, or its software isn't in the table. Steers by curvature with comma's settings. |
 | **Not supported** | The software is known and this build can't steer it, so the car only records, as a dashcam. The 2024 Transit's KK21-14D003-AM is marked this way: its module has no lane centering at all. |
-| **Off** | You switched on **Disable BP Lateral Control**. Stock openpilot steering runs. |
+| **Off** | You switched on **Disable BP Lateral Control**. Stock openpilot steering runs, as the fallback does: on the 2021-23 F-150 and the Bronco Sport without the extra smoothing comma's code adds there. |
 | **Not read yet** | The car hasn't been started with this build yet. |
 
 Full and Curvature rows without path angle steer the same way. Only Full rows can have path angle.
@@ -436,7 +436,7 @@ you tuned no longer apply.
 newer or older version, or another data file), or didn't answer. Steering Support shows what it answered.
 
 **Is the fallback worse?** On a row without path angle, the row differs from the fallback only in the
-things listed in section 4, under the table. The fallback is stock openpilot's Ford steering code and its own
-panda check, as they are: it holds the command to the yaw sensor, and on CAN FD cars it uses comma's limit.
+things listed in section 4, under the table. The fallback is stock openpilot's Ford steering code (without its extra
+smoothing on the 2021-23 F-150 and the Bronco Sport) and its own panda check: it holds the command to the yaw sensor, and on CAN FD cars it uses comma's limit.
 
 **Can I bring back the old settings or the angle mode?** Not in this build.

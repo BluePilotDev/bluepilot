@@ -110,7 +110,7 @@ can be supported. The logic is meant to be fit for upstream; the packaging isn't
    settings.
 2. **A table keyed on the module's own answers:** exact (F188, F10A) pairs, read fresh at every start.
    A row carries that module's constants. A module without a row gets the **fallback**: comma's stock
-   Ford car controller and the host's stock panda check, as they are, with no BluePilot startup bit (2.3).
+   Ford car controller (without its `anti_overshoot`, 2.3) and the host's stock panda check, with no BluePilot startup bit (2.3).
    With path angle off, a row can change up to three things against the fallback, where it has the
    value: the lateral-acceleration limit (2.9) and the ramp type, in its steering frames and in the inactive frames
    that end a request (0, comma's, by default; 2 on the older library's rows; 3 on BA; the restart frame after a
@@ -250,10 +250,12 @@ part 1). Nothing executed says how it behaves on a module never read; that is th
 **Choice.** comma's command: it is comma's own, the safety code's stock check is built for it, and on every module run it is refused 0 times. `FALLBACK_ROW` is curvature
 only, ramp type 0, precision 1, with nothing of a module's own. It is a row like any other, so the
 controller always reads exactly one row. On the platforms where comma's stock code smooths the request
-(`CAR.FORD_F_150_MK14` and `CAR.FORD_BRONCO_SPORT_MK1`, comma's `anti_overshoot`), the fallback no longer does:
-every module's command path run in an emulator follows a curvature request with a slew and a first-order
-low-pass, which cannot overshoot it (BD executed, every step 1.00000 of the request); what overshoots is the
-vehicle, and with comma's own car port on executed BD, BDL and RL14 removing it cleared 3 of 5 runaways. Our fits put most logged 2021-23 F-150s (level BC) and the
+(`CAR.FORD_F_150_MK14` and `CAR.FORD_BRONCO_SPORT_MK1`, comma's `anti_overshoot`), the fallback no longer does, and
+neither does comma's stock path with "Disable BP Lateral Control" on (it is the same branch of the car controller):
+BD's command path follows a curvature request with a slew and a first-order low-pass, which cannot overshoot it
+(executed, every step 1.00000 of the request); the Bronco Sport's module (LX6C, the older library, which closes a
+loop on measured curvature) was not stepped, so there the removal rests on the runs below, not on its module; what
+overshoots is the vehicle, and with comma's own car port on executed BD, BDL and RL14 removing it cleared 3 of 5 runaways. Our fits put most logged 2021-23 F-150s (level BC) and the
 one logged Bronco Sport at a damping of about 0.40, the least damped Fords logged
 (`assumptions-audit.md` §3.7). A row on a read module takes the request as it is. Two things still
 differ from stock: no clip to measured curvature (and no measured-curvature band in the panda, 2.4),
@@ -523,7 +525,7 @@ noisy readings (`clean-build.md` §14.1). A yaw zero of
 
 - **Curvature gain.** A window is at least a minute of hands-off driving above 9 m/s with enough steering
   in it (`MIN_EXCITATION`). The command is delayed by lagd's delay (`LateralInputs.lateralDelay`), else
-  the row's learner start, else 0.4 s, and the yaw zero measured at standstill is removed. With a delay of 0 s,
+  openpilot's own start, 0.4 s, and the yaw zero measured at standstill is removed. With a delay of 0 s,
   as the fallback once had, one logged Lightning on the fallback read 0.59 to 0.90 and went degraded; with
   lagd's delay no logged vehicle of 84 does (`assumptions-audit.md` §3.5). No window counts until that zero is known. A window is out of range outside
   0.85 to 1.15, and three out-of-range windows in a row mean degraded. Windows carry across drives of
@@ -576,7 +578,7 @@ which no firmware holds. Cost: on BD trucks lagd starts 0.1 s short of the 0.50 
 
 lagd keeps its learnt delay across drives while the car model is the same. After the steering module's
 software changes on the same car (another F188 or F10A than the last start's), BluePilot has lagd start
-again from the row's start (`steering_software_changed` in `bluepilot/selfdrive/car/ford_lateral_support.py`,
+again from openpilot's own 0.4 s (`steering_software_changed` in `bluepilot/selfdrive/car/ford_lateral_support.py`,
 called from `lagd.retrieve_initial_lag`); otherwise a BC → BD update would run about 0.16 s short for
 about 20 minutes of highway turning.
 
@@ -685,7 +687,7 @@ curvature rate can't be tested from public data: every engaged second on every t
 That is the project's choice: BC's files were never found, its curvature behaviour is BD's, and it is the
 level most of these trucks run. The rest is BC's own or comma's: comma's stock ramp type and precision,
 the BD row's lateral-acceleration limit (also by that choice), lagd's start at 0.34 s (measured on logged BC
-drives), and `ANY_DATA_FILE` (2.2). Like every row it doesn't smooth the request, so it drops comma's `anti_overshoot`, which stock
+drives; no row sets a start now, every row starts at openpilot's 0.4 s), and `ANY_DATA_FILE` (2.2). Like every row it doesn't smooth the request, so it drops comma's `anti_overshoot`, which stock
 applies on these trucks (2.3). BA, the level before BC, keeps "older than Ford's current level".
 
 **Cost.** It rests on behaviour, not files, so it is the one row without the control law read (3.3).
