@@ -250,8 +250,9 @@ part 1). Nothing executed says how it behaves on a module never read; that is th
 **Choice.** comma's command: it is comma's own, the safety code's stock check is built for it, and on every module run it is refused 0 times. `FALLBACK_ROW` is curvature
 only, ramp type 0, precision 1, with nothing of a module's own. It is a row like any other, so the
 controller always reads exactly one row. On the platforms where comma's stock code smooths the request
-(`CAR.FORD_F_150_MK14` and `CAR.FORD_BRONCO_SPORT_MK1`, comma's `anti_overshoot`), the fallback no longer does, and
-neither does comma's stock path with "Disable BP Lateral Control" on (it is the same branch of the car controller):
+(`CAR.FORD_F_150_MK14` and `CAR.FORD_BRONCO_SPORT_MK1`, comma's `anti_overshoot`), the fallback no longer does (with
+"Disable BP Lateral Control" on, comma's code runs exactly, the smoothing included: the sunnypilot adapter sets
+`FordLateralFlagsSP.BP_LATERAL_SWITCHED_OFF` in `CarParamsSP.flags` at car init and the car controller reads it):
 BD's command path follows a curvature request with a slew and a first-order low-pass, which cannot overshoot it
 (executed, every step 1.00000 of the request); the Bronco Sport's module (LX6C, the older library, which closes a
 loop on measured curvature) was not stepped, so there the removal rests on the runs below, not on its module; what

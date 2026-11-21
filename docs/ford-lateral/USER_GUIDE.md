@@ -230,7 +230,7 @@ shows one of these:
 | **Lane centering denied by the steering module** | On the last drive your module refused lane centering. Either lane centering isn't set up on this truck, and the build can't steer a truck built without it, or the module stopped for a fault for that drive, which the next start clears. |
 | **Fallback** | Your module didn't answer, or its software isn't in the table. Steers by curvature with comma's settings. |
 | **Not supported** | The software is known and this build can't steer it, so the car only records, as a dashcam. The 2024 Transit's KK21-14D003-AM is marked this way: its module has no lane centering at all. |
-| **Off** | You switched on **Disable BP Lateral Control**. Stock openpilot steering runs, as the fallback does: on the 2021-23 F-150 and the Bronco Sport without the extra smoothing comma's code adds there. |
+| **Off** | You switched on **Disable BP Lateral Control**. Stock openpilot steering runs, exactly as comma wrote it, its extra smoothing on the 2021-23 F-150 and the Bronco Sport included. |
 | **Not read yet** | The car hasn't been started with this build yet. |
 
 Full and Curvature rows without path angle steer the same way. Only Full rows can have path angle.
