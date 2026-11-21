@@ -600,7 +600,8 @@ group's 50,000+ miles of path-angle-only control, and the two rows measured on a
   and the row's gain curve for that row.
 - **The window test** runs every switched-on row with path angle on: zero refused frames.
 - **The other two versions stay as they are.** The base, `clean/ford-lateral`, has every switch off. The
-  test branch `clean/ford-lateral-drive1` has path angle on for the Explorer row only, all its pairs.
+  first-drive test build, kept as the tag `archive/drive1/ford-lateral`, has path angle on for the Explorer row only,
+  all its pairs.
 
 **What has been on a road.** For each row a car can reach on this branch. "Logged" drives were steered
 by comma's stock command (curvature only); the path-angle measurements used earlier BluePilot builds.
