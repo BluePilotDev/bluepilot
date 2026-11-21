@@ -386,12 +386,14 @@ check): for any frames the panda lets through, timing, inactive frames and modul
 copy toward a frame it was sent or toward zero at its rate or faster steers for no more than the cap, its half step
 and its two rates over its read time. Two things the proof takes as given are the check's own rules since
 `notes/clean-build.md` §16.14: a frame the Ford mode refuses (for its path offset or curvature rate) is never the
-last frame sent, and after the safety mode is set no steering frame is taken for 2 s (`BP_INIT_HOLD_US`,
-`limits.INIT_HOLD`), because the ranges then start at zero whatever the module was sent before and the speed samples
-the cap is read at are zero until six are in. The hold covers the module's own frame time-out where it is known: BD
-steers for its last frame 1.02 s and lets go by 1.06 s (executed); BA runs BD's receive code (read); the Explorer
-about 1 s (read); the Maverick's and LX6C's are not established. The host reports a panda in another mode
-(`pandaCarSafety`) and the controller waits the hold out from the first state in the car's mode. Figures: 1.014 of the cap on the Explorer at 100 km/h, 1.030 on LX6C, 1.044 on the F-150, 1.057 on the
+last frame sent (nor is one the relay-malfunction flag blocks), and after the safety mode is set no steering frame is
+taken until an inactive frame has gone out and 2 s after it (`BP_INIT_HOLD_US`, `limits.INIT_HOLD`). The ranges then
+start at zero whatever the module was sent before; the inactive frame is what makes every module executed drop its
+copies to zero (within 12 ms on BD, BA, the Explorer, the Maverick and LX6C), so the hold needs no module's own frame
+time-out, which is known only on BD (executed: it steers for its last frame 1.02 s) and the Explorer (read, about 1 s);
+and the speed samples the cap is read at are zero until six are in. The host reports a panda in another mode
+(`pandaCarSafety`: no panda in a car's mode; a second panda the car isn't on doesn't count) and the controller waits
+the hold and a steering period out from the first state in the car's mode, sending inactive frames. Figures: 1.014 of the cap on the Explorer at 100 km/h, 1.030 on LX6C, 1.044 on the F-150, 1.057 on the
 Maverick, with the read times as read. It is not proven while the car gains speed (the cap falls faster than the
 module can follow), above a curve's gain bound, or for a speed reading that is wrong.
 
@@ -754,7 +756,8 @@ commit.
    So every frame is inside the panda's check by construction, given that the panda saw the last one.
    **Restart:** if a frame is lost or refused, the panda restarts from zero and the controller doesn't.
    When the car state's count of refused steering frames rises (`steering_tx_blocked`, from the frames pandad returns
-   on bus + 0xC0; not `safetyTxBlocked`, which counts every refused message) while the panda allows steering, the next frames are
+   on bus + 0xC0; not `safetyTxBlocked`, which counts every refused message, but a refusal that count shows and no
+   returned frame matches for two panda states is taken for one: its return was lost) while the panda allows steering, the next frames are
    one inactive frame, so both restart from zero; neither drops its ranges of the copies
    (`test_one_lost_frame_doesnt_stop_the_steering`, `test_a_restart_takes_one_inactive_frame`). Before, every
    later frame was refused until the request came back near zero. The controller's ranges of the copies are

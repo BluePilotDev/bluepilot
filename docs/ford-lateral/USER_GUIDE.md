@@ -372,9 +372,10 @@ The check never changes the steering, so the car steers the same way while it sh
   comma's sideways limits. It refuses steering while openpilot isn't engaged, makes every engagement
   start from straight ahead, and refuses path angle on any car whose row doesn't have it switched on.
   That is every car except the rows in section 3.
-- **The panda waits 2 s after it is set up.** For 2 s after the panda's safety mode is set (at each
-  start, and after the comma reconnects to the panda) it refuses every steering message: it doesn't know
-  the car's speed yet, nor what the module was last sent. BluePilot waits that out too, so lane centering
+- **The panda waits 2 s after it is set up.** After the panda's safety mode is set (at each start, and
+  after the comma reconnects to the panda) it refuses every steering message until it has let one "not
+  steering" message through and 2 s more have passed: it doesn't know the car's speed yet, and only that
+  message makes the module forget what it was last sent. BluePilot waits that out too, so lane centering
   can't start in those 2 s ("waiting for the panda"). A message the panda refuses never counts as sent.
 - **The panda counts how the module follows a message.** The module doesn't jump to each new
   message. It moves its own copy of each value at a set pace, so for a moment it can hold an old turn
