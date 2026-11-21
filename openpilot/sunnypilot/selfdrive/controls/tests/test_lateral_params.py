@@ -55,11 +55,14 @@ class TestPandaInputs(OpenpilotTestCase):
     self.assertTrue(self._fill(_SM([], seen=False)).pandaLateralAllowed)
     self.assertTrue(self._fill(_SM([])).pandaLateralAllowed)
 
-  def test_car_safety_only_while_current_and_every_panda_runs_a_cars_mode(self):
+  def test_car_safety_only_while_current_and_a_panda_runs_a_cars_mode(self):
     self.assertTrue(self._fill(_SM([], seen=False)).pandaCarSafety)
     self.assertTrue(self._fill(_SM([_panda(), _panda()])).pandaCarSafety)
     for mode in ("silent", "noOutput", "elm327", "allOutput"):
-      self.assertFalse(self._fill(_SM([_panda(), _panda(mode=mode)])).pandaCarSafety, mode)
+      self.assertFalse(self._fill(_SM([_panda(mode=mode)])).pandaCarSafety, mode)
+      self.assertFalse(self._fill(_SM([_panda(mode=mode), _panda(mode=mode)])).pandaCarSafety, mode)
+      # a second panda the car isn't on: the car's panda is the one that holds the steering frames
+      self.assertTrue(self._fill(_SM([_panda(), _panda(mode=mode)])).pandaCarSafety, mode)
     sm = _SM([_panda()])
     sm.alive["pandaStates"] = False  # pandad restarting
     self.assertFalse(self._fill(sm).pandaCarSafety)
@@ -69,6 +72,9 @@ class TestPandaInputs(OpenpilotTestCase):
     self.assertTrue(self._fill(_SM([_panda(lateral=True)])).pandaLateralAllowed)
     self.assertFalse(self._fill(_SM([_panda()])).pandaLateralAllowed)
     self.assertFalse(self._fill(_SM([_panda(controls_allowed=True), _panda()])).pandaLateralAllowed)
+    # a second panda in noOutput never allows: only the pandas in the car's mode count
+    self.assertTrue(self._fill(_SM([_panda(controls_allowed=True), _panda(mode="noOutput")])).pandaLateralAllowed)
+    self.assertFalse(self._fill(_SM([_panda(), _panda(mode="noOutput")])).pandaLateralAllowed)
 
   def test_blocked_messages_are_summed(self):
     self.assertEqual(self._fill(_SM([_panda(blocked=2), _panda(blocked=3)])).safetyTxBlocked, 5)
