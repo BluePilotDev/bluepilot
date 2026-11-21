@@ -67,6 +67,7 @@ struct LateralInputs {
   lateralDelay @16 :Float32;         # lateralDelay.lateralDelay
   pandaLateralAllowed @17 :Bool = true;  # pandaStates: every panda allows lateral control
   safetyTxBlocked @18 :UInt32;       # pandaStates.safetyTxBlocked, summed over the pandas
+  pandaCarSafety @19 :Bool = true;   # pandaStates: current, and every panda runs a car's safety mode
 }
 
 # Same struct as Log.RadarState.LeadData

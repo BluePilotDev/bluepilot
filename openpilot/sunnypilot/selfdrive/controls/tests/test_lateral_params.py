@@ -36,10 +36,11 @@ class _SM(dict):
     model = SimpleNamespace(laneLines=[], laneLineProbs=[], laneLineStds=[])
     super().__init__(pandaStates=panda_states, modelV2=model, vehicleParameters=None, lateralDelay=None)
     self.seen = {"pandaStates": seen, "modelV2": False, "vehicleParameters": False}
+    self.alive = {"pandaStates": seen}
 
 
-def _panda(controls_allowed=False, lateral=False, blocked=0):
-  return SimpleNamespace(controlsAllowed=controls_allowed, controlsAllowedLateral=lateral, safetyTxBlocked=blocked)
+def _panda(controls_allowed=False, lateral=False, blocked=0, mode="ford"):
+  return SimpleNamespace(controlsAllowed=controls_allowed, controlsAllowedLateral=lateral, safetyTxBlocked=blocked, safetyModel=mode)
 
 
 class TestPandaInputs(OpenpilotTestCase):
@@ -53,6 +54,15 @@ class TestPandaInputs(OpenpilotTestCase):
   def test_allowed_until_a_panda_state_was_seen(self):
     self.assertTrue(self._fill(_SM([], seen=False)).pandaLateralAllowed)
     self.assertTrue(self._fill(_SM([])).pandaLateralAllowed)
+
+  def test_car_safety_only_while_current_and_every_panda_runs_a_cars_mode(self):
+    self.assertTrue(self._fill(_SM([], seen=False)).pandaCarSafety)
+    self.assertTrue(self._fill(_SM([_panda(), _panda()])).pandaCarSafety)
+    for mode in ("silent", "noOutput", "elm327", "allOutput"):
+      self.assertFalse(self._fill(_SM([_panda(), _panda(mode=mode)])).pandaCarSafety, mode)
+    sm = _SM([_panda()])
+    sm.alive["pandaStates"] = False  # pandad restarting
+    self.assertFalse(self._fill(sm).pandaCarSafety)
 
   def test_every_panda_must_allow(self):
     self.assertTrue(self._fill(_SM([_panda(controls_allowed=True)])).pandaLateralAllowed)

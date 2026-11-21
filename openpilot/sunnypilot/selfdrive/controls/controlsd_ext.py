@@ -23,6 +23,9 @@ from openpilot.sunnypilot.selfdrive.controls.lib.latcontrol_torque_v0 import Lat
 BP_PARAMS_REFRESH_PERIOD = 0.5  # seconds
 
 
+# BluePilot: the panda's modes that run no car's safety (panda board/main.c is_car_safety_mode)
+NON_CAR_SAFETY_MODELS = ('silent', 'noOutput', 'elm327', 'allOutput')
+
 class ControlsExt(ModelStateBase):
   def __init__(self, CP: structs.CarParams, params: Params):
     ModelStateBase.__init__(self)
@@ -185,6 +188,9 @@ class ControlsExt(ModelStateBase):
     if sm.seen['pandaStates'] and len(panda_states) > 0:
       li.pandaLateralAllowed = all(ps.controlsAllowed or ps.controlsAllowedLateral for ps in panda_states)
       li.safetyTxBlocked = sum(ps.safetyTxBlocked for ps in panda_states)
+      # the panda takes no steering frame for a while after its safety mode is set: a panda in another mode, or no
+      # current panda state (pandad restarting), tells the controller to wait that out once the car's mode is back
+      li.pandaCarSafety = bool(sm.alive['pandaStates']) and all(str(ps.safetyModel) not in NON_CAR_SAFETY_MODELS for ps in panda_states)
 
     md = sm['modelV2']
     lp = sm['vehicleParameters']
