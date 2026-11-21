@@ -519,7 +519,8 @@ noisy readings (`clean-build.md` §14.1). A yaw zero of
   whenever its lane-centering inputs fail its own check: our steering frames, or another input such as
   a vehicle sensor, or a module fault (`assumptions-audit.md` §3.9). The module reports its status on
   CAN FD only, so a CAN car has no such signal.
-- **The panda blocked messages** while steering and allowed. One counts only after 30 frames of
+- **The panda blocked steering frames** while steering and allowed (`CarState.steering_tx_blocked`: refused
+  0x3D3 / 0x3D6 frames only; a refused cancel press is not one). One counts only after 30 frames of
   "allowed", so an ordinary disengage, which the controller hears up to 100 ms late, doesn't latch
   "degraded" (`clean-build.md` §14.1). A single blocked message is enough.
 - **The module answers Denied** while asked: lane centering isn't configured on that truck as built, or
@@ -752,7 +753,8 @@ commit.
    path angle step from this fit, even when a jump in the speed reading leaves no whole step that fits.
    So every frame is inside the panda's check by construction, given that the panda saw the last one.
    **Restart:** if a frame is lost or refused, the panda restarts from zero and the controller doesn't.
-   When the host reports a rise in `safetyTxBlocked` while the panda allows steering, the next frames are
+   When the car state's count of refused steering frames rises (`steering_tx_blocked`, from the frames pandad returns
+   on bus + 0xC0; not `safetyTxBlocked`, which counts every refused message) while the panda allows steering, the next frames are
    one inactive frame, so both restart from zero; neither drops its ranges of the copies
    (`test_one_lost_frame_doesnt_stop_the_steering`, `test_a_restart_takes_one_inactive_frame`). Before, every
    later frame was refused until the request came back near zero. The controller's ranges of the copies are
