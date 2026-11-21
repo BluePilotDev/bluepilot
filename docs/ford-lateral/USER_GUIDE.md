@@ -87,9 +87,17 @@ So this build does both:
 
 - F-150 2021-23 on software version BD;
 - F-150 2021-23 on version BA with data file ML34-14D007-BDE, with its own numbers;
+- F-150 Lightning (RL38-14D003-AA), with the 2021-23 F-150's numbers, which its software holds bit for bit;
 - Explorer 2020-24;
 - Maverick 2022-24;
-- Escape 2020-22 and Bronco Sport 2021-22 on LX6C-14D003-AL.
+- Escape 2020-22 and Bronco Sport 2021-22 on LX6C-14D003-AL;
+- Ranger 2024-25 (RB3C-14D003-AA), with its own numbers. Its module takes no lane centering for the first 9
+  seconds after the truck starts (its own software, run in an emulator), and in a curve whose measured sideways
+  acceleration is above 2.7 m/s^2 its own limiter takes over and lets the steering go toward straight.
+
+Not driven yet with path angle: the Lightning and the Ranger. The 2024 Mustang's whole steering step has also
+been run, but its path angle waits on a change to the panda's safety margin (its own numbers need a slightly
+larger one than the others); openpilot has no Mustang (2024) platform, so no car reaches that row today.
 
 These are the rows whose module's software was read and holds what path angle needs: how far ahead the
 module looks, and how fast it lets curvature and path angle change. Every other car, and the fallback,
@@ -248,7 +256,6 @@ A row applies only when your module answers exactly these part numbers. Steering
 | Vehicle | Strategy | Data file |
 |---|---|---|
 | F-150 2021-23 | ML3V-14D003-BD | ML34-14D007-EDL or -BDL |
-| F-150 2021-23, version BC | ML3V-14D003-BC | any (see below) |
 | F-150 2021-23, version BA | ML3V-14D003-BA | ML34-14D007-BDE |
 | F-150 Lightning | RL38-14D003-AA | RL38-14D007-DD or -AD |
 | Explorer 2020-24 | M1MC-14D003-AC | MB5C-14D007-BD |
@@ -283,13 +290,8 @@ centering request at all, so no build can steer it that way. **Not checked:** wh
 recognised anyway.
 
 **2021-23 F-150s on version BC.** Most 2021-23 F-150s run software version BC (42 of the 45 in
-the drive logs studied). No copy of the BC software was available to decode, so unlike the other rows,
-its row comes from how 33 BC trucks behaved on public drives. They follow a curvature command just like
-version BD, and react 0.15 to 0.3 seconds sooner. The row steers with BD's path-angle numbers, because
-BC's own were never read, with comma's ramp-out and BC's own measured reaction time, and without the
-smoothing comma's code adds on these trucks. **Not checked:** whether BC's numbers really are BD's. A
-copy of a BC data file, or a BC drive with path angle, would show it. It accepts any data file, but **your module still has to answer the data-file question at
-start**.
+the drive logs studied). No copy of the BC software has been read, so this build has no row for it: a BC truck
+runs the fallback (comma's own steering, section 6) until a BC truck's files are read.
 
 **An older F-150 version.** A 2021-23 F-150 on ML3V-14D003-BA with data file ML34-14D007-BDE has its own
 row, with path angle and its own numbers. Its steering messages ask for the quick let-go (ramp type 3), so

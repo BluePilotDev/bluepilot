@@ -119,8 +119,10 @@ can be supported. The logic is meant to be fit for upstream; the packaging isn't
    from its module is generated from the module's files (3.3).
 3. **Path angle (approach A′)** on rows whose preview is known. Curvature moves at the module's rate,
    and path angle carries what that rate still holds back, in the module's own K2. It is a per-row
-   switch, **on for every row whose module's preview, c2 rate and c1 rate were read, and for BC with
-   BD's numbers** (seven rows), off on the others and the fallback.
+   switch, **on for every row whose whole lateral step and inactive frame ran in an emulator** (seven rows: the
+   F-150 BD and BA, the Lightning on BD's curve, the Explorer, the Maverick, LX6C and the Ranger on its own curve),
+   off on the others and the fallback. The Mustang 2024's step has run too; its path angle waits on a gain margin per
+   curve (its curve needs 1.1164 with the 6 % speed allowance, over the shared 1.10).
 4. **The panda bounds the command by lateral acceleration and jerk** (comma's numbers, except a lower
    cap of BluePilot's own on CAN FD, 3.2), on the
    curvature signal alone, on the implied curvature at the highest K2 the module can have at that
@@ -176,7 +178,7 @@ module's preview, c2 rate and c1 rate were read from its files: F-150 2021-23 (B
 Explorer 2020-24, Ranger 2024-25, Maverick 2022-24, and the Escape 2020-22 and Bronco Sport 2021-22
 (LX6C-14D003-AL). Each has had its module's code run in an emulator (3.6): BD's (and through the same code
 the Lightning's), the Ranger's controller chain, the Explorer's, the Maverick's and LX6C's whole lateral step.
-One row takes another module's numbers, by the project's choice: the F-150's level BC takes BD's (2.11). The
+No row takes another module's numbers: the F-150's level BC row (2.11) is gone, and a BC truck runs the fallback. The
 Explorer's second pair's data file (MB5C-14D007-BA) has been read since: its preview numbers are the first pair's. It is off on every other row and on the fallback
 (`test_path_angle_is_on_for_every_row_that_can_use_it`). The evidence for switching it on is the
 BluePilot dev group's 50,000+ miles of path-angle-only control, and the two rows measured on a road
@@ -224,12 +226,9 @@ generations never shares a row (`test_the_mach_e_generations_never_share_a_row`)
 is pinned yet: no F124 has been read with this code (the Explorer's, M1MC-14D004-AB, is known from
 Ford's records and a read with another tool), and the 2022-24 Maverick's module has none.
 
-**One exception, the BC row (2.11).** It uses `ANY_DATA_FILE`, which a test allows only on a curvature
-row with comma's stock ramp type and precision. The row still carries BD's limit table and BC's learner start, which
-change what is sent above about 109 km/h on CAN FD and where lagd starts, so it holds only while every BC
-data file has those numbers; none has been read. Even there the module must
-answer F10A: `match_strategy` returns "didn't answer" before it looks at any row when either key is
-empty.
+**No exception.** Every row is exact pairs: the BC row, the one row that took `ANY_DATA_FILE`, is gone (a BC truck
+runs the fallback). Even so a module must answer F10A: `match_strategy` returns "didn't answer" before it looks at any
+row when either key is empty.
 
 **Cost: coverage.** Of 63 vehicles' module records from Ford's service archive, 26 match a row today. Of 67 logged openpilot vehicles, 42
 are on the BC row once their module answers F10A, 19 run a strategy with a row but an unread data file,
@@ -628,10 +627,10 @@ by comma's stock command (curvature only); the path-angle measurements used earl
 | Row | Control law read | Code run in an emulator | Logged drives, curvature | Path-angle gain on a road |
 |---|---|---|---|---|
 | F-150 2021-23 BD | yes | yes: the twin is held to it | 1 truck | one truck, bp-7.0: 0.93, 1.01 and 1.00 of the row's at 5-12, 12-20 and 20-45 m/s (research note `pathangle-route`) |
-| F-150 2021-23 BC | no (no file) | no | 33 trucks | none |
-| F-150 Lightning | yes | its code is BD's instruction for instruction; its own image not run | 2 trucks | none |
+| F-150 2021-23 BC (no row: the fallback) | no (no file) | no | 33 trucks | none |
+| F-150 Lightning | yes | yes: its whole lateral step from its own start-up, held to Ghidra's emulation; the inactive frame | 2 trucks | none |
 | Explorer 2020-24 | yes | yes: M1MC-AC with MB5C-BD's start-up and whole lateral step, on two emulators that agree on every tick; L1MC-AL's start-up and K2 lookup; P1MC-AA with PB5C-NB from its own start-up, equal in every path number. MB5C-BA (read since) holds BD's preview numbers | 9 trucks | one truck: 0.97 of the model's on an angle-mode drive, 0.95 with Ford's own camera (`twin.md` §10.4) |
-| Ranger 2024-25 | yes | its controller chain, its applied limit and rates equal to the row | 1 truck | none |
+| Ranger 2024-25 | yes | yes: its whole lateral step from its own start-up, held to Ghidra's emulation; the inactive frame. No control for 9.0 s after start-up; its mode-1 limiter takes over above 2.7 m/s^2 measured | 1 truck | none |
 | Maverick 2022-24 | yes | yes: its whole lateral step from power-up on two emulators, with ABD (T max from the first step) | 23 trucks | none |
 | Escape 2020-22, Bronco Sport 2021-22 (LX6C-AL) | yes | yes: the Maverick's code with CAH | 3 cars | none |
 | Mach-E 2021-22, 2023-24 | yes | yes: GA, FA and HA from start-up to engaged torque | 6 cars | none (curvature rows) |
@@ -656,7 +655,10 @@ obeys the rule starts from straight. The frames move at the module's rate from t
 holds the wire to it. (Newer-library rows once sent the panda's step until the module reported control,
 because that module takes the frame at once until then; the rate check refuses those frames.)
 
-### 2.11 The BC row, from fleet behaviour
+### 2.11 The BC row, from fleet behaviour (removed)
+
+**Removed.** No file of BC was ever obtained, so a BC truck runs the fallback until one is read; the row and its
+loan of BD's limit are gone. What follows is why it had been made, kept for the record.
 
 **Problem.** 42 of 45 logged 2021-23 F-150s run ML3V-14D003-BC. Our row and twin are BD. No BC file was
 found (`bc-sources.md`).
