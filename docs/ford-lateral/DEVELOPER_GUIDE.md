@@ -844,11 +844,21 @@ runs:
 - after any violation, and while lateral control isn't allowed, the last command is zero, so the next
   ramp starts from zero. There is no latch; three tests pin that.
 
-The caps are about 3.6 m/s² on CAN and about 2.4 m/s² on CAN FD (`FORD_BP_LIMITS`). The CAN one is
-comma's. The CAN FD one is BluePilot's own: comma's check in this branch has one cap, 3.6, for both
-(`O/opendbc/safety/lateral.h`). Its reason, more steering force on CAN FD, is an old comment of comma's
-that nothing of ours shows (`assumptions-audit.md` item 3). So "Disable BP Lateral Control" raises a CAN
-FD car's cap to 3.6.
+The caps are about 3.6 m/s² on CAN (comma's) and, on CAN FD, **the row's own executed lateral acceleration limit by
+speed, never above comma's 3.6** (the curve limit by row): startup bits 7-9 (`FordSafetyFlagsSP.BP_CURVE_LIMIT`) name
+one of the panda's tables, generated with the rows into `L/safety/ford_limit_tables.h` (`core/module_tables.py`
+`PANDA_LIMITS`, `ModuleRow.panda_limit`; pinned by `tests/test_limits.py`): each the module's own mode-1 limit, executed
+on every row it names, one table for rows whose tables are equal point for point (the F-150 2021-23, the Lightning, the
+F-150 2024-26 and the Mustang 2025 share one), and comma's cap for a module whose code has none (BA with BDE; and the
+CAN rows of the 2020-24 Explorer and LX6C, where it changes nothing). `ford_bp_lmc_tx` reads the table at the check's
+own speed (its lowest recent sample less 1 m/s; every table falls or stays flat with speed, so that is at least what
+the module allows at the car's speed); the controller (`core/limits.py` `max_lateral_accel`, `window`) at the car's
+speed, under it. A row whose limit did not run (the read Explorer 2025 and 2026 rows), the fallback and index 0 keep
+BluePilot's earlier 2.4 (`FORD_BP_LIMITS`): comma's check in this branch has one cap, 3.6, for both buses
+(`O/opendbc/safety/lateral.h`), and the reason for the lower one, more steering force on CAN FD, is an old comment of
+comma's that nothing of ours shows (`assumptions-audit.md` item 3). So "Disable BP Lateral Control" gives a CAN FD car
+comma's 3.6. **StarPilot and IQ.Pilot hosts stay on index 0 (2.4):** their adapters don't ask `ford_safety_param` for
+the bits (its `curve_limit` argument; StarPilot's seven carried bits have no room for them).
 
 Without bit 5, the stock check runs: `ford_stock_curvature_checks`, a wrapper around comma's
 `steer_curvature_cmd_checks` with its band. The wrapper restarts the check from zero while lateral

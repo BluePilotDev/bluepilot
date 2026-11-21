@@ -194,7 +194,7 @@ If your module doesn't answer, or its part numbers aren't in the table, the buil
 curvature alone (without the extra smoothing comma's code adds on the 2021-23 F-150 and the Bronco Sport), and
 the panda's stock check for your car. So it holds the command close to what the yaw sensor measures (as
 earlier BluePilot did, above), and on CAN FD cars it uses comma's limit on how hard the car turns, 3.6 m/s²
-rather than BluePilot's 2.4. It is the approach tested on the most Fords.
+(BluePilot's own steering uses your module's own limit, below). It is the approach tested on the most Fords.
 
 ### A health check
 
@@ -205,11 +205,12 @@ and reports. It never changes the steering (section 7).
 
 The build uses comma's limits on how hard the car may be pushed sideways in a curve, and how quickly
 that push may change, with one exception. On newer Fords with a faster internal network (called CAN
-FD), such as the F-150, Mach-E and Ranger, BluePilot keeps a lower limit of its own: about 2.4 against
-comma's 3.6 (in m/s², sideways acceleration). An old comment in comma's code gave the reason as their
-steering having more force; nothing measured shows that. Switching on **Disable BP Lateral Control**
-gives a CAN FD car comma's 3.6 again, and so does the fallback (stock openpilot's code steers it). Where your module allows less than the limit, the build asks for
-no more than your module allows.
+FD), such as the F-150, Mach-E and Ranger, the limit is your steering module's own, read from its software and
+run in an emulator, by speed, and never above comma's 3.6 (in m/s², sideways acceleration). On a 2021-23 F-150 that is
+3.0 up to 60 km/h, 2.5 at 100 and 2.0 at 160; on a Ranger 2.7; on an F-150 with steering software BA, whose module has
+no limit of its own, comma's 3.6. A module whose limit hasn't been run yet keeps BluePilot's earlier 2.4. Switching on
+**Disable BP Lateral Control** gives a CAN FD car comma's 3.6 again, and so does the fallback (stock openpilot's code
+steers it). The build asks for no more than your module allows.
 
 openpilot is told the same limit. The comma's safety chip, the **panda**, checks it too (section 8). So when a curve needs more than that, you see openpilot's usual
 "turn exceeds steering limit" warning instead of the car quietly turning less.
