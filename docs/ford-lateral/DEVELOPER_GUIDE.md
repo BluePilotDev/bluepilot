@@ -533,6 +533,11 @@ noisy readings (`clean-build.md` §14.1). A yaw zero of
   the same car and software (`health.carry` and `restore`, stored in `FordLateralSupport`). On the
   seven recorded routes, the seven windows read 0.94 to 1.03
   (`logs-derived/clean-build/health_on_routes.json`).
+- **Frames at the module's own limit are left out of the gain.** Where the module reports its limit status 2 or 3
+  (at its torque limit, or on the F-150s its lateral-acceleration clip, with or without the driver), it holds its
+  output there by its firmware and the car falls short of the command; that says nothing about the row
+  (`torque-ceiling.md` §2). The status is 0x3CC's on CAN FD and 0x417's on the 2020-24 Explorer; a car that reports
+  none counts every frame.
 - **The module's capability signal reads Faulty** while BluePilot is steering. The module reports that
   whenever its lane-centering inputs fail its own check: our steering frames, or another input such as
   a vehicle sensor, or a module fault (`assumptions-audit.md` §3.9). The module reports its status on
@@ -740,7 +745,15 @@ commit.
 3. **Request rule** (`L/core/request.py`). Ask only while openpilot wants lateral control, the panda
    allows it, and the module says Available or Active. The module's state (`pscm_status`) is read from
    Lane_Assist_Data3_FD1 by `O/opendbc/car/ford/carstate.py`, on CAN FD only; Denied is its own state. On
-   CAN, where there is no status, the rule follows openpilot and the panda. Otherwise the inactive frame
+   CAN, where there is no status, the rule follows openpilot and the panda. The module's **limit status** alone
+   (`LatCtlLim_D_Stat`'s values: 1 close, 2 at its limit, 3 at it with the driver) is also read where the 2020-24
+   Explorer's module sends it, 0x417 byte 2 bits 5-6 (its 0x3CC is always 0; read from its code and COM tables,
+   `torque-ceiling.md` §2.1), into `CarState.pscm_limit`, held between 0x417's frames (every change and once a
+   second), none before the first; the DBC's `LatCtlLim_D_Stat_417` and `LatCtlSte_D_Stat_417` are ours. Only on the
+   programs `module_tables.LIMIT_STATUS_ON_0X417` names (L1MC-AL, M1MC-AC; the 2023 Explorer's P1MC is not traced).
+   It goes to the log (`pscmLimit`) and the health check, not to the request rule: that stays the CAN rule above.
+   The drive's 0x417 frames through the car state equal the truck's own status on every 10 ms tick (`TestFordCarState`;
+   research `logs-derived/fw-round4/p2/`). Otherwise the inactive frame
    is sent: all zero, the row's ramp type (0 on the restart frame after a refused frame), precision 1. The reasons: a module configured for Ford's hands-free
    driving stays Unavailable while it is asked, a refused frame is a missing frame to the module, and the inactive
    frame always passes (`test_never_asks_through_unavailable`). The driver's column torque (`steeringTorque`,
