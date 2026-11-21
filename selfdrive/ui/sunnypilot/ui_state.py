@@ -8,6 +8,7 @@ from enum import Enum
 
 from cereal import messaging, log, car, custom
 from openpilot.common.params import Params
+from openpilot.sunnypilot.selfdrive.car.intelligent_cruise_button_management.helpers import icbm_with_op_long
 from openpilot.selfdrive.ui.sunnypilot.layouts.settings.display import OnroadBrightness
 from openpilot.sunnypilot.sunnylink.sunnylink_state import SunnylinkState
 from openpilot.system.ui.lib.application import gui_app
@@ -209,7 +210,7 @@ class UIStateSP:
 
     # ICBM: clear if not available or if full longitudinal control is active
     if self.CP_SP is not None:
-      if not self.CP_SP.intelligentCruiseButtonManagementAvailable or has_long:
+      if not self.CP_SP.intelligentCruiseButtonManagementAvailable or (has_long and not (CP is not None and icbm_with_op_long(CP))):
         self.params.remove("IntelligentCruiseButtonManagement")
         self.has_icbm = False
     else:

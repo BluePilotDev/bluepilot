@@ -2,7 +2,6 @@
 
 from collections.abc import Callable
 
-from openpilot.common.params import Params
 from openpilot.selfdrive.ui.bp.mici.widgets.button_bp import BigParamControlBP
 from openpilot.selfdrive.ui.bp.mici.widgets.floatbutton import BigParamFloatControl
 from openpilot.selfdrive.ui.ui_state import ui_state
@@ -14,7 +13,6 @@ class VehicleLayoutMici(NavScroller):
     super().__init__()
     if back_callback is not None:
       self.set_back_callback(back_callback)
-    self._params = Params()
 
     self.show_hands_free_ui = BigParamControlBP("Show BlueCruise UI on Cluster", "send_hands_free_cluster_msg")
     # Init-time param (read once at car init, mirrored into panda safety); takes effect after restart.

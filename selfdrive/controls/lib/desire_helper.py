@@ -70,8 +70,10 @@ class DesireHelper:
     one_blinker = carstate.leftBlinker != carstate.rightBlinker
     below_lane_change_speed = v_ego < LANE_CHANGE_SPEED_MIN
 
+    blindspot_left, blindspot_right = carstate.leftBlindspot, carstate.rightBlindspot
+
     # Lane turn controller update
-    self.lane_turn_controller.update_lane_turn(blindspot_left=carstate.leftBlindspot, blindspot_right=carstate.rightBlindspot,
+    self.lane_turn_controller.update_lane_turn(blindspot_left=blindspot_left, blindspot_right=blindspot_right,
                                                left_blinker=carstate.leftBlinker, right_blinker=carstate.rightBlinker, v_ego=v_ego)
     self.lane_turn_direction = self.lane_turn_controller.get_turn_direction()
 
@@ -96,8 +98,10 @@ class DesireHelper:
                          ((carstate.steeringTorque > 0 and self.lane_change_direction == LaneChangeDirection.left) or
                           (carstate.steeringTorque < 0 and self.lane_change_direction == LaneChangeDirection.right))
 
-        blindspot_detected = ((carstate.leftBlindspot and self.lane_change_direction == LaneChangeDirection.left) or
-                              (carstate.rightBlindspot and self.lane_change_direction == LaneChangeDirection.right))
+        # BluePilot: use the combined OEM and vision blind-spot state.
+        blindspot_detected = ((blindspot_left and self.lane_change_direction == LaneChangeDirection.left) or
+                              (blindspot_right and self.lane_change_direction == LaneChangeDirection.right))
+        # End BluePilot
 
         self.alc.update_lane_change(blindspot_detected, carstate.brakePressed)
 

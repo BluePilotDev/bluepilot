@@ -549,6 +549,9 @@ static bool ford_tx_hook(const CANPacket_t *msg) {
     bool violation = false;
     violation |= ((msg->data[1] >> 0) & 1U) && !cruise_engaged_prev;   // Signal: CcAslButtnCnclPress (cancel)
     violation |= ((msg->data[3] >> 1) & 1U) && !controls_allowed;     // Signal: CcAsllButtnResPress (resume)
+    // BluePilot: ICBM's set-speed presses only while controls are allowed
+    violation |= ((msg->data[3] >> 3) & 1U) && !controls_allowed;     // Signal: CcAslButtnSetIncPress (set +)
+    violation |= ((msg->data[3] >> 4) & 1U) && !controls_allowed;     // Signal: CcAslButtnSetDecPress (set -)
 
     if (violation) {
       tx = false;

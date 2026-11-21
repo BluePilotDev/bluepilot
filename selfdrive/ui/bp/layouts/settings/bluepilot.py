@@ -27,6 +27,7 @@ from openpilot.selfdrive.ui.bp.lib.dm_icon_style import (
   get_dm_icon_style,
 )
 from openpilot.selfdrive.ui.bp.lib.custom_sound import get_custom_sound_selection
+from openpilot.selfdrive.ui.bp.lib.model_path_color import ModelPathColor, get_model_path_color
 from opendbc.sunnypilot.car.ford.lateral_curv_ext import PrimaryLateralControl
 from openpilot.selfdrive.ui.bp.onroad.augmented_road_view_bp import GaugeStyle
 
@@ -87,6 +88,14 @@ class BluePilotLayout(Widget):
       ("ShowBrakeStatus", self._show_brake_status),
       ("BPHideOnroadBorder", self._hide_onroad_border),
       ("BPShowConfidenceBall", self._show_confidence_ball),
+      ("BPLaneCenterIcon", self._lane_center_icon),
+      ("BPHideDMicon", self._hide_dm_icon),
+      ("BPHideWheelIcon", self._hide_wheel_icon),
+      ("BPShowNetworkStatus", self._show_network_status),
+      ("BPCameraAngleAuto", self._automatic_camera_view),
+      ("BPCroppedDcam", self._experimental_dcam),
+      ("BPCurvaturePathEdges", self._curve_path_highlight),
+      ("BPFordACCPathFeedback", self._ford_acc_path_feedback),
       ("BPAnimateSteeringWheel", self._animate_steering_wheel),
       ("BPUseCustomSounds", self._use_custom_sounds),
       ("FordPrefShowRadarLeadOverlay", self._show_ford_radar_overlay),
@@ -195,6 +204,90 @@ class BluePilotLayout(Widget):
       icon="warning.png"
     )
 
+    self._lane_center_icon = toggle_item(
+      lambda: tr("Lane Positioning Confidence Indicator"),
+      lambda: tr("Show Lane Centering Icon on Interface when lane positioning controls are active."),
+      initial_state=self._safe_get_bool(self._params, "BPLaneCenterIcon"),
+      callback=lambda state: self._toggle_callback(state, "BPLaneCenterIcon"),
+      icon="monitoring.png"
+    )
+
+    self._hide_dm_icon = toggle_item(
+      lambda: tr("Hide Driver Monitoring Icon"),
+      lambda: tr("Removes DM silhouette icon from UI."),
+      initial_state=self._safe_get_bool(self._params, "BPHideDMicon"),
+      callback=lambda state: self._toggle_callback(state, "BPHideDMicon"),
+      icon="monitoring.png"
+    )
+
+    self._hide_wheel_icon = toggle_item(
+      lambda: tr("Hide Steering Wheel Icon"),
+      lambda: tr("Removes steering wheel icon from UI."),
+      initial_state=self._safe_get_bool(self._params, "BPHideWheelIcon"),
+      callback=lambda state: self._toggle_callback(state, "BPHideWheelIcon"),
+      icon="chffr_wheel.png"
+    )
+
+    self._show_network_status = toggle_item(
+      lambda: tr("Show Network Status"),
+      lambda: tr("Show network connectivity bars on bottom-left of screen"),
+      initial_state=self._safe_get_bool(self._params, "BPShowNetworkStatus"),
+      callback=lambda state: self._toggle_callback(state, "BPShowNetworkStatus"),
+      icon="monitoring.png"
+    )
+
+    self._experimental_dcam = toggle_item(
+      lambda: tr("Enable Experimental DCam Features"),
+      lambda: tr("Show cropped driver-camera side views using the selected activation options."),
+      initial_state=self._safe_get_bool(self._params, "BPCroppedDcam"),
+      callback=lambda state: self._toggle_callback(state, "BPCroppedDcam"),
+      icon="monitoring.png",
+    )
+    self._dcam_triggers = button_item(
+      lambda: tr("DCam Activation Options"), lambda: tr("SELECT"),
+      lambda: tr("Choose when the driver-camera side views appear."),
+      callback=self._open_dcam_triggers,
+      enabled=lambda: self._safe_get_bool(self._params, "BPCroppedDcam"),
+    )
+
+    self._automatic_camera_view = toggle_item(
+      lambda: tr("Automatic Camera View"),
+      lambda: tr("Automatically switch between wide-angle view at low speeds and normal view at higher speeds, without requiring Experimental Mode."),
+      initial_state=self._safe_get_bool(self._params, "BPCameraAngleAuto"),
+      callback=lambda state: self._toggle_callback(state, "BPCameraAngleAuto"),
+      icon="monitoring.png"
+    )
+
+    self._ford_acc_path_feedback = toggle_item(
+      lambda: tr("Ford ACC Path Feedback"),
+      lambda: tr("Model path changes shading and color for Ford ACC accel / brake signals"),
+      initial_state=self._safe_get_bool(self._params, "BPFordACCPathFeedback"),
+      callback=lambda state: self._toggle_callback(state, "BPFordACCPathFeedback"),
+      icon="chffr_wheel.png"
+    )
+
+    self._model_path_color_entries = [
+      (tr("Green (Default)"), ModelPathColor.GREEN),
+      (tr("Ford"), ModelPathColor.FORD),
+    ]
+    self._model_path_color_dialog: MultiOptionDialog | None = None
+    self._model_path_color_action = ButtonAction(lambda: tr("SELECT"))
+    self._model_path_color_action.set_value(lambda: self._get_model_path_color_display())
+    self._model_path_color_btn = ListItem(
+      lambda: tr("Model Path Color"),
+      description=lambda: tr("Choose between the default green model path and a Ford-style blue model path."),
+      action_item=self._model_path_color_action,
+      callback=self._select_model_path_color,
+    )
+
+    self._curve_path_highlight = toggle_item(
+      lambda: tr("Curve Path Highlight"),
+      lambda: tr("Subtly brighten the model path edges through curves while retaining your selected path color."),
+      initial_state=self._safe_get_bool(self._params, "BPCurvaturePathEdges"),
+      callback=lambda state: self._toggle_callback(state, "BPCurvaturePathEdges"),
+      icon="chffr_wheel.png",
+    )
+
     # Animate steering wheel toggle
     self._animate_steering_wheel = toggle_item(
       lambda: tr("Animate Steering Wheel"),
@@ -204,7 +297,7 @@ class BluePilotLayout(Widget):
       icon="chffr_wheel.png"
     )
 
-    # BluePilot: one theme selector for everything (8-Bit Racer + seasonal packs),
+    # BluePilot: one theme selector for everything (code themes + seasonal packs),
     # same entries and param as the MICI page — see theme_pack.selector_entries().
     # A dialog (not a button row) so any number of packs stays inside the item box.
     self._theme_entries = theme_pack.selector_entries()
@@ -213,7 +306,7 @@ class BluePilotLayout(Widget):
     self._theme_action.set_value(lambda: self._get_theme_display())
     self._theme_pack_btn = ListItem(
       lambda: tr("Theme"),
-      description=lambda: tr("8-Bit Racer game view, or a seasonal theme pack (recolors the road and the wheel icon)."),
+      description=lambda: tr("Choose 8-Bit Racer, Tesla, or a seasonal theme pack."),
       action_item=self._theme_action,
       callback=self._select_theme,
     )
@@ -736,12 +829,22 @@ class BluePilotLayout(Widget):
         self._hide_onroad_border,
         self._disable_lane_line_status_color,
         self._hide_camera_view,
+        self._model_path_color_btn,
+        self._curve_path_highlight,
+        self._ford_acc_path_feedback,
         self._theme_pack_btn,
         self._theme_auto_seasonal,
         self._rainbow_lane_lines,
         self._show_blindspot,
         self._show_brake_status,
         self._show_confidence_ball,
+        self._lane_center_icon,
+        self._hide_dm_icon,
+        self._hide_wheel_icon,
+        self._show_network_status,
+        self._automatic_camera_view,
+        self._experimental_dcam,
+        self._dcam_triggers,
         self._animate_steering_wheel,
         self._wheel_icon_style_btn,
         self._dm_icon_style_btn,
@@ -1077,7 +1180,36 @@ class BluePilotLayout(Widget):
     stored = self._safe_get(self._params, theme_pack.PARAM_KEY) or ""
     if isinstance(stored, bytes):
       stored = stored.decode("utf-8", errors="replace")
+    stored = theme_pack.normalize_selector_value(stored)
     return next((label for label, v in self._theme_entries if v and v.lower() == stored.lower()), tr("Off"))
+
+  def _open_dcam_triggers(self):
+    from openpilot.selfdrive.ui.bp.layouts.settings.dcam import DcamTriggersLayout
+    gui_app.push_widget(DcamTriggersLayout())
+
+  def _get_model_path_color_display(self) -> str:
+    selected = get_model_path_color(self._params)
+    return next(label for label, value in self._model_path_color_entries if value == selected)
+
+  def _select_model_path_color(self):
+    """Open the model-path color menu and persist the selected enum value."""
+    def handle_selection(result: DialogResult):
+      if result == DialogResult.CONFIRM and self._model_path_color_dialog is not None:
+        selection = self._model_path_color_dialog.selection
+        value = next(
+          (value for label, value in self._model_path_color_entries if label == selection),
+          ModelPathColor.GREEN,
+        )
+        self._params.put("BPModelPathColor", int(value))
+      self._model_path_color_dialog = None
+
+    self._model_path_color_dialog = MultiOptionDialog(
+      tr("Model Path Color"),
+      [label for label, _ in self._model_path_color_entries],
+      self._get_model_path_color_display(),
+      callback=handle_selection,
+    )
+    gui_app.push_widget(self._model_path_color_dialog)
 
   def _select_theme(self):
     """Open a scrollable option dialog; stores the selected entry's param value."""

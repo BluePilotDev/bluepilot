@@ -10,6 +10,7 @@ from opendbc.car import structs
 from opendbc.car.interfaces import CarInterfaceBase
 from openpilot.common.params import Params
 from openpilot.common.swaglog import cloudlog
+from openpilot.sunnypilot.selfdrive.car.intelligent_cruise_button_management.helpers import icbm_with_op_long
 from openpilot.sunnypilot.selfdrive.controls.lib.nnlc.helpers import get_nn_model_path
 from openpilot.sunnypilot.selfdrive.controls.lib.speed_limit.helpers import set_speed_limit_assist_availability
 
@@ -60,7 +61,7 @@ def _initialize_intelligent_cruise_button_management(CP: structs.CarParams, CP_S
     params = Params()
 
   icbm_enabled = params.get_bool("IntelligentCruiseButtonManagement")
-  if icbm_enabled and CP_SP.intelligentCruiseButtonManagementAvailable and not CP.openpilotLongitudinalControl:
+  if icbm_enabled and CP_SP.intelligentCruiseButtonManagementAvailable and (not CP.openpilotLongitudinalControl or icbm_with_op_long(CP)):
     CP_SP.pcmCruiseSpeed = False
 
 
@@ -78,7 +79,7 @@ def _cleanup_unsupported_params(CP: structs.CarParams, CP_SP: structs.CarParamsS
     params.remove("NeuralNetworkLateralControl")
     params.remove("EnforceTorqueControl")
 
-  if not CP_SP.intelligentCruiseButtonManagementAvailable or CP.openpilotLongitudinalControl:
+  if not CP_SP.intelligentCruiseButtonManagementAvailable or (CP.openpilotLongitudinalControl and not icbm_with_op_long(CP)):
     cloudlog.warning("ICBM not available or openpilot Longitudinal Control enabled, cleaning up params")
     params.remove("IntelligentCruiseButtonManagement")
 

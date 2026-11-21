@@ -10,6 +10,7 @@ from openpilot.common.constants import CV
 from openpilot.sunnypilot.selfdrive.selfdrived.events_base import EventsBase, Priority, ET, Alert, \
   NoEntryAlert, ImmediateDisableAlert, EngagementAlert, NormalPermanentAlert, AlertCallbackType, wrong_car_mode_alert
 from openpilot.sunnypilot.selfdrive.controls.lib.speed_limit import PCM_LONG_REQUIRED_MAX_SET_SPEED, CONFIRM_SPEED_THRESHOLD
+from openpilot.sunnypilot.selfdrive.car.intelligent_cruise_button_management.helpers import icbm_manages_set_speed_with_op_long
 from openpilot.system.hardware import HARDWARE
 
 AlertSize = log.SelfdriveState.AlertSize
@@ -48,7 +49,7 @@ def speed_limit_pre_active_alert(CP: car.CarParams, CS: car.CarState, sm: messag
   alert_1_str = ""
   alert_size = AlertSize.small
 
-  if CP.openpilotLongitudinalControl and CP.pcmCruise:
+  if CP.openpilotLongitudinalControl and CP.pcmCruise and not icbm_manages_set_speed_with_op_long(CP.brand, CP.openpilotLongitudinalControl):
     # PCM long
     cst_low, cst_high = PCM_LONG_REQUIRED_MAX_SET_SPEED[metric]
     pcm_long_required_max = cst_low if speed_limit_final_last_conv < CONFIRM_SPEED_THRESHOLD[metric] else cst_high

@@ -7,6 +7,7 @@ See the LICENSE.md file in the root directory for more details.
 """
 
 import os
+os.environ['GMMU'] = '0'
 from openpilot.system.hardware import TICI
 os.environ['DEV'] = 'QCOM' if TICI else 'CPU'
 USBGPU = "USBGPU" in os.environ
@@ -17,7 +18,7 @@ import pickle
 import time
 import numpy as np
 import cereal.messaging as messaging
-from cereal import car, log
+from cereal import car, custom, log
 from setproctitle import setproctitle
 from cereal.messaging import PubMaster, SubMaster
 from msgq.visionipc import VisionIpcClient, VisionStreamType, VisionBuf
@@ -36,6 +37,7 @@ from openpilot.sunnypilot.modeld_v2.fill_model_msg import fill_model_msg, fill_p
 from openpilot.sunnypilot.modeld_v2.constants import Plan
 from openpilot.sunnypilot.modeld_v2.meta_helper import load_meta_constants
 from openpilot.sunnypilot.modeld_v2.camera_offset_helper import CameraOffsetHelper
+from openpilot.sunnypilot.modeld_v2.runtime_helpers import POLICY_INPUTS, WARP_INPUTS, load_oob
 
 from openpilot.sunnypilot.livedelay.helpers import get_lat_delay
 from openpilot.sunnypilot.modeld_v2.modeld_base import ModelStateBase
@@ -100,17 +102,31 @@ class ModelState(ModelStateBase):
   def _init_combined(self, pkl_path, cam_w, cam_h, bundle):
     from tinygrad.tensor import Tensor
     from openpilot.system.camerad.cameras.nv12_info import get_nv12_info
-    from openpilot.sunnypilot.modeld_v2.compile_modeld import derive_frame_skip, make_split_input_queues
+    from openpilot.sunnypilot.modeld_v2.compile_modeld import derive_frame_skip
     from tinygrad.device import Device
 
-    from openpilot.common.file_chunker import read_file_chunked
+    from openpilot.common.file_chunker import open_file_chunked
 
     cloudlog.warning(f"loading combined pkl: {pkl_path}")
-    jits = pickle.loads(read_file_chunked(pkl_path))
+    with open_file_chunked(pkl_path) as model_file:
+      if bundle is not None and bundle.models[0].type == custom.ModelManagerSP.Model.Type.chunked:
+        jits = load_oob(model_file)
+      else:
+        jits = pickle.load(model_file)
 
     self.DEV = Device.DEFAULT
+    self.WARP_DEV = 'QCOM' if TICI else self.DEV
+    self.QUEUE_DEV = self.DEV
 
     metadata = jits['metadata']
+    self.is_legacy_model = 'run_policy' not in jits
+    if self.is_legacy_model:
+      self.warp = jits[(cam_w, cam_h)]['warp_enqueue']
+      self.run_policy = jits[(cam_w, cam_h)]['run_policy']
+    else:
+      self.run_policy = jits['run_policy']
+      self.warp = jits[(cam_w, cam_h)]
+
     if 'model' in metadata:
       model_metadata = metadata['model']
       self.vision_output_slices = model_metadata['output_slices']
@@ -118,9 +134,13 @@ class ModelState(ModelStateBase):
       self._policy_slices_list = []
       self._combined_model_type = 'supercombo'
       self._vision_input_names = [k for k in model_metadata['input_shapes'] if 'img' in k]
-      from openpilot.sunnypilot.modeld_v2.compile_modeld import make_supercombo_input_queues
+      if self.is_legacy_model:
+        from openpilot.sunnypilot.modeld_v2.compile_modeld import make_supercombo_input_queues
+      else:
+        from openpilot.sunnypilot.modeld_v2.runtime_helpers import make_supercombo_input_queues
       frame_skip = derive_frame_skip({}, model_metadata['input_shapes'])
-      self.input_queues, self.numpy_inputs = make_supercombo_input_queues(model_metadata['input_shapes'], frame_skip, device=self.DEV)
+      self.input_queues, self.numpy_inputs = make_supercombo_input_queues(model_metadata['input_shapes'], frame_skip,
+                                                                          device=self.QUEUE_DEV)
     else:
       vision_metadata = metadata['vision']
       policy_keys = [k for k in metadata if k != 'vision']
@@ -138,7 +158,16 @@ class ModelState(ModelStateBase):
       policy_input_shapes = first_policy_metadata['input_shapes']
       self._vision_input_names = [k for k in vision_input_shapes if 'img' in k]
       frame_skip = derive_frame_skip(vision_input_shapes, policy_input_shapes)
-      self.input_queues, self.numpy_inputs = make_split_input_queues(vision_input_shapes, policy_input_shapes, frame_skip, device=self.DEV)
+      if self.is_legacy_model:
+        from openpilot.sunnypilot.modeld_v2.compile_modeld import make_split_input_queues
+      else:
+        from openpilot.sunnypilot.modeld_v2.runtime_helpers import make_split_input_queues
+      self.input_queues, self.numpy_inputs = make_split_input_queues(vision_input_shapes, policy_input_shapes, frame_skip,
+                                                                     device=self.QUEUE_DEV)
+
+    self._desire_key = next(key for key in self.numpy_inputs if key.startswith('desire'))
+    self._road_key = next(key for key in self._vision_input_names if 'big' not in key)
+    self._wide_key = next(key for key in self._vision_input_names if 'big' in key)
 
     from openpilot.sunnypilot.modeld_v2.parse_model_outputs_split import Parser as SplitParser
     from openpilot.sunnypilot.modeld_v2.parse_model_outputs import Parser as CombinedParser
@@ -158,14 +187,13 @@ class ModelState(ModelStateBase):
     nv12_info = get_nv12_info(cam_w, cam_h)
     self.frame_buf_params = dict.fromkeys(self._vision_input_names, nv12_info)
 
-    self._run_policy = jits[(cam_w, cam_h)]['run_policy']
-    self._warp_enqueue = jits[(cam_w, cam_h)]['warp_enqueue']
-    road_name = next(k for k in self._vision_input_names if 'big' not in k)
-    yuv_size = self.frame_buf_params[road_name][3]
-    self._warp_enqueue(
-      **self.input_queues,
-      frame=Tensor(np.zeros(yuv_size, dtype=np.uint8), device=self.DEV).contiguous().realize(),
-      big_frame=Tensor(np.zeros(yuv_size, dtype=np.uint8), device=self.DEV).contiguous().realize())
+    yuv_size = self.frame_buf_params[self._road_key][3]
+    frame = Tensor(np.zeros(yuv_size, dtype=np.uint8), device=self.WARP_DEV).contiguous().realize()
+    big_frame = Tensor(np.zeros(yuv_size, dtype=np.uint8), device=self.WARP_DEV).contiguous().realize()
+    if self.is_legacy_model:
+      self.warp(**self.input_queues, frame=frame, big_frame=big_frame)
+    else:
+      self.warp(**{key: self.input_queues[key] for key in WARP_INPUTS}, frame=frame, big_frame=big_frame)
 
 
   @property
@@ -178,7 +206,7 @@ class ModelState(ModelStateBase):
 
   @property
   def desire_key(self) -> str:
-    return next(k for k in self.numpy_inputs if k.startswith('desire'))
+    return self._desire_key
 
   def run(self, bufs: dict[str, VisionBuf], transforms: dict[str, np.ndarray],
                 inputs: dict[str, np.ndarray], prepare_only: bool) -> dict[str, np.ndarray] | None:
@@ -189,36 +217,49 @@ class ModelState(ModelStateBase):
       yuv_size = self.frame_buf_params[key][3]
       cache_key = (key, ptr)
       if cache_key not in self._blob_cache:
-        self._blob_cache[cache_key] = Tensor.from_blob(ptr, (yuv_size,), dtype='uint8', device=self.DEV)
+        self._blob_cache[cache_key] = Tensor.from_blob(ptr, (yuv_size,), dtype='uint8', device=self.WARP_DEV)
       self.full_frames[key] = self._blob_cache[cache_key]
 
     desire_key = self.desire_key
     inputs[desire_key][0] = 0
     self.numpy_inputs[desire_key][:] = np.where(inputs[desire_key] - self.prev_desire > .99, inputs[desire_key], 0)
     self.prev_desire[:] = inputs[desire_key]
-    for key in ('traffic_convention', 'lateral_control_params'):
+    for key in ('traffic_convention', 'lateral_control_params', 'action_t'):
       if key in self.numpy_inputs and key in inputs:
         self.numpy_inputs[key][:] = inputs[key]
 
-    road_key = next(n for n in bufs if 'big' not in n)
-    wide_key = next(n for n in bufs if 'big' in n)
+    road_key = self._road_key
+    wide_key = self._wide_key
     self.numpy_inputs['tfm'][:, :] = transforms[road_key].reshape(3, 3)
     self.numpy_inputs['big_tfm'][:, :] = transforms[wide_key].reshape(3, 3)
 
-    if prepare_only:
-      self._warp_enqueue(**self.input_queues, frame=self.full_frames[road_key], big_frame=self.full_frames[wide_key])
-      return None
-
-    raw_outputs = self._run_policy(**self.input_queues, frame=self.full_frames[road_key], big_frame=self.full_frames[wide_key])
+    if self.is_legacy_model:
+      if prepare_only:
+        self.warp(**self.input_queues, frame=self.full_frames[road_key], big_frame=self.full_frames[wide_key])
+        return None
+      raw_outputs = self.run_policy(**self.input_queues, frame=self.full_frames[road_key], big_frame=self.full_frames[wide_key])
+    else:
+      warp_inputs = {key: self.input_queues[key] for key in WARP_INPUTS}
+      if prepare_only:
+        self.warp(**warp_inputs, frame=self.full_frames[road_key], big_frame=self.full_frames[wide_key])
+        return None
+      warped = self.warp(**warp_inputs, frame=self.full_frames[road_key], big_frame=self.full_frames[wide_key])
+      policy_inputs = {key: self.input_queues[key] for key in POLICY_INPUTS if key in self.input_queues}
+      raw_outputs = self.run_policy(**policy_inputs, warped=warped)
 
     if self._combined_model_type == 'supercombo':
       model_output = raw_outputs.numpy().flatten()
       sliced = {k: model_output[np.newaxis, v] for k, v in self.vision_output_slices.items()}
       outputs = self.parser.parse_outputs(sliced)
+      if 'prev_feat' in self.numpy_inputs:
+        self.numpy_inputs['prev_feat'][:] = model_output[self.vision_output_slices['hidden_state']]
     else:
       vision_output = raw_outputs[0].numpy().flatten()
       vision_sliced = {k: vision_output[np.newaxis, v] for k, v in self.vision_output_slices.items()}
       outputs = self.parser.parse_vision_outputs(vision_sliced)
+
+      if 'prev_feat' in self.numpy_inputs and 'hidden_state' in self.vision_output_slices:
+        self.numpy_inputs['prev_feat'][:] = vision_output[self.vision_output_slices['hidden_state']]
 
       for i, policy_slices in enumerate(self._policy_slices_list):
         policy_output = raw_outputs[i + 1].numpy().flatten()
@@ -240,13 +281,20 @@ class ModelState(ModelStateBase):
 
   def get_action_from_model(self, model_output: dict[str, np.ndarray], prev_action: log.ModelDataV2.Action,
                             lat_action_t: float, long_action_t: float, v_ego: float) -> log.ModelDataV2.Action:
-    plan = model_output['plan'][0]
-    desired_accel, should_stop = get_accel_from_plan(plan[:, Plan.VELOCITY][:, 0], plan[:, Plan.ACCELERATION][:, 0], self.constants.T_IDXS,
-                                                     action_t=long_action_t)
-    desired_accel = smooth_value(desired_accel, prev_action.desiredAcceleration, self.LONG_SMOOTH_SECONDS)
+    if 'action' in model_output:
+      desired_curvature = model_output['action'][0, 0] / max(1.0, v_ego) ** 2
+      desired_accel = model_output['action'][0, 1]
+      should_stop = v_ego < 0.3 and desired_accel < 0.1
+    else:
+      plan = model_output['plan'][0]
+      desired_accel, should_stop = get_accel_from_plan(plan[:, Plan.VELOCITY][:, 0], plan[:, Plan.ACCELERATION][:, 0],
+                                                       self.constants.T_IDXS, action_t=long_action_t)
 
-    curvature_plan = plan + (self.PLANPLUS_CONTROL - 1.0) * model_output['planplus'][0] if 'planplus' in model_output and self.PLANPLUS_CONTROL != 1.0 else plan
-    desired_curvature = get_curvature_from_output(model_output, curvature_plan, v_ego, lat_action_t, self.mlsim)
+      curvature_plan = plan + (self.PLANPLUS_CONTROL - 1.0) * model_output['planplus'][0] \
+        if 'planplus' in model_output and self.PLANPLUS_CONTROL != 1.0 else plan
+      desired_curvature = get_curvature_from_output(model_output, curvature_plan, v_ego, lat_action_t, self.mlsim)
+
+    desired_accel = smooth_value(desired_accel, prev_action.desiredAcceleration, self.LONG_SMOOTH_SECONDS)
     if self.generation is not None and self.generation >= 10: # smooth curvature for post FOF models
       if v_ego > self.MIN_LAT_CONTROL_SPEED:
         desired_curvature = smooth_value(desired_curvature, prev_action.desiredCurvature, self.LAT_SMOOTH_SECONDS)
@@ -399,6 +447,10 @@ def main(demo=False):
 
     bufs = {name: buf_extra if 'big' in name else buf_main for name in model.vision_input_names}
     transforms = {name: model_transform_extra if 'big' in name else model_transform_main for name in model.vision_input_names}
+    frame_delay = DT_MDL
+    action_delay = DT_MDL / 2
+    lat_action_t = lat_delay + frame_delay + action_delay
+    long_action_t = long_delay + frame_delay + action_delay
     inputs:dict[str, np.ndarray] = {
       model.desire_key: vec_desire,
       'traffic_convention': traffic_convention,
@@ -406,6 +458,8 @@ def main(demo=False):
 
     if 'lateral_control_params' in model.numpy_inputs:
       inputs['lateral_control_params'] = np.array([v_ego, lat_delay], dtype=np.float32)
+    if 'action_t' in model.numpy_inputs:
+      inputs['action_t'] = np.array([lat_action_t, long_action_t], dtype=np.float32)
 
     mt1 = time.perf_counter()
     model_output = model.run(bufs, transforms, inputs, prepare_only)
@@ -418,7 +472,7 @@ def main(demo=False):
       posenet_send = messaging.new_message('cameraOdometry')
       mdv2sp_send = messaging.new_message('modelDataV2SP')
 
-      action = model.get_action_from_model(model_output, prev_action, lat_delay + DT_MDL, long_delay + DT_MDL, v_ego)
+      action = model.get_action_from_model(model_output, prev_action, lat_action_t, long_action_t, v_ego)
       prev_action = action
       fill_model_msg(drivingdata_send, modelv2_send, model_output, action,
                      publish_state, meta_main.frame_id, meta_extra.frame_id, frame_id,

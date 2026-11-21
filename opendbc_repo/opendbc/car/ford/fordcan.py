@@ -338,5 +338,10 @@ def create_button_msg(packer, bus: int, stock_values: dict, cancel=False, resume
     "CcAslButtnCnclPress": 1 if cancel else 0,      # CC cancel button
     "CcAsllButtnResPress": 1 if resume else 0,      # CC resume button
     "TjaButtnOnOffPress": 1 if tja_toggle else 0,   # LCA/TJA toggle button
+    # BluePilot: don't replay a Set+/Set- the driver is holding. The driver's own frame is already
+    # on the bus, and the safety model rejects a frame with either bit while controls aren't
+    # allowed, which would otherwise block this cancel.
+    "CcAslButtnSetIncPress": 0,
+    "CcAslButtnSetDecPress": 0,
   })
   return packer.make_can_msg("Steering_Data_FD1", bus, values)

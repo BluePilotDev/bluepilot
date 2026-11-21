@@ -1,3 +1,4 @@
+from openpilot.selfdrive.ui.bp.lib.camera_transition import AutomaticCameraFadeMixin
 import pyray as rl
 
 from msgq.visionipc import VisionStreamType
@@ -8,13 +9,14 @@ from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.selfdrive.ui.bp.lib import theme_pack
 
 
-class CameraViewBP(TiciCameraView):
+class CameraViewBP(AutomaticCameraFadeMixin, TiciCameraView):
   """BluePilot camera view overrides."""
 
   def __init__(self, *args, **kwargs):
     super().__init__(*args, **kwargs)
     self._bp_camera_params = Params()
     self._bp_hide_camera_view = self._bp_camera_params.get_bool("BPHideCameraView")
+    self._bp_camera_angle_auto = self._bp_camera_params.get_bool("BPCameraAngleAuto")
     self._bp_rad_racer_theme = theme_pack.rad_racer_active(self._bp_camera_params)
     self._bp_camera_param_counter = 0
 
@@ -24,6 +26,7 @@ class CameraViewBP(TiciCameraView):
     if self._bp_camera_param_counter >= 60:
       self._bp_camera_param_counter = 0
       self._bp_hide_camera_view = self._bp_camera_params.get_bool("BPHideCameraView")
+      self._bp_camera_angle_auto = self._bp_camera_params.get_bool("BPCameraAngleAuto")
       self._bp_rad_racer_theme = theme_pack.rad_racer_active(self._bp_camera_params)
 
   def _should_hide_camera_view(self) -> bool:
