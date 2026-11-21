@@ -267,9 +267,10 @@ and BluePilot's lower cap on CAN FD (3.2).
 - **Replaced levels (`SUPERSEDED`)** carry a reason the owner can act on: the wording of Ford's service
   message SSM 53105 for RL34-14D003-AD with an RL34-14D004-E\* calibration (`ssm-53105.md`), and "older
   than Ford's current level" for RL34-14D003-AD otherwise. ML3V-14D003-BA has its own row on ML34-14D007-BDE
-  (its whole lateral step run, `emu-ba.md`), with path angle, its own gain curve (the fifth) and ramp type 3:
-  it ramps its torque out at 7 to 10 Nm/s on types 0 to 2 and at 50 on type 3, where BD takes 51 on every type
-  (executed).
+  (its whole lateral step run, `emu-ba.md`), with path angle, its own gain curve (the fifth) and ramp type 3 in its
+  steering frames. That type sets only the ramp-out the module starts itself after a bad frame or a fault: BA 7 to
+  10 Nm/s on types 0 to 2 and 50 on type 3, BD 50 on every type (executed), so on type 3 BA's is BD's. A disengage
+  ramps at the type of the frame that carries request 0, which this build sends as type 0 (7 Nm/s on BA).
 
 **Cost.** Every car we have logs from ran the fallback in replay, because those logs predate the
 start-up read (`clean-build.md` §9 item 10).

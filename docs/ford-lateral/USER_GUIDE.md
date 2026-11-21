@@ -291,8 +291,9 @@ copy of a BC data file, or a BC drive with path angle, would show it. It accepts
 start**.
 
 **An older F-150 version.** A 2021-23 F-150 on ML3V-14D003-BA with data file ML34-14D007-BDE has its own
-row, with path angle and its own numbers. It asks the module to let go quickly when steering stops (ramp
-type 3): on the other types this module lets go of its torque several times slower than version BD. On any
+row, with path angle and its own numbers. Its steering messages ask for the quick let-go (ramp type 3), so
+after a bad message or a fault this module lets go of its torque as fast as version BD; on the other types it
+is several times slower. When you disengage it still lets go at the slower rate. On any
 other data file Steering Support says the data file isn't in the table, and the car stays on the fallback.
 
 **Not checked yet:** whether steering modules answer the data-file question during a normal start. The
