@@ -373,7 +373,8 @@ The check never changes the steering, so the car steers the same way while it sh
 - **The panda counts how the module follows a message.** The module doesn't jump to each new
   message. It moves its own copy of each value at a set pace, so for a moment it can hold an old turn
   together with a new path angle. The panda keeps track of where those copies can be, and refuses a
-  message that would let the module steer past the sideways limit that way. On these rows it also uses
+  message that would let the module steer past the sideways limit that way. It keeps counting them where they
+  may be after a message that stops steering too, because the module may not have read that message yet. On these rows it also uses
   each module's own path-angle numbers, read from its software, not one figure for every Ford.
 - **One difference from comma's own Ford check.** comma's check also refuses a curvature far from what
   the yaw sensor measures. This build drops that part, on every car. It ties the command to a sensor

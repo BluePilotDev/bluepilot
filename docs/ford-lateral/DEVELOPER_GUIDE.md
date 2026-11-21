@@ -309,7 +309,7 @@ about 125 km/h comma's jerk limit is faster than that c2 rate. So a sender could
 cap at the jerk step while raising c1 so `c2 + K2max·c1` never moved: the panda accepted every frame, and
 the module held the old c2 with the new c1, 1.4 to 2.4 times the cap. A per-module gain made that larger,
 because it removed the single curve's slack (`verify-mythos-clean-build.md` finding 1). The check below
-keeps the wire within the module's own rate of its copies, which closes this.
+keeps the range each of the module's copies can be in and bounds what they can steer for, which closes this.
 
 **Choice.** The two bounds, because the band is incompatible with A′ and the single sum bound is unsound.
 BluePilot's check has no measured band; the fallback runs the host's stock check, band included. bp-dev's pinion yaw source (an
@@ -332,7 +332,7 @@ higher than its T when the module starts, below), the two
 preview-distance clamps by speed (past the upper the distance is the upper, the module's own order), and
 its K2 table by distance, read straight between the table's points as the module reads it. The bound is
 that module's largest K2 at the speed, times a margin of 1.10. Each curve also carries the module's two rates,
-c2 and c1, which the check holds the wire to. A module may start or restart at any time, and it previews
+c2 and c1, at which the check moves its ranges of the module's copies. A module may start or restart at any time, and it previews
 from its T at power-up until T reaches its floor, so each curve takes that T as its floor where it is lower
 (`FORD_BP_PREVIEW_TIME_AT_START` in `safety/ford.h`, `PREVIEW_TIME_AT_START` in `core/limits.py`; not generated,
 because it is what the start-up code does, not a table in the flash): 0 on the Explorer's (executed) and the
@@ -347,42 +347,42 @@ to 4 once carried a measurement source, in builds that never set bit 6. Bits 3 a
 bits fit StarPilot, whose adapter carries seven.
 
 **The module's copies.** The module moves its copies toward each frame at its rates (executed on BD, M1MC-AC,
-P1MC-AA, L1MC-AL, NZ6C-AL and LX6C-AL; `notes/clean-build.md` §16.4, §16.11). It zeroes them once it has held an
-inactive frame for a few of its 4 ms ticks (two on BD, one on the Explorer, three on the Maverick and LX6C), and
-one tick of it already makes it take the next frame at once (executed on BD). It reads the bus in its own period
-(BD: Com in the 10 ms task; the Explorer about 4 ms to the law's cells, the Maverick and LX6C about 11 ms; all
-read, not executed). So the panda keeps one position per
-signal (`FordBpLateralState`): moved toward the last frame it let through, at the curve's own rates, for the time
-since, and at zero only once the inactive frames it let through span the module's settle time and receive period
-(the curve's `inactive_span`, generated: 18 ms on BD's curve, 24 ms on the Explorer's, 32 ms on the Maverick's and
-LX6C's, the PowerPC programs' receive period taken as 20 ms, about twice what was read). On a car with path
-angle, in comma's vocabulary:
+P1MC-AA, L1MC-AL, NZ6C-AL and LX6C-AL; `notes/clean-build.md` §16.4, §16.11), takes a frame at once when it starts
+to steer, and drops both copies to zero once it has held an inactive frame for a few of its 4 ms ticks. It reads
+the bus in its own period (BD: Com in the 10 ms task; the Explorer about 4 ms to the law's cells, the Maverick and
+LX6C about 11 ms; all read, not executed), so an inactive frame followed closely by an active one may never reach
+its law. So each copy can be anywhere between where it was, the frames it was sent and zero, and the module can
+hold an old c2 with a new c1. The panda keeps that range per signal (`FordBpLateralState`, a low and a high end):
+both ends move toward the last frame it let through at the curve's own rates for the time since, and that frame
+and zero always stay inside. On a car with path angle, in comma's vocabulary:
 
-- **settling:** no active frame until then, so the module has always zeroed its copies when the next one comes
-  (an inactive frame followed closely by an active one may never reach its law, and its copies would still be
-  where the curve left them). The controller sends inactive frames in runs that long (`core/limits.py`
-  `inactive_frames`: one on BD's curve, two on the others);
+- **maximum, on the frame:** comma's cap on c2 and on the implied curvature at the largest gain (what the module
+  steers for is linear in K2, so every gain in between is inside; a large c2 can't hide behind an opposite c1);
+- **maximum, on the copies:** once the frame is inside the ranges, the most they can steer for, each range at its
+  worse end, `c2_high + K2max·c1_high` and the mirror for the low ends, is no higher than the cap with its half
+  step, or than it already was. Zero inside the c1 range is the old rule's "none for a path angle that takes
+  away"; zero inside the c2 range covers a module that never read an inactive frame;
+- **a cap that fell** below what the copies can steer for (the car sped up): the frame itself must be under the new
+  cap, and it may raise nothing, so the ranges come back toward it at the module's own rate. The controller puts c2
+  1.75 frames of the rate nearer zero than where its copy can be (`BACK_LEAD_FRAMES`), so a frame lost on the way
+  does not leave the module standing;
+- **inactive:** both signals zero, and nothing in the ranges changes (zero is inside already). One inactive frame
+  is enough, and the next frame may be active;
+- **jerk:** comma's, on c2 and on the implied curvature; comma's real-time count.
 
-- **rate:** each signal within two and a half frames of the module's rate of its position, and half a wire
-  step (two frames: one lost on the way reached neither the panda nor the module; half a frame: when the
-  frames arrive). The wire never outruns the module, so comma's jerk limit on the wire bounds what the module
-  does;
-- **maximum:** the cap on what the module steers for anywhere between its copies and the frame, each signal
-  at its worse end, at the largest gain for a path angle that adds and none for one that takes away;
-- **a cap that fell** below that (the car sped up): the frame must bring the copies back as fast as the module
-  moves them, c2 a whole frame of the module's rate (or the jerk step where less) nearer zero than its copy, and
-  add no path angle. What the module steers for then stays under that end of the copies, which falls as fast as
-  the module allows; a path angle that takes away may come back toward zero meanwhile, under the same end.
-  That needs the frames on time: a late frame finds the module sitting where the last one put it. So from the first
-  such frame on, the c2 copy must be within 1.5 frames (`BP_BACK_SLACK`) of where it would be had a frame come every
-  frame; a sender's lateness uses that up once, and then its frames are refused. The controller puts the frame 1.75
-  frames of the rate under the copy (`BACK_LEAD_FRAMES`), so one lost frame uses a quarter of a frame of it at most;
-- **jerk:** comma's, on c2 and on the implied curvature.
+There is no rule on how far a frame may be from the copies, no settle time and no come-back pace. The panda holds
+the rates and the gain curve as numbers from the firmware, nothing else. Without path angle the gain is 0 and the
+check is comma's without its band. The controller keeps the same four ends, moved one frame at a time; it judges a
+frame with them moved a quarter frame less (at least as wide as the panda's) and what they could already steer
+for with them moved a quarter frame more, for the difference between the panda's clock and its own
+(`core/limits.py` `FRAME_TIMING`).
 
-Without path angle it is comma's check without its band. The controller keeps the same position, moved one
-frame at a time, and keeps a quarter of a frame of the module's rate inside the panda's limits for the
-difference between the panda's clock and its own (`core/limits.py` `FRAME_TIMING`). Before this, the panda
-kept the range each copy could be in, and the controller kept it twice (0.8 and 1.25 of a frame).
+What this is proven to bound (`notes/panda-design.md` §5, a solver's induction on a model held to the compiled
+check): for any frames, timing, inactive frames and module restarts, a module that moves each copy toward a frame
+it was sent or toward zero at its rate or faster steers for no more than the cap, its half step and its two rates
+over its read time: 1.014 of the cap on the Explorer at 100 km/h, 1.030 on LX6C, 1.044 on the F-150, 1.057 on the
+Maverick, with the read times as read. It is not proven while the car gains speed (the cap falls faster than the
+module can follow), above a curve's gain bound, or for a speed reading that is wrong.
 
 Path offset and curvature rate must be inactive on every module.
 
@@ -419,9 +419,16 @@ Path offset and curvature rate must be inactive on every module.
   Lightning and Ranger rows, the module got 96 to 98 % of the path angle asked, against 94 to 96 %, and
   the tracking error at 60 km/h falls from 0.0025 to 0.0015 1/m on the F-150 and from 0.0021 to 0.0012
   on the Ranger (figures from before the start-up floor; not re-run). The cap and the jerk limit are unchanged.
-- The position assumes a module never moves its copies slower than the rates above (executed on every program
-  with path angle). After a disengage the panda takes no active frame for the curve's inactive span, one inactive
-  frame on every curve (50 ms).
+- The ranges assume a module never moves a copy away from every frame it was sent and from zero, or slower than
+  the rates above (executed on every program with path angle). After a disengage one inactive frame (50 ms)
+  restarts the controller on every curve.
+- The check refuses a frame whose c1 alone, at the largest gain, is past the cap behind an opposite c2. The
+  controller wants one only in a reversal at the cap at low speed: there it runs 0.5 to 2.8 m wider than a check
+  without that rule at 45 to 60 km/h, where every build is metres off the line; from 80 km/h up it is the same or
+  better (`notes/panda-design.md` §5.5).
+- No rule holds the module's own build-up to comma's 3.6 m/s³: a sender with a frame every 32 ms, each signal at
+  the module's rate, drives BD's module at 5.5 m/s³ at 100 km/h, the same behind every check considered (comma's own wire limit at that frame rate is 6.3); a 20 Hz sender that builds a lead first
+  reaches 5.55 m/s³, under the cap (`notes/panda-design.md` §6).
 - "Disable BP Lateral Control" is read at car init only, because that is when the panda is told which
   check to run.
 
@@ -729,16 +736,17 @@ commit.
    saw (zero after any inactive frame), it allows one jerk step either way within the cap, for the
    curvature signal and for the implied curvature. The controller reads K2max, from the same gain curve
    as the panda, 1 m/s below the car's speed, so its K2max is at or above the panda's, which reads it at
-   its lowest recent speed sample. It also keeps the panda's position of the module's copies (2.4). Curvature
+   its lowest recent speed sample. It also keeps the panda's ranges of the module's copies (2.4). Curvature
    is fitted first, then path angle into what is left. A car whose path angle is off never gets a
    path angle step from this fit, even when a jump in the speed reading leaves no whole step that fits.
    So every frame is inside the panda's check by construction, given that the panda saw the last one.
    **Restart:** if a frame is lost or refused, the panda restarts from zero and the controller doesn't.
    When the host reports a rise in `safetyTxBlocked` while the panda allows steering, the next frames are
-   inactive, as many as span the module's settle time (`limits.inactive_frames`), so both restart from zero
-   (`test_one_lost_frame_doesnt_stop_the_steering`, `test_a_restart_puts_the_copies_at_zero`). Before, every
-   later frame was refused until the request came back near zero. The controller's position of the copies is
-   the panda's to `FRAME_TIMING` after each restart (`test_the_controllers_copies_are_the_pandas`).
+   one inactive frame, so both restart from zero; neither drops its ranges of the copies
+   (`test_one_lost_frame_doesnt_stop_the_steering`, `test_a_restart_takes_one_inactive_frame`). Before, every
+   later frame was refused until the request came back near zero. The controller's ranges of the copies are
+   the panda's to `FRAME_TIMING` once no frame has been lost or refused for 2 s
+   (`test_the_controllers_copies_are_the_pandas`).
 7. **Pack** (`L/core/carcontroller_ext.py` `_frame`, `L/can/fordcan_ext.py`). Each path signal is clamped to its
    DBC range in the wire's sign (the wrap fix, `test_wire_clamp.py`). The library sets the
    LateralMotionControl2 checksum itself. Lane keeping and the cluster messages are sent by the host's car
@@ -780,10 +788,9 @@ runs:
   - signal ranges: ±0.02 1/m and ±0.5 rad;
   - without path angle, the lateral-acceleration cap on the curvature signal, at the lowest recent speed
     sample minus 1 m/s;
-  - with path angle, each signal within the module's rate of its copies, and the cap on what the module
-    steers for between its copies and the frame, `c2 + K2max·c1` with K2max the module's own gain curve
-    read at the lowest recent speed sample, or the frame bringing the copies back under a cap that fell
-    (2.4);
+  - with path angle, the cap on the implied curvature `c2 + K2max·c1`, with K2max the module's own gain curve
+    read at the lowest recent speed sample, and on the most the ranges of the module's copies can steer for once
+    it has the frame, no higher than the cap or than they already could (2.4);
   - comma's lateral jerk limit (about 3.6 m/s³) on the curvature signal and the implied curvature, against
     the last command;
   - comma's real-time rate check and the speed-mismatch check;
@@ -838,7 +845,8 @@ The pipeline lives in the project's research notes (to be published):
 7. **Path angle on:** only where the row's whole lateral step has run in an emulator, the inactive frame
    included. It is one generator entry with three fields beside the row's: `path_angle_run` (the results that
    show it), `t_start` (T at the module's start, executed) and `inactive` (its settle time after an inactive
-   frame, executed, and its receive period), with a preview; then `--write`, and the tests that list the rows
+   frame, executed, and its receive period: the facts that its inactive scenario ran; this build's panda carries
+   no time from them, since its ranges keep zero inside), with a preview; then `--write`, and the tests that list the rows
    with path angle or the panda's curves (`test_strategy`, `test_safety_param_bits`, `test_controller`,
    `test_limits`, the window tests) take the new row. A family's drive check (2.10) can take it off again.
 8. **The block above the row** in `L/core/strategy.py`, and its line in the table below: where the
@@ -935,7 +943,7 @@ What the main tests guard against:
 | Test | Guards against |
 |---|---|
 | `L/safety/tests/test_ford_bluepilot_window.py` | the real car interface and controller leaving the compiled panda's window: speed grid, engaging in a curve, hard acceleration and braking, random requests, module Unavailable/RampOut/Denied, the panda withdrawing; CAN and CAN FD, every row with path angle on (a guard fails if one is missing), rows with it off, fallback and stock path. Zero refused frames |
-| `L/safety/tests/test_ford_bluepilot.py` | breaking the panda rule: `test_curvature_cannot_hide_behind_an_opposite_path_angle`, no latch, restart from zero, bit 6 off refusing path angle, upstream's `test_steer_allowed` sweep; each module's gain curve to the wire step, no curve meaning the single one, the cap and jerk limit the same with every curve; a sender walking c2 to the opposite cap behind a rising c1 (what the module's copies steer for stays inside the cap) |
+| `L/safety/tests/test_ford_bluepilot.py` | breaking the panda rule: `test_curvature_cannot_hide_behind_an_opposite_path_angle`, no latch, restart from zero, bit 6 off refusing path angle, upstream's `test_steer_allowed` sweep; each module's gain curve to the wire step, no curve meaning no path angle, the cap and jerk limit the same with every curve; the cap on where the copies can be; a fallen cap; senders behind a model module: walking c2 to the opposite cap behind a rising c1, frames timed against the module's law calls, an inactive frame the module misses, random frames and gaps (what the module steers for stays inside the cap, its copies inside the panda's ranges) |
 | `L/tests/test_strategy.py` | wrong matches: exact pairs, generations never sharing, BC, superseded reasons, read-only reads, retries, the switch on exactly for the rows that can use it, BC with BD's numbers |
 | `L/tests/test_controller.py` | breaking the request rule, the exact c2 rate, the first frame, asking through Unavailable; every row as built: bit 6, its gain curve and path angle sent on the switched-on rows only; a sharp curve entry held back by the gain bound (97 % or more delivered) |
 | `L/tests/test_limits.py` | a gain curve drifting from the panda's table, rising with speed, falling under what its module steers for, or above the single curve |
