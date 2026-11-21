@@ -392,7 +392,10 @@ and its two rates over its read time. Two things the proof takes as given are th
 last frame sent (nor is one the relay-malfunction flag blocks), and after the safety mode is set no steering frame is
 taken until an inactive frame has gone out and 2 s after it (`BP_INIT_HOLD_US`, `limits.INIT_HOLD`). The ranges then
 start at zero whatever the module was sent before; the inactive frame is what makes every module executed drop its
-copies to zero (within 12 ms on BD, BA, the Explorer, the Maverick and LX6C), so the hold needs no module's own frame
+copies to zero (executed: 8-12 ms for a small path angle on BD, BA, the Lightning, the Explorer, the Maverick, LX6C
+and the Ranger; longer for a large one, since the path-angle copy falls at 30 rad/s: 18 ms for 0.38 rad on BD and 16 ms
+for 0.5 rad on the Explorer, and up to about 32 ms for 0.5 rad on the 4 ms-task programs by arithmetic, not run; the
+2 s hold is over 60 times the longest), so the hold needs no module's own frame
 time-out, which is known only on BD (executed: it steers for its last frame 1.02 s) and the Explorer (read, about 1 s);
 and the speed samples the cap is read at are zero until six are in. The host reports a panda in another mode
 (`pandaCarSafety`: no panda in a car's mode; a second panda the car isn't on doesn't count) and the controller waits
