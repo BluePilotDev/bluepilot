@@ -23,13 +23,17 @@ exit "$UPDATER_EXIT"
 """
 AGNOS_PY = """#!/bin/sh
 echo "agnos $1" >> "$LOG"
-if [ "$1" = "--verify" ]; then exit 1; fi
+if [ "$1" = "--verify" ]; then exit "$VERIFY_EXIT"; fi
 n=$(grep -c "agnos --swap" "$LOG")
 [ "$n" -gt "$SWAP_FAILS" ]
 """
-# agnos_init alone, with sudo and rm as shell functions (sudo reboot is logged and returns, as the real one does)
+# agnos_init alone, with sudo and rm as shell functions (sudo reboot is logged and returns, as the real one does; the
+# first REBOOT_FAILS requests fail)
 RUN = """
-sudo() { echo "sudo $*" >> "$LOG"; }
+sudo() {
+  echo "sudo $*" >> "$LOG"
+  if [ "$1" = reboot ] && [ "$(grep -c '^sudo reboot' "$LOG")" -le "$REBOOT_FAILS" ]; then return 1; fi
+}
 rm() { :; }
 source <(sed -n '/^function agnos_init/,/^}/p' "$SCRIPT")
 agnos_init
@@ -37,7 +41,8 @@ agnos_init
 
 
 class TestAgnosInit(unittest.TestCase):
-  def _run(self, updater_exit: int, swap_fails: int = 0, timeout: float = 3.) -> tuple[list[str], bool]:
+  def _run(self, updater_exit: int, swap_fails: int = 0, timeout: float = 3., verify_exit: int = 1,
+           reboot_fails: int = 0) -> tuple[list[str], bool]:
     with tempfile.TemporaryDirectory() as d:
       comma = Path(d, "openpilot/common/hardware/comma")
       comma.mkdir(parents=True)
@@ -47,7 +52,8 @@ class TestAgnosInit(unittest.TestCase):
       log = Path(d, "log")
       log.touch()
       env = dict(os.environ, DIR=d, LOG=str(log), SCRIPT=str(SCRIPT), AGNOS_VERSION="not-the-installed-one",
-                 UPDATER_EXIT=str(updater_exit), SWAP_FAILS=str(swap_fails))
+                 UPDATER_EXIT=str(updater_exit), SWAP_FAILS=str(swap_fails), VERIFY_EXIT=str(verify_exit),
+                 REBOOT_FAILS=str(reboot_fails))
       try:
         subprocess.run(["bash", "-c", RUN], env=env, timeout=timeout, capture_output=True)
         ended = True
@@ -67,6 +73,17 @@ class TestAgnosInit(unittest.TestCase):
     self.assertFalse(ended)
     self.assertEqual(log, ["agnos --verify", "updater", "agnos --swap", "updater", "agnos --swap", "sudo reboot"],
                      "something started after the reboot request")
+
+  def test_a_verified_update_starts_nothing_after_its_reboot_request(self):
+    # comma's own line: the update is already written, so it reboots; the updater's screen must not start meanwhile
+    log, ended = self._run(updater_exit=1, verify_exit=0)
+    self.assertFalse(ended)
+    self.assertEqual(log, ["agnos --verify", "sudo reboot"], "something started after the reboot request")
+
+  def test_a_failed_reboot_request_is_asked_again_and_nothing_else_runs(self):
+    log, ended = self._run(updater_exit=1, reboot_fails=2, timeout=14.)
+    self.assertFalse(ended)
+    self.assertEqual(log, ["agnos --verify", "updater", "agnos --swap", "sudo reboot", "sudo reboot", "sudo reboot"])
 
   def test_a_working_updater_runs_as_before(self):
     # its screen does the swap and reboots the device itself; the fallback never runs
