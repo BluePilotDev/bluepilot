@@ -86,10 +86,8 @@ So this build does both:
 **Path angle is switched on in this version for:**
 
 - F-150 2021-23 on software version BD;
-- F-150 2021-23 on version BC, with BD's numbers (below);
-- F-150 Lightning;
+- F-150 2021-23 on version BA with data file ML34-14D007-BDE, with its own numbers;
 - Explorer 2020-24;
-- Ranger 2024-25;
 - Maverick 2022-24;
 - Escape 2020-22 and Bronco Sport 2021-22 on LX6C-14D003-AL.
 
@@ -218,7 +216,7 @@ shows one of these:
 
 | Shown | What it means |
 |---|---|
-| **Full** | Your module's exact software is in the table, and its row was compared with a computer model of the module or a drive. For most modules that model is a reading of their code, not checked against the code running. Steers by curvature with the row's numbers. Seven of these rows also send path angle (section 3). |
+| **Full** | Your module's exact software is in the table, and its row was compared with a computer model of the module or a drive. For most modules that model is a reading of their code, not checked against the code running. Steers by curvature with the row's numbers. Eight of these rows also send path angle (section 3). |
 | **Curvature** | Your module's software is in the table, but its row hasn't been compared with a model or a drive. Steers by curvature with the row's numbers. |
 | **Lane centering denied by the steering module** | On the last drive your module refused lane centering. Either lane centering isn't set up on this truck, and the build can't steer a truck built without it, or the module stopped for a fault for that drive, which the next start clears. |
 | **Fallback** | Your module didn't answer, or its software isn't in the table. Steers by curvature with comma's settings. |
@@ -250,6 +248,7 @@ A row applies only when your module answers exactly these part numbers. Steering
 |---|---|---|
 | F-150 2021-23 | ML3V-14D003-BD | ML34-14D007-EDL or -BDL |
 | F-150 2021-23, version BC | ML3V-14D003-BC | any (see below) |
+| F-150 2021-23, version BA | ML3V-14D003-BA | ML34-14D007-BDE |
 | F-150 Lightning | RL38-14D003-AA | RL38-14D007-DD or -AD |
 | Explorer 2020-24 | M1MC-14D003-AC | MB5C-14D007-BD |
 | Explorer 2020-24 | L1MC-14D003-AL | MB5C-14D007-BA |
@@ -291,8 +290,10 @@ smoothing comma's code adds on these trucks. **Not checked:** whether BC's numbe
 copy of a BC data file, or a BC drive with path angle, would show it. It accepts any data file, but **your module still has to answer the data-file question at
 start**.
 
-**An older F-150 version.** A 2021-23 F-150 on ML3V-14D003-BA stays on the fallback, and Steering
-Support says "This steering software is older than Ford's current level".
+**An older F-150 version.** A 2021-23 F-150 on ML3V-14D003-BA with data file ML34-14D007-BDE has its own
+row, with path angle and its own numbers. It asks the module to let go quickly when steering stops (ramp
+type 3): on the other types this module lets go of its torque several times slower than version BD. On any
+other data file Steering Support says the data file isn't in the table, and the car stays on the fallback.
 
 **Not checked yet:** whether steering modules answer the data-file question during a normal start. The
 software of every module with a row allows it, but it has not been tried on a real truck, and BC's
@@ -370,6 +371,10 @@ The check never changes the steering, so the car steers the same way while it sh
   comma's sideways limits. It refuses steering while openpilot isn't engaged, makes every engagement
   start from straight ahead, and refuses path angle on any car whose row doesn't have it switched on.
   That is every car except the rows in section 3.
+- **The panda waits 2 s after it is set up.** For 2 s after the panda's safety mode is set (at each
+  start, and after the comma reconnects to the panda) it refuses every steering message: it doesn't know
+  the car's speed yet, nor what the module was last sent. BluePilot waits that out too, so lane centering
+  can't start in those 2 s ("waiting for the panda"). A message the panda refuses never counts as sent.
 - **The panda counts how the module follows a message.** The module doesn't jump to each new
   message. It moves its own copy of each value at a set pace, so for a moment it can hold an old turn
   together with a new path angle. The panda keeps track of where those copies can be, and refuses a

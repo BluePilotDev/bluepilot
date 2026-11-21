@@ -266,7 +266,10 @@ and BluePilot's lower cap on CAN FD (3.2).
   "known, and not yet supported" instead of "not in the table".
 - **Replaced levels (`SUPERSEDED`)** carry a reason the owner can act on: the wording of Ford's service
   message SSM 53105 for RL34-14D003-AD with an RL34-14D004-E\* calibration (`ssm-53105.md`), and "older
-  than Ford's current level" for RL34-14D003-AD otherwise and for ML3V-14D003-BA.
+  than Ford's current level" for RL34-14D003-AD otherwise. ML3V-14D003-BA has its own row on ML34-14D007-BDE
+  (its whole lateral step run, `emu-ba.md`), with path angle, its own gain curve (the fifth) and ramp type 3:
+  it ramps its torque out at 7 to 10 Nm/s on types 0 to 2 and at 50 on type 3, where BD takes 51 on every type
+  (executed).
 
 **Cost.** Every car we have logs from ran the fallback in replay, because those logs predate the
 start-up read (`clean-build.md` §9 item 10).
@@ -378,9 +381,16 @@ for with them moved a quarter frame more, for the difference between the panda's
 (`core/limits.py` `FRAME_TIMING`).
 
 What this is proven to bound (`notes/panda-design.md` §5, a solver's induction on a model held to the compiled
-check): for any frames, timing, inactive frames and module restarts, a module that moves each copy toward a frame
-it was sent or toward zero at its rate or faster steers for no more than the cap, its half step and its two rates
-over its read time: 1.014 of the cap on the Explorer at 100 km/h, 1.030 on LX6C, 1.044 on the F-150, 1.057 on the
+check): for any frames the panda lets through, timing, inactive frames and module restarts, a module that moves each
+copy toward a frame it was sent or toward zero at its rate or faster steers for no more than the cap, its half step
+and its two rates over its read time. Two things the proof takes as given are the check's own rules since
+`notes/clean-build.md` §16.14: a frame the Ford mode refuses (for its path offset or curvature rate) is never the
+last frame sent, and after the safety mode is set no steering frame is taken for 2 s (`BP_INIT_HOLD_US`,
+`limits.INIT_HOLD`), because the ranges then start at zero whatever the module was sent before and the speed samples
+the cap is read at are zero until six are in. The hold covers the module's own frame time-out where it is known: BD
+steers for its last frame 1.02 s and lets go by 1.06 s (executed); BA runs BD's receive code (read); the Explorer
+about 1 s (read); the Maverick's and LX6C's are not established. The host reports a panda in another mode
+(`pandaCarSafety`) and the controller waits the hold out from the first state in the car's mode. Figures: 1.014 of the cap on the Explorer at 100 km/h, 1.030 on LX6C, 1.044 on the F-150, 1.057 on the
 Maverick, with the read times as read. It is not proven while the car gains speed (the cap falls faster than the
 module can follow), above a curve's gain bound, or for a speed reading that is wrong.
 
