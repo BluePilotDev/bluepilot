@@ -623,7 +623,7 @@ struct ControllerStateBP @0xcd96dafb67a082d0 {
     strategy @3 :Text;               # the steering module's part numbers as read this start; "" = no answer
     dataFile @4 :Text;
     calibration @5 :Text;
-    requestState @6 :UInt8;          # 0 off, 1 requesting, 2 active, 3 waiting for the module, 4 waiting for the panda, 5 denied
+    requestState @6 :UInt8;          # 0 off, 1 requesting, 2 active, 3 waiting for the module, 4 waiting for the panda, 5 denied, 6 driver's own turn (reset)
     pscmState @7 :Int8;              # LatCtlSte_D_Stat; -1 on a car that doesn't report it
     pscmLimit @8 :Int8;              # LatCtlLim_D_Stat
     pscmCapability @9 :Int8;         # LatCtlCpblty_D_Stat
