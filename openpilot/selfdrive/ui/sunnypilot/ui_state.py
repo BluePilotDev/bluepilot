@@ -10,6 +10,7 @@ from openpilot.cereal import messaging, log, custom
 from opendbc.car.structs import car
 from opendbc.sunnypilot.car.interfaces import has_bsm
 from openpilot.common.params import Params
+from openpilot.common.swaglog import cloudlog  # BluePilot: log an unreadable CarParamsSPPersistent
 from openpilot.selfdrive.ui.sunnypilot.layouts.settings.display import OnroadBrightness
 from openpilot.sunnypilot.models.helpers import ACTIVE_BUNDLE_KEYS, get_active_source
 from openpilot.sunnypilot.sunnylink.sunnylink_state import SunnylinkState
@@ -158,8 +159,18 @@ class UIStateSP:
 
   def update_params(self) -> None:
     CP_SP_bytes = self.params.get("CarParamsSPPersistent")
+    # BluePilot: skip an unreadable cached CarParamsSP (e.g. another fork's format) instead of crashing the UI
+    CP_SP = None
     if CP_SP_bytes is not None:
-      self.CP_SP = messaging.log_from_bytes(CP_SP_bytes, custom.CarParamsSP)
+      try:
+        CP_SP = messaging.log_from_bytes(CP_SP_bytes, custom.CarParamsSP)
+      except Exception:
+        if not getattr(self, "_bp_bad_cp_sp_logged", False):
+          cloudlog.exception("ui_state: unreadable CarParamsSPPersistent, ignoring")
+          self._bp_bad_cp_sp_logged = True
+    if CP_SP is not None:
+      self.CP_SP = CP_SP
+      # End BluePilot
       self.has_icbm = self.CP_SP.intelligentCruiseButtonManagementAvailable and self.params.get_bool("IntelligentCruiseButtonManagement")
 
     self._enforce_constraints()

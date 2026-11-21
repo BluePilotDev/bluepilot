@@ -251,8 +251,19 @@ class UIState(UIStateSP):
     # For slower operations
     # Update longitudinal control state
     CP_bytes = self.params.get("CarParamsPersistent")
+    # BluePilot: skip an unreadable cached CarParams (e.g. another fork's format) instead of crashing the UI;
+    # logged once, since this runs every second until card rewrites the param
+    CP = None
     if CP_bytes is not None:
-      self.CP = messaging.log_from_bytes(CP_bytes, car.CarParams)
+      try:
+        CP = messaging.log_from_bytes(CP_bytes, car.CarParams)
+      except Exception:
+        if not getattr(self, "_bp_bad_cp_logged", False):
+          cloudlog.exception("ui_state: unreadable CarParamsPersistent, ignoring")
+          self._bp_bad_cp_logged = True
+    if CP is not None:
+      self.CP = CP
+      # End BluePilot
       if self.CP.alphaLongitudinalAvailable:
         self.has_longitudinal_control = self.params.get_bool("AlphaLongitudinalEnabled")
       else:
