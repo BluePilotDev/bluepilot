@@ -450,7 +450,11 @@ Path offset and curvature rate must be inactive on every module.
   better (`notes/panda-design.md` §5.5).
 - No rule holds the module's own build-up to comma's 3.6 m/s³: a sender with a frame every 32 ms, each signal at
   the module's rate, drives BD's module at 5.5 m/s³ at 100 km/h, the same behind every check considered (comma's own wire limit at that frame rate is 6.3); a 20 Hz sender that builds a lead first
-  reaches 5.55 m/s³, under the cap (`notes/panda-design.md` §6).
+  reaches 5.55 m/s³, under the cap (`notes/panda-design.md` §6). The 2.8 m/s³ once quoted for the 20 Hz swing
+  behind the simplified check was one sender's result, not a bound: other senders at the module's rates reach 4.72
+  m/s³ over 100 ms behind that check with none refused, and for a module that may take a frame at once or drop to zero
+  at once no check bounds jerk at all (research note panda-design2 §2.2). This check (option C) has no jerk rule and
+  claims no jerk bound.
 - "Disable BP Lateral Control" is read at car init only, because that is when the panda is told which
   check to run.
 
