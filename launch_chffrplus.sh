@@ -28,7 +28,14 @@ function agnos_init {
       sudo reboot
     fi
     while true; do
-      "$DIR/openpilot/common/hardware/comma/updater" "$AGNOS_PY" "$MANIFEST"
+      # BluePilot: the bundled updater is only a screen around `agnos.py --swap`. Where it can't start (its bundled
+      # UI code needs pyray's raygui, which a newer AGNOS's pyray lacks), flash without the screen: agnos.py writes the
+      # inactive slot, checks it by hash and swaps. On a failure the loop goes round again, as before.
+      if ! "$DIR/openpilot/common/hardware/comma/updater" "$AGNOS_PY" "$MANIFEST"; then
+        if "$AGNOS_PY" --swap "$MANIFEST"; then
+          sudo reboot
+        fi
+      fi
     done
   fi
 }

@@ -14,6 +14,7 @@ pinned commit). **Not checked:** these steps on a comma four, and the clone comm
   (BluePilot), `clean/opendbc-pathangle` and `clean/bluepilot-lateral-pathangle`. One recursive clone
   fetches all three. The build without path angle is `clean/ford-lateral`, the default branch.
 - The comma on Wi-Fi. The download is about 1 GB plus the driving models.
+- The build runs on AGNOS 19.9 (`launch_env.sh`). A comma on another AGNOS is moved to 19.9 at its first start.
 
 ## Install
 
@@ -104,4 +105,5 @@ BP Lateral Control** in the same Lateral Tuning section. It takes effect at the 
 | `Permission denied (publickey)` while cloning | Your GitHub account can't read the private repo, or the comma can't see your key: check `ssh-add -l` on your computer lists a key, and that you connected with `ssh -A` |
 | A submodule fails with a username or password prompt | The `-c … insteadOf` part of the line is missing, so the private parts were asked for over https |
 | The build fails on the device | Go back (above), then report the error screen's text |
+| It loops at first start with an updater error (`module 'pyray' has no attribute 'GuiTextAlignment'`) | The comma is on another AGNOS and the bundled updater screen can't start on it (its own copy of the UI code needs a part of pyray that newer AGNOS lacks). This build's launch script then flashes AGNOS 19.9 without the screen: the display stays as it is for several minutes while about 4.7 GB of AGNOS is written (fetched over Wi-Fi, compressed), then the comma reboots. On a build without that fix, run it by hand over SSH: `cd /data/openpilot && openpilot/common/hardware/comma/agnos.py --swap openpilot/system/hardware/comma/agnos.json && sudo reboot`. It writes the unused slot, checks it by hash and only then switches to it |
 | Large files are missing or tiny text stubs | Run `git lfs pull` in `/data/openpilot` (or in the computer's clone, then copy again) |
