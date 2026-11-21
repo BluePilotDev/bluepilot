@@ -119,10 +119,10 @@ can be supported. The logic is meant to be fit for upstream; the packaging isn't
    from its module is generated from the module's files (3.3).
 3. **Path angle (approach A′)** on rows whose preview is known. Curvature moves at the module's rate,
    and path angle carries what that rate still holds back, in the module's own K2. It is a per-row
-   switch, **on for every row whose whole lateral step and inactive frame ran in an emulator** (seven rows: the
-   F-150 BD and BA, the Lightning on BD's curve, the Explorer, the Maverick, LX6C and the Ranger on its own curve),
-   off on the others and the fallback. The Mustang 2024's step has run too; its path angle waits on a gain margin per
-   curve (its curve needs 1.1164 with the 6 % speed allowance, over the shared 1.10).
+   switch, **on for every row whose whole lateral step and inactive frame ran in an emulator** (eight rows: the
+   F-150 BD and BA, the Lightning on BD's curve, the Explorer, the Maverick, LX6C, the Ranger and the Mustang 2024 on
+   their own curves), off on the others and the fallback. The Mustang 2025's step has run too; its path angle waits on
+   its own task order (the research's EMU-REST: its lateral task runs before its limiter, the reverse of the order run).
 4. **The panda bounds the command by lateral acceleration and jerk** (comma's numbers, except a lower
    cap of BluePilot's own on CAN FD, 3.2), on the
    curvature signal alone, on the implied curvature at the highest K2 the module can have at that
@@ -333,15 +333,16 @@ in the second safety param (`current_safety_param_sp`):
 - **bits 0 to 2, `BP_PATH_ANGLE_GAIN`:** which module's own gain curve bounds the path angle
   (`StrategyRow.panda_gain_curve`). Set with bit 6.
 
-**The gain curves.** The panda holds six, one per module with path angle on, numbered as the startup bits name them:
+**The gain curves.** The panda holds seven, one per module with path angle on, numbered as the startup bits name them:
 1 the 2021-23 F-150 (BD) and the Lightning (its numbers BD's bit for bit), 2 the 2020-24 Explorer, 3 the 2022-24
-Maverick, 4 LX6C, 5 the F-150's level BA, 6 the Ranger. Each is generated from that module's flash (`safety/ford_gain_curves.h`, written by the same
+Maverick, 4 LX6C, 5 the F-150's level BA, 6 the Ranger, 7 the Mustang 2024. Seven fills the three bits: an eighth
+module needs another bit. Each is generated from that module's flash (`safety/ford_gain_curves.h`, written by the same
 script and from the same reading as `core/module_tables.py`; `core/limits.py` `GAIN_CURVES` is built from
 the Python file, and `test_limits.py` pins the two): its c2 rate, its shortest preview time (taken no
 higher than its T when the module starts, below), the two
 preview-distance clamps by speed (past the upper the distance is the upper, the module's own order), and
 its K2 table by distance, read straight between the table's points as the module reads it. The bound is
-that module's largest K2 at the speed, times a margin of 1.10. Each curve also carries the module's two rates,
+that module's largest K2 at the speed, times its curve's margin (generated, below). Each curve also carries the module's two rates,
 c2 and c1, at which the check moves its ranges of the module's copies. A module may start or restart at any time, and it previews
 from its T at power-up until T reaches its floor, so each curve takes that T as its floor where it is lower
 (`preview_time_at_start` in each curve of `safety/ford_gain_curves.h`, `PANDA_CURVES_T_START` in
@@ -432,10 +433,16 @@ Path offset and curvature rate must be inactive on every module.
   age (at 3 m/s²); that the module's cell holds that very signal (read from its receive code); below about
   5 km/h (BD's curve is flat there); a truck configured without the brake module's speed (no stability
   control); every program but BD. Where the chain was not run the allowance stays this project's choice, 6 %:
-  the Lightning shares BD's curve (its speed chain is BD's code, read, not run), and the Maverick, LX6C, BA and the
-  Ranger have their own. With it the least margin over every curve is 1.0955 (LX6C's and BA's at about 153 and 178
-  km/h; the Ranger's 1.0847), so 1.10. The 2024 Mustang's curve would need 1.1164, so its path angle waits on a
-  margin per curve. Without the margin, a speed reading 1 % under the panda's would put the module's gain
+  the Lightning shares BD's curve (its speed chain is BD's code, read, not run), and the Maverick, LX6C, BA, the
+  Ranger and the Mustang 2024 have their own. **Each curve has its own margin**, the least that covers every row on
+  it, rounded up to the hundredth (`core/module_tables.py` `PANDA_CURVES_MARGIN` with what each rests on,
+  `PANDA_CURVES_MARGIN_BASIS`; `.margin` in `safety/ford_gain_curves.h`, read by `lateral.h`; `test_limits.py`
+  derives each): 1 **1.10** (BD alone 1.027, the Lightning with the 6 % 1.0949), 2 the Explorer **1.01** (float
+  lookup, and its curve is flat at its start, T 0, so no speed error moves it: 1.0000002, float32 rounding alone), 3 the Maverick **1.09** (1.0896), 4
+  LX6C **1.10** (1.0906), 5 BA **1.10** (1.0906; float lookup, executed), 6 the Ranger **1.08** (1.0799), 7 the Mustang
+  2024 **1.12** (1.1114). BD's 1.027 rests on the 30 ms sample age at 3 m/s²: at 6 m/s² it is 1.048, at 9.8 m/s² 1.073;
+  executing BD's speed chain with its tasks' real order replaces that choice, and the Lightning's own chain, run,
+  would let curve 1 take BD's. Without the margin, a speed reading 1 % under the panda's would put the module's gain
   about 1 % above the bound. It costs a few % of
   path angle in sharp entries at the cap.
 - What each module's own curve buys over the single one (controller only, open loop, with the copies'
@@ -526,13 +533,20 @@ noisy readings (`clean-build.md` §14.1). A yaw zero of
 
 - **Curvature gain.** A window is at least a minute of hands-off driving above 9 m/s with enough steering
   in it (`MIN_EXCITATION`). The command is delayed by lagd's delay (`LateralInputs.lateralDelay`), else
-  openpilot's own start, 0.4 s, and the yaw zero measured at standstill is removed. With a delay of 0 s,
+  openpilot's own start, 0.4 s, and the yaw zero measured at standstill is removed. The yaw is the brake module's
+  **compensated yaw rate (0x077, `CarState.yaw_rate_077`)**, the signal every steering module run steers on
+  (`fw-basis.md` §2.2, §2.7), with its own standstill zero; the raw yaw (0x091) only where the car state has no
+  current 0x077 sample (none before its first frame, during the brake module's power-up pattern, raw 0xFFE, or once
+  100 ms old). 0x077 is an optional message in the car state, so a Ford without it keeps CAN validity. On the 2021
+  Explorer the raw one reads 0.026 rad/s under the compensated one. With a delay of 0 s,
   as the fallback once had, one logged Lightning on the fallback read 0.59 to 0.90 and went degraded; with
   lagd's delay no logged vehicle of 84 does (`assumptions-audit.md` §3.5). No window counts until that zero is known. A window is out of range outside
   0.85 to 1.15, and three out-of-range windows in a row mean degraded. Windows carry across drives of
   the same car and software (`health.carry` and `restore`, stored in `FordLateralSupport`). On the
   seven recorded routes, the seven windows read 0.94 to 1.03
   (`logs-derived/clean-build/health_on_routes.json`).
+- **Frames whose request is over the row's own executed lateral acceleration limit are left out of the gain** (the
+  module holds its limit there by its firmware; `fw-basis.md` §2.7), as are frames hands-on and below 9 m/s.
 - **Frames at the module's own limit are left out of the gain.** Where the module reports its limit status 2 or 3
   (at its torque limit, or on the F-150s its lateral-acceleration clip, with or without the driver), it holds its
   output there by its firmware and the car falls short of the command; that says nothing about the row

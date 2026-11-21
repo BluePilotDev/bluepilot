@@ -93,11 +93,12 @@ So this build does both:
 - Escape 2020-22 and Bronco Sport 2021-22 on LX6C-14D003-AL;
 - Ranger 2024-25 (RB3C-14D003-AA), with its own numbers. Its module takes no lane centering for the first 9
   seconds after the truck starts (its own software, run in an emulator), and in a curve whose measured sideways
-  acceleration is above 2.7 m/s^2 its own limiter takes over and lets the steering go toward straight.
+  acceleration is above 2.7 m/s^2 its own limiter takes over and lets the steering go toward straight;
+- Mustang 2024 (PR3C-14D003-AD), with its own numbers. openpilot has no Mustang (2024) platform, so no car reaches
+  this row today.
 
-Not driven yet with path angle: the Lightning and the Ranger. The 2024 Mustang's whole steering step has also
-been run, but its path angle waits on a change to the panda's safety margin (its own numbers need a slightly
-larger one than the others); openpilot has no Mustang (2024) platform, so no car reaches that row today.
+Not driven yet with path angle: the Lightning, the Ranger and the 2024 Mustang. The 2025 Mustang's steering step
+has been run too; its path angle waits on one more run of its own software.
 
 These are the rows whose module's software was read and holds what path angle needs: how far ahead the
 module looks, and how fast it lets curvature and path angle change. Every other car, and the fallback,
