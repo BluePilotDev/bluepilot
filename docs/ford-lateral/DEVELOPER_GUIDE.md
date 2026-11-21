@@ -66,9 +66,8 @@ and `B/` is this repo's root.
   starts from (2.12).
 - **lagd.** openpilot's delay learner. It estimates the lateral delay from driving, and the driving
   model plans ahead by that delay.
-- **Learner start and delay.** A row carries one timing number, its **learner start**
-  (`StrategyRow.learner_start`): where lagd starts on that software, measured on logged drives of it.
-  It is a measurement of car and module together, not a firmware value, and lagd replaces it. The
+- **Delay.** No row carries a timing number: lagd starts at openpilot's own 0.4 s on every row (a drive never
+  sets a number; the module's own share is executed, 0.04-0.42 s on BD, the rest is the vehicle's). The
   **delay** is what lagd estimates: the time shift that best lines up requested and measured lateral
   acceleration. The driving model plans with the delay. No row carries a lag any more
   (`StrategyRow.lag` is None, and the status's `lag` reads 0), 2.8.
@@ -113,9 +112,10 @@ can be supported. The logic is meant to be fit for upstream; the packaging isn't
    A row carries that module's constants. A module without a row gets the **fallback**: comma's stock
    Ford car controller and the host's stock panda check, as they are, with no BluePilot startup bit (2.3).
    With path angle off, a row can change up to three things against the fallback, where it has the
-   value: the lateral-acceleration limit (2.9), lagd's starting delay (2.8), and the ramp type (2 on
-   most rows, 0 on the fallback and BC). Rows don't smooth the request. The health check delays the
-   command by lagd's delay, else the row's learner start, else 0.4 s (2.7). Every number a row takes
+   value: the lateral-acceleration limit (2.9) and the ramp type, in its steering frames and in the inactive frames
+   that end a request (0, comma's, by default; 2 on the older library's rows; 3 on BA; the restart frame after a
+   refused frame sends 0). Rows don't smooth the request. The health check delays the command by lagd's delay,
+   else 0.4 s (2.7). Every number a row takes
    from its module is generated from the module's files (3.3).
 3. **Path angle (approach A′)** on rows whose preview is known. Curvature moves at the module's rate,
    and path angle carries what that rate still holds back, in the module's own K2. It is a per-row
@@ -250,9 +250,10 @@ comma's command is the one with fleet evidence: on 102 vehicles of 11 platforms,
 **Choice.** comma's command, because it is the only one with fleet evidence. `FALLBACK_ROW` is curvature
 only, ramp type 0, precision 1, with nothing of a module's own. It is a row like any other, so the
 controller always reads exactly one row. On the platforms where comma's stock code smooths the request
-(`CAR.FORD_F_150_MK14` and `CAR.FORD_BRONCO_SPORT_MK1`), the fallback smooths it the same way
-(comma's own `anti_overshoot`, since the fallback is comma's code), because the fallback is for modules nobody
-has read. Our fits put most logged 2021-23 F-150s (level BC) and the
+(`CAR.FORD_F_150_MK14` and `CAR.FORD_BRONCO_SPORT_MK1`, comma's `anti_overshoot`), the fallback no longer does:
+every module's command path run in an emulator follows a curvature request with a slew and a first-order
+low-pass, which cannot overshoot it (BD executed, every step 1.00000 of the request); what overshoots is the
+vehicle, and with comma's own car port on executed BD, BDL and RL14 removing it cleared 3 of 5 runaways. Our fits put most logged 2021-23 F-150s (level BC) and the
 one logged Bronco Sport at a damping of about 0.40, the least damped Fords logged
 (`assumptions-audit.md` §3.7). A row on a read module takes the request as it is. Two things still
 differ from stock: no clip to measured curvature (and no measured-curvature band in the panda, 2.4),
@@ -268,9 +269,10 @@ and BluePilot's lower cap on CAN FD (3.2).
   message SSM 53105 for RL34-14D003-AD with an RL34-14D004-E\* calibration (`ssm-53105.md`), and "older
   than Ford's current level" for RL34-14D003-AD otherwise. ML3V-14D003-BA has its own row on ML34-14D007-BDE
   (its whole lateral step run, `emu-ba.md`), with path angle, its own gain curve (the fifth) and ramp type 3 in its
-  steering frames. That type sets only the ramp-out the module starts itself after a bad frame or a fault: BA 7 to
-  10 Nm/s on types 0 to 2 and 50 on type 3, BD 50 on every type (executed), so on type 3 BA's is BD's. A disengage
-  ramps at the type of the frame that carries request 0, which this build sends as type 0 (7 Nm/s on BA).
+  steering frames and in the inactive frames that end a request. BA ramps its torque out at 7 to 10 Nm/s on types 0
+  to 2 and 50 on type 3, BD 50 on every type (executed): a disengage ramps at the type of the frame that carries
+  request 0, so on type 3 BA lets go as BD does (0.48 s from 24 Nm against 3.4 s), and the ramp-out BA starts itself
+  after a bad frame is BD's too.
 
 **Cost.** Every car we have logs from ran the fallback in replay, because those logs predate the
 start-up read (`clean-build.md` §9 item 10).
@@ -553,17 +555,13 @@ fitted servo, fleet delay fits, dead time plus a time constant, a model with a f
 `assumptions-audit.md` item 25). None of them was lagd's delay: lagd's own estimator, run over logged
 drives with its own gates, learns 0.50 s on BD, where the old row lag at 100 km/h was 0.39 s
 (`assumptions-audit.md` §3.4). Nothing steered by the lag, so it is gone. A row carries one timing
-number: where the delay learner starts, measured on logged drives of that software. It is a measurement
-of car and module together, not a firmware value, and the learner replaces it.
+number no more: the per-row starts that were measured on logged drives are gone, because a drive never sets a
+number.
 
-**Choice.** Start lagd from what lagd itself learns on logged drives of the row's strategy (median over
-vehicles), because a learnt value still takes over and only the starting point changes. The mechanism is
-`steerActuatorDelay = start − 0.2 s` (`StrategyRow.learner_start`, returned by `delay_learner_start` and
-set in `L/hosts/sunnypilot/safety_param.py`), and with the learner off that start is the fixed delay. The
-rejected option would have bypassed `steerActuatorDelay`. Starts: 0.50 s on the 2021-23 F-150 BD row,
-0.34 s on BC, 0.43 s on the Lightning, 0.27 s and 0.31 s on the 2021-22 and 2023-24 Mach-E, 0.30 s on
-LX6C, 0.41 s on the Explorer and 0.32 s on the Maverick. Rows with no logged drive (the Bronco Sport and
-Escape 2025 among them), the fallback and the stock path keep openpilot's start.
+**Choice.** lagd starts at openpilot's own start (`steerActuatorDelay` 0.2 s plus lagd's 0.2 s) on every row
+and learns the rest. The module's own share of the delay is executed on BD (0.04-0.42 s from frame to its
+filtered command, by speed and frequency); the rest, from the angle target to the yaw, is the servo, rack and tyres,
+which no firmware holds. Cost: on BD trucks lagd starts 0.1 s short of the 0.50 s it lands on, until it has learnt.
 
 lagd keeps its learnt delay across drives while the car model is the same. After the steering module's
 software changes on the same car (another F188 or F10A than the last start's), BluePilot has lagd start
@@ -726,7 +724,7 @@ commit.
    allows it, and the module says Available or Active. The module's state (`pscm_status`) is read from
    Lane_Assist_Data3_FD1 by `O/opendbc/car/ford/carstate.py`, on CAN FD only; Denied is its own state. On
    CAN, where there is no status, the rule follows openpilot and the panda. Otherwise the inactive frame
-   is sent: all zero, ramp type 0, precision 1. The reasons: a module configured for Ford's hands-free
+   is sent: all zero, the row's ramp type (0 on the restart frame after a refused frame), precision 1. The reasons: a module configured for Ford's hands-free
    driving stays Unavailable while it is asked, a refused frame is a missing frame to the module, and the inactive
    frame always passes (`test_never_asks_through_unavailable`). The driver's column torque (`steeringTorque`,
    behind `steeringPressed`, the hands-on timer and the path-angle hold-off) is the DBC's decode plus 3/32 Nm
@@ -735,7 +733,7 @@ commit.
    Ranger's), so the decode sits 1/16 to 2/16 Nm under the torque, and the 1 Nm press was 1.125 Nm one way and 0.94
    the other. Every other platform's packer is not read, so its decode is taken as it is (`TestFordCarState`).
 4. **Limit** (`L/core/carcontroller_ext.py` `step_lateral`). The request is clipped to `lat_accel_limit / v²`.
-   (The fallback never reaches this controller: comma's stock code steers it, its `anti_overshoot` included.)
+   (The fallback never reaches this controller: comma's stock code steers it, without its `anti_overshoot`.)
 5. **Path** (`_path`). Without path angle, `want` goes straight through. With it:
    - curvature moves toward `want` at the row's rate, so it always equals the module's own copy. The
      position is kept unrounded (`clean-build.md` §14.1);

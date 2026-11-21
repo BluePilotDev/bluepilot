@@ -169,9 +169,10 @@ On a row without path angle, the row can change up to three things compared with
 the row has the number:
 
 - the build never asks for more turning than your module allows;
-- openpilot starts from the reaction time measured on logged drives of your module's software;
-- on most rows, the build asks for the same ramp-out (how the module eases off its steering) that
-  earlier BluePilot used. Not every module uses it.
+- openpilot's reaction-time learner starts where it does on every car and learns your truck;
+- when you disengage, the build asks for the ramp-out (how fast the module lets go of its steering) its
+  firmware gives your module: a quicker one on the older modules that otherwise hold fading torque for
+  seconds. On the newer modules every ramp-out is the same quick one.
 
 On the rows with path angle, the row also sends path angle (section 3).
 
@@ -292,8 +293,8 @@ start**.
 
 **An older F-150 version.** A 2021-23 F-150 on ML3V-14D003-BA with data file ML34-14D007-BDE has its own
 row, with path angle and its own numbers. Its steering messages ask for the quick let-go (ramp type 3), so
-after a bad message or a fault this module lets go of its torque as fast as version BD; on the other types it
-is several times slower. When you disengage it still lets go at the slower rate. On any
+when you disengage, and after a bad message or a fault, this module lets go of its torque as fast as version BD;
+on the other types it is several times slower. On any
 other data file Steering Support says the data file isn't in the table, and the car stays on the fallback.
 
 **Not checked yet:** whether steering modules answer the data-file question during a normal start. The
