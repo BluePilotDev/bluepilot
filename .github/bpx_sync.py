@@ -3,15 +3,18 @@
 
 T = this repo's bp-sunnypilot branch (the mirror public-sync publishes), P = the opendbc commit T pins,
 Q = the ford-op/opendbc bp-full commit with P that the target's opendbc_repo points at.
-usage: bpx_sync.py bp-full | prepare | merge   (env: TARGET, BP_TOKEN, ODBC_TOKEN; see bpx-sync.yml)"""
+usage: bpx_sync.py bp-full | prepare | review-prompt <prompt file> | post <review file> | merge   (env: see bpx-sync.yml)"""
 import json
 import os
+import re
+import secrets
 import subprocess
 import sys
 import tempfile
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 from bluepilot_hooks import listed_hooks
 
@@ -22,6 +25,7 @@ REQUIRED = ("build release", "static analysis", "unit tests", "process replay", 
 ODBC_REQUIRED = ("bluepilot-hooks", "safety", "bluepilot-safety", "./test.sh (Linux)")
 BP_FULL_BRANCH = "bpx-sync/bp-full"
 REPLAY = " A process replay difference gets the `replay-accepted` label once it is traced and written in the PR (the job never adds it)."
+SHA = re.compile(r"[0-9a-f]{40}")
 BOT = ["-c", "user.name=bluepilot-sync[bot]", "-c", "user.email=348581487+bluepilot-sync[bot]@users.noreply.github.com"]
 
 
@@ -37,6 +41,10 @@ class Git:
 
   def is_ancestor(self, a: str, b: str) -> bool:
     return self.ok("merge-base", "--is-ancestor", a, b)
+
+
+def job_branch(target: str) -> str:
+  return f"bpx-sync/{target}"
 
 
 def pick_q(odbc: Git, p: str, pin: str, bp_full: str) -> str:
@@ -55,13 +63,30 @@ def merge_tree(git: Git, ours: str, theirs: str) -> tuple[str, list[str]]:
   return lines[0], [line for line in lines[1:] if line]
 
 
+def bp_full_head(git: Git, full: str, p: str, branch: str | None) -> tuple[str, list[str]]:
+  """Step 1's PR head and the conflicts with bp-full. P itself, unless the job branch carries someone's commits: then
+  P merged on top of them, so the branch only fast-forwards. ("", conflicts) when it can't be built."""
+  head = p
+  if branch and not git.is_ancestor(branch, full) and not git.is_ancestor(branch, p):
+    if git.is_ancestor(p, branch):
+      head = branch
+    else:
+      tree, conflicts = merge_tree(git, branch, p)
+      if conflicts:
+        return "", conflicts
+      head = git(*BOT, "commit-tree", tree, "-p", branch, "-p", p, "-m", f"Merge {p[:8]} into {BP_FULL_BRANCH}")
+  _, conflicts = merge_tree(git, full, head)
+  return ("", conflicts) if conflicts else (head, [])
+
+
 @dataclass
 class Plan:
   action: str  # "nothing", "conflict" (nothing is pushed) or "ready" (commit is the job branch's head)
   base: str = ""  # the target or the job branch: what T is merged into
   commit: str = ""
-  conflicts: list[str] = field(default_factory=list)  # other than opendbc_repo
+  conflicts: list[str] = field(default_factory=list)  # merging T: other than opendbc_repo
   pin_conflicted: bool = False
+  against_target: bool = False  # the conflicts are between the open job branch and a target that moved since
 
 
 def plan(git: Git, target_name: str, target: str, t: str, q: str, branch: str | None) -> Plan:
@@ -74,17 +99,24 @@ def plan(git: Git, target_name: str, target: str, t: str, q: str, branch: str | 
   others = [c for c in conflicts if c != "opendbc_repo"]
   if others:
     return Plan("conflict", base, conflicts=others)
+  pin_conflicted = "opendbc_repo" in conflicts
   with tempfile.TemporaryDirectory() as tmp:
     env = {**os.environ, "GIT_INDEX_FILE": os.path.join(tmp, "index")}
     git("read-tree", tree, env=env)
     git("update-index", "--cacheinfo", f"160000,{q},opendbc_repo", env=env)
     tree = git("write-tree", env=env)
   if tree == git("rev-parse", f"{base}^{{tree}}") and git.is_ancestor(t, base):
-    return Plan("ready", base, commit=base, pin_conflicted="opendbc_repo" in conflicts)
-  parents = ["-p", base] + ([] if git.is_ancestor(t, base) else ["-p", t])
-  commit = git(*BOT, "commit-tree", tree, *parents, "-m", f"Merge bp-sunnypilot {t[:8]} into {target_name}",
-               "-m", f"opendbc_repo: ford-op/opendbc bp-full {q[:8]}. Built by the BPx sync job (#225).")
-  return Plan("ready", base, commit=commit, pin_conflicted="opendbc_repo" in conflicts)
+    commit = base
+  else:
+    parents = ["-p", base] + ([] if git.is_ancestor(t, base) else ["-p", t])
+    commit = git(*BOT, "commit-tree", tree, *parents, "-m", f"Merge bp-sunnypilot {t[:8]} into {target_name}",
+                 "-m", f"opendbc_repo: ford-op/opendbc bp-full {q[:8]}. Built by the BPx sync job (#225).")
+  if base != target:
+    # GitHub refuses a PR that conflicts with its base and runs no CI on it: waiting would time out forever
+    _, against = merge_tree(git, target, commit)
+    if against:
+      return Plan("conflict", base, conflicts=against, against_target=True)
+  return Plan("ready", base, commit=commit, pin_conflicted=pin_conflicted)
 
 
 def overlap(git: Git, base: str, t: str, hooks_text: str) -> list[str]:
@@ -117,9 +149,21 @@ def count(n: int) -> str:
   return "1 file" if n == 1 else f"{n} files"
 
 
+def commit_link(repo: str, sha: str) -> str:
+  return f"[`{sha[:8]}`](https://github.com/{repo}/commit/{sha})"
+
+
+def fenced(lines: list[str]) -> list[str]:
+  """Upstream-written text in a code block, where GitHub doesn't act on "Fixes #N"; the fence outgrows any backticks in it."""
+  longest = max([len(run) for line in lines for run in re.findall(r"`+", line)] or [0])
+  fence = "`" * max(3, longest + 1)
+  return [f"{fence}text", *lines, fence]
+
+
 def pr_body(s: Summary) -> str:
   merged = f" (merged by ford-op/opendbc#{s.bp_full_pr})" if s.bp_full_pr else ""
-  rows = [f"| ✅ | opendbc | ford-op/opendbc `bp-full` contains bp-sunnypilot's pin `{s.p[:8]}`{merged}; `opendbc_repo` → `{s.q[:8]}` |",
+  pins = f"bp-sunnypilot's pin {commit_link(ODBC, s.p)}{merged}; `opendbc_repo` → {commit_link(ODBC, s.q)}"
+  rows = [f"| ✅ | opendbc | ford-op/opendbc `bp-full` contains {pins} |",
           f"| ✅ | Conflicts | `opendbc_repo`, resolved by the job (→ `{s.q[:8]}`) |" if s.pin_conflicted else "| ✅ | Conflicts | none |"]
   if s.overlap:
     rows.append(f"| ⚠️ | Overlap | {count(len(s.overlap))} on the hook list that bp-sunnypilot changed, listed below: the review comment looks at each |")
@@ -132,12 +176,12 @@ def pr_body(s: Summary) -> str:
   else:
     rows.append("| ✅ | Panda firmware | unchanged |")
   rows.append(f"| ✅ | Library | unchanged at {s.lib_old} |" if s.lib_old == s.lib_new else f"| ⚠️ | Library | moves {s.lib_old} → {s.lib_new} |")
-  more = [f"- …and {s.total - len(s.commits)} more"] if s.total > len(s.commits) else []
+  more = [f"…and {s.total - len(s.commits)} more"] if s.total > len(s.commits) else []
   pin_note = f"- `opendbc_repo`: both sides moved it; the job set it to ford-op/opendbc `bp-full` `{s.q[:8]}`"
   return "\n".join([
     f"❌ **Merge commit only: never squash or rebase.** A squash or rebase leaves bp-sunnypilot's commits out of `{s.target}`.",
     "",
-    f"Automated sync of bp-sunnypilot `{s.t[:8]}` into `{s.target}` (#225), {s.total} commits, with `opendbc_repo` resolved by the job.",
+    f"Automated sync of bp-sunnypilot {commit_link(REPO, s.t)} into `{s.target}` (#225), {s.total} commits, with `opendbc_repo` resolved by the job.",
     "The job merges this with a merge commit once the six required checks pass: the rows below inform, they don't block.",
     "",
     "| | Check | Result |",
@@ -145,7 +189,7 @@ def pr_body(s: Summary) -> str:
     *rows,
     "",
     "### Upstream commits",
-    *[f"- {c}" for c in s.commits], *more,
+    *fenced(s.commits), *more,
     "",
     "### Conflicts",
     pin_note if s.pin_conflicted else "None.",
@@ -159,41 +203,40 @@ def pr_body(s: Summary) -> str:
   ])
 
 
-def issue_body(*, step: int, target: str, t: str, p: str, q: str, start: str, reason: str, link: str = "",
+def issue_body(*, step: int, target: str, t: str, p: str, q: str, reason: str, fix: str, start: str = "", link: str = "",
                files: list[str] | tuple = ()) -> str:
-  """The one "needs a maintainer" issue: what waits and why, and how to finish it by hand."""
-  if step == 1:
-    branch = f"sync/bp-full-{p[:8]}"
-    commands = ["git clone --filter=blob:none https://github.com/ford-op/opendbc.git && cd opendbc",
-                f"git checkout -B {branch} origin/bp-full",
-                f"git merge --no-ff {p}",
-                "# if it stops on conflicts: resolve the files listed above, git add them and git commit",
-                f"git push origin {branch}"]
-    after = f"Then open a PR from `{branch}` into `bp-full` in ford-op/opendbc and merge it with a merge commit once its checks pass. "
+  """The one "needs a maintainer" issue: what waits and why, and how to finish it by hand.
+  fix: "merge" (redo the merge from start), "merge-target" (merge the moved target into the job branch), "push" (a fix)."""
+  repo, branch = (ODBC, BP_FULL_BRANCH) if step == 1 else (REPO, job_branch(target))
+  base = "bp-full" if step == 1 else target
+  commands = [f"git clone --filter=blob:none https://github.com/{repo}.git && cd {repo.split('/')[1]}"]
+  if fix == "push":
+    commands += [f"git checkout -B {branch} origin/{branch}", "# fix what the check reports and commit it, then:"]
   else:
-    commands = ["git clone --filter=blob:none https://github.com/BluePilotDev/bluepilot.git && cd bluepilot",
-                f"git checkout -B bpx-sync/{target} origin/{start}",
-                f"git merge --no-ff --no-commit {t}",
-                f"git update-index --cacheinfo 160000,{q},opendbc_repo",
-                "# resolve the files listed above and git add them, then:",
-                "git commit",
-                f"git push origin bpx-sync/{target}"]
-    after = "The job then opens the sync PR from that branch and merges it on green. "
-  where = "bp-full" if step == 1 else target
-  lines = [f"The BPx sync job (#225) can't finish on its own. Step {step} ({where}) is waiting: {reason}", "",
-           f"- bp-sunnypilot: [`{t[:8]}`](https://github.com/BluePilotDev/bluepilot/commit/{t}), pinning ford-op/opendbc `{p[:8]}`"]
+    commands.append(f"git checkout -B {branch} origin/{start or branch}")
+    if fix == "merge-target":
+      commands.append(f"git merge --no-ff origin/{base}")
+    elif step == 1:
+      commands.append(f"git merge --no-ff {p}")
+    else:
+      commands += [f"git merge --no-ff --no-commit {t}", f"git update-index --cacheinfo 160000,{q},opendbc_repo"]
+    commands += ["# resolve the files listed above and git add them, then:", "git commit"]
+  commands.append(f"git push origin {branch}")
+  lines = [f"The BPx sync job (#225) can't finish on its own. Step {step} ({base}) is waiting: {reason}", "",
+           f"- bp-sunnypilot: {commit_link(REPO, t)}, pinning ford-op/opendbc {commit_link(ODBC, p)}"]
   if link:
     lines.append(f"- {link}")
   if files:
     lines += ["", "Conflicted files:", *[f"- `{f}`" for f in files]]
   return "\n".join([
     *lines, "",
-    "To redo the merge by hand (LFS isn't needed: `export GIT_LFS_SKIP_SMUDGE=1`):",
+    "To finish it by hand (LFS isn't needed: `export GIT_LFS_SKIP_SMUDGE=1`):",
     "```sh", *commands, "```",
-    f"{after}Then run the job again (Actions → bpx sync → Run workflow, target `{target}`).",
-    "It picks up where this stopped and closes this issue when the sync goes through.",
+    f"The job then merges `{branch}` into `{base}` on green. Run it again (Actions → bpx sync → Run workflow, target `{target}`),",
+    "or wait for the next bp-sunnypilot publish: it picks up where this stopped and closes this issue when the sync goes through.",
     "",
   ])
+
 
 
 # --- the job: everything below talks to GitHub ---
@@ -207,9 +250,30 @@ def push_url(token: str, repo: str) -> str:
 
 
 def output(**values: object) -> None:
+  """Step outputs, each with its own random delimiter: a value (a file name, say) can't end it and forge another output."""
   with open(os.environ.get("GITHUB_OUTPUT", "/dev/stdout"), "a") as f:
     for key, value in values.items():
-      f.write(f"{key}<<EOF\n{value}\nEOF\n")
+      delimiter = secrets.token_hex(16)
+      if delimiter in str(value):
+        raise ValueError(f"output {key} holds its delimiter")
+      f.write(f"{key}<<{delimiter}\n{value}\n{delimiter}\n")
+
+
+def require(ok: bool, what: str) -> None:
+  if not ok:
+    sys.exit(f"::error::{what}")
+
+
+def env_sha(name: str) -> str:
+  value = os.environ[name]
+  require(bool(SHA.fullmatch(value)), f"{name} isn't a commit ID")
+  return value
+
+
+def env_number(name: str) -> str:
+  value = os.environ[name]
+  require(value.isdigit(), f"{name} isn't a number")
+  return value
 
 
 def ensure(git: Git, sha: str) -> None:
@@ -227,10 +291,18 @@ def opendbc() -> Git:
   return odbc
 
 
+def remote_branch(git: Git, branch: str) -> str | None:
+  """Fetch a branch if it exists; its head."""
+  if not git("ls-remote", "origin", f"refs/heads/{branch}"):
+    return None
+  git("fetch", "-q", "--no-tags", "origin", f"+refs/heads/{branch}:refs/remotes/origin/{branch}")
+  return git("rev-parse", f"origin/{branch}")
+
+
 def mirror(bp: Git) -> tuple[str, str]:
   """T and P."""
-  bp("fetch", "-q", "--no-tags", "origin", "+refs/heads/bp-sunnypilot:refs/remotes/origin/bp-sunnypilot")
-  t = bp("rev-parse", "origin/bp-sunnypilot")
+  t = remote_branch(bp, "bp-sunnypilot")
+  assert t
   return t, bp("rev-parse", f"{t}:opendbc_repo")
 
 
@@ -249,13 +321,14 @@ def upsert_pr(token: str, repo: str, head: str, base: str, title: str, body: str
 
 
 def wait_checks(token: str, repo: str, pr: str, head: str, names: tuple, minutes: int = 45) -> tuple[str, str]:
-  """("pass" | "fail" | "timeout", links to the failed checks). Skipped counts as passed, as in branch protection."""
+  """("pass" | "fail" | "timeout", links to the failed checks). Only the PR's own runs count: step 1's head is a bp-opendbc
+  commit whose push runs are green already. Skipped counts as passed, as in branch protection; cancelled as still pending."""
   for _ in range(minutes * 3):
     # only trust checks for the new head: right after a push the PR can still show the old one's
     if gh(token, "pr", "view", pr, "-R", repo, "--json", "headRefOid", "-q", ".headRefOid", check=False) == head:
-      out = gh(token, "pr", "checks", pr, "-R", repo, "--json", "name,bucket,link", check=False)  # exits non-zero while pending
-      checks = [c for c in json.loads(out or "[]") if c["name"] in names]
-      failed = [c for c in checks if c["bucket"] in ("fail", "cancel")]
+      out = gh(token, "pr", "checks", pr, "-R", repo, "--json", "name,bucket,event,link", check=False)  # exits non-zero while pending
+      checks = [c for c in json.loads(out or "[]") if c["name"] in names and c["event"] == "pull_request"]
+      failed = [c for c in checks if c["bucket"] == "fail"]
       if failed:
         return "fail", ", ".join(f"[{c['name']}]({c['link']})" for c in failed)
       # a name passes only when every run with it has: a check can run twice on one commit, and GitHub refuses the
@@ -285,19 +358,45 @@ def find_issue(token: str, target: str) -> str:
             "-q", f"map(select(.title == {json.dumps(title)})) | .[0].number // empty")
 
 
-def report(token: str, target: str, body: str) -> str:
-  """Write the one issue (updated in place); returns its number."""
+def report(token: str, target: str, body: str) -> tuple[str, bool]:
+  """Write the one issue; (its number, whether this is news). The same stuck state is left as it is."""
   num = find_issue(token, target)
-  if num:
-    gh(token, "issue", "edit", num, "-R", REPO, "--body", body)
-    return num
-  return gh(token, "issue", "create", "-R", REPO, "--title", issue_title(target), "--body", body).rsplit("/", 1)[-1]
+  if not num:
+    return gh(token, "issue", "create", "-R", REPO, "--title", issue_title(target), "--body", body).rsplit("/", 1)[-1], True
+  if gh(token, "issue", "view", num, "-R", REPO, "--json", "body", "-q", ".body").strip() == body.strip():
+    return num, False
+  gh(token, "issue", "edit", num, "-R", REPO, "--body", body)
+  return num, True
+
+
+def stuck(token: str, target: str, body: str, what: str) -> tuple[str, int]:
+  """Record a stuck state. The run fails only when the state is new or changed: public-sync starts a run every few hours."""
+  num, news = report(token, target, body)
+  if news:
+    print(f"::error::{what}; see #{num}")
+    return num, 1
+  print(f"::notice::still waiting, as #{num} already says: {what}")
+  return num, 0
 
 
 def close_issue(token: str, target: str, why: str) -> None:
   num = find_issue(token, target)
   if num:
     gh(token, "issue", "close", num, "-R", REPO, "--comment", why)
+
+
+def marker(up: str) -> str:
+  return f"<!-- bpx-sync-review {up} -->"
+
+
+def reviewed(token: str, on: str, up: str) -> bool:
+  return marker(up) in gh(token, "api", f"repos/{REPO}/issues/{on}/comments", "--paginate", "-q", ".[].body")
+
+
+def want_review(token: str, on: str, **inputs: object) -> None:
+  """Hand the review job its inputs, once per upstream commit. The review job holds no App token (bpx-sync.yml)."""
+  if not reviewed(token, on, str(inputs["up"])):
+    output(review=json.dumps({"on": on, **inputs}))
 
 
 def library_label(odbc: Git, commit: str, tags: dict[str, str]) -> str:
@@ -326,31 +425,37 @@ def step_bp_full(target: str) -> int:
     print(f"bp-full already contains {p[:8]}")
     output(ready="yes")
     return 0
-  _, conflicts = merge_tree(odbc, full, p)
+  branch = remote_branch(odbc, BP_FULL_BRANCH)
+  head, conflicts = bp_full_head(odbc, full, p, branch)
+  def issue(**kw: Any) -> str:
+    return issue_body(step=1, target=target, t=t, p=p, q="", **kw)
+  pr = open_pr(odbc_token, ODBC, BP_FULL_BRANCH, "bp-full")
   if conflicts:
-    report(bp_token, target, issue_body(step=1, target=target, t=t, p=p, q="", start="bp-full", files=conflicts,
-                                        reason=f"merging bp-sunnypilot's opendbc pin `{p[:8]}` into `bp-full` conflicts in {count(len(conflicts))}."))
-    print(f"::error::merging {p[:8]} into bp-full conflicts; see the issue")
-    return 1
-  # the PR's head is P itself, pushed to the job's branch: P only moves forward on bp-opendbc, so this never needs a force
-  odbc("push", "-q", "--no-verify", push_url(odbc_token, ODBC), f"{p}:refs/heads/{BP_FULL_BRANCH}")
+    built_on = branch and not odbc.is_ancestor(branch, full) and not odbc.is_ancestor(branch, p)
+    num, rc = stuck(bp_token, target, issue(fix="merge", start=BP_FULL_BRANCH if built_on else "bp-full", files=conflicts,
+                                                 link=f"Open PR: ford-op/opendbc#{pr}" if pr else "",
+                                                 reason=f"merging bp-sunnypilot's opendbc pin `{p[:8]}` into `bp-full` conflicts in {count(len(conflicts))}."),
+                    f"merging {p[:8]} into bp-full conflicts")
+    want_review(bp_token, num, repo=ODBC, base=odbc("merge-base", full, p), up=p, integration=full, q="", files=conflicts, conflicts=conflicts)
+    return rc
+  if head != branch:
+    odbc("push", "-q", "--no-verify", push_url(odbc_token, ODBC), f"{head}:refs/heads/{BP_FULL_BRANCH}")
   body = "\n".join([
-    f"Merges `{p[:8]}`, the ford-op/opendbc commit that bp-sunnypilot `{t[:8]}` pins, into `bp-full`.",
+    f"Merges {commit_link(ODBC, p)}, the ford-op/opendbc commit that bp-sunnypilot {commit_link(REPO, t)} pins, into `bp-full`.",
     "Opened by the BPx sync job (BluePilotDev/bluepilot#225), which merges it with a merge commit once the required checks pass.", "",
     "## Validation", *[f"- [ ] {c}" for c in ODBC_REQUIRED], ""])
   pr = upsert_pr(odbc_token, ODBC, BP_FULL_BRANCH, "bp-full", f"sync: bp-sunnypilot's opendbc pin {p[:8]} into bp-full", body)
   print(f"ford-op/opendbc#{pr}")
-  result, links = wait_checks(odbc_token, ODBC, pr, p, ODBC_REQUIRED)
+  result, links = wait_checks(odbc_token, ODBC, pr, head, ODBC_REQUIRED)
   if result == "pass":
-    merge_pr(odbc_token, ODBC, pr, p, BP_FULL_BRANCH, f"Merge bp-sunnypilot's opendbc pin {p[:8]} into bp-full (#{pr})",
+    merge_pr(odbc_token, ODBC, pr, head, BP_FULL_BRANCH, f"Merge bp-sunnypilot's opendbc pin {p[:8]} into bp-full (#{pr})",
              f"Merged on green by the BPx sync job (BluePilotDev/bluepilot#225), for bp-sunnypilot {t[:8]}.")
     output(ready="yes", bp_full_pr=pr)
     return 0
   if result == "fail":
-    report(bp_token, target, issue_body(step=1, target=target, t=t, p=p, q="", start="bp-full", link=f"Failing: {links}",
-                                        reason=f"ford-op/opendbc#{pr} (bp-sunnypilot's pin into `bp-full`) has a failing required check."))
-    print(f"::error::ford-op/opendbc#{pr}: a required check failed; see the issue")
-    return 1
+    return stuck(bp_token, target, issue(fix="push", link=f"ford-op/opendbc#{pr}, failing: {links}",
+                                              reason=f"ford-op/opendbc#{pr} (bp-sunnypilot's pin into `bp-full`) has a failing required check."),
+                 f"ford-op/opendbc#{pr}: a required check failed")[1]
   print(f"::notice::ford-op/opendbc#{pr}: checks still running after 45 minutes; the next run picks it up")
   output(ready="no")
   return 0
@@ -361,13 +466,11 @@ def prepare(target: str) -> int:
   token = os.environ["BP_TOKEN"]
   bp = Git(".")
   t, p = mirror(bp)
-  branch = f"bpx-sync/{target}"
-  bp("fetch", "-q", "--no-tags", "origin", f"+refs/heads/{target}:refs/remotes/origin/{target}")
-  have_branch = bool(bp("ls-remote", "origin", f"refs/heads/{branch}"))
-  if have_branch:
-    bp("fetch", "-q", "--no-tags", "origin", f"+refs/heads/{branch}:refs/remotes/origin/{branch}")
-  target_sha = bp("rev-parse", f"origin/{target}")
-  branch_sha = bp("rev-parse", f"origin/{branch}") if have_branch else None
+  branch = job_branch(target)
+  target_sha = remote_branch(bp, target)
+  require(target_sha is not None, f"no branch {target}")
+  assert target_sha
+  branch_sha = remote_branch(bp, branch)
   odbc = opendbc()
   pin = bp("rev-parse", f"{target_sha}:opendbc_repo")
   for sha in (p, pin):
@@ -379,13 +482,21 @@ def prepare(target: str) -> int:
     close_issue(token, target, f"Nothing left to do: `{target}` contains bp-sunnypilot `{t[:8]}` and pins `bp-full` `{q[:8]}`.")
     return 0
   if pl.action == "conflict":
-    start = branch if pl.base == branch_sha else target
-    num = report(token, target, issue_body(step=2, target=target, t=t, p=p, q=q, start=start, files=pl.conflicts,
-                                           reason=f"merging bp-sunnypilot into `{start}` conflicts in {count(len(pl.conflicts))}."))
-    output(review="yes", review_on=num, files="\n".join(pl.conflicts), conflicts="\n".join(pl.conflicts),
-           base=bp("merge-base", pl.base, t), up=t, integration=pl.base, q=q)
-    print(f"::error::merging bp-sunnypilot {t[:8]} into {start} conflicts; see the issue")
-    return 1
+    pr = open_pr(token, REPO, branch, target)
+    def issue(**kw: Any) -> str:
+      return issue_body(step=2, target=target, t=t, p=p, q=q, files=pl.conflicts, link=f"Open sync PR: #{pr}" if pr else "", **kw)
+    if pl.against_target:
+      body = issue(fix="merge-target",
+                        reason=f"the open sync PR's branch `{branch}` conflicts with `{target}`, which moved since, in {count(len(pl.conflicts))}.")
+      review = {"base": bp("merge-base", target_sha, pl.base), "up": t, "integration": target_sha}
+    else:
+      start = branch if pl.base == branch_sha else target
+      body = issue(fix="merge", start=start,
+                        reason=f"merging bp-sunnypilot into `{start}` conflicts in {count(len(pl.conflicts))}.")
+      review = {"base": bp("merge-base", pl.base, t), "up": t, "integration": pl.base}
+    num, rc = stuck(token, target, body, f"the sync into {target} conflicts")
+    want_review(token, num, repo=REPO, q=q, files=pl.conflicts, conflicts=pl.conflicts, **review)
+    return rc
   if pl.commit != branch_sha:
     bp("push", "-q", "--no-verify", push_url(token, REPO), f"{pl.commit}:refs/heads/{branch}")
   base = bp("merge-base", target_sha, t)
@@ -401,37 +512,68 @@ def prepare(target: str) -> int:
     bp_full_pr=int(os.environ["BP_FULL_PR"]) if os.environ.get("BP_FULL_PR") else None)
   pr = upsert_pr(token, REPO, branch, target, f"sync: bp-sunnypilot {t[:8]} into {target}", pr_body(summary))
   print(f"#{pr} at {pl.commit}")
-  output(pr=pr, head=pl.commit, t=t, q=q)
+  output(pr=pr, head=pl.commit, t=t, p=p, q=q)
   if summary.overlap:
-    output(review="yes", review_on=pr, files="\n".join(summary.overlap), conflicts="", base=base, up=t, integration=target_sha, q=q)
+    want_review(token, pr, repo=REPO, base=base, up=t, integration=target_sha, q=q, files=summary.overlap, conflicts=[])
+  return 0
+
+
+def review_prompt(path: str) -> str:
+  """The review's prompt: the prompt file and the inputs the sync job handed over (REVIEW)."""
+  r = json.loads(os.environ["REVIEW"])
+  lines = [Path(path).read_text(), "", "## Inputs", f"- BASE: {r['base']}", f"- UPSTREAM: {r['up']}", f"- INTEGRATION: {r['integration']}"]
+  if r["repo"] == ODBC:
+    lines.append("- Step 1, in ford-op/opendbc: UPSTREAM is the bp-opendbc commit bp-sunnypilot pins, INTEGRATION is `bp-full`.")
+  else:
+    lines.append(f"- `opendbc_repo`: resolved by the job to ford-op/opendbc `bp-full` {r['q']}")
+  lines += [f"- Files that conflict: {', '.join(r['conflicts']) or 'none'}", "- Files to review:", *[f"  - {f}" for f in r["files"]], ""]
+  return "\n".join(lines)
+
+
+def post(path: str) -> int:
+  """Post the review job's text as a comment, once per upstream commit. Runs with the App token: it only reads the file."""
+  token, r = os.environ["BP_TOKEN"], json.loads(os.environ["REVIEW"])
+  on, up = str(r["on"]), str(r["up"])
+  require(on.isdigit() and bool(SHA.fullmatch(up)), "malformed review inputs")
+  text = Path(path).read_text().strip()
+  require(bool(text), "the review came back empty")
+  if reviewed(token, on, up):
+    print(f"#{on} already has a review for {up}")
+    return 0
+  gh(token, "issue", "comment", on, "-R", REPO, "--body", f"{marker(up)}\n{text}")  # an issue or a PR: both take issue comments
   return 0
 
 
 def merge(target: str) -> int:
   """Step 2, last part: merge the sync PR on green, delete the job branch, close the issue."""
-  token, pr, head, t, q = (os.environ[k] for k in ("BP_TOKEN", "PR", "HEAD", "T", "Q"))
+  token, pr, head, t, p, q = os.environ["BP_TOKEN"], env_number("PR"), env_sha("HEAD"), env_sha("T"), env_sha("P"), env_sha("Q")
+  branch = job_branch(target)
+  view = json.loads(gh(token, "pr", "view", pr, "-R", REPO, "--json", "headRefName,baseRefName,isCrossRepository,state"))
+  require(view == {"headRefName": branch, "baseRefName": target, "isCrossRepository": False, "state": "OPEN"},
+          f"#{pr} isn't the job's open PR from {branch} into {target}: {view}")
   result, links = wait_checks(token, REPO, pr, head, REQUIRED)
   if result == "pass":
-    merge_pr(token, REPO, pr, head, f"bpx-sync/{target}", f"Merge bp-sunnypilot {t[:8]} into {target} (#{pr})",
+    merge_pr(token, REPO, pr, head, branch, f"Merge bp-sunnypilot {t[:8]} into {target} (#{pr})",
              f"opendbc_repo: ford-op/opendbc bp-full {q[:8]}. Merged on green by the BPx sync job (#225).")
     close_issue(token, target, f"Synced: #{pr} merged bp-sunnypilot `{t[:8]}` into `{target}`.")
     print(f"merged #{pr}")
     return 0
   if result == "fail":
-    p = Git(".")("rev-parse", f"{t}:opendbc_repo")
-    # the commands start from the PR's branch: a fix pushed there is a fast-forward
-    report(token, target, issue_body(step=2, target=target, t=t, p=p, q=q, start=f"bpx-sync/{target}", link=f"PR #{pr}; failing: {links}",
-                                     reason=f"#{pr} has a failing required check. Fix it on the PR's branch, or redo the merge." + REPLAY))
-    print(f"::error::#{pr}: a required check failed; it stays open, see the issue")
-    return 1
+    return stuck(token, target, issue_body(step=2, target=target, t=t, p=p, q=q, fix="push", link=f"Sync PR: #{pr}; failing: {links}",
+                                           reason=f"#{pr} has a failing required check. Fix it on the PR's branch." + REPLAY),
+                 f"#{pr}: a required check failed; it stays open")[1]
   print(f"::notice::#{pr}: checks still running after 45 minutes; the next run picks it up")
   return 0
 
 
 def main(argv: list[str]) -> int:
+  if argv[1] == "review-prompt":
+    print(review_prompt(argv[2]))
+    return 0
+  if argv[1] == "post":
+    return post(argv[2])
   target = os.environ["TARGET"]
-  if target == "bp-sunnypilot":
-    sys.exit("the target can't be the bp-sunnypilot mirror")
+  require(target != "bp-sunnypilot", "the target can't be the bp-sunnypilot mirror")
   return {"bp-full": step_bp_full, "prepare": prepare, "merge": merge}[argv[1]](target)
 
 
