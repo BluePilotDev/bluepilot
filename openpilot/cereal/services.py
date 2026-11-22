@@ -102,6 +102,8 @@ _services: dict[str, tuple] = {
   "carStateBP": (True, 100., 10),
   # BluePilot: BluePilot's onroad events (JetLink's), logged as onroadEventsSP is
   "onroadEventsBP": (True, 1., 1),
+  # BluePilot: JetLink's big model as modeld saw it (D2 b), every model frame; qlog as modelDataV2SP
+  "modelDataV2BP": (True, 20., 10),
   # End BluePilot
 
   # debug

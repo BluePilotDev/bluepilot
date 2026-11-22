@@ -405,6 +405,16 @@ Top-level items (always available):
 | Predicted Curvature Blend Ratio High | value: 0.0–1.0 | Blend in curves. Default 0.4; most drivers like 0.4–0.6. Higher = smoother but may ping-pong in curves. |
 | Centering PID Gain | value: 0.0–50.0 | Centering strength on straights (with Lane Positioning + Custom Profile). Default 3.0; adjust in small steps. |
 
+### JetLink
+
+Experimental: the big driving model on a computer on the comma's USB-C port. See [docs/jetlink](docs/jetlink/README.md) for what you need, what each status and alert means, and the logs.
+
+| Setting | Type | Description |
+|---|---|---|
+| Big Model Link (JetLink) | selector: Off / USB | Run the big driving model on a Jetson, Mac or PC running JetLink on the comma's USB-C port. The comma must run from the car harness; ADB over USB is unavailable while the link holds the port. Offroad only. |
+| JetLink Status | read-only | What the link is doing: Off, Connecting, Preparing, Ready, Big model driving, Reconnecting, Failed or Unavailable. On the C3X, tap for the details. |
+| JetLink: Charge Phone | toggle | Let a phone running JetLink charge from the comma's USB-C port. Offroad only. |
+
 ### BP Portal panel (C3X)
 
 | Setting | Type | Description |
@@ -700,6 +710,10 @@ The BluePilot Portal is a React-based Progressive Web App served directly from t
 * **Diagnostics** - Real-time TMUX streaming and parameter browser
 
 Modification endpoints are blocked (HTTP 403) while the vehicle is driving.
+
+### JetLink docs
+
+* [docs/jetlink](docs/jetlink/README.md): JetLink for owners (setup, status, alerts) and developers (code, params, `modelDataV2BP` logs, tests, moving the pin)
 
 ### Ford lateral control docs
 
