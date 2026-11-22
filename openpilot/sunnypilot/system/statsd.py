@@ -87,9 +87,18 @@ class StatLogSP(StatLog):
       self.comma_statlog.connect()
 
   def __del__(self):
+    # BluePilot: both connect on the one zmq.Context.instance(), and term() blocks while any socket on it is open:
+    # close comma_statlog's socket before super() terminates the shared context, and terminate it only once. The old
+    # order (super() first) hung every process that had sent a stat at exit
+    if self.comma_statlog and self.comma_statlog.sock is not None:
+      self.comma_statlog.sock.close()
+      self.comma_statlog.sock = None
+      if self.comma_statlog.zctx is self.zctx:
+        self.comma_statlog.zctx = None
     super().__del__()
     if self.comma_statlog:
       self.comma_statlog.__del__()
+    # End BluePilot
 
   def _send(self, metric: str) -> None:
     super()._send(metric)
