@@ -6,7 +6,7 @@
 .gitattributes                                                                         # BluePilot's own binaries are plain git files, not LFS
 .gitignore                                                                             # local agent docs and tools
 README.md                                                                              # BluePilot's README
-launch_chffrplus.sh                                                                    # boot logo, EGL/GLES library fix
+launch_chffrplus.sh                                                                    # boot logo
 launch_env.sh                                                                          # connect backend (comma / Konik / offline)
 opendbc_repo                                                                           # points at ford-op/opendbc bp-full (BluePilot's Ford car code), not bp-opendbc
 openpilot/cereal/custom.capnp                                                          # controllerStateBP, carStateBP and BluePilot's other structs

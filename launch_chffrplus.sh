@@ -33,22 +33,6 @@ function agnos_init {
   fi
 }
 
-function fix_egl_adreno {
-  # BluePilot: comma's on-screen URL installer points the GPU EGL/GLES libs at the Adreno
-  # drivers. ford-op/BluePilot installs by git clone (private repo), which skips that
-  # installer, so ldconfig's higher-versioned glvnd/Mesa libs win and magic.service (the
-  # AGNOS display server) fails eglGetDisplay -> no UI. Re-point them like the installer does.
-  local lib=/usr/lib/aarch64-linux-gnu
-  if [ "$(readlink "$lib/libEGL.so.1")" != "libEGL.so.1.0.0" ] || \
-     [ "$(readlink "$lib/libGLESv2.so.2")" != "libGLESv2.so.2.0.0" ]; then
-    sudo mount -o remount,rw /
-    sudo ln -sf libEGL.so.1.0.0 "$lib/libEGL.so.1"
-    sudo ln -sf libGLESv2.so.2.0.0 "$lib/libGLESv2.so.2"
-    sudo mount -o remount,ro /
-    sudo systemctl restart magic.service 2>/dev/null || true
-  fi
-}
-
 function launch {
   # Remove orphaned git lock if it exists on boot
   [ -f "$DIR/.git/index.lock" ] && rm -f "$DIR/.git/index.lock"
@@ -109,7 +93,6 @@ function launch {
   # hardware specific init
   if [ -f /AGNOS ]; then
     agnos_init
-    fix_egl_adreno
   fi
 
   # write tmux scrollback to a file
