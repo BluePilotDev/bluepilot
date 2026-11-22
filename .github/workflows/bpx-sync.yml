@@ -1,0 +1,174 @@
+# BluePilot: the BPx sync job (spec: #225). Merges this repo's bp-sunnypilot mirror into full BluePilot's work branch,
+# with opendbc_repo at the ford-op/opendbc bp-full commit that has bp-sunnypilot's opendbc pin (merging that pin into
+# bp-full first when it isn't there). Both PRs merge with merge commits on green; a conflict or a red check goes into
+# one issue. The logic is in .github/bpx_sync.py. Full BluePilot only: this file doesn't exist in ford-op/bp-sunnypilot.
+#
+# Three jobs, so the review (a model reading upstream diffs) never shares a runner with the App's write token:
+#   sync   - App tokens: step 1 (bp-full), then the sync PR. Never runs the model.
+#   review - the review token only, no App token: writes the review text to an artifact.
+#   finish - App token, a fresh checkout the model never touched: posts that text as a comment, merges the PR on green.
+name: bpx sync
+
+on:
+  repository_dispatch:
+    types: [bpx-sync]  # sent by ford-op/bp-sunnypilot's public-sync after it publishes the mirror
+  workflow_dispatch:
+    inputs:
+      target:
+        description: branch to sync into
+        default: bp-7.1-dev
+
+permissions: {}
+
+concurrency:
+  group: bpx-sync
+
+env:
+  TARGET: ${{ inputs.target || 'bp-7.1-dev' }}
+  GIT_LFS_SKIP_SMUDGE: 1
+  # no submodules are checked out: a fetch that recursed into a moved gitlink would fail
+  GIT_CONFIG_COUNT: 1
+  GIT_CONFIG_KEY_0: fetch.recurseSubmodules
+  GIT_CONFIG_VALUE_0: 'false'
+
+jobs:
+  sync:
+    if: github.repository == 'BluePilotDev/bluepilot'
+    runs-on: ubuntu-24.04
+    environment: bpx-sync  # the App key and the review token; the environment is limited to the default branch
+    timeout-minutes: 75  # step 1 can wait 45 minutes for ford-op/opendbc's checks
+    outputs:
+      pr: ${{ steps.prepare.outputs.pr }}
+      head: ${{ steps.prepare.outputs.head }}
+      t: ${{ steps.prepare.outputs.t }}
+      p: ${{ steps.prepare.outputs.p }}
+      q: ${{ steps.prepare.outputs.q }}
+      review: ${{ steps.prepare.outputs.review || steps.bpfull.outputs.review }}
+    steps:
+    # GITHUB_TOKEN can't be used: pushes and PRs made with it don't start CI. One App token per org.
+    - uses: actions/create-github-app-token@v2
+      id: bp
+      with:
+        app-id: ${{ secrets.SYNC_APP_ID }}
+        private-key: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
+        owner: BluePilotDev
+        repositories: bluepilot
+    - uses: actions/create-github-app-token@v2
+      id: odbc
+      with:
+        app-id: ${{ secrets.SYNC_APP_ID }}
+        private-key: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
+        owner: ford-op
+        repositories: opendbc
+    # history and trees only (merge-tree fetches the few file contents it needs), no LFS, and the working tree is just
+    # .github: a run with nothing to do stays cheap. Pushes use the App token's URL.
+    - uses: actions/checkout@v7
+      with:
+        fetch-depth: 0
+        filter: blob:none
+        sparse-checkout: .github
+        persist-credentials: false
+    - name: 'Step 1: bp-full'
+      id: bpfull
+      env:
+        BP_TOKEN: ${{ steps.bp.outputs.token }}
+        ODBC_TOKEN: ${{ steps.odbc.outputs.token }}
+      run: python3 .github/bpx_sync.py bp-full
+    # a fresh token: App tokens last an hour, and step 1 can wait 45 minutes
+    - uses: actions/create-github-app-token@v2
+      id: bp2
+      if: steps.bpfull.outputs.ready == 'yes'
+      with:
+        app-id: ${{ secrets.SYNC_APP_ID }}
+        private-key: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
+        owner: BluePilotDev
+        repositories: bluepilot
+    - name: 'Step 2: the sync PR'
+      id: prepare
+      if: steps.bpfull.outputs.ready == 'yes'
+      env:
+        BP_TOKEN: ${{ steps.bp2.outputs.token }}
+        BP_FULL_PR: ${{ steps.bpfull.outputs.bp_full_pr }}
+      run: python3 .github/bpx_sync.py prepare
+
+  # a plain-English review of the overlapping (on the PR) or conflicting (on the issue) files, once per upstream commit.
+  # Read-only git commands only, and this job holds no App token: whatever the model does stays on this runner.
+  review:
+    needs: sync
+    if: ${{ !cancelled() && needs.sync.outputs.review != '' }}
+    runs-on: ubuntu-24.04
+    environment: bpx-sync  # for CLAUDE_CODE_OAUTH_TOKEN only
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    steps:
+    - uses: actions/checkout@v7
+      with:
+        fetch-depth: 0
+        filter: blob:none
+        sparse-checkout: .github
+        persist-credentials: false
+    - name: Review
+      env:
+        CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+        REVIEW: ${{ needs.sync.outputs.review }}
+      run: |
+        set -euo pipefail
+        python3 .github/bpx_sync.py review-prompt .github/bpx-sync-review-prompt.md > "$RUNNER_TEMP/prompt.md"
+        dir=$PWD
+        if [ "$(jq -r .repo <<<"$REVIEW")" = ford-op/opendbc ]; then  # a step-1 conflict: the commits are in ford-op/opendbc
+          dir=$RUNNER_TEMP/opendbc
+          git clone -q --filter=blob:none --no-checkout https://github.com/ford-op/opendbc.git "$dir"
+        fi
+        npm install -g --silent @anthropic-ai/claude-code
+        cd "$dir"
+        claude -p "$(cat "$RUNNER_TEMP/prompt.md")" --max-turns 40 \
+          --allowedTools "Bash(git diff:*),Bash(git log:*),Bash(git show:*)" < /dev/null > "$RUNNER_TEMP/review.md"
+        [ -s "$RUNNER_TEMP/review.md" ] || { echo "::error::the review came back empty"; exit 1; }
+    - uses: actions/upload-artifact@v7
+      with:
+        name: review
+        path: ${{ runner.temp }}/review.md
+
+  finish:
+    needs: [sync, review]
+    if: ${{ !cancelled() && (needs.sync.outputs.pr != '' || needs.review.result == 'success') }}
+    runs-on: ubuntu-24.04
+    environment: bpx-sync
+    timeout-minutes: 60  # waits up to 45 minutes for the sync PR's checks
+    steps:
+    - uses: actions/create-github-app-token@v2
+      id: bp
+      with:
+        app-id: ${{ secrets.SYNC_APP_ID }}
+        private-key: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
+        owner: BluePilotDev
+        repositories: bluepilot
+    - uses: actions/checkout@v7
+      with:
+        sparse-checkout: .github
+        persist-credentials: false
+    # the review is advice: a failure to post it never stops the merge
+    - uses: actions/download-artifact@v7
+      if: needs.review.result == 'success'
+      continue-on-error: true
+      with:
+        name: review
+        path: ${{ runner.temp }}/review
+    - name: Post the review
+      if: needs.review.result == 'success'
+      continue-on-error: true
+      env:
+        BP_TOKEN: ${{ steps.bp.outputs.token }}
+        REVIEW: ${{ needs.sync.outputs.review }}
+      run: python3 .github/bpx_sync.py post "$RUNNER_TEMP/review/review.md"
+    - name: 'Step 2: merge on green'
+      if: needs.sync.result == 'success' && needs.sync.outputs.pr != ''
+      env:
+        BP_TOKEN: ${{ steps.bp.outputs.token }}
+        PR: ${{ needs.sync.outputs.pr }}
+        HEAD: ${{ needs.sync.outputs.head }}
+        T: ${{ needs.sync.outputs.t }}
+        P: ${{ needs.sync.outputs.p }}
+        Q: ${{ needs.sync.outputs.q }}
+      run: python3 .github/bpx_sync.py merge
