@@ -419,7 +419,8 @@ def merge(target: str) -> int:
     return 0
   if result == "fail":
     p = Git(".")("rev-parse", f"{t}:opendbc_repo")
-    report(token, target, issue_body(step=2, target=target, t=t, p=p, q=q, start=target, link=f"PR #{pr}; failing: {links}",
+    # the commands start from the PR's branch: a fix pushed there is a fast-forward
+    report(token, target, issue_body(step=2, target=target, t=t, p=p, q=q, start=f"bpx-sync/{target}", link=f"PR #{pr}; failing: {links}",
                                      reason=f"#{pr} has a failing required check. Fix it on the PR's branch, or redo the merge." + REPLAY))
     print(f"::error::#{pr}: a required check failed; it stays open, see the issue")
     return 1
