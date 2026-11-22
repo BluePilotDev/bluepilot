@@ -201,6 +201,15 @@ if is_bluepilot():
     PythonProcess("bp_route_preprocessor", "bluepilot.backend.routes.preprocessor", _bp_route_preprocessor_enabled),
   ]
 
+  # BluePilot: JetLink's gadget owner, after models_manager. Onroad and offroad while the link is on: a gadget whose
+  # owner exits drops off the bus. Restarted if it dies; selfdrived leaves it out of processNotRunning
+  from openpilot.bluepilot import jetlink_adapter
+  from openpilot.bluepilot.system.manager.restarting_process import RestartingPythonProcess
+  procs += [
+    RestartingPythonProcess(jetlink_adapter.OWNER, jetlink_adapter.__name__, jetlink_adapter.should_run),
+  ]
+  # End BluePilot
+
 if os.path.exists("../../sunnypilot/sunnylink/uploader.py"):
   procs += [PythonProcess("sunnylink_uploader", "openpilot.sunnypilot.sunnylink.uploader", use_sunnylink_uploader_shim)]
 

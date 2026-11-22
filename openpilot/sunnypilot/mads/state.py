@@ -40,6 +40,13 @@ class StateMachine:
     return bool(self._events.contains(event_type) or self._events_sp.contains(event_type))
 
   def check_contains_in_list(self) -> bool:
+    # BluePilot: JetLink's no-entry second after a swap (bigModelLoading) pauses MADS turned on in it, which resumes
+    # by itself after the chime, rather than refusing it and leaving it off with main on. A native big model's load
+    # (also bigModelLoading) still refuses, as before
+    jetlink = getattr(self.selfdrive, 'jetlink', None)
+    if jetlink is not None and jetlink.no_entry and self._events.has(EventName.bigModelLoading):
+      return True
+    # End BluePilot
     return bool(self._events.contains_in_list(GEARS_ALLOW_PAUSED) or self._events_sp.contains_in_list(GEARS_ALLOW_PAUSED_SILENT))
 
   def update(self):

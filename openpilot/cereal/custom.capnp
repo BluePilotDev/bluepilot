@@ -510,8 +510,33 @@ struct ModelDataV2SP @0xa1680744031fdb2d {
   }
 }
 
-struct CustomReserved10 @0xcb9fd56c7057593a {
+# BluePilot: BluePilot's own onroad events, which selfdrived turns into alerts beside sunnypilot's (claims the
+# CustomReserved10 slot). JetLink's two first (bluepilot/selfdrive/selfdrived/events_bp.py)
+struct OnroadEventBP @0xcb9fd56c7057593a {
+  events @0 :List(Event);
+
+  struct Event {
+    name @0 :EventName;
+
+    # event types, as OnroadEventSP.Event
+    enable @1 :Bool;
+    noEntry @2 :Bool;
+    warning @3 :Bool;
+    userDisable @4 :Bool;
+    softDisable @5 :Bool;
+    immediateDisable @6 :Bool;
+    preEnable @7 :Bool;
+    permanent @8 :Bool;
+    overrideLateral @10 :Bool;
+    overrideLongitudinal @9 :Bool;
+  }
+
+  enum EventName {
+    bigModelAvailable @0;  # JetLink: the big model is ready while engaged; re-engage to switch to it
+    bigModelLinkLost @1;   # JetLink: the big model's link fell while engaged; the small model drives on
+  }
 }
+# End BluePilot
 
 struct CustomReserved11 @0xc2243c65e0340384 {
 }

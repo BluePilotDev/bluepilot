@@ -23,6 +23,11 @@ blacklist = [
   ".idea/",
 ]
 
+# BluePilot: of JetLink's submodule only what the comma runs and its license (JetLink's docs/porting.md): the host
+# apps, docs, scripts and tests stay out of a release
+blacklist += [r"^jetlink_repo/(?!(jetlink/|LICENSE$|pyproject\.toml$|README\.md$))"]
+# End BluePilot
+
 # gets you through the blacklist
 whitelist: list[str] = [r"^\.lfsconfig$"] if os.getenv("INCLUDE_BIG_MODEL") else []
 

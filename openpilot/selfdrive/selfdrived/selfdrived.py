@@ -32,6 +32,10 @@ from openpilot.sunnypilot.selfdrive.car.car_specific import CarSpecificEventsSP
 from openpilot.sunnypilot.selfdrive.car.intelligent_cruise_button_management.controller import IntelligentCruiseButtonManagement
 from openpilot.sunnypilot.selfdrive.selfdrived.button_state_tracker import ButtonStateTracker
 from openpilot.sunnypilot.selfdrive.selfdrived.events import EventsSP
+# BluePilot: BluePilot's onroad events, JetLink's swap events among them
+from openpilot.bluepilot.selfdrive.selfdrived.events_bp import EventsBP
+from openpilot.bluepilot.selfdrive.selfdrived.jetlink_events import JetlinkEvents
+# End BluePilot
 
 REPLAY = "REPLAY" in os.environ
 SIMULATION = "SIMULATION" in os.environ
@@ -92,7 +96,8 @@ class SelfdriveD:
     self.big_model_ready_t = 0.
 
     # Setup sockets
-    self.pm = messaging.PubMaster(['selfdriveState', 'onroadEvents'] + ['selfdriveStateSP', 'onroadEventsSP'])
+    self.pm = messaging.PubMaster(['selfdriveState', 'onroadEvents'] + ['selfdriveStateSP', 'onroadEventsSP']
+                                  + ['onroadEventsBP'])  # BluePilot: BluePilot's onroad events
 
     self.gps_location_service = get_gps_location_service(self.params)
     self.gps_packets = [self.gps_location_service]
@@ -159,6 +164,9 @@ class SelfdriveD:
     self.rk = Ratekeeper(100, print_delay_threshold=None)
 
     self.ignored_processes = {'mapd', }
+    # BluePilot: a dead JetLink owner sends the drive back to the small model; it never blocks engaging
+    self.ignored_processes |= JetlinkEvents.OPTIONAL_PROCESSES
+    # End BluePilot
 
     # Determine startup event
     is_remote = build_metadata.openpilot.comma_remote or build_metadata.openpilot.sunnypilot_remote
@@ -181,6 +189,12 @@ class SelfdriveD:
     self.events_sp = EventsSP()
     self.events_sp_prev = []
 
+    # BluePilot: BluePilot's onroad events, and JetLink's swap events (built once, link on or off)
+    self.events_bp = EventsBP()
+    self.events_bp_prev = []
+    self.jetlink = JetlinkEvents()
+    # End BluePilot
+
     self.mads = ModularAssistiveDrivingSystem(self)
     self.icbm = IntelligentCruiseButtonManagement(self.CP, self.CP_SP)
 
@@ -193,6 +207,7 @@ class SelfdriveD:
 
     self.events.clear()
     self.events_sp.clear()
+    self.events_bp.clear()  # BluePilot
 
     if self.sm['controlsState'].lateralControlState.which() == 'debugState':
       self.events.add(EventName.joystickDebug)
@@ -220,6 +235,11 @@ class SelfdriveD:
       self.big_model_active = True
     if not self.enabled and not model_unavailable:
       self.big_model_active = False
+
+    # BluePilot: JetLink's big model joining or leaving mid-drive. In control: the adapter's engaged() rule,
+    # openpilot or MADS, MADS paused included
+    self.jetlink.update(self.sm, self.enabled or self.mads.enabled, self.events, self.events_sp, self.events_bp)
+    # End BluePilot
 
     if self.sm.recv_frame['lateralManeuverPlan'] > 0:
       self.events.add(EventName.lateralManeuver)
@@ -450,6 +470,9 @@ class SelfdriveD:
     # close this, since the race is at the transition boundary, not about recovery duration.
     warmup_sec = 5.
     big_model_settling = self.big_model_loading or time.monotonic() < self.big_model_ready_t + warmup_sec
+    # BluePilot: a JetLink swap or hand-back drops a frame or two; hold its errors as a native big model's load
+    big_model_settling = big_model_settling or self.jetlink.settling
+    # End BluePilot
     raw_comm_issue = not self.sm.all_checks() and no_system_errors and not big_model_settling  # the load holds modelV2 and friends back on purpose
     self.comm_issue_counter = self.comm_issue_counter + 1 if raw_comm_issue else 0
     if self.comm_issue_counter > COMM_ISSUE_DEBOUNCE_FRAMES:
@@ -609,6 +632,9 @@ class SelfdriveD:
 
     alerts = self.events.create_alerts(self.state_machine.current_alert_types, callback_args)
     alerts_sp = self.events_sp.create_alerts(self.state_machine.current_alert_types, callback_args)
+    # BluePilot: BluePilot's alerts beside openpilot's and sunnypilot's
+    alerts_sp += self.events_bp.create_alerts(self.state_machine.current_alert_types, callback_args)
+    # End BluePilot
 
     self.AM.add_many(self.sm.frame, alerts + alerts_sp)
     self.AM.process_alerts(self.sm.frame, clear_event_types)
@@ -668,6 +694,15 @@ class SelfdriveD:
       ce_send_sp.onroadEventsSP.events = self.events_sp.to_msg()
       self.pm.send('onroadEventsSP', ce_send_sp)
     self.events_sp_prev = self.events_sp.names.copy()
+
+    # BluePilot: onroadEventsBP, logged every second or on change, as onroadEventsSP
+    if (self.sm.frame % int(1. / DT_CTRL) == 0) or (self.events_bp.names != self.events_bp_prev):
+      ce_send_bp = messaging.new_message('onroadEventsBP')
+      ce_send_bp.valid = True
+      ce_send_bp.onroadEventsBP.events = self.events_bp.to_msg()
+      self.pm.send('onroadEventsBP', ce_send_bp)
+    self.events_bp_prev = self.events_bp.names.copy()
+    # End BluePilot
 
   def step(self):
     CS = self.data_sample()

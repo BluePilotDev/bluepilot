@@ -360,4 +360,13 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"BPDongleIdKonik", {PERSISTENT, STRING}},
     {"BPLastSeenVersion", {PERSISTENT, STRING}},
     {"WifiFavoriteSSID", {PERSISTENT | BACKUP, STRING}},
+
+    // BluePilot: JetLink (jetlink_repo, zoompilot/jetlink, MIT), the big driving model on a computer on the USB-C port.
+    // JetLink's canonical names (its docs/porting.md); bluepilot/jetlink_adapter reads them.
+    {"JetlinkLink", {PERSISTENT | BACKUP, INT, "0"}},  // 0 off, 1 USB (Jetson, PC, Mac, Android), 2 iOS
+    {"JetlinkProgress", {CLEAR_ON_MANAGER_START, JSON}},
+    {"JetlinkSpec", {PERSISTENT, JSON}},  // survives reboots, or every drive rebuilds the engine for minutes
+    {"JetlinkChargePhone", {PERSISTENT, BOOL, "0"}},
+    {"Offroad_JetlinkUnavailable", {CLEAR_ON_MANAGER_START, JSON}},
+    // End BluePilot
 };

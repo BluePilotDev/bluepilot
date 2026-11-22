@@ -1,5 +1,3 @@
-import pyray as rl
-
 from openpilot.common.params import Params
 from openpilot.common.params import UnknownKeyName
 from openpilot.common.swaglog import cloudlog
@@ -29,6 +27,7 @@ from openpilot.selfdrive.ui.bp.lib.dm_icon_style import (
 from openpilot.selfdrive.ui.bp.lib.custom_sound import get_custom_sound_selection
 from openpilot.bluepilot.selfdrive.car.ford_lateral_support import SUPPORT_PARAM, support_row
 from openpilot.selfdrive.ui.bp.onroad.augmented_road_view_bp import GaugeStyle
+from openpilot.selfdrive.ui.bp.lib import jetlink_settings
 
 
 class BluePilotLayout(Widget):
@@ -90,6 +89,7 @@ class BluePilotLayout(Widget):
       ("disable_ford_radar_UI", self._disable_ford_radar),
       ("BpShowLateralControl", self._show_lateral_control),
       ("BPUIDebugLog", self._ui_debug_log),
+      (jetlink_settings.CHARGE_PHONE_PARAM, self._jetlink_charge_phone),
     )
 
     ui_state.add_offroad_transition_callback(self._update_toggles)
@@ -372,7 +372,7 @@ class BluePilotLayout(Widget):
     self._connect_backend_action.set_value(lambda: self._get_connect_backend_display())
     self._connect_backend_btn = ListItem(
       lambda: tr("Connect Backend"),
-      description=lambda: tr("Comma Connect uses stock servers. Konik Stable sends routes to stable.konik.ai (dongle ID switches automatically). Offline Mode points at unreachable hosts so uploads never succeed. Reboot to apply."),
+      description=lambda: tr("Comma Connect uses stock servers. Konik Stable sends routes to stable.konik.ai (dongle ID switches automatically). Offline Mode points at unreachable hosts so uploads never succeed. Reboot to apply."),  # noqa: E501
       action_item=self._connect_backend_action,
       callback=self._select_connect_backend
     )
@@ -383,7 +383,7 @@ class BluePilotLayout(Widget):
     self._restore_dongle_action.set_value(lambda: self._get_recoverable_dongle_id_preview())
     self._restore_dongle_btn = ListItem(
       lambda: tr("Restore Cached Dongle ID"),
-      description=lambda: tr("If switching backends left this device unregistered, restore a previously registered ID found cached here. Only enabled when one is found."),
+      description=lambda: tr("If switching backends left this device unregistered, restore a previously registered ID found cached here. Only enabled when one is found."),  # noqa: E501
       action_item=self._restore_dongle_action,
       callback=self._restore_dongle_id
     )
@@ -459,6 +459,26 @@ class BluePilotLayout(Widget):
       callback=self._clear_model_cache
     )
 
+    # JetLink: the big model on a computer on the USB-C port. Offroad only
+    self._jetlink_link_btn = multiple_button_item(
+      lambda: tr(jetlink_settings.TITLE),
+      lambda: tr(jetlink_settings.DESCRIPTION),
+      buttons=[(lambda label=label: tr(label)) for label in jetlink_settings.LINK_LABELS.values()],
+      button_width=225,
+      callback=self._set_jetlink_link,
+      selected_index=jetlink_settings.selected_index(self._params),
+      icon="chffr_wheel.png"
+    )
+    self._jetlink_link_btn.action_item.set_enabled(lambda: ui_state.is_offroad())
+    self._jetlink_charge_phone = toggle_item(
+      lambda: tr(jetlink_settings.CHARGE_PHONE_TITLE),
+      lambda: tr(jetlink_settings.CHARGE_PHONE_DESCRIPTION),
+      initial_state=self._safe_get_bool(self._params, jetlink_settings.CHARGE_PHONE_PARAM),
+      callback=lambda state: self._toggle_callback(state, jetlink_settings.CHARGE_PHONE_PARAM),
+      icon="chffr_wheel.png"
+    )
+    self._jetlink_charge_phone.action_item.set_enabled(lambda: ui_state.is_offroad())
+
     # BluePilot: reset menu layout — collapses all sections, fixing overlap glitch without reboot.
     self._reset_menu_btn = button_item(
       lambda: tr("Reset Menu Layout"),
@@ -522,6 +542,10 @@ class BluePilotLayout(Widget):
         self._disable_lane_change_under_speed,
         self._blinker_min_speed,
         self._show_lateral_control,
+      ]) +
+      _section(tr("JetLink"), [
+        self._jetlink_link_btn,
+        self._jetlink_charge_phone,
       ])
     )
     # End BluePilot
@@ -681,6 +705,7 @@ class BluePilotLayout(Widget):
     # Conditional on BlinkerPauseLaneChange
     self._blinker_min_speed.action_item.set_enabled(pause_lc)
     self._lateral_support = support_row(self._safe_get(ui_state.params, SUPPORT_PARAM))
+    self._jetlink_link_btn.action_item.set_selected_button(jetlink_settings.selected_index(ui_state.params))
 
   def show_event(self):
     super().show_event()
@@ -869,6 +894,11 @@ class BluePilotLayout(Widget):
   def _handle_sound_reboot(self, result):
     if result == DialogResult.CONFIRM:
       self._params.put_bool("DoReboot", True)
+
+  def _set_jetlink_link(self, button_index: int):
+    """JetLink's link selector: Off or USB, offroad only (the buttons are disabled onroad too)."""
+    if not jetlink_settings.write_link(self._params, button_index, ui_state.is_offroad()):
+      self._jetlink_link_btn.action_item.set_selected_button(jetlink_settings.selected_index(self._params))
 
   def _set_hybrid_gauge_size(self, button_index: int):
     """Handle hybrid gauge size button selection. Buttons are 0/1/2, param stores 1/2/3."""
