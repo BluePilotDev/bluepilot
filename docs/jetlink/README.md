@@ -42,8 +42,16 @@ BluePilot menu on the comma four. Both change **offroad only**.
 | Setting | Type | Description |
 |---|---|---|
 | Big Model Link (JetLink) | selector: Off / USB / iOS | Run the big driving model on a device on the comma's USB-C port: **USB** for a Jetson, Mac, PC or Android phone, **iOS** for an iPhone or iPad. Reboot after changing it. |
-| JetLink Status | read-only | What the link is doing (below). On the comma 3X, tap it for the details: progress, the USB port, the big model and the ADB note. |
+| JetLink Status | read-only | What the link is doing (below). On the comma 3X, tap it for the details: progress, the USB port, the big model and the ADB note. On the comma four it shows the one line that matters, and "reboot to apply the new link setting" after you change the link until you reboot. |
 | JetLink: Charge Phone | toggle | Let a phone running JetLink charge from the comma's USB-C port. |
+
+### On the home screen
+
+The **Driving Models** card shows the on-device model and, with the link on, JetLink's big model: its state, how it
+is linked, the link's USB speed (USB3 green, USB2 yellow: JetLink wants USB 3), the build's progress, and which model
+drives. The on-device model drives whenever the big one cannot. On the comma 3X the card is in the home screen's right
+column on a paired device; on the comma four it is its own page, a swipe left from home, offroad. Tap it for the
+Models settings.
 
 With the link on, the driving-model picker lists JetLink's big models in place of the comma's own big models, as long
 as no chestnut is fitted. The model that runs when you have not picked one is JetLink's default, shown in the picker.

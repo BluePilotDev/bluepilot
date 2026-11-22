@@ -54,6 +54,9 @@ class SettingsLayoutSP(OP.SettingsLayout):
     models_panel = ModelsLayoutMici()
     models_btn = SettingsBigButton(tr("models"), "", gui_app.texture("../../sunnypilot/selfdrive/assets/offroad/icon_models.png", ICON_SIZE, ICON_SIZE))
     models_btn.set_click_callback(lambda: gui_app.push_widget(models_panel))
+    # BluePilot: the home's Driving Models page opens this same panel
+    self.models_panel = models_panel
+    # End BluePilot
 
     # onroad: enable button sits at the front (left of toggles)
     self._enable_offroad_btn_onroad = BigCircleButton(self.icon_offroad_enable, red=True)

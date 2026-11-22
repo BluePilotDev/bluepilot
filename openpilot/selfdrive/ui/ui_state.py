@@ -17,6 +17,7 @@ from openpilot.selfdrive.modeld.helpers import chestnut_compiled
 from openpilot.selfdrive.selfdrived.alertmanager import OFFROAD_ALERTS
 
 from openpilot.common.bluepilot import is_bluepilot
+from openpilot.bluepilot import jetlink_adapter  # BluePilot: JetLink's host is not a chestnut
 from openpilot.selfdrive.ui.sunnypilot.ui_state import UIStateSP, DeviceSP
 
 BACKLIGHT_OFFROAD = 65 if HARDWARE.get_device_type() == "mici" else 50
@@ -217,7 +218,12 @@ class UIState(UIStateSP):
         self.status = UIStatus.DISENGAGED
         self.started_frame = self.sm.frame
         self.started_time = time.monotonic()
-        self.chestnut_present = self.sm["deviceState"].chestnutPresent or (self.chestnut_compiled and self.usb_connected)
+        # BluePilot: a JetLink host (phone, Jetson) on the port is a cable too; it is a chestnut only while the link is
+        # off, as modeld decides (jetlink_adapter.chestnut_cable). Else the UI shows a chestnut loading, then failed,
+        # while JetLink's big model drives.
+        self.chestnut_present = self.sm["deviceState"].chestnutPresent or \
+          (self.chestnut_compiled and jetlink_adapter.chestnut_cable(self.usb_connected))
+        # End BluePilot
 
       for callback in self._offroad_transition_callbacks:
         callback()
@@ -275,7 +281,11 @@ class UIState(UIStateSP):
         self.usb_connected_ts = now
         self.usb_unknown = False
       elif self.usb_connected_ts is not None and now - self.usb_connected_ts > 10.:
-        self.usb_unknown = not any(is_chestnut_usb_id(d["vendorId"], d["productId"], True) for d in get_usb_state())
+        # BluePilot: while JetLink is on, the port is its host's, not an unknown device's (the Driving Models card
+        # says what is on it)
+        self.usb_unknown = not jetlink_adapter.link_on() and \
+          not any(is_chestnut_usb_id(d["vendorId"], d["productId"], True) for d in get_usb_state())
+        # End BluePilot
         self.usb_connected_ts = None
     elif self.usb_connected:
       if self.usb_disconnected_ts is None:
