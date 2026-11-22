@@ -77,3 +77,11 @@ jobs:
           if [ "$current" = "$SHA" ]; then echo "public already matches; nothing to publish"; exit 0; fi
           git -c filter.lfs.process= -c filter.lfs.required=false push --no-verify --force "$remote" "$SHA:refs/heads/bp-sunnypilot"
           echo "published $SHA to BluePilotDev/bluepilot@bp-sunnypilot"
+
+      # starts full BluePilot's sync job (BluePilotDev/bluepilot#225); a no-op there until that repo listens. Sent on
+      # every published run, also when the mirror already matched, so a sync that timed out waiting for CI is retried.
+      - name: Start the BPx sync
+        if: steps.gate.outputs.go == 'yes'
+        env:
+          GH_TOKEN: ${{ steps.apptoken.outputs.token }}
+        run: gh api repos/BluePilotDev/bluepilot/dispatches -f event_type=bpx-sync
