@@ -9,7 +9,7 @@ pinned commit). **Not checked:** these steps on a comma four, and the clone comm
 
 - SSH access to the comma (Settings → Developer → Enable SSH, with your GitHub username's keys added).
   comma's guide: [docs/how-to/connect-to-comma.md](../how-to/connect-to-comma.md).
-- Read access to the private repository **github.com/jrneulight/bluepilot-clean** for the same GitHub
+- Read access to the private repository **github.com/ford-op/bluepilot-clean** for the same GitHub
   account. It holds all three parts of this build as branches: `clean/ford-lateral-pathangle`
   (BluePilot), `clean/opendbc-pathangle` and `clean/bluepilot-lateral-pathangle`. One recursive clone
   fetches all three. The build without path angle is `clean/ford-lateral`, the default branch.
@@ -44,7 +44,7 @@ This is how you go back later. Don't delete it.
 On the comma, one line:
 
 ```
-git -c url."git@github.com:jrneulight/".insteadOf="https://github.com/jrneulight/" clone --recurse-submodules --depth 1 --shallow-submodules -b clean/ford-lateral-pathangle git@github.com:jrneulight/bluepilot-clean.git openpilot
+git -c url."git@github.com:ford-op/".insteadOf="https://github.com/ford-op/" clone --recurse-submodules --depth 1 --shallow-submodules -b clean/ford-lateral-pathangle git@github.com:ford-op/bluepilot-clean.git openpilot
 ```
 
 Answer `yes` if it asks whether to trust github.com. The `-c … insteadOf` part sends the build's two
@@ -75,7 +75,7 @@ Connect with `ssh -A` again, then on the comma:
 ```
 cd /data/openpilot
 git pull
-git -c url."git@github.com:jrneulight/".insteadOf="https://github.com/jrneulight/" submodule update --init --recursive
+git -c url."git@github.com:ford-op/".insteadOf="https://github.com/ford-op/" submodule update --init --recursive
 sudo reboot
 ```
 
