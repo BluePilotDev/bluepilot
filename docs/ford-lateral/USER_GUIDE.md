@@ -107,12 +107,13 @@ steers by curvature alone.
 **Why it is on.** The BluePilot developers' 50,000+ miles of steering by path angle alone show that it
 steers Fords well. Each row's numbers are read from that module's software files by a script, not typed
 in. For the 2021-23 F-150 on software BD the module's own steering code was also run in an emulator, and
-the computer model matches it; the Lightning runs the same code, though its own copy hasn't been run yet. For the Ranger and the
-2024 Mustang the main part of it was run, and for the 2020-24 Explorer its lane-centering code, from start-up (the data file
-on some of these trucks, MB5C-14D007-BA, read since from a 2021 Explorer, holds the same numbers). For the 2022-24
-Maverick, the 2020-22 Escape and Bronco Sport, the Mach-E 2021-24 and the 2025 cars on one shared program (Bronco
-Sport, Escape, Mach-E) the lane-centering code was run too. For the other rows the code has been read, not run,
-and BC's software has not been read at all.
+the computer model matches it. For the F-150 on BA, the Lightning, the Ranger and the 2024 Mustang the whole steering
+step of each module's own software was run, from its own start-up, and for the 2020-24 Explorer its lane-centering
+code, from start-up (the data file on some of these trucks, MB5C-14D007-BA, read since from a 2021 Explorer, holds the
+same numbers). For the 2022-24 Maverick, the 2020-22 Escape and Bronco Sport, the Mach-E 2021-24 and the 2025 cars on
+one shared program (Bronco Sport, Escape, Mach-E) the lane-centering code was run too. For the other rows the code
+has been read, not run. BC's program has been read and run with another version's data file in place of its own,
+which hasn't been read, so a BC truck runs the fallback.
 On two rows they have also been measured on the road with earlier BluePilot versions. On
 the 2020-24 Explorer the truck turned 0.95 to 0.97 times what the model predicts. On the 2021-23 F-150
 with software BD it turned 0.93 to 1.01 times what the row predicts, which passes the release check
@@ -243,12 +244,13 @@ shows one of these:
 Full and Curvature rows without path angle steer the same way. Only Full rows can have path angle.
 
 How sure each row's numbers are is a separate question. Every row's numbers are read from its
-module's own files. For the 2021-23 F-150 on BD (and, through the same code, the Lightning and most of
-the Ranger's) and for the 2020-24 Explorer the module's steering code was also run and matches. For the 2024 Mustang
-its controller chain, and for the 2024-26 F-150 its steering library and limiter, were run too, and so was
-the code of the 2022-24 Maverick, the 2020-22 Escape and Bronco Sport, the Mach-E 2021-24, the 2025 Bronco
-Sport, Escape and Mach-E, the Super Duty and the Transit. For the 2025 Explorer and Mustang and the 2026
-Explorer the code has been read but not run, and for the F-150 on BC no file has been read at all.
+module's own files. For the 2021-23 F-150 on BD and on BA, the Lightning, the Ranger, the 2024 and 2025 Mustang and
+the 2020-24 Explorer the module's steering code was also run and matches (each one's own software, from its own
+start-up). For the 2024-26 F-150 its steering library and limiter were run too, and so was the code of the 2022-24
+Maverick, the 2020-22 Escape and Bronco Sport, the Mach-E 2021-24, the 2025 Bronco Sport, Escape and Mach-E, the
+Super Duty and the Transit. For the 2025 and 2026 Explorer the code has been read but not run. For the F-150 on BC
+the program has been read and run with another version's data file in place of its own; its own data files haven't
+been read.
 
 The text under it (on a comma four, tap **steering support**) gives the reason, the part numbers your
 module answered, and how openpilot recognised your car. If it says **", degraded"** after the support level, the health check found a problem on
