@@ -4,9 +4,9 @@ Placed as its own sub-panel until the MICI menu redesign settles where it lives.
 
 from collections.abc import Callable
 
-from openpilot.selfdrive.ui.bp.lib import jetlink_settings
+from openpilot.selfdrive.ui.bp.lib import jetlink_settings, jetlink_status
 from openpilot.selfdrive.ui.bp.mici.widgets.button_bp import BigMultiParamToggleBP, BigParamControlBP
-from openpilot.selfdrive.ui.mici.widgets.button import BigMultiToggle
+from openpilot.selfdrive.ui.mici.widgets.button import BigMultiToggle, GreyBigButton
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.system.ui.widgets.scroller import NavScroller
 
@@ -29,6 +29,25 @@ class JetlinkLinkToggle(BigMultiParamToggleBP):
       self._load_value()
 
 
+class JetlinkStatusCard(GreyBigButton):
+  """The link's state: the chip as the title, the port, progress and the ADB note under it. Not tappable."""
+
+  def __init__(self):
+    super().__init__("jetlink", "")
+    self._reader = jetlink_status.StatusReader()
+    self._shown: tuple[str, str] | None = None
+
+  def _update_state(self):
+    super()._update_state()
+    status = self._reader.get()
+    text = f"jetlink: {jetlink_status.chip(status).lower()}"
+    value = "\n".join(jetlink_status.detail_lines(status)[:3])
+    if (text, value) != self._shown:
+      self._shown = (text, value)
+      self.set_text(text)
+      self.set_value(value)
+
+
 class JetlinkLayoutMici(NavScroller):
   def __init__(self, back_callback: Callable[[], None] | None = None):
     super().__init__()
@@ -40,8 +59,11 @@ class JetlinkLayoutMici(NavScroller):
     self.charge_phone = BigParamControlBP("jetlink: charge phone", jetlink_settings.CHARGE_PHONE_PARAM)
     self.charge_phone.set_enabled(lambda: ui_state.is_offroad())
 
+    self.status = JetlinkStatusCard()
+
     self._scroller.add_widgets([
       self.link,
+      self.status,
       self.charge_phone,
     ])
     ui_state.add_offroad_transition_callback(self._update_buttons)
