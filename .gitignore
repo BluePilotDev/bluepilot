@@ -21,6 +21,8 @@ bin/
 /rednose
 /teleoprtc
 /tinygrad
+# BluePilot: JetLink's package link (launch_chffrplus.sh)
+/jetlink
 
 *.mp4
 *.dylib

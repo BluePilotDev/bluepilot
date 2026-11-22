@@ -100,6 +100,9 @@ _services: dict[str, tuple] = {
   # BluePilot: controllerStateBP (lateral uncertainty) + carStateBP (hybrid drive)
   "controllerStateBP": (True, 100., 10),
   "carStateBP": (True, 100., 10),
+  # BluePilot: BluePilot's onroad events (JetLink's), logged as onroadEventsSP is
+  "onroadEventsBP": (True, 1., 1),
+  # End BluePilot
 
   # debug
   "uiDebug": (True, 0., 1),

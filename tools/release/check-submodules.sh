@@ -16,6 +16,18 @@ while read -r hash submodule ref; do
 
   hash=$(echo "$hash" | sed 's/^[+-]//')
 
+  # BluePilot: JetLink is pinned to a release tag (its default branch is main): the pin must be a tagged commit
+  if [ "$submodule" = "jetlink_repo" ]; then
+    git -C "$submodule" fetch --depth 100 origin "+refs/tags/*:refs/tags/*"
+    if [ -n "$(git -C "$submodule" tag --points-at "$hash")" ]; then
+      echo "$submodule ok (tag $(git -C "$submodule" tag --points-at "$hash" | head -1))"
+      continue
+    fi
+    echo "$submodule: $hash is not a tagged JetLink release"
+    exit 1
+  fi
+  # End BluePilot
+
   if [ "$submodule" = "tinygrad_repo" ]; then
     echo "Skipping $submodule"
     continue

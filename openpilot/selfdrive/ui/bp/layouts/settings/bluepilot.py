@@ -28,6 +28,7 @@ from openpilot.selfdrive.ui.bp.lib.dm_icon_style import (
 from openpilot.selfdrive.ui.bp.lib.custom_sound import get_custom_sound_selection
 from opendbc.bluepilot_lateral.core.lateral_curv_ext import PrimaryLateralControl
 from openpilot.selfdrive.ui.bp.onroad.augmented_road_view_bp import GaugeStyle
+from openpilot.selfdrive.ui.bp.lib import jetlink_settings
 
 
 class BluePilotLayout(Widget):
@@ -103,6 +104,7 @@ class BluePilotLayout(Widget):
       ("disable_ford_radar_UI", self._disable_ford_radar),
       ("BpShowLateralControl", self._show_lateral_control),
       ("BPUIDebugLog", self._ui_debug_log),
+      (jetlink_settings.CHARGE_PHONE_PARAM, self._jetlink_charge_phone),
     )
 
     ui_state.add_offroad_transition_callback(self._update_toggles)
@@ -656,6 +658,26 @@ class BluePilotLayout(Widget):
       callback=self._clear_model_cache
     )
 
+    # JetLink: the big model on a computer on the USB-C port. Offroad only
+    self._jetlink_link_btn = multiple_button_item(
+      lambda: tr(jetlink_settings.TITLE),
+      lambda: tr(jetlink_settings.DESCRIPTION),
+      buttons=[(lambda label=label: tr(label)) for label in jetlink_settings.LINK_LABELS.values()],
+      button_width=225,
+      callback=self._set_jetlink_link,
+      selected_index=jetlink_settings.selected_index(self._params),
+      icon="chffr_wheel.png"
+    )
+    self._jetlink_link_btn.action_item.set_enabled(lambda: ui_state.is_offroad())
+    self._jetlink_charge_phone = toggle_item(
+      lambda: tr(jetlink_settings.CHARGE_PHONE_TITLE),
+      lambda: tr(jetlink_settings.CHARGE_PHONE_DESCRIPTION),
+      initial_state=self._safe_get_bool(self._params, jetlink_settings.CHARGE_PHONE_PARAM),
+      callback=lambda state: self._toggle_callback(state, jetlink_settings.CHARGE_PHONE_PARAM),
+      icon="chffr_wheel.png"
+    )
+    self._jetlink_charge_phone.action_item.set_enabled(lambda: ui_state.is_offroad())
+
     # BluePilot: reset menu layout — collapses all sections, fixing overlap glitch without reboot.
     self._reset_menu_btn = button_item(
       lambda: tr("Reset Menu Layout"),
@@ -760,7 +782,11 @@ class BluePilotLayout(Widget):
         self._disable_dowhill_comp,
         self._disable_ford_radar,
       ]) +
-      lateral_section
+      lateral_section +
+      _section(tr("JetLink"), [
+        self._jetlink_link_btn,
+        self._jetlink_charge_phone,
+      ])
     )
     # End BluePilot
 
@@ -945,6 +971,7 @@ class BluePilotLayout(Widget):
     self._pc_blend_ratio_high_C.action_item.set_enabled(is_curv and custom_prof)
     self._pc_blend_ratio_low_C.action_item.set_enabled(is_curv and custom_prof)
     self._lc_pid_gain.action_item.set_enabled(is_curv and lane_pos and custom_prof)
+    self._jetlink_link_btn.action_item.set_selected_button(jetlink_settings.selected_index(ui_state.params))
 
   def show_event(self):
     super().show_event()
@@ -1133,6 +1160,11 @@ class BluePilotLayout(Widget):
   def _handle_sound_reboot(self, result):
     if result == DialogResult.CONFIRM:
       self._params.put_bool("DoReboot", True)
+
+  def _set_jetlink_link(self, button_index: int):
+    """JetLink's link selector: Off or USB, offroad only (the buttons are disabled onroad too)."""
+    if not jetlink_settings.write_link(self._params, button_index, ui_state.is_offroad()):
+      self._jetlink_link_btn.action_item.set_selected_button(jetlink_settings.selected_index(self._params))
 
   def _set_hybrid_gauge_size(self, button_index: int):
     """Handle hybrid gauge size button selection. Buttons are 0/1/2, param stores 1/2/3."""
