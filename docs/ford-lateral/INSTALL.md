@@ -74,10 +74,16 @@ Connect with `ssh -A` again, then on the comma:
 
 ```
 cd /data/openpilot
-git pull
-git -c url."git@github.com:ford-op/".insteadOf="https://github.com/ford-op/" submodule update --init --recursive
+git -c url."git@github.com:ford-op/".insteadOf="https://github.com/jrneulight/" -c url."git@github.com:ford-op/".insteadOf="git@github.com:jrneulight/" -c url."git@github.com:ford-op/".insteadOf="https://github.com/ford-op/" pull
+git -c url."git@github.com:ford-op/".insteadOf="https://github.com/jrneulight/" -c url."git@github.com:ford-op/".insteadOf="git@github.com:jrneulight/" -c url."git@github.com:ford-op/".insteadOf="https://github.com/ford-op/" submodule update --init --recursive
 sudo reboot
 ```
+
+The three `-c … insteadOf` parts send every address the build has used (the old `jrneulight` names and the https
+form of `ford-op`) to `ford-op` over ssh, on both lines: `git pull` fetches the submodules too, so it needs them as
+well, and an install made before the move still has the old names stored. Checked by running both lines on an
+install made at the earlier testers' head (no global git settings, as on a comma). On an install made with this
+guide only the last of the three matches anything; that one was run on its own, the three together there were not.
 
 **Not checked:** what openpilot's own background updater does with a private repo it can't reach. It is
 expected to fail to fetch and change nothing.
