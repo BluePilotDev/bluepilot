@@ -237,6 +237,19 @@ class _Off:
     return answer if callable(answer) else lambda *args: answer
 
 
+def usb_speed() -> str | None:
+  """The USB speed the host negotiated with JetLink's gadget, as Linux names it (super-speed, high-speed, ...):
+  JetLink's gadget.usb_speed(). None with the link off, without a usable JetLink, or before a host configured the
+  gadget. One sysfs read; never raises."""
+  if not link_on() or isinstance(hooks(), _Off):
+    return None
+  try:
+    from jetlink.comma import gadget
+    return gadget.usb_speed()
+  except Exception:
+    return None
+
+
 def _hook(name: str):
   def call(*args):
     return getattr(hooks(), name)(*args)

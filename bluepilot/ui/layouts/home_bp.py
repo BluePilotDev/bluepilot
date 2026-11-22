@@ -193,15 +193,28 @@ class HomeLayoutBP(HomeLayout):
     rl.draw_text_ex(font, text, rl.Vector2(int(text_x), int(text_y)), BADGE_FONT_SIZE, 0, rl.WHITE)
 
   def _render_left_column(self):
-    """Override: render DriveStats + ModelInfo instead of PrimeWidget."""
+    """Override: DriveStats instead of PrimeWidget. A paired device has the column to itself; an unpaired one keeps
+    the pairing prompt in the right column, so the Driving Models card shares this one."""
     rect = self.left_column_rect
+    if ui_state.prime_state.is_paired():
+      self._drive_stats.render(rect)
+      return
 
-    # DriveStats takes ~70% of height, ModelInfo takes ~30%
-    stats_height = rect.height * 0.7 - SPACING / 2
-    model_height = rect.height * 0.3 - SPACING / 2
+    # the card needs more room with a big model in play (two tiles)
+    model_share = 0.55 if self._model_info.has_big_model else 0.3
+    stats_height = rect.height * (1 - model_share) - SPACING / 2
+    model_height = rect.height * model_share - SPACING / 2
 
     stats_rect = rl.Rectangle(rect.x, rect.y, rect.width, stats_height)
     self._drive_stats.render(stats_rect)
 
     model_rect = rl.Rectangle(rect.x, rect.y + stats_height + SPACING, rect.width, model_height)
     self._model_info.render(model_rect)
+
+  def _render_right_column(self):
+    """Override: on a paired device the Driving Models card (the on-device model and the big one) takes the column
+    in place of upstream's Firehose prompt, which stays in Settings. Unpaired, the pairing prompt keeps it."""
+    if ui_state.prime_state.is_paired():
+      self._model_info.render(self.right_column_rect)
+    else:
+      super()._render_right_column()
