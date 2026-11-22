@@ -24,6 +24,12 @@ def tracked(root: Path) -> set[str]:
   return {p for p in out.stdout.decode().split("\0") if p}
 
 
+def missing_submodules(root: Path) -> list[str]:
+  """The submodules the tree records but has not checked out (git marks them '-'), as paths relative to root."""
+  out = subprocess.run(["git", "-C", str(root), "submodule", "status", "--recursive"], capture_output=True, check=True)
+  return [line[1:].split()[1] for line in out.stdout.decode().splitlines() if line.startswith("-")]
+
+
 class TestUpdaterBundle(unittest.TestCase):
   @classmethod
   def setUpClass(cls):
@@ -32,9 +38,15 @@ class TestUpdaterBundle(unittest.TestCase):
       raise unittest.SkipTest("not a git checkout")
     cls.root = root.resolve()
     cls.files = tracked(cls.root)
+    cls.missing = missing_submodules(cls.root)
     cls.zip = zipfile.ZipFile(BUNDLE)
 
   def test_every_file_is_one_the_tree_tracks(self):
+    # a submodule not checked out has no tracked files to compare its bundled ones with: skip, as comma's tests do
+    # without their submodules' data
+    missing = [m for m in self.missing if any(name.startswith(m + "/") for name in self.zip.namelist())]
+    if missing:
+      self.skipTest(f"submodules not checked out: {', '.join(missing)}")
     extra = []
     for name in self.zip.namelist():
       if name.endswith("/") or name == "__main__.py":
