@@ -299,8 +299,11 @@ centering request at all, so no build can steer it that way. **Not checked:** wh
 recognised anyway.
 
 **2021-23 F-150s on version BC.** Most 2021-23 F-150s run software version BC (42 of the 45 in
-the drive logs studied). No copy of the BC software has been read, so this build has no row for it: a BC truck
-runs the fallback (comma's own steering, section 6) until a BC truck's files are read.
+the drive logs studied). BC: program read and run, data file not held. The BC program (ML3V-14D003-BC) has
+been read and its steering step run in a computer model of the module, with another version's data file in
+place of its own; every number a row would steer with sits in the data file, and no BC data file has been read.
+So this build knows BC (Steering Support: "This steering software is known, and not yet supported") and a BC
+truck runs the fallback (comma's own steering, section 6) until a BC truck's data file is read.
 
 **An older F-150 version.** A 2021-23 F-150 on ML3V-14D003-BA with data file ML34-14D007-BDE has its own
 row, with path angle and its own numbers. Its steering messages ask for the quick let-go (ramp type 3), so
@@ -309,8 +312,8 @@ on the other types it is several times slower. On any
 other data file Steering Support says the data file isn't in the table, and the car stays on the fallback.
 
 **Not checked yet:** whether steering modules answer the data-file question during a normal start. The
-software of every module with a row allows it, but it has not been tried on a real truck, and BC's
-software has never been read. If a module doesn't answer, that car runs on the fallback whatever the
+software of every module with a row allows it, but it has not been tried on a real truck, and a BC
+truck's data file has never been read. If a module doesn't answer, that car runs on the fallback whatever the
 table says, and Steering Support says "The steering module didn't answer".
 
 ### Your first drives

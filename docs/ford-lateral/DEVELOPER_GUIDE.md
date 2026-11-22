@@ -178,7 +178,7 @@ module's preview, c2 rate and c1 rate were read from its files: F-150 2021-23 (B
 Explorer 2020-24, Ranger 2024-25, Maverick 2022-24, and the Escape 2020-22 and Bronco Sport 2021-22
 (LX6C-14D003-AL). Each has had its module's code run in an emulator (3.6): BD's (and through the same code
 the Lightning's), the Ranger's controller chain, the Explorer's, the Maverick's and LX6C's whole lateral step.
-No row takes another module's numbers: the F-150's level BC row (2.11) is gone, and a BC truck runs the fallback. The
+No row takes another module's numbers: the F-150's level BC rows name the level and stay on the fallback (2.11). The
 Explorer's second pair's data file (MB5C-14D007-BA) has been read since: its preview numbers are the first pair's. It is off on every other row and on the fallback
 (`test_path_angle_is_on_for_every_row_that_can_use_it`). The evidence for switching it on is the
 BluePilot dev group's 50,000+ miles of path-angle-only control, and the two rows measured on a road
@@ -197,7 +197,7 @@ BluePilot dev group's 50,000+ miles of path-angle-only control, and the two rows
   starts (at or after the module), and rises at the module's rate whether or not it steers: the 2020-24
   Explorer's T is 0 at power-up and takes about 25 s to reach 5 s, so until then it previews its lower
   distance at every speed (executed); the 2021-23 F-150's, the Ranger's, the 2022-24 Maverick's and LX6C's
-  start at T max (executed); the rows whose start-up was not run (BC, the Lightning) start at 0. That holds only where the row's K2 itself isn't low. The F-150 and
+  start at T max (executed); a row whose start-up was not run would start at 0 (none with path angle; the Lightning's was run, T max). That holds only where the row's K2 itself isn't low. The F-150 and
   Lightning rows' K2 was 11 % low at a 15 m preview, the overshoot side, until they took the module's
   K2 table (below).
 - Every row with path angle carries its module's own K2 table, generated from the module's files, and
@@ -226,12 +226,12 @@ generations never shares a row (`test_the_mach_e_generations_never_share_a_row`)
 is pinned yet: no F124 has been read with this code (the Explorer's, M1MC-14D004-AB, is known from
 Ford's records and a read with another tool), and the 2022-24 Maverick's module has none.
 
-**No exception.** Every row is exact pairs: the BC row, the one row that took `ANY_DATA_FILE`, is gone (a BC truck
-runs the fallback). Even so a module must answer F10A: `match_strategy` returns "didn't answer" before it looks at any
+**No exception.** Every row is exact pairs: the BC row that took `ANY_DATA_FILE` is gone; the three BC
+rows are exact pairs on the fallback (2.11). Even so a module must answer F10A: `match_strategy` returns "didn't answer" before it looks at any
 row when either key is empty.
 
 **Cost: coverage.** Of 63 vehicles' module records from Ford's service archive, 26 match a row today. Of 67 logged openpilot vehicles, 42
-are on the BC row once their module answers F10A, 19 run a strategy with a row but an unread data file,
+run BC, whose rows are the fallback (2.11), 19 run a strategy with a row but an unread data file,
 and 6 have no row (`clean-build.md` §14.3, from `scripts/clean-build/table_coverage.py`).
 
 ### 2.3 The fallback and "not supported"
@@ -511,7 +511,7 @@ read.
 
 **From the firmware.** Each program's own read-identifier check allows F10A in the default session on
 every program with a row except the Super Duty's, which wasn't decoded and is on the fallback anyway.
-BC's software was never read.
+BC's program, read since (2.11), was not checked for this.
 
 **Not checked.** Whether F10A answers on a real truck; no truck has been read with this code. If it
 doesn't, that car is on the fallback.
@@ -640,7 +640,7 @@ build's controller. Two rows' gains have been measured on the road with earlier 
 The review found a busier wheel on real requests (`clean-build.md` §14.1).
 
 **Choice.** This version switches path angle on for every row whose module's numbers were read from its
-files, and for BC with BD's (2.1, 2.11); the Explorer's second pair's data file has been read since. It is ready to release once testing is done. The reason is the BluePilot dev
+files (BC's rows stay on the fallback, 2.11); the Explorer's second pair's data file has been read since. It is ready to release once testing is done. The reason is the BluePilot dev
 group's 50,000+ miles of path-angle-only control, and the two rows measured on a road (table below).
 
 - **What testing checks, per family:** a drive where `drive_check.py` (3.4) finds the measured
@@ -661,7 +661,7 @@ by comma's stock command (curvature only); the path-angle measurements used earl
 | Row | Control law read | Code run in an emulator | Logged drives, curvature | Path-angle gain on a road |
 |---|---|---|---|---|
 | F-150 2021-23 BD | yes | yes: the twin is held to it | 1 truck | one truck, bp-7.0: 0.93, 1.01 and 1.00 of the row's at 5-12, 12-20 and 20-45 m/s (research note `pathangle-route`) |
-| F-150 2021-23 BC (no row: the fallback) | no (no file) | no | 33 trucks | none |
+| F-150 2021-23 BC (rows on the fallback) | program read; data file not held | program's whole step, with another version's data file | 33 trucks | none |
 | F-150 Lightning | yes | yes: its whole lateral step from its own start-up, held to Ghidra's emulation; the inactive frame | 2 trucks | none |
 | Explorer 2020-24 | yes | yes: M1MC-AC with MB5C-BD's start-up and whole lateral step, on two emulators that agree on every tick; L1MC-AL's start-up and K2 lookup; P1MC-AA with PB5C-NB from its own start-up, equal in every path number. MB5C-BA (read since) holds BD's preview numbers | 9 trucks | one truck: 0.97 of the model's on an angle-mode drive, 0.95 with Ford's own camera (`twin.md` §10.4) |
 | Ranger 2024-25 | yes | yes: its whole lateral step from its own start-up, held to Ghidra's emulation; the inactive frame. No control for 9.0 s after start-up; its mode-1 limiter takes over above 2.7 m/s^2 measured | 1 truck | none |
@@ -680,8 +680,7 @@ at 60 km/h. On a row with path angle it is faster: the twin of the 2021-23 F-150
 2.7 s at 30 km/h and about 1 s at 60 km/h (measured with the quick engage, which is gone: about 0.1 to
 0.2 s slower now at 30-60 km/h, `simplify-plan.md` step 4). The other rows haven't been modelled for this case. Hold the
 wheel through the first seconds. These figures come from a model whose steering servo is read from the
-module's code and not yet run, with a lag fitted to drives. For BC: "steers with BD's path-angle numbers, with timing measured on
-BC trucks."
+module's code and not yet run, with a lag fitted to drives. BC runs the fallback (2.11).
 
 **Why engaging in a curve is slow, and quick engage.** comma's rule says the inactive frame must be all zero, so the
 module's copy of c2 starts at zero, and the panda's check restarts from zero too. Any controller that obeys the rule
@@ -697,10 +696,18 @@ both), so a whole first frame would put the controller ahead of the module. Opti
 the panda takes either. A frame 1-4 module ticks after the inactive one is taken whole by none of them while the
 path-angle copy is still falling; the build never sends one that soon.
 
-### 2.11 The BC row, from fleet behaviour (removed)
+### 2.11 The BC rows: program read and run, data file not held
 
-**Removed.** No file of BC was ever obtained, so a BC truck runs the fallback until one is read; the row and its
-loan of BD's limit are gone. What follows is why it had been made, kept for the record.
+**Now.** ML3V-14D003-BC has been read and its whole lateral step run in an emulator from its own image, with another
+version's data file in place of its own (research note `ml3v-bc-firmware.md`): BA's lane-centering library on BD's
+base software, and with BDE's cells it equals BA tick for tick, so every number a row carries is its data file's
+(ML34-14D007-BDH, -BKH or -EAH), and none of them is held. The table has one row per BC pair, each at the fallback
+level with evidence `unread` (Steering Support: "This steering software is known, and not yet supported"), and a BC
+truck runs comma's own steering until one of its data files is read; then its row takes BA's evidence path. BC packs
+the column torque with BD's packer, so the +3/32 Nm decode applies to it (`test_column_torque_offset_on_a_bc_truck`).
+
+The earlier row from fleet behaviour was removed when no BC file had been found; why it had been made is kept below for
+the record.
 
 **Problem.** 42 of 45 logged 2021-23 F-150s run ML3V-14D003-BC. Our row and twin are BD. No BC file was
 found (`bc-sources.md`).
@@ -940,7 +947,7 @@ The pipeline lives in the project's research notes (to be published):
 
 | Level or field | Needs |
 |---|---|
-| curvature | the control law read from that strategy's software, and the exact pair. BC is the one exception (2.11) |
+| curvature | the control law read from that strategy's software, and the exact pair |
 | full | the above, plus a comparison with the twin or a drive (the level's name; what the comparison rests on is the evidence level, 3.6) |
 | executed (evidence) | the module's lateral code run in the emulator, with recorded traces the twin is tested against. A drive checks the result; it does not make a row |
 | a preview in the row | both distance clamps at all eight speed points. RZ1C and PZ11 have four, so their path angle stays zero |
@@ -956,7 +963,7 @@ module's copy of the curvature never falls behind the controller's.
 | Row | Numbers from | Confirmed | Not confirmed | What would confirm or change it |
 |---|---|---|---|---|
 | F-150 2021-23 BD (path angle) | ML3V-14D003-BD with ML34-14D007-EDL; -BDL holds the same lane-centering numbers | read; the twin held to the firmware's code run in an emulator; path-angle gain on a road, 0.93 to 1.01 of the row's up to 96 km/h | path angle above 96 km/h; a drive on -BDL | a drive above 100 km/h through `drive_check.py`; any drive on -BDL |
-| F-150 2021-23 BC (path angle) | no file of BC read: BD's numbers, by choice; BC's earlier response measured on 33 trucks | curvature gain and response, from those trucks | that BC's preview, rates, K2 and limiter are BD's; BC trucks reach their limiter at lower lateral acceleration than BD's table | reading ML34-14D007-BDH or -BKH, or the BC program; a BC drive with path angle through `drive_check.py` |
+| F-150 2021-23 BC (fallback) | ML3V-14D003-BC read and its whole step run with another version's data file; ML34-14D007-BDH, -BKH and -EAH not held | the program is BA's library on BD's base software; the column-torque packer is BD's | every row number (they are the data file's) | one of BC's data files, read off a BC truck |
 | F-150 Lightning (path angle) | RL38-14D003-AA with RL38-14D007-DD or -AD | the F-150's code instruction for instruction and its values byte for byte, so the F-150's executed code and drive carry over | its own image run; no Lightning drive with path angle | a Lightning drive through `drive_check.py` |
 | Explorer 2020-24 (path angle) | M1MC-14D003-AC with MB5C-14D007-BD; L1MC-14D003-AL has the same code, with MB5C-14D007-BA (read since: -BD's preview numbers); P1MC-14D003-AA with PB5C-14D007-NB | executed: M1MC-AC with MB5C-BD's start-up and whole lateral step (two emulators), L1MC-AL's start-up and K2 lookup, P1MC-AA with PB5C-NB from its own start-up (equal in every path number); path-angle gain on a road, 0.95 to 0.97 of the model's | MB5C-14D007-BA run; the supplier code after the library | a drive with this build through `drive_check.py` |
 | Ranger 2024-25 (path angle) | RB3C-14D003-AA with RB3C-14D007-ECC | read; its controller chain run in the emulator, its applied limit and rates equal to the row | no drive. The row most sensitive to a gain error: 43 % off puts the car 0.5 to 0.7 m off in town curves | a Ranger drive through `drive_check.py` |
@@ -1066,8 +1073,8 @@ decision (2.10).
   PZ11-14D003-EA and the unread files. RZ1C and PZ11 need preview tables. Calibrations aren't pinned
   yet.
 - No route exercises a row's own numbers yet. This build's controller has never sent path angle on a
-  drive. Two rows' path-angle gains are measured with earlier BluePilot (2.10). BC's numbers are BD's,
-  unread (2.11).
+  drive. Two rows' path-angle gains are measured with earlier BluePilot (2.10). BC's rows are the fallback until a
+  BC data file is read (2.11).
 - The stock path ("Disable BP Lateral Control") still has 143 refused frames over seven routes, inside
   comma's band. That is outside this build's goal.
 - IQ.Pilot hasn't run its coverage step (it needs clang-18 and mull) and doesn't do the start-up read.
