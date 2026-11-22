@@ -15,7 +15,8 @@ from pathlib import Path
 from openpilot.common.basedir import BASEDIR
 
 BUNDLE = Path(BASEDIR) / "openpilot/common/hardware/comma/updater"
-HOME_PATH = re.compile(rb"/(?:home|Users)/[A-Za-z0-9._-]+/|/root/")
+# (written so that this file, which the bundle carries too, does not match itself)
+HOME_PATH = re.compile(rb"/(?:home|Users)/[A-Za-z0-9._-]+/|/(?:root)/")
 
 
 def tracked(root: Path) -> set[str]:
