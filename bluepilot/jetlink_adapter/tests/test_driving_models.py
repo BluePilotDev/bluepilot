@@ -115,5 +115,85 @@ class TestSpeed(unittest.TestCase):
       self.assertIsNone(jetlink_adapter.usb_speed())
 
 
+class TestCompactTile(unittest.TestCase):
+  """MICI's page: one block of text under the chip."""
+
+  def test_short_name(self):
+    self.assertEqual(dm.short_name("North Nevada v2 (November 04, 2026)"), "North Nevada v2")
+    self.assertEqual(dm.short_name("Plain"), "Plain")
+    self.assertEqual(dm.short_name("(Only parens)"), "(Only parens)")
+
+  def test_link_text(self):
+    usb = dm.view("S", status(phase='active', port_state='connected', transport='USB', active_model='B')).big
+    self.assertEqual(dm.link_text(usb), "JetLink, USB")
+    ios = dm.view("S", status(phase='prepared', mode='ios', port_state='connected',
+                              transport='iOS over USB (192.168.60.12)', active_model='B')).big
+    self.assertEqual(dm.link_text(ios), "JetLink, iOS over USB")
+    self.assertEqual(dm.link_text(dm.view("S", None, None, 'ready', 'C').big), "chestnut")
+    self.assertIsNone(dm.link_text(dm.view("S").small))
+
+  def test_detail_order(self):
+    # why it cannot run beats the build's progress
+    failed = dm.view("S", status(phase='failed', reason='Phone app not running', model='B',
+                                 progress={'stage': 'compile', 'frac': 0.5, 'msg': 'Compiling B'})).big
+    self.assertEqual(dm.compact_detail(failed), ("Phone app not running", dm.ERROR))
+    preparing = dm.view("S", status(phase='preparing', model='B',
+                                    progress={'stage': 'compile', 'frac': 0.5, 'msg': 'Compiling B'})).big
+    self.assertEqual(dm.compact_detail(preparing), ("Compiling B", dm.WORK))
+    # what is on the port beats the bare source
+    empty = dm.view("S", status(phase='connecting', port_state='empty', model='B')).big
+    self.assertEqual(dm.compact_detail(empty)[0], "Nothing on the USB port")
+    # connected and nothing else to say: the link
+    linked = dm.view("S", status(phase='active', port_state='connected', transport='USB', active_model='B')).big
+    self.assertEqual(dm.compact_detail(linked), ("JetLink, USB", dm.IDLE))
+    # the on-device model alone has nothing to add
+    self.assertIsNone(dm.compact_detail(dm.view("S").small))
+
+
+class TestViewReader(unittest.TestCase):
+  """The live reader both homes share (driving_models_reader.ViewReader), against a patched JetLink and ui_state."""
+
+  def setUp(self):
+    from openpilot.selfdrive.ui.bp.lib import driving_models_reader
+    self.mod = driving_models_reader
+    self.ui = types.SimpleNamespace(chestnut_state=types.SimpleNamespace(value='disconnected'), sm={})
+    patcher = mock.patch.object(driving_models_reader, 'ui_state', self.ui)
+    patcher.start()
+    self.addCleanup(patcher.stop)
+
+  def reader(self, clock):
+    return self.mod.ViewReader(params=mock.Mock(), clock=clock)
+
+  def test_jetlink_view_and_speed(self):
+    s = status(phase='active', port_state='connected', transport='USB', active_model='Big')
+    with mock.patch.object(jetlink_adapter, 'status', return_value=s), \
+         mock.patch.object(jetlink_adapter, 'usb_speed', return_value='super-speed'):
+      v = self.reader(lambda: 0.0).update()
+    self.assertEqual((v.big.name, v.big.badge), ("Big", "USB3"))
+    self.assertTrue(v.small.standby)
+
+  def test_on_device_name_and_no_big(self):
+    self.ui.sm = {"modelManagerSP": types.SimpleNamespace(activeBundle=types.SimpleNamespace(ref='x', displayName='Mine'))}
+    with mock.patch.object(jetlink_adapter, 'status', return_value=None):
+      v = self.reader(lambda: 0.0).update()
+    self.assertIsNone(v.big)
+    self.assertEqual(v.small.name, "Mine")
+
+  def test_chestnut_name_read_at_most_once_a_second(self):
+    self.ui.chestnut_state = types.SimpleNamespace(value='ready')
+    now = [0.0]
+    bundle = types.SimpleNamespace(displayName='Chestnut One')
+    with mock.patch.object(jetlink_adapter, 'status', return_value=None), \
+         mock.patch('openpilot.sunnypilot.models.helpers.get_selected_bundle', return_value=bundle) as picked:
+      r = self.reader(lambda: now[0])
+      self.assertEqual(r.update().big.name, "Chestnut One")
+      now[0] = 0.5
+      r.update()
+      self.assertEqual(picked.call_count, 1)
+      now[0] = 1.2
+      r.update()
+      self.assertEqual(picked.call_count, 2)
+
+
 if __name__ == '__main__':
   unittest.main()

@@ -10,14 +10,12 @@ Clickable to open the Models settings panel.
 """
 
 import re
-import time
 from collections.abc import Callable
 
 import pyray as rl
 
-from openpilot.common.params import Params
-from openpilot.selfdrive.ui.bp.lib import driving_models, jetlink_status
-from openpilot.selfdrive.ui.ui_state import ui_state
+from openpilot.selfdrive.ui.bp.lib import driving_models
+from openpilot.selfdrive.ui.bp.lib.driving_models_reader import ViewReader
 from openpilot.system.ui.lib.application import gui_app, FontWeight, MousePos
 from openpilot.system.ui.lib.text_measure import measure_text_cached
 from openpilot.system.ui.lib.wrap_text import wrap_text
@@ -74,9 +72,6 @@ LINK_TEXT = "Falls back to"
 NO_BIG_TITLE = "No big model"
 NO_BIG_HINT = "Turn on JetLink in BluePilot settings to add one."
 
-# the chestnut pick's name: a params read, once a second at most
-CHESTNUT_NAME_PERIOD_S = 1.0
-
 ELLIPSIS = "..."  # the UI fonts have no U+2026
 
 
@@ -103,11 +98,8 @@ class ModelInfoWidget(Widget):
   def __init__(self):
     super().__init__()
     self._click_callback: Callable[[], None] | None = None
-    self._params = Params()
-    self._reader = jetlink_status.StatusReader(speed=True)
-    self._chestnut_name: str | None = None
-    self._chestnut_name_at = -float('inf')
-    self._view = driving_models.view(None)
+    self._reader = ViewReader()
+    self._view = self._reader.view
 
   def set_click_callback(self, callback: Callable[[], None]):
     self._click_callback = callback
@@ -117,34 +109,7 @@ class ModelInfoWidget(Widget):
     return self._view.big is not None
 
   def _update_state(self):
-    status = self._reader.get()
-    chestnut_state = getattr(ui_state.chestnut_state, 'value', 'disconnected')
-    if not jetlink_status.shown(status) and chestnut_state != 'disconnected':
-      self._refresh_chestnut_name()
-    self._view = driving_models.view(self._get_active_model_name(), status, self._reader.speed(), chestnut_state,
-                                     self._chestnut_name)
-
-  def _refresh_chestnut_name(self):
-    now = time.monotonic()
-    if now - self._chestnut_name_at < CHESTNUT_NAME_PERIOD_S:
-      return
-    self._chestnut_name_at = now
-    try:
-      from openpilot.sunnypilot.models.helpers import get_selected_bundle
-      bundle = get_selected_bundle(self._params, "chestnut")
-      self._chestnut_name = bundle.displayName if bundle is not None and bundle.displayName else None
-    except Exception:
-      self._chestnut_name = None
-
-  @staticmethod
-  def _get_active_model_name() -> str | None:
-    try:
-      model_manager = ui_state.sm["modelManagerSP"]
-      if model_manager.activeBundle.ref:
-        return model_manager.activeBundle.displayName
-    except Exception:
-      pass
-    return None
+    self._view = self._reader.update()
 
   def _handle_mouse_release(self, mouse_pos: MousePos):
     super()._handle_mouse_release(mouse_pos)

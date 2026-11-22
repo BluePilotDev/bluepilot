@@ -139,3 +139,36 @@ def view(small_name: str | None, status=None, speed: str | None = None, chestnut
   if big.driving:
     return View(Tile(SMALL, small_name or DEFAULT_SMALL, "Standby", IDLE, standby=True), big)
   return View(Tile(SMALL, small_name or DEFAULT_SMALL, "Fallback", IDLE), big)
+
+
+# -- a small screen's tile (MICI's page, selfdrive/ui/bp/mici/layouts/driving_models_page.py) ----------------------
+# A MICI tile has room for the name, the chip and one short block of text, so it picks the one thing to say.
+
+def short_name(name: str) -> str:
+  """The name without its trailing date: "Name (November 04, 2026)" -> "Name"."""
+  head, sep, _ = name.rpartition(" (")
+  return head if sep and name.endswith(")") and head else name
+
+
+def link_text(tile: Tile) -> str | None:
+  """Where the model runs and how it is linked, as one phrase: "JetLink, USB", "JetLink, iOS over USB", "chestnut"."""
+  facts = {f.label: f.value for f in tile.facts}
+  source, link = facts.get("Source"), facts.get("Link")
+  if source and link:
+    if "ios" in link.lower():
+      source = source.removesuffix(" iOS")
+    return f"{source}, {link}"
+  return source or link
+
+
+def compact_detail(tile: Tile) -> tuple[str, str] | None:
+  """What a small screen's tile says under its chip, and its tone: why it cannot run, else the build's progress, else
+  any other note (what is on the port, not built yet), else where it runs and how it is linked."""
+  for tone in (ERROR, WORK):
+    if note := next((n for n in tile.notes if n.tone == tone), None):
+      return note.text, tone
+  if tile.notes:
+    return tile.notes[0].text, tile.notes[0].tone
+  if (text := link_text(tile)) is not None:
+    return text, IDLE
+  return None
