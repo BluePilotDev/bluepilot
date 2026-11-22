@@ -9,6 +9,7 @@ on:
     branches:
       - bp-7.1-dev
       - bp-dev
+      - 'bpx-test/**'  # throwaway targets for testing the BPx sync job (#225)
 
 permissions:
   contents: read
