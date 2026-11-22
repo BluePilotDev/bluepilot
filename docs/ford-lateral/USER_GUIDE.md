@@ -89,7 +89,8 @@ So this build does both:
 - F-150 2021-23 on version BA with data file ML34-14D007-BDE, with its own numbers;
 - Explorer 2020-24;
 - Maverick 2022-24;
-- Escape 2020-22 and Bronco Sport 2021-22 on LX6C-14D003-AL.
+- Escape 2020-22 and Bronco Sport 2021-22 on LX6C-14D003-AL;
+- Mustang Mach-E 2021-22 (LJ9C-14D003-GA with data file -ANA, -AMA or -ARA, and -HA with -KNB).
 
 These are the rows whose module's software was read and holds what path angle needs: how far ahead the
 module looks, and how fast it lets curvature and path angle change. Every other car, and the fallback,
@@ -102,7 +103,9 @@ the computer model matches it; the Lightning runs the same code, though its own 
 2024 Mustang the main part of it was run, and for the 2020-24 Explorer its lane-centering code, from start-up (the data file
 on some of these trucks, MB5C-14D007-BA, read since from a 2021 Explorer, holds the same numbers). For the 2022-24
 Maverick, the 2020-22 Escape and Bronco Sport, the Mach-E 2021-24 and the 2025 cars on one shared program (Bronco
-Sport, Escape, Mach-E) the lane-centering code was run too. For the other rows the code has been read, not run,
+Sport, Escape, Mach-E) the lane-centering code was run too. For the 2021-22 Mach-E the parts path angle adds were
+run as well, on all four of its software pairs: how its module looks up the path-angle gain, the camera request that
+shortens how far it looks, how fast it follows path angle after the driver steers, and the stop frame. For the other rows the code has been read, not run,
 and BC's software has not been read at all.
 On two rows they have also been measured on the road with earlier BluePilot versions. On
 the 2020-24 Explorer the truck turned 0.95 to 0.97 times what the model predicts. On the 2021-23 F-150
@@ -216,7 +219,7 @@ shows one of these:
 
 | Shown | What it means |
 |---|---|
-| **Full** | Your module's exact software is in the table, and its row was compared with a computer model of the module or a drive. For most modules that model is a reading of their code, not checked against the code running. Steers by curvature with the row's numbers. Eight of these rows also send path angle (section 3). |
+| **Full** | Your module's exact software is in the table, and its row was compared with a computer model of the module or a drive. For most modules that model is a reading of their code, not checked against the code running. Steers by curvature with the row's numbers. Twelve of these rows also send path angle (section 3). |
 | **Curvature** | Your module's software is in the table, but its row hasn't been compared with a model or a drive. Steers by curvature with the row's numbers. |
 | **Lane centering denied by the steering module** | On the last drive your module refused lane centering. Either lane centering isn't set up on this truck, and the build can't steer a truck built without it, or the module stopped for a fault for that drive, which the next start clears. |
 | **Fallback** | Your module didn't answer, or its software isn't in the table. Steers by curvature with comma's settings. |
