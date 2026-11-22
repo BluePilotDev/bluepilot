@@ -56,6 +56,7 @@ from openpilot.sunnypilot.models.helpers import get_active_bundle
 from openpilot.sunnypilot.selfdrive.controls.lib.relc import RoadEdgeLaneChangeController
 # BluePilot: JetLink, the big driving model on a computer on the USB-C port
 from openpilot.bluepilot import jetlink_adapter
+from openpilot.bluepilot.jetlink_adapter import telemetry as jetlink_telemetry
 # End BluePilot
 
 PROCESS_NAME = "openpilot.selfdrive.modeld.modeld_tinygrad"
@@ -353,6 +354,9 @@ def main(demo=False):
 
   # messaging
   pub_socks = ["modelV2", "drivingModelData", "cameraOdometry", "modelDataV2SP"] + (["chestnutGpuState"] if CHESTNUT else [])
+  # BluePilot: JetLink's big model as modeld saw it, for logs (D2 b)
+  pub_socks += [jetlink_telemetry.SERVICE]
+  # End BluePilot
   pm = PubMaster(pub_socks)
   sm = SubMaster(["deviceState", "carState", "narrowRoadCameraState", "extrinsicsCalibration", "driverMonitoringState",
                   "carControl", "controlsState", "lateralDelay"])
@@ -549,6 +553,9 @@ def main(demo=False):
       pm.send('drivingModelData', drivingdata_send)
       pm.send('cameraOdometry', posenet_send)
       pm.send('modelDataV2SP', mdv2sp_send)
+      # BluePilot: JetLink's big model as modeld saw it, for logs (D2 b)
+      pm.send(jetlink_telemetry.SERVICE, jetlink_telemetry.message(HOOKS, model, modelv2_send.valid))
+      # End BluePilot
     last_vipc_frame_id = meta_main.frame_id
 
 if __name__ == "__main__":

@@ -2649,7 +2649,7 @@ struct Event {
     liveMapDataSP @115 :Custom.LiveMapDataSP;
     modelDataV2SP @116 :Custom.ModelDataV2SP;
     gpsLocationSP @136 :Custom.GpsLocationSP;
-    customReserved11 @137 :Custom.CustomReserved11;
+    modelDataV2BP @137 :Custom.ModelDataV2BP;  # BluePilot: claims customReserved11 slot
     onroadEventsBP @138 :Custom.OnroadEventBP;  # BluePilot: claims customReserved12 slot
     controllerStateBP @139 :Custom.ControllerStateBP;  # BluePilot: claims customReserved13 slot
     carStateBP @140 :Custom.CarStateBP;  # BluePilot: claims customReserved14 slot
