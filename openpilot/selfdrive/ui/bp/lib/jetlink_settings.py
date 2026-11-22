@@ -3,23 +3,24 @@ The JetLink settings both BluePilot settings menus show (TICI and MICI): the lin
 toggle. Changeable offroad only: the link moves the USB-C port between the comma and a host, and modeld decides at
 its start whether the big model may join.
 
-Phase 1 offers Off and USB (a Jetson, Mac or PC). iOS (JetlinkLink 2) is experimental upstream and left out; a
-value the selector does not offer shows no selection rather than a wrong one, and is left alone until the user
-picks another.
+It offers JetLink's three modes: Off, USB (a Jetson, Mac or PC, or an Android phone through a USB 3 hub: JetLink's
+Android app uses the USB mode) and iOS (an iPhone or iPad). The phones are experimental upstream. A value the selector
+does not offer shows no selection rather than a wrong one, and is left alone until the user picks another.
 """
 from openpilot.bluepilot import jetlink_adapter
 
 LINK_PARAM = jetlink_adapter.KEYS.link
 CHARGE_PHONE_PARAM = jetlink_adapter.KEYS.charge_phone
 # the selector's buttons, by JetlinkLink value (jetlink_adapter.SELECTABLE_MODES)
-LINK_LABELS = {0: "Off", 1: "USB"}
+LINK_LABELS = {0: "Off", 1: "USB", 2: "iOS"}
 
 TITLE = "Big Model Link (JetLink)"
 DESCRIPTION = " ".join((
-  "Run the big driving model on a computer connected to the comma's USB-C port (a Jetson, Mac or PC running JetLink).",
+  "Run the big driving model on a device running JetLink on the comma's USB-C port.",
+  "USB: a Jetson, Mac or PC, or an Android phone through a USB 3 hub. iOS: an iPhone or iPad. Phones are experimental.",
   "The comma must be powered from the car harness, not that port.",
   "While the link holds the port, ADB over USB is unavailable; the BluePilot portal over WiFi still works.",
-  "Change offroad only.",
+  "Change offroad only, then reboot.",
 ))
 CHARGE_PHONE_TITLE = "JetLink: Charge Phone"
 CHARGE_PHONE_DESCRIPTION = "Let a phone running JetLink charge from the comma's USB-C port. Change offroad only."

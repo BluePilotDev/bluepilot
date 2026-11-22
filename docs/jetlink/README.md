@@ -17,16 +17,22 @@ engaged, the comma says **TAKE CONTROL** and stays engaged on the small model. B
 
 - A comma four or a comma 3X. **JetLink is tested upstream on the comma four only.** The 3X shares its kernel and is
   expected to work, but nobody has tested it on BluePilot yet.
-- A computer that runs JetLink: a Jetson Orin Nano Super, an Apple silicon Mac, or a Linux PC with an NVIDIA GPU.
-  BluePilot offers these as **USB**. JetLink's iPhone, iPad and Android apps are experimental and BluePilot does not
-  offer them.
-- A USB 3 data cable between the comma's USB-C port and the computer.
+- A device that runs JetLink, and the link setting that goes with it:
+
+  | Device | Link setting | Connection |
+  |---|---|---|
+  | Jetson Orin Nano Super, Apple silicon Mac, Linux PC with an NVIDIA GPU | **USB** | A USB 3 data cable |
+  | Android phone, Android 12 or later with USB 3 (experimental) | **USB** | A powered USB 3 hub: the phone and a charger on the hub, the hub's USB-A port to the comma |
+  | USB-C iPhone or iPad on iOS 26.1 or later, a USB 3 model (experimental) | **iOS** | A USB 3 USB-C data cable; keep the JetLink app open on screen |
+
+- USB 3 end to end: the device, the cable and the port. JetLink is built for USB 3; a USB 2 link is not supported.
 - **Separate power for the comma and the computer.** With the link on, the comma draws nothing from its USB-C port.
   It must run from the car harness.
 
-Set up the computer with JetLink's own guide: `jetlink_repo/README.md`, or
+Set up the device with JetLink's own guide: `jetlink_repo/README.md`, or
 [JetLink's README](https://github.com/zoompilot/jetlink#quick-start). Its "Quick start" table links one guide per
-computer. Set up offroad, with both devices online.
+device. Set up offroad, with both devices online. Where a guide says to set the comma's **Settings > Models >
+Jetlink**, use BluePilot's **Big Model Link (JetLink)** setting instead.
 
 ### Turning it on
 
@@ -35,7 +41,7 @@ BluePilot menu on the comma four. Both change **offroad only**.
 
 | Setting | Type | Description |
 |---|---|---|
-| Big Model Link (JetLink) | selector: Off / USB | Run the big driving model on a computer on the comma's USB-C port. Takes effect at the next start of the driving model; a reboot is the simplest way. |
+| Big Model Link (JetLink) | selector: Off / USB / iOS | Run the big driving model on a device on the comma's USB-C port: **USB** for a Jetson, Mac, PC or Android phone, **iOS** for an iPhone or iPad. Reboot after changing it. |
 | JetLink Status | read-only | What the link is doing (below). On the comma 3X, tap it for the details: progress, the USB port, the big model and the ADB note. |
 | JetLink: Charge Phone | toggle | Let a phone running JetLink charge from the comma's USB-C port. |
 
@@ -48,13 +54,13 @@ as no chestnut is fitted. The model that runs when you have not picked one is Je
 |---|---|
 | Off | The link is off. |
 | Not available | This build has no usable JetLink, so the link stays off. |
-| Connecting | Waiting for the computer on the USB-C port. A count of drops means the cable keeps dropping: check the cable. |
+| Connecting | Waiting for the device on the USB-C port. A count of drops means the link keeps dropping: check the cable, and on a phone that the JetLink app is open. |
 | Preparing *n*% | The computer is downloading or building the big model. The first build of a model takes minutes. |
 | Ready | The big model is ready. It takes over when you next engage. |
 | Ready: re-engage to switch | The big model became ready while engaged. Disengage and re-engage to switch to it. |
 | Big model driving | The big model drives. |
 | Reconnecting | The link dropped. The small model drives while it reconnects. |
-| Failed | The link failed. The small model drives. The details say why. |
+| Failed | The link failed. The small model drives. Check that JetLink is running on the device and that the link setting matches it (USB or iOS). The comma tries again on its own. |
 | Unavailable | The big model cannot run on this device or link. The details say why, and so does an offroad alert, "JetLink unavailable: …". |
 
 ### Alerts while driving
@@ -98,7 +104,7 @@ JetLink's porting contract is `jetlink_repo/docs/porting.md`. Every change to an
 
 | Param | Holds |
 |---|---|
-| `JetlinkLink` | The link: 0 off, 1 USB. 2 (iOS) is JetLink's but not offered. |
+| `JetlinkLink` | The link: 0 off, 1 USB (a Jetson, Mac, PC or Android phone), 2 iOS. |
 | `JetlinkChargePhone` | The charge-phone toggle. |
 | `JetlinkProgress` | JetLink's offroad progress: stage, fraction, message, drops. |
 | `JetlinkSpec` | JetLink's record of the host and its models. |
