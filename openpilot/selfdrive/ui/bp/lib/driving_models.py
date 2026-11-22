@@ -7,17 +7,18 @@ The on-device model is sunnypilot's active bundle (modelManagerSP.activeBundle).
 link is on (its status() names the model it builds), else a fitted chestnut's (ui_state.chestnut_state and the
 model manager's chestnut pick). JetLink comes first: a JetLink host on the port is not a chestnut.
 """
+import re
 from dataclasses import dataclass
 
 from openpilot.selfdrive.ui.bp.lib import jetlink_status
 
-# tones: what a tag or the pill says about the model, and the card's colour for it
-DRIVE, READY, WORK, ERROR, IDLE = 'drive', 'ready', 'work', 'error', 'idle'
+# tones: what a tag, a fact or a note says, and the card's colour for it. PLAIN is a value with nothing to flag.
+DRIVE, READY, WORK, ERROR, IDLE, PLAIN = 'drive', 'ready', 'work', 'error', 'idle', 'plain'
 
 # JetLink's phase -> the big model's tag and tone
 JETLINK_TAGS = {
   'active': ("Driving", DRIVE),
-  'waiting': ("Ready: re-engage", READY),
+  'waiting': ("Re-engage", READY),
   'prepared': ("Ready", READY),
   'preparing': ("Preparing", WORK),
   'connecting': ("Connecting", WORK),
@@ -37,64 +38,88 @@ CHESTNUT_TAGS = {
   'failed': ("Failed", ERROR),
 }
 
+BIG, SMALL = "Big model", "On-device model"
 DEFAULT_SMALL = "Default Model"
 NO_BIG_PICK = "No big model picked"
-USB3_HINT = "USB 3 recommended"
+RECOMMENDED_SPEED = "USB 3"  # jetlink_status.speed_label's name for the speed JetLink wants
+NOT_BUILT = "Not built yet"
+
+# JetLink's transport names the iOS peer: 'iOS over USB (192.168.60.12)'. The card has no room for the address.
+_PEER = re.compile(r'\s*\(.*\)\s*$')
+
+
+@dataclass(frozen=True)
+class Fact:
+  label: str                        # "Source", "Link"
+  value: str
+  tone: str = PLAIN
+
+
+@dataclass(frozen=True)
+class Note:
+  text: str                         # why it cannot run, the build's progress, what is on the port, a hint
+  tone: str = IDLE
 
 
 @dataclass(frozen=True)
 class Tile:
-  role: str                         # what this model is: "On-device model", "Big model (JetLink, iOS)"
+  role: str                         # BIG or SMALL
   name: str                         # the model's name
   tag: str = ""                     # its state, "" for none
   tone: str = IDLE
-  details: tuple[str, ...] = ()     # the lines under it: connection, speed, progress, why it cannot run
+  facts: tuple[Fact, ...] = ()      # where it runs and how it is linked
+  notes: tuple[Note, ...] = ()
   progress: float | None = None     # 0..1 while it is being prepared
   driving: bool = False             # it drives now
+  standby: bool = False             # another model drives: drawn dimmed
+  badge: str = ""                   # the link's USB speed ("USB3", "USB2"), at the right of the last fact's row
+  badge_tone: str = IDLE
 
 
 @dataclass(frozen=True)
 class View:
   small: Tile
   big: Tile | None                  # None: no big model in play (link off, no chestnut)
-  pill: str = ""                    # the card's headline state, "" for none
-  pill_tone: str = IDLE
 
 
 def _jetlink_tile(status, speed: str | None) -> Tile:
   phase = str(getattr(status, 'phase', ''))
   tag, tone = JETLINK_TAGS.get(phase, UNKNOWN_TAG)
   name = status.active_model or status.model or jetlink_status.default_big_model(status) or NO_BIG_PICK
+  ios = str(getattr(status, 'mode', '') or '') == 'ios'
 
-  details = []
+  facts = [Fact("Source", "JetLink iOS" if ios else "JetLink")]
+  notes = []
+  if getattr(status, 'port_state', None) == 'connected':
+    facts.append(Fact("Link", _PEER.sub('', str(status.transport)) or "USB"))
+  elif port := jetlink_status.port_line(status):
+    notes.append(Note(port.removesuffix('.')))
+  # the link's USB speed as a badge on the link's row: green at USB 3, what JetLink wants; yellow below it
+  badge = badge_tone = ""
+  if (label := jetlink_status.speed_label(speed)) is not None:
+    badge, badge_tone = label.replace(" ", ""), (DRIVE if label == RECOMMENDED_SPEED else WORK)
+
   frac = None
   if status.reason:
-    details.append(str(status.reason))
+    notes.insert(0, Note(str(status.reason), ERROR))
   if (p := jetlink_status.progress(status)) is not None:
     _, frac, line = p
     if phase == 'preparing' and 0.0 < frac < 1.0:
       tag = f"{tag} {frac:.0%}"
-    details.append(line)
+    notes.insert(0, Note(line, WORK))
   if getattr(status, 'enabled', False) and not status.active_model and status.model and phase != 'preparing':
-    details.append("Not built yet")
-  port = jetlink_status.port_line(status)
-  if port:
-    details.append(port.removesuffix('.'))
-  label = jetlink_status.speed_label(speed)
-  if label is not None:
-    details.append(label if label == "USB 3" else f"{label}: {USB3_HINT}")
+    notes.append(Note(NOT_BUILT))
 
-  mode = str(getattr(status, 'mode', '') or '')
-  role = "Big model (JetLink, iOS)" if mode == 'ios' else "Big model (JetLink)"
-  return Tile(role, name, tag, tone, tuple(details), frac if frac is not None and phase == 'preparing' else None,
-              driving=phase == 'active')
+  return Tile(BIG, name, tag, tone, tuple(facts), tuple(notes),
+              frac if frac is not None and phase == 'preparing' else None, driving=phase == 'active',
+              badge=badge, badge_tone=badge_tone or IDLE)
 
 
 def _chestnut_tile(chestnut_state: str, name: str | None) -> Tile | None:
   if chestnut_state not in CHESTNUT_TAGS:
     return None
   tag, tone = CHESTNUT_TAGS[chestnut_state]
-  return Tile("Big model (chestnut)", name or NO_BIG_PICK, tag, tone, driving=chestnut_state == 'active')
+  return Tile(BIG, name or NO_BIG_PICK, tag, tone, (Fact("Source", "chestnut"),), driving=chestnut_state == 'active')
 
 
 def view(small_name: str | None, status=None, speed: str | None = None, chestnut_state: str = 'disconnected',
@@ -108,20 +133,9 @@ def view(small_name: str | None, status=None, speed: str | None = None, chestnut
   big = _jetlink_tile(status, speed) if jetlink_status.shown(status) else _chestnut_tile(chestnut_state, chestnut_name)
 
   if big is None:
-    small = Tile("On-device model", small_name or DEFAULT_SMALL)
-    return View(small, None)
+    return View(Tile(SMALL, small_name or DEFAULT_SMALL), None)
 
+  # the on-device model drives until the big model is ready, and takes back over if it drops
   if big.driving:
-    small = Tile("On-device model", small_name or DEFAULT_SMALL, "Standby", IDLE)
-    return View(small, big, "Big model driving", DRIVE)
-
-  # the big model is not driving: the on-device model drives until it is ready, and takes back over if it drops
-  small = Tile("On-device model", small_name or DEFAULT_SMALL, "Fallback", IDLE)
-  pills = {DRIVE: "Big model driving", READY: "Big model ready", WORK: "Preparing big model",
-           ERROR: "Big model unavailable", IDLE: "Big model off"}
-  pill = pills[big.tone]
-  if big.tone == WORK and big.tag.startswith(("Connecting", "Reconnecting")):
-    pill = "Connecting"
-  if big.tone == ERROR and big.tag == "Failed":
-    pill = "Big model failed"
-  return View(small, big, pill, big.tone)
+    return View(Tile(SMALL, small_name or DEFAULT_SMALL, "Standby", IDLE, standby=True), big)
+  return View(Tile(SMALL, small_name or DEFAULT_SMALL, "Fallback", IDLE), big)
