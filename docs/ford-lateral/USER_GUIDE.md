@@ -110,9 +110,10 @@ in. For the 2021-23 F-150 on software BD the module's own steering code was also
 the computer model matches it. For the F-150 on BA, the Lightning, the Ranger and the 2024 Mustang the whole steering
 step of each module's own software was run, from its own start-up, and for the 2020-24 Explorer its lane-centering
 code, from start-up (the data file on some of these trucks, MB5C-14D007-BA, read since from a 2021 Explorer, holds the
-same numbers). For the 2022-24 Maverick, the 2020-22 Escape and Bronco Sport, the Mach-E 2021-24 and the 2025 cars on
-one shared program (Bronco Sport, Escape, Mach-E) the lane-centering code was run too. For the other rows the code
-has been read, not run. BC's program has been read and run with another version's data file in place of its own,
+same numbers, and its whole step was run with it). For the 2022-24 Maverick, the 2020-22 Escape and Bronco Sport, the
+Mach-E 2021-24 and the 2025 cars on one shared program (Bronco Sport, Escape, Mach-E) the lane-centering code was run
+too, and so were the 2025 Mustang's whole steering step, the 2024-26 F-150's steering library and limiter, and the
+Super Duty's and the Transit's code. For the 2025 and 2026 Explorer the code has been read, not run. BC's program has been read and run with another version's data file in place of its own,
 which hasn't been read, so a BC truck runs the fallback.
 On two rows they have also been measured on the road with earlier BluePilot versions. On
 the 2020-24 Explorer the truck turned 0.95 to 0.97 times what the model predicts. On the 2021-23 F-150
