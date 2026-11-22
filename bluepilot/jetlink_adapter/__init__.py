@@ -38,8 +38,9 @@ OWNER = 'jetlinkd'
 # the JetLink setting (JetlinkLink), stored as an index: jetlink.openpilot.MODES, written out so the settings build
 # the selector without a JetLink checkout
 MODES = ('off', 'usb', 'ios')
-# the modes BluePilot's selector offers in phase 1: off and USB (a Jetson, Mac or PC). iOS is experimental upstream
-SELECTABLE_MODES = (0, 1)
+# the modes BluePilot's selector offers: all three. USB is a Jetson, Mac or PC, or an Android phone through a USB 3
+# hub (JetLink's Android app uses the USB mode); iOS is an iPhone or iPad. Phones are experimental upstream
+SELECTABLE_MODES = (0, 1, 2)
 
 # the params JetLink reads and writes, all declared in params_keys.h. JetLink's canonical names, plus sunnypilot's
 # model manager slots: big_model and catalog are its big-model pick and catalog (models.helpers'

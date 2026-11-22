@@ -411,7 +411,7 @@ Experimental: the big driving model on a computer on the comma's USB-C port. See
 
 | Setting | Type | Description |
 |---|---|---|
-| Big Model Link (JetLink) | selector: Off / USB | Run the big driving model on a Jetson, Mac or PC running JetLink on the comma's USB-C port. The comma must run from the car harness; ADB over USB is unavailable while the link holds the port. Offroad only. |
+| Big Model Link (JetLink) | selector: Off / USB / iOS | Run the big driving model on a device running JetLink on the comma's USB-C port: USB for a Jetson, Mac, PC or Android phone (through a USB 3 hub), iOS for an iPhone or iPad. Phones are experimental. Reboot after changing it. The comma must run from the car harness; ADB over USB is unavailable while the link holds the port. Offroad only. |
 | JetLink Status | read-only | What the link is doing: Off, Connecting, Preparing, Ready, Big model driving, Reconnecting, Failed or Unavailable. On the C3X, tap for the details. |
 | JetLink: Charge Phone | toggle | Let a phone running JetLink charge from the comma's USB-C port. Offroad only. |
 

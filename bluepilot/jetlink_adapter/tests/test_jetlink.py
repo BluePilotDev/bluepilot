@@ -399,7 +399,7 @@ class TestJetlinkShutdown(unittest.TestCase):
 
 
 class TestJetlinkSettings(ParamsStoreTest):
-  def test_offroad_only_and_usb_only(self):
+  def test_offroad_only(self):
     from openpilot.common.params import Params
     from openpilot.selfdrive.ui.bp.lib import jetlink_settings as js
 
@@ -414,9 +414,17 @@ class TestJetlinkSettings(ParamsStoreTest):
     self.assertTrue(js.write_link(params, 1, offroad=True))
     self.assertEqual(js.read_link(params), 1)
     self.assertTrue(jetlink_adapter.link_on())
-    # no iOS button in phase 1
-    self.assertFalse(js.write_link(params, 2, offroad=True))
-    params.put(js.LINK_PARAM, 2)
+    # iOS is the third button, and like the others written offroad only
+    self.assertEqual(list(js.LINK_LABELS.values()), ["Off", "USB", "iOS"])
+    self.assertFalse(js.write_link(params, 2, offroad=False))
+    self.assertEqual(js.read_link(params), 1)
+    self.assertTrue(js.write_link(params, 2, offroad=True))
+    self.assertEqual(js.read_link(params), 2)
+    self.assertEqual(js.selected_index(params), 2)
+    self.assertTrue(jetlink_adapter.link_on())
+    # no fourth button; a value the selector does not offer shows no selection
+    self.assertFalse(js.write_link(params, 3, offroad=True))
+    params.put(js.LINK_PARAM, 5)
     self.assertEqual(js.selected_index(params), -1)
     self.assertTrue(js.write_link(params, 0, offroad=True))
     self.assertFalse(jetlink_adapter.link_on())

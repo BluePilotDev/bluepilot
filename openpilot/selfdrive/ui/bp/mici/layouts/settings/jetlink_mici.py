@@ -12,7 +12,7 @@ from openpilot.system.ui.widgets.scroller import NavScroller
 
 
 class JetlinkLinkToggle(BigMultiParamToggleBP):
-  """JetlinkLink as Off / USB. A value the selector does not offer (iOS) shows Off; tapping writes only the modes
+  """JetlinkLink as Off / USB / iOS. A value the selector does not offer shows Off; tapping writes only the modes
   offered, and only offroad."""
 
   def _load_value(self):
