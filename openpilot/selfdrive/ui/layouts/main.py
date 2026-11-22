@@ -84,9 +84,10 @@ class MainLayout(Widget):
   def _setup_callbacks(self):
     self._sidebar.set_callbacks(on_settings=self._on_settings_clicked,
                                 on_flag=self._on_bookmark_clicked,
-                                # BluePilot: sidebar debug and network buttons
+                                # BluePilot: sidebar debug, network and BluePilot settings buttons
                                 **({"on_debug": self._on_debug_clicked,
-                                    "on_network": lambda: self.open_settings(PanelType.NETWORK)} if is_bluepilot() else {}),
+                                    "on_network": lambda: self.open_settings(PanelType.NETWORK),
+                                    "on_bluepilot": lambda: self.open_settings(PanelType.BLUEPILOT)} if is_bluepilot() else {}),
                                 open_settings=lambda: self.open_settings(PanelType.TOGGLES))
     self._layouts[MainState.HOME]._setup_widget.set_open_settings_callback(lambda: self.open_settings(PanelType.FIREHOSE))
     # BluePilot: model info click opens Models settings panel

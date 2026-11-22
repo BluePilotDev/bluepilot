@@ -53,7 +53,7 @@ class SidebarBP(Widget):
   - CPU, GPU, Memory metric cards (compact layout)
   - Vehicle, Connect, SunnyLink metric cards (standard layout)
   - Animated fan icon
-  - Settings, Flag/Home, Debug buttons
+  - Settings, Flag/Home, Info, BluePilot settings shortcut, Debug buttons
   """
 
   def __init__(self):
@@ -92,6 +92,7 @@ class SidebarBP(Widget):
     self._on_flag_click: Callable | None = None
     self._on_info_click: Callable | None = None
     self._on_debug_click: Callable | None = None
+    self._on_bluepilot_click: Callable | None = None
     self._on_network_click: Callable | None = None
     self._open_settings_callback: Callable | None = None  # For compatibility
 
@@ -125,6 +126,11 @@ class SidebarBP(Widget):
     self._debug_btn.set_on_click(self._handle_debug_click)
     self._debug_btn.set_scale(0.65)
 
+    # Shortcut straight to the BluePilot settings panel (same wheel icon as its settings nav entry)
+    self._bluepilot_btn = IconButton("icons/chffr_wheel.png")
+    self._bluepilot_btn.set_on_click(self._handle_bluepilot_click)
+    self._bluepilot_btn.set_scale(0.55)
+
     # Fan widget - rotates continuously based on fan speed
     self._fan_widget = FanWidget()
 
@@ -153,13 +159,15 @@ class SidebarBP(Widget):
 
   def set_callbacks(self, on_settings: Callable = None, on_flag: Callable = None,
                     on_info: Callable = None, on_debug: Callable = None,
-                    on_network: Callable = None, open_settings: Callable = None):
+                    on_network: Callable = None, open_settings: Callable = None,
+                    on_bluepilot: Callable = None):
     """Set button callbacks - supports both old and new API"""
     self._on_settings_click = on_settings
     self._on_flag_click = on_flag
     self._on_info_click = on_info
     self._on_debug_click = on_debug
     self._on_network_click = on_network
+    self._on_bluepilot_click = on_bluepilot
     self._open_settings_callback = open_settings
 
   def _handle_settings_click(self):
@@ -191,6 +199,10 @@ class SidebarBP(Widget):
   def _handle_debug_click(self):
     if self._on_debug_click:
       self._on_debug_click()
+
+  def _handle_bluepilot_click(self):
+    if self._on_bluepilot_click:
+      self._on_bluepilot_click()
 
   def _handle_network_click(self):
     if self._on_network_click:
@@ -517,6 +529,11 @@ class SidebarBP(Widget):
     # Info always visible
     self._info_btn.render(rl.Rectangle(self._btn_x, bottom_y, btn_size, btn_size))
     bottom_y -= btn_size + btn_spacing
+
+    # BluePilot settings shortcut, always visible, directly under the onroad debug button's slot
+    if self._on_bluepilot_click is not None:
+      self._bluepilot_btn.render(rl.Rectangle(self._btn_x, bottom_y, btn_size, btn_size))
+      bottom_y -= btn_size + btn_spacing
 
     # Debug only when onroad
     if ui_state.started and self._debug_btn:

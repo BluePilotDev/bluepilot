@@ -4,14 +4,13 @@ from openpilot.common.swaglog import cloudlog
 from openpilot.system.ui.widgets import Widget, DialogResult
 from openpilot.system.ui.widgets.confirm_dialog import ConfirmDialog
 from openpilot.system.ui.widgets.list_view import toggle_item, multiple_button_item, button_item, text_item, ButtonAction, ListItem
-from openpilot.system.ui.widgets.scroller_tici import Scroller
 from openpilot.system.ui.widgets.option_dialog import MultiOptionDialog
 from openpilot.system.ui.lib.application import gui_app
 from openpilot.system.ui.lib.multilang import tr
 from openpilot.system.ui.lib.wifi_manager import WifiManager, Network
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.selfdrive.ui.bp.widgets.float_control_item import float_control_item, int_control_item
-from openpilot.selfdrive.ui.bp.widgets.section_header import CollapsibleSectionHeader
+from openpilot.selfdrive.ui.bp.widgets.section_header import CollapsibleSectionHeader, SectionScroller
 from openpilot.selfdrive.ui.bp.lib.steering_wheel_style import (
   ensure_steering_wheel_icon_style_initialized,
   get_steering_wheel_icon_style,
@@ -65,8 +64,10 @@ class BluePilotLayout(Widget):
     self._wifi_manager.add_callbacks(networks_updated=self._on_network_updated)
 
     # Initialize items
+    self._section_headers: list[CollapsibleSectionHeader] = []
     items = self._initialize_items()
-    self._scroller = Scroller(items, line_separator=True, spacing=0)
+    # Section cards: an open section's items grouped in one card, the whole header row tappable
+    self._scroller = SectionScroller(items, line_separator=True)
 
     # Toggle refresh list
     self._refresh_toggles = (
@@ -496,14 +497,19 @@ class BluePilotLayout(Widget):
     )
     # End BluePilot
 
-    # BluePilot: collapsible section groups — all start collapsed when the menu opens.
-    def _section(title: str, items: list) -> list:
-      header = CollapsibleSectionHeader(title)
+    # BluePilot: collapsible section groups — all start collapsed when the menu opens, and one is open
+    # at a time (opening one closes the others and scrolls it to the top).
+    sp_icons = "../../sunnypilot/selfdrive/assets/offroad/"
+
+    def _section(title: str, subtitle: str, icon: str, items: list) -> list:
+      header = CollapsibleSectionHeader(title, subtitle=subtitle, icon=icon)
       header.set_items(items)
+      header.set_toggle_callback(self._on_section_toggled)
+      self._section_headers.append(header)
       return [header] + items
 
     return (
-      _section(tr("System"), [
+      _section(tr("System"), tr("Wi-Fi, connect backend, model cache"), "icons/settings.png", [
         self._preferred_network_btn,
         self._clear_model_cache_btn,
         self._ui_debug_log,
@@ -511,15 +517,15 @@ class BluePilotLayout(Widget):
         self._restore_dongle_btn,
         self._reset_menu_btn,
       ]) +
-      _section(tr("Vehicle"), [
+      _section(tr("Vehicle"), tr("Cluster display, 12V battery"), sp_icons + "icon_vehicle.png", [
         self._show_hands_free_ui,
         self._vbatt_pause_charging,
       ]) +
-      _section(tr("Audio"), [
+      _section(tr("Audio"), tr("Engage and disengage sounds"), "icons/microphone.png", [
         self._use_custom_sounds,
         self._custom_sound_selection_btn,
       ]) +
-      _section(tr("Visuals"), [
+      _section(tr("Visuals"), tr("Driving view, theme, gauges, overlays"), sp_icons + "icon_visuals.png", [
         self._hide_onroad_border,
         self._disable_lane_line_status_color,
         self._hide_camera_view,
@@ -539,25 +545,34 @@ class BluePilotLayout(Widget):
         self._hybrid_gauge_size_btn,
         self._hybrid_gauge_style_btn,
       ]) +
-      _section(tr("Longitudinal Tuning"), [
+      _section(tr("Longitudinal Tuning"), tr("BP long control, downhill, radar"), "icons/speed_limit.png", [
         self._disable_BP_long,
         self._disable_dowhill_comp,
         self._disable_ford_radar,
       ]) +
-      _section(tr("Lateral Tuning"), [
+      _section(tr("Lateral Tuning"), tr("Steering support, lane changes"), sp_icons + "icon_lateral.png", [
         self._lateral_support_item,
         self._disable_BP_lat,
         self._disable_lane_change_under_speed,
         self._blinker_min_speed,
         self._show_lateral_control,
       ]) +
-      _section(tr("JetLink"), [
+      _section(tr("JetLink"), tr("Big model on a USB-C computer"), "icons/link.png", [
         self._jetlink_link_btn,
         self._jetlink_status,
         self._jetlink_charge_phone,
       ])
     )
     # End BluePilot
+
+  def _on_section_toggled(self, header: CollapsibleSectionHeader) -> None:
+    """One section open at a time; bring the one just opened to the top of the list."""
+    if not header.expanded:
+      return
+    for other in self._section_headers:
+      if other is not header and other.expanded:
+        other.collapse()
+    self._scroller.scroll_to(header)
 
   def _get_float_param(self, param: str, default: float) -> float:
     """Get float parameter value."""
