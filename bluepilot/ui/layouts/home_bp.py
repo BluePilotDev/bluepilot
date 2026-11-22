@@ -201,7 +201,7 @@ class HomeLayoutBP(HomeLayout):
       return
 
     # the card needs more room with a big model in play (two tiles)
-    model_share = 0.55 if self._model_info.has_big_model else 0.3
+    model_share = 0.62 if self._model_info.has_big_model else 0.35
     stats_height = rect.height * (1 - model_share) - SPACING / 2
     model_height = rect.height * model_share - SPACING / 2
 
