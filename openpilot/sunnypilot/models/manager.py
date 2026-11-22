@@ -22,6 +22,9 @@ from openpilot.cereal import messaging, custom
 from openpilot.sunnypilot.models.fetcher import ModelFetcher
 from openpilot.sunnypilot.models.helpers import (ACTIVE_BUNDLE_KEYS, get_active_bundle, get_selected_bundle,
                                                   resolve_bundle_by_ref, validate_active_bundles, verify_file)
+# BluePilot: JetLink's big-model list with no chestnut fitted (bluepilot/jetlink_adapter/catalog.py)
+from openpilot.bluepilot.jetlink_adapter.catalog import JetlinkModelFetcher, PickCarryOver
+# End BluePilot
 
 # (connect, read) seconds. read is per-request inactivity, not a total cap
 DOWNLOAD_TIMEOUT = (30, 30)
@@ -125,7 +128,10 @@ class ModelManagerSP:
 
   def __init__(self):
     self.params = Params()
-    self.model_fetcher = ModelFetcher(self.params)
+    # BluePilot: JetLink's big-model list with no chestnut fitted; sunnypilot's fetcher otherwise
+    self.model_fetcher = JetlinkModelFetcher(self.params)
+    self.jetlink_pick = PickCarryOver()
+    # End BluePilot
     self.pm = messaging.PubMaster(["modelManagerSP"])
     self.sm = messaging.SubMaster(["deviceState"])
     self.chestnut_present = False
@@ -376,6 +382,9 @@ class ModelManagerSP:
         self.chestnut_present = self.sm['deviceState'].chestnutPresent
         self.source_models = {source: self.model_fetcher.get_bundles_for_source(source) for source in ModelFetcher.MODEL_SOURCES}
         self.available_models = self.source_models[ModelFetcher.active_source(self.chestnut_present)]
+        # BluePilot: a big-model pick JetLink's list now names under a newer ref is carried over, not reset
+        self.jetlink_pick.update(self.params, self.source_models)
+        # End BluePilot
         validate_active_bundles(self.params, self.source_models)
         self.active_bundle = get_active_bundle(self.params, chestnut=self.chestnut_present)
 

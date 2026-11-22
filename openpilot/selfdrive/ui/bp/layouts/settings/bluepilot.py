@@ -27,7 +27,7 @@ from openpilot.selfdrive.ui.bp.lib.dm_icon_style import (
 from openpilot.selfdrive.ui.bp.lib.custom_sound import get_custom_sound_selection
 from openpilot.bluepilot.selfdrive.car.ford_lateral_support import SUPPORT_PARAM, support_row
 from openpilot.selfdrive.ui.bp.onroad.augmented_road_view_bp import GaugeStyle
-from openpilot.selfdrive.ui.bp.lib import jetlink_settings
+from openpilot.selfdrive.ui.bp.lib import jetlink_settings, jetlink_status
 
 
 class BluePilotLayout(Widget):
@@ -478,6 +478,13 @@ class BluePilotLayout(Widget):
       icon="chffr_wheel.png"
     )
     self._jetlink_charge_phone.action_item.set_enabled(lambda: ui_state.is_offroad())
+    # the link's state: the chip, and under it why it cannot run, progress, the port, the model and the ADB note
+    self._jetlink_status_reader = jetlink_status.StatusReader()
+    self._jetlink_status = text_item(
+      lambda: tr("JetLink Status"),
+      lambda: tr(jetlink_status.chip(self._jetlink_status_reader.get())),
+      description=lambda: "<br>".join(tr(line) for line in jetlink_status.detail_lines(self._jetlink_status_reader.get())),
+    )
 
     # BluePilot: reset menu layout — collapses all sections, fixing overlap glitch without reboot.
     self._reset_menu_btn = button_item(
@@ -545,6 +552,7 @@ class BluePilotLayout(Widget):
       ]) +
       _section(tr("JetLink"), [
         self._jetlink_link_btn,
+        self._jetlink_status,
         self._jetlink_charge_phone,
       ])
     )

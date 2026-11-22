@@ -8,6 +8,8 @@ BluePilot's JetLink integration uses and adapts code from two projects by Zeph L
 | `bluepilot/jetlink_adapter/__init__.py` (the guard, `_Off`, the hooks by name, `link_on()`, the `Adapter` overrides) | [zoompilot](https://github.com/zoompilot/zoompilot) `openpilot/sunnypilot/jetlink_adapter/__init__.py` | Copyright (c) 2026- Zeph Leggett | MIT |
 | `bluepilot/system/manager/restarting_process.py` (`RestartingPythonProcess`) | zoompilot `openpilot/sunnypilot/system/manager/processes.py` | Copyright (c) 2026- Zeph Leggett | MIT |
 | `bluepilot/selfdrive/selfdrived/jetlink_events.py` (`JetlinkEvents`) and the two alerts in `bluepilot/selfdrive/selfdrived/events_bp.py` | zoompilot `openpilot/sunnypilot/selfdrive/selfdrived/accelerator_events.py`, `events_zp.py` | Copyright (c) 2026- Zeph Leggett | MIT |
+| `bluepilot/jetlink_adapter/catalog.py` (`JetlinkModelFetcher`, `BigCatalogCache`, `PickCarryOver`) | zoompilot `openpilot/sunnypilot/models/fetcher_zp.py`, `default_bootstrap.py` | Copyright (c) 2026- Zeph Leggett | MIT |
+| `openpilot/selfdrive/ui/bp/lib/jetlink_status.py` (the progress, port and status lines) | zoompilot `openpilot/selfdrive/ui/sunnypilot/accelerator_link.py` | Copyright (c) 2026- Zeph Leggett | MIT |
 | The `with_blendful()` approach in the adapter | zoompilot `openpilot/sunnypilot/modeld_v2/model_settings.py` | Copyright (c) 2026- Zeph Leggett | MIT |
 
 zoompilot's own files are offered under the MIT License by their author (zoompilot's `NOTICE.md`, "zoompilot's own

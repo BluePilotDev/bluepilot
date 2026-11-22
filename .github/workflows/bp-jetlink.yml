@@ -21,6 +21,8 @@ on:
       - 'openpilot/sunnypilot/mads/state.py'
       - 'openpilot/system/hardware/hardwared.py'
       - 'openpilot/system/manager/process_config.py'
+      - 'openpilot/sunnypilot/models/manager.py'
+      - 'openpilot/selfdrive/ui/sunnypilot/model_info.py'
       - 'openpilot/common/params_keys.h'
       - 'openpilot/cereal/**'
       - 'openpilot/selfdrive/ui/bp/**'
