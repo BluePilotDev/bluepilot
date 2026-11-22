@@ -778,7 +778,7 @@ commit.
    (`LatCtlLim_D_Stat`'s values: 1 close, 2 at its limit, 3 at it with the driver) is also read where the 2020-24
    Explorer's module sends it, 0x417 byte 2 bits 5-6 (its 0x3CC is always 0; read from its code and COM tables,
    `torque-ceiling.md` §2.1), into `CarState.pscm_limit`, held between 0x417's frames (every change and once a
-   second), none before the first; the DBC's `LatCtlLim_D_Stat_417` and `LatCtlSte_D_Stat_417` are ours. Only on the
+   second), none before the first and none once its last frame is 3 s old (the module stopped sending it); the DBC's `LatCtlLim_D_Stat_417` and `LatCtlSte_D_Stat_417` are ours. Only on the
    programs `module_tables.LIMIT_STATUS_ON_0X417` names (L1MC-AL, M1MC-AC; the 2023 Explorer's P1MC is not traced).
    It goes to the log (`pscmLimit`) and the health check, not to the request rule: that stays the CAN rule above.
    The drive's 0x417 frames through the car state equal the truck's own status on every 10 ms tick (`TestFordCarState`;
@@ -813,12 +813,15 @@ commit.
    So every frame is inside the panda's check by construction, given that the panda saw the last one.
    **The ledger** (path-angle rows, `L/core/limits.py` `Ledger`): the panda returns every frame it put on the bus (bus
    \+ 0x80) and every one it refused (bus + 0xC0) into one queue, in the order it handled them; the car state keeps the
-   steering frames among them with their bytes (`CarState.steering_returns`), and the controller rebuilds the panda's
+   steering frames among them with their bytes (`CarState.steering_returns`, the last second's worth: on a car without
+   path angle nobody takes them), and the controller rebuilds the panda's
    own state from them each frame: its ranges of the module's copies, the last frame the module was sent, its last
    command. A refused frame moves no range and leaves the last command zero; a frame sent before one that came back from
-   the bus, and never back itself, never reached the panda. A frame not back yet by the next frame: the window is what
-   the panda accepts in both its possible states (taken, or never seen: `limits.both`), so a lost frame costs no
-   refusal. A host whose pandad returns no frame from the bus keeps the old way (frames taken as sent).
+   the bus, and never back itself, never reached the panda. Frames not back yet by the next frame: the window is what
+   the panda accepts in every state it can be in, each frame taken or never seen (`Ledger.states`, `limits.common`;
+   2^k states, up to `LEDGER_EXACT` = 4 frames, then the two extremes), so a lost frame costs no refusal; where no frame
+   fits them all, it fits the likeliest (all taken, then fewest lost). A refused frame whose return is late is counted as
+   taken until its return comes (`test_late_returns.py`). A host whose pandad returns no frame from the bus keeps the old way (frames taken as sent).
    **Restart:** if a frame is refused the panda restarts from zero. The controller knows at its next frame (from the
    returned frame; else, on a host without returns, from the count `steering_tx_blocked` a frame later) and sends
    one inactive frame then, so both restart from zero; neither drops its ranges of the copies
