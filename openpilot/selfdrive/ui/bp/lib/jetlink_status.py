@@ -35,15 +35,23 @@ PORT_LINES = {'empty': "Nothing on the USB port.", 'device': "A device is on the
 ADB_NOTE = "ADB over USB is unavailable while JetLink holds the port; the BluePilot portal over WiFi still works."
 
 
-class StatusReader:
-  """JetLink's status at most every STATUS_PERIOD_S, from any number of widgets in one frame."""
+# the USB speed the host negotiated (jetlink_adapter.usb_speed), as the UI names it
+SPEED_LABELS = {'super-speed-plus': "USB 3", 'super-speed': "USB 3", 'high-speed': "USB 2", 'full-speed': "USB 1",
+                'low-speed': "USB 1"}
 
-  def __init__(self, clock=time.monotonic):
+
+class StatusReader:
+  """JetLink's status, and with speed=True the link's USB speed, at most every STATUS_PERIOD_S, from any number of
+  widgets in one frame."""
+
+  def __init__(self, clock=time.monotonic, speed: bool = False):
     self._clock = clock
     self._at = -float('inf')
     self._status = None
+    self._read_speed = speed
+    self._speed = None
 
-  def get(self):
+  def _refresh(self):
     now = self._clock()
     if now - self._at >= STATUS_PERIOD_S:
       self._at = now
@@ -51,7 +59,20 @@ class StatusReader:
         self._status = jetlink_adapter.status()
       except Exception:
         self._status = None
+      if self._read_speed:
+        try:
+          self._speed = jetlink_adapter.usb_speed() if self._status is not None else None
+        except Exception:
+          self._speed = None
+
+  def get(self):
+    self._refresh()
     return self._status
+
+  def speed(self) -> str | None:
+    """The link's USB speed as Linux names it, or None (speed=False, no JetLink, no host)."""
+    self._refresh()
+    return self._speed
 
 
 def shown(status) -> bool:
@@ -93,6 +114,11 @@ def port_line(status) -> str:
   if port == 'connected':
     return f"Connected: {status.transport}."
   return PORT_LINES.get(port, "")
+
+
+def speed_label(speed: str | None) -> str | None:
+  """"USB 3", "USB 2" or "USB 1" for the link's speed, None where it is not known."""
+  return SPEED_LABELS.get(speed) if speed else None
 
 
 def chip(status) -> str:
