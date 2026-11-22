@@ -240,6 +240,14 @@ class TestStatusLines(unittest.TestCase):
     down = status(phase='unavailable', reason='no warp built for this camera')
     self.assertEqual(jetlink_status.detail_lines(down), ["Unavailable: no warp built for this camera"])
     self.assertTrue(jetlink_status.shown(down))
+    # MICI's card: the one line that matters most
+    self.assertEqual(jetlink_status.headline(None), "")
+    self.assertEqual(jetlink_status.headline(on), "Big model: Big One")
+    self.assertEqual(jetlink_status.headline(down), "Unavailable: no warp built for this camera")
+    self.assertEqual(jetlink_status.headline(status(port_state='empty')), "Nothing on the USB port.")
+    building = status(enabled=True, holds_port=True, port_state='connected', model='Next One',
+                      progress={'stage': 'build', 'frac': 0.5, 'msg': 'about 2 min left'})
+    self.assertEqual(jetlink_status.headline(building), "about 2 min left")
     self.assertFalse(jetlink_status.shown(status()))
 
 
