@@ -30,7 +30,8 @@ class JetlinkLinkToggle(BigMultiParamToggleBP):
 
 
 class JetlinkStatusCard(GreyBigButton):
-  """The link's state: the chip as the title, the port, progress and the ADB note under it. Not tappable."""
+  """The link's state: the chip as the title and its most important line under it (the card has room for about two
+  short lines, so one line that wraps, not three cut off). Not tappable."""
 
   def __init__(self):
     super().__init__("jetlink", "")
@@ -41,7 +42,7 @@ class JetlinkStatusCard(GreyBigButton):
     super()._update_state()
     status = self._reader.get()
     text = f"jetlink: {jetlink_status.chip(status).lower()}"
-    value = "\n".join(jetlink_status.detail_lines(status)[:3])
+    value = jetlink_status.headline(status)
     if (text, value) != self._shown:
       self._shown = (text, value)
       self.set_text(text)

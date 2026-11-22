@@ -28,6 +28,7 @@ from openpilot.selfdrive.ui.bp.lib.custom_sound import get_custom_sound_selectio
 from openpilot.bluepilot.selfdrive.car.ford_lateral_support import SUPPORT_PARAM, support_row
 from openpilot.selfdrive.ui.bp.onroad.augmented_road_view_bp import GaugeStyle
 from openpilot.selfdrive.ui.bp.lib import jetlink_settings, jetlink_status
+from openpilot.selfdrive.ui.bp.widgets.live_description_item import live_text_item
 
 
 class BluePilotLayout(Widget):
@@ -480,7 +481,7 @@ class BluePilotLayout(Widget):
     self._jetlink_charge_phone.action_item.set_enabled(lambda: ui_state.is_offroad())
     # the link's state: the chip, and under it why it cannot run, progress, the port, the model and the ADB note
     self._jetlink_status_reader = jetlink_status.StatusReader()
-    self._jetlink_status = text_item(
+    self._jetlink_status = live_text_item(
       lambda: tr("JetLink Status"),
       lambda: tr(jetlink_status.chip(self._jetlink_status_reader.get())),
       description=lambda: "<br>".join(tr(line) for line in jetlink_status.detail_lines(self._jetlink_status_reader.get())),

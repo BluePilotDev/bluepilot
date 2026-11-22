@@ -124,6 +124,16 @@ def detail_lines(status) -> list[str]:
   return lines
 
 
+def headline(status) -> str:
+  """The one line a small screen has room for: why it cannot run, else the progress, else the big model, else the port."""
+  lines = [line for line in detail_lines(status) if line != ADB_NOTE]
+  if not lines:
+    return ""
+  if status.reason or progress(status) is not None:
+    return lines[0]
+  return next((line for line in lines if line.startswith("Big model: ")), lines[0])
+
+
 def default_big_model(status) -> str | None:
   """JetLink's default big model, named as the chestnut's are: what runs with no pick. None without JetLink."""
   name = getattr(status, 'default_model', None)
