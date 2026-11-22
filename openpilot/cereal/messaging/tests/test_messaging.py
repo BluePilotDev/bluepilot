@@ -148,7 +148,9 @@ class TestMessaging(OpenpilotTestCase):
     sub_sock = messaging.sub_sock(sock, timeout=round(sock_timeout*1000))
 
     # wait 5 socket timeouts and make sure it's still retrying
-    p = multiprocessing.Process(target=messaging.recv_one_retry, args=(sub_sock,))
+    # BluePilot: fork, as on Linux: macOS defaults to spawn, which must pickle the SubSocket and cannot
+    p = multiprocessing.get_context("fork").Process(target=messaging.recv_one_retry, args=(sub_sock,))
+    # End BluePilot
     p.start()
     time.sleep(sock_timeout*5)
     assert p.is_alive()
