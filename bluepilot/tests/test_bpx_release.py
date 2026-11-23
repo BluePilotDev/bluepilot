@@ -52,9 +52,9 @@ CFG = rel.Config()
 
 
 def facts(**kw):
-  """A green bp-dev commit A with BPVERSION 7.1.0 and no branches or other tags yet."""
+  """A green bp-dev commit A with BPVERSION 7.1.0 and no branches or other tags yet (a bp-stable given is on 7.0.0)."""
   return rel.Facts(**{"commit": A, "bpversion": "7.1.0", "on_source": True, "version_branch": None, "stable": None,
-                      "tags": ["v7.1.0"], "not_green": [], **kw})
+                      "tags": ["v7.1.0"], "not_green": [], "stable_bpversion": "7.0.0", **kw})
 
 
 class TestNewVersion(unittest.TestCase):
@@ -90,6 +90,24 @@ class TestHighestRelease(unittest.TestCase):
   def test_names_the_release_that_keeps_bp_stable(self):
     self.assertEqual(rel.higher_release((7, 9, 0), ["v7.9.0", "v7.10.0", "v7.10.1", "v7.8.3"], "v"), "v7.10.1")
     self.assertIsNone(rel.higher_release((7, 10, 1), ["v7.9.0", "v7.10.0", "v7.10.1", "bpx-test/v9.0.0"], "v"))
+
+
+class TestStableNeverMovesBack(unittest.TestCase):
+  def test_a_higher_version_on_bp_stable_keeps_it(self):
+    # bp-7.2 deleted: no tag says 7.2 was released, bp-stable's own BPVERSION still does
+    f = facts(bpversion="7.1.1", on_source=False, version_branch=A, stable=OLD, stable_bpversion="7.2.0", tags=["v7.1.1"])
+    self.assertEqual(rel.plan((7, 1, 1), f, CFG), [])
+    self.assertEqual(rel.stable_stays((7, 1, 1), f, CFG), "bp-stable doesn't move: it is at 7.2.0, a higher version.")
+
+  def test_an_unreadable_bpversion_on_bp_stable_refuses(self):
+    for bad in (None, "7.2", "v7.2.0", "7.2.0\nx"):
+      with self.subTest(bpversion=bad), self.assertRaisesRegex(
+          rel.Refused, "^BPVERSION on bp-stable .cccccccc. is missing or isn't MAJOR.MINOR.PATCH: put bp-stable right by hand"):
+        rel.plan((7, 1, 0), facts(stable=OLD, stable_bpversion=bad), CFG)
+
+  def test_a_release_is_never_re_pointed(self):
+    with self.assertRaisesRegex(rel.Refused, "^bp-stable already has 7.1.0 at another commit .cccccccc.: a release is never re-pointed"):
+      rel.plan((7, 1, 0), facts(stable=OLD, stable_bpversion="7.1.0"), CFG)
 
 
 class TestPatch(unittest.TestCase):
@@ -340,7 +358,25 @@ class TestRelease(unittest.TestCase):
     self.assertEqual(self.o.heads(), {"bp-dev": b, "bp-7.1": fix, "bp-7.2": b, "bp-stable": b})
     self.assertTrue("bp-stable doesn't move: v7.2.0 is a higher release." in out.getvalue(), out.getvalue())
 
-  def test_throwaway_names(self):
+  def test_an_older_patch_after_its_newer_version_branch_was_deleted(self):
+    a = self.o.commit("7.1.0")
+    self.o.tag("v7.1.0", a)
+    self.release("v7.1.0")
+    b = self.o.commit("7.2.0")
+    self.o.tag("v7.2.0", b)
+    self.o.job = self.o.job.with_name("job2")
+    self.release("v7.2.0")
+    self.o.git("push", "-q", "origin", ":refs/heads/bp-7.2")
+    fix = self.o.commit("7.1.1", branch="bp-7.1")
+    self.o.tag("v7.1.1", fix)
+    self.o.job = self.o.job.with_name("job3")
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+      self.release("v7.1.1")
+    self.assertEqual(self.o.heads(), {"bp-dev": b, "bp-7.1": fix, "bp-stable": b})
+    self.assertTrue("bp-stable doesn't move: it is at 7.2.0, a higher version." in out.getvalue(), out.getvalue())
+
+  def test_throwaway_names_with_no_stable_branch_yet(self):
     a = self.o.commit("7.1.0", branch="bpx-test/dev")
     self.o.tag("bpx-test/v7.1.0", a)
     self.release("bpx-test/v7.1.0", **TEST_ENV)

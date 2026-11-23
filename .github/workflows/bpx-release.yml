@@ -6,7 +6,9 @@
 # tagged commit's copy of this file: there, `dispatch` only checks the tag's form and starts a workflow_dispatch run on the
 # default branch with the built-in token (one of the two events that token can start a run with). `release` runs only on
 # workflow_dispatch, in the bpx-sync environment, whose single rule (the default branch) needs no tag rule. A ruleset
-# limiting v* tags to admins is still wanted: a tag push is what releases.
+# limiting v* tags to admins is still wanted: a tag push is what releases. Version branches (bp-7.1, ...) must be protected
+# against deletion and force pushes: the job trusts a version branch that holds a tag's commit as that release's record
+# (bp-stable never moves back regardless: the job also reads BPVERSION on bp-stable itself).
 name: bpx release
 
 on:

@@ -74,6 +74,7 @@ class Facts:
   tags: list[str]  # release tags counted as released: higher versions whose version branch holds their commit (a stray or
                    # refused tag doesn't count); lower ones never matter
   not_green: list[str]  # required push checks that didn't pass
+  stable_bpversion: str | None = None  # BPVERSION on bp-stable's commit, when bp-stable exists; None when it has none
 
 
 def version_branch(cfg: Config, version: tuple[int, int, int]) -> str:
@@ -111,9 +112,28 @@ def plan(version: tuple[int, int, int], f: Facts, cfg: Config) -> list[Update]:
   if f.not_green:
     failing = ", ".join(f.not_green)
     raise Refused(f"{short}'s push checks aren't all green ({failing}): wait for them and run the job again, or fix them and tag the fixed commit.")
-  if higher_release(version, f.tags, cfg.tag_prefix) is None and f.stable != f.commit:
+  if f.stable != f.commit and stable_stays(version, f, cfg) is None:
     updates.append(Update(cfg.stable, f.commit, f.stable))
   return updates
+
+
+def stable_stays(version: tuple[int, int, int], f: Facts, cfg: Config) -> str | None:
+  """Why bp-stable doesn't move to this release (None: it moves, or is there already). It never moves back: not past a higher
+  release still on its version branch, and not past the version on bp-stable itself, whatever branches were deleted."""
+  if f.stable is None or f.stable == f.commit:
+    return None
+  if f.stable_bpversion is None or not re.fullmatch(VERSION, f.stable_bpversion):
+    where = f"{cfg.stable} ({f.stable[:8]})"
+    raise Refused(f"BPVERSION on {where} is missing or isn't MAJOR.MINOR.PATCH: put {cfg.stable} right by hand, then run the job again.")
+  at = parse_tag(f.stable_bpversion, "")
+  if at == version:
+    where = f"{f.stable_bpversion} at another commit ({f.stable[:8]})"
+    raise Refused(f"{cfg.stable} already has {where}: a release is never re-pointed, so release the change as a patch.")
+  if higher := higher_release(version, f.tags, cfg.tag_prefix):
+    return f"{cfg.stable} doesn't move: {higher} is a higher release."
+  if at > version:
+    return f"{cfg.stable} doesn't move: it is at {f.stable_bpversion}, a higher version."
+  return None
 
 
 def higher_release(version: tuple[int, int, int], tags: list[str], prefix: str) -> str | None:
@@ -157,13 +177,15 @@ def gather(git: Git, cfg: Config, tag: str, version: tuple[int, int, int], token
   commit = git("rev-parse", f"refs/tags/{tag}^{{commit}}")
   bpversion = git("show", f"{commit}:BPVERSION") if git.ok("cat-file", "-e", f"{commit}:BPVERSION") else None
   source = remote_branch(git, cfg.source)
+  stable = remote_branch(git, cfg.stable)
+  stable_bpversion = git("show", f"{stable}:BPVERSION") if stable and git.ok("cat-file", "-e", f"{stable}:BPVERSION") else None
   suites = gh(token, "api", "--paginate", f"repos/{REPO}/actions/runs?head_sha={commit}&event=push&per_page=100",
               "-q", ".workflow_runs[].check_suite_id")
   runs = gh(token, "api", "--paginate", f"repos/{REPO}/commits/{commit}/check-runs?per_page=100",
             "-q", ".check_runs[] | {name, status, conclusion, suite: .check_suite.id}")
   return Facts(commit=commit, bpversion=bpversion, on_source=bool(source) and git.is_ancestor(commit, source),
-               version_branch=remote_branch(git, version_branch(cfg, version)), stable=remote_branch(git, cfg.stable),
-               tags=[tag, *filter(released, commits)],
+               version_branch=remote_branch(git, version_branch(cfg, version)), stable=stable,
+               tags=[tag, *filter(released, commits)], stable_bpversion=stable_bpversion,
                not_green=not_green([json.loads(line) for line in runs.splitlines()], {int(s) for s in suites.split()}))
 
 
@@ -174,8 +196,8 @@ def release(environ, git: Git) -> int:
   facts = gather(git, cfg, tag, version, environ["GH_TOKEN"])
   updates = plan(version, facts, cfg)
   dry = environ.get("DRY_RUN") == "true"
-  if higher := higher_release(version, facts.tags, cfg.tag_prefix):
-    print(f"{cfg.stable} doesn't move: {higher} is a higher release.")
+  if stays := stable_stays(version, facts, cfg):
+    print(stays)
   if not updates:
     print(f"Nothing to do: the branches are already where {tag} puts them.")
   for u in updates:
