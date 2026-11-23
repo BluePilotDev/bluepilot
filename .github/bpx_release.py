@@ -120,7 +120,11 @@ def plan(version: tuple[int, int, int], f: Facts, cfg: Config) -> list[Update]:
 def stable_stays(version: tuple[int, int, int], f: Facts, cfg: Config) -> str | None:
   """Why bp-stable doesn't move to this release (None: it moves, or is there already). It never moves back: not past a higher
   release still on its version branch, and not past the version on bp-stable itself, whatever branches were deleted."""
-  if f.stable is None or f.stable == f.commit:
+  if f.stable == f.commit:
+    return None
+  if higher := higher_release(version, f.tags, cfg.tag_prefix):  # checked first: it holds with no bp-stable too
+    return f"{cfg.stable} doesn't move: {higher} is a higher release."
+  if f.stable is None:
     return None
   if f.stable_bpversion is None or not re.fullmatch(VERSION, f.stable_bpversion):
     where = f"{cfg.stable} ({f.stable[:8]})"
@@ -129,8 +133,6 @@ def stable_stays(version: tuple[int, int, int], f: Facts, cfg: Config) -> str | 
   if at == version:
     where = f"{f.stable_bpversion} at another commit ({f.stable[:8]})"
     raise Refused(f"{cfg.stable} already has {where}: a release is never re-pointed, so release the change as a patch.")
-  if higher := higher_release(version, f.tags, cfg.tag_prefix):
-    return f"{cfg.stable} doesn't move: {higher} is a higher release."
   if at > version:
     return f"{cfg.stable} doesn't move: it is at {f.stable_bpversion}, a higher version."
   return None

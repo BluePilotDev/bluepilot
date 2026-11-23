@@ -99,6 +99,10 @@ class TestStableNeverMovesBack(unittest.TestCase):
     self.assertEqual(rel.plan((7, 1, 1), f, CFG), [])
     self.assertEqual(rel.stable_stays((7, 1, 1), f, CFG), "bp-stable doesn't move: it is at 7.2.0, a higher version.")
 
+  def test_a_missing_bp_stable_isnt_created_below_a_higher_release(self):
+    f = facts(bpversion="7.1.1", on_source=False, version_branch=A, stable=None, tags=["v7.1.1", "v7.2.0"])
+    self.assertEqual(rel.plan((7, 1, 1), f, CFG), [])
+
   def test_an_unreadable_bpversion_on_bp_stable_refuses(self):
     for bad in (None, "7.2", "v7.2.0", "7.2.0\nx"):
       with self.subTest(bpversion=bad), self.assertRaisesRegex(
