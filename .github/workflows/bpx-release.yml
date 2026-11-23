@@ -1,0 +1,82 @@
+# BluePilot: the release job (spec: #227). A pushed release tag (v7.2.0, v7.2.1) creates the version's branch (bp-7.2) for a
+# new version and moves bp-stable when it's the highest version released. The rules are in .github/bpx_release.py; any
+# failed rule writes nothing. Full BluePilot only: this file doesn't exist in ford-op/bp-sunnypilot.
+#
+# The App token can push to bp-stable: only a reviewed workflow file may hold it. The bpx-sync environment's branch and tag
+# rules decide which refs a run may come from, and v* tags must be creatable by maintainers only (a tag ruleset).
+name: bpx release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: release tag to run for (it must exist)
+        required: true
+      dry_run:
+        description: only print what it would do
+        type: boolean
+        default: true
+      # throwaway names for testing the job; when any is changed, the stable branch and the prefix must start with bpx-test/
+      source:
+        description: branch a new version's commit must be on
+        default: bp-dev
+      stable:
+        description: stable branch
+        default: bp-stable
+      branch_prefix:
+        description: version branch prefix
+        default: bp-
+      tag_prefix:
+        description: release tag prefix
+        default: v
+
+permissions: {}
+
+concurrency:
+  group: bpx-release
+
+env:
+  GIT_LFS_SKIP_SMUDGE: 1
+  GIT_CONFIG_COUNT: 1
+  GIT_CONFIG_KEY_0: fetch.recurseSubmodules
+  GIT_CONFIG_VALUE_0: 'false'
+
+jobs:
+  release:
+    if: github.repository == 'BluePilotDev/bluepilot'
+    runs-on: ubuntu-24.04
+    environment: bpx-sync  # the App key
+    timeout-minutes: 10
+    permissions:
+      contents: read  # the checkout
+      actions: read  # which runs on the commit came from a push (the App can't read Actions)
+      checks: read
+    steps:
+    - uses: actions/create-github-app-token@v2
+      id: bp
+      if: inputs.dry_run != true
+      with:
+        app-id: ${{ secrets.SYNC_APP_ID }}
+        private-key: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
+        owner: BluePilotDev
+        repositories: bluepilot
+    # history and trees only, no LFS, and the working tree is just .github. Pushes use the App token's URL.
+    - uses: actions/checkout@v7
+      with:
+        fetch-depth: 0
+        filter: blob:none
+        sparse-checkout: .github
+        persist-credentials: false
+    - name: Release
+      env:
+        TAG: ${{ inputs.tag || github.ref_name }}  # untrusted: bpx_release.py checks it before using it
+        DRY_RUN: ${{ inputs.dry_run }}
+        SOURCE_BRANCH: ${{ inputs.source }}
+        STABLE_BRANCH: ${{ inputs.stable }}
+        BRANCH_PREFIX: ${{ inputs.branch_prefix }}
+        TAG_PREFIX: ${{ inputs.tag_prefix }}
+        GH_TOKEN: ${{ github.token }}
+        BP_TOKEN: ${{ steps.bp.outputs.token }}  # empty on a dry run
+      run: python3 .github/bpx_release.py
