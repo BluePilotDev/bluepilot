@@ -120,7 +120,8 @@ def onroad_cases(family: str, theme_packs: list[str]) -> list[tuple[str, dict, d
   cases += [
     ("rad racer", {"BPThemePack": "rad_racer"}, {}, ["RadRacerTheme.render_background", "RadRacerTheme.render_foreground"]),
     ("rad racer, openpilot long", {"BPThemePack": "rad_racer"}, {"op_long": True},
-     ["RadRacerTheme.render_background", "RadRacerTheme.render_foreground"]),
+     ["RadRacerTheme.render_background", "RadRacerTheme.render_foreground"] +
+     (["!ModelRenderer._draw_lead_indicator"] if family == "mici" else [])),
     ("wheel comma four, still", {"BPSteeringWheelIconStyle": 0, "BPAnimateSteeringWheel": False}, {}, model + hud),
     ("wheel comma 3X, animated", {"BPSteeringWheelIconStyle": 1, "BPAnimateSteeringWheel": True}, {}, model + hud),
     ("wheel comma 3X, still", {"BPSteeringWheelIconStyle": 1, "BPAnimateSteeringWheel": False}, {}, model + hud),
