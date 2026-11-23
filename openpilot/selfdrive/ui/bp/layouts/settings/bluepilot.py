@@ -396,6 +396,15 @@ class BluePilotLayout(Widget):
       lambda: self._lateral_support[1],
     )
 
+    # Read the Ford's modules (ford_reads.py): part numbers, As-Built and fault codes, read-only; stops
+    # openpilot for the read and reboots after it
+    self._ford_reads_btn = button_item(
+      lambda: tr("Read Vehicle Modules"),
+      lambda: tr("READ"),
+      lambda: self._ford_reads_description(),
+      callback=self._start_ford_reads
+    )
+
     # Disable BP lateral control toggle
     self._disable_BP_lat = toggle_item(
       lambda: tr("Disable BP Lateral Control"),
@@ -518,6 +527,7 @@ class BluePilotLayout(Widget):
       ]) +
       _section(tr("Lateral Tuning"), [
         self._lateral_support_item,
+        self._ford_reads_btn,
         self._disable_BP_lat,
         self._disable_lane_change_under_speed,
         self._blinker_min_speed,
@@ -785,6 +795,39 @@ class BluePilotLayout(Widget):
       callback=handle_selection
     )
     gui_app.push_widget(self._preferred_network_dialog)
+
+  @staticmethod
+  def _ford_reads_description() -> str:
+    from openpilot.bluepilot.system.ford_reads.runner import last_read_text
+    return tr("Read-only: saves every module's part numbers, As-Built and fault codes to /data/ford-reads/ for the developers. " +
+              "Park with the ignition on and the engine off. openpilot stops for about a minute, then the device reboots.") + \
+      " " + tr(last_read_text())
+
+  @staticmethod
+  def _ford_reads_blocker() -> str | None:
+    from openpilot.bluepilot.system.ford_reads.runner import blocker
+    reason = blocker(ui_state.started, ui_state.engaged, ui_state.sm["carState"])
+    return None if reason is None else tr(reason)
+
+  def _start_ford_reads(self):
+    blocker = self._ford_reads_blocker()
+    if blocker is not None:
+      gui_app.push_widget(ConfirmDialog(blocker, tr("OK"), cancel_text=""))
+      return
+
+    def handle_confirm(result: DialogResult):
+      if result != DialogResult.CONFIRM or self._ford_reads_blocker() is not None:
+        return
+      from openpilot.bluepilot.system.ford_reads.runner import launch
+      cloudlog.info("BluePilot: starting the Ford module read (ford_reads), the device reboots after it")
+      launch()
+
+    gui_app.push_widget(ConfirmDialog(
+      tr("Read every module now? openpilot stops for about a minute and the device reboots when the read is done. " +
+         "Only read-only requests are sent."),
+      tr("Read & Reboot"),
+      callback=handle_confirm
+    ))
 
   def _clear_model_cache(self):
     """Clear ModelRunnerTypeCache and ModelManager_ActiveBundle, then reboot."""
