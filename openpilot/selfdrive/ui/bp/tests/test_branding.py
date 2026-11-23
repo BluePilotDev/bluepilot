@@ -26,7 +26,9 @@ class TestSpinnerImage(unittest.TestCase):
   def _logo(self, spinner_cls) -> str:
     with mock.patch.object(gui_app, "texture", return_value=rl.Texture()) as texture:
       spinner_cls()
-    return os.path.realpath(os.path.join(ASSETS_DIR, texture.call_args_list[0].args[0]))  # first texture = the logo
+    path = os.path.join(ASSETS_DIR, texture.call_args_list[0].args[0])  # first texture = the logo
+    self.assertTrue(os.path.isfile(path), path)
+    return os.path.realpath(path)
 
   def test_stock_spinner_loads_bluepilot_logo(self):
     self.assertEqual(self._logo(Spinner), os.path.realpath(BP_SPINNER_IMAGE))
@@ -36,9 +38,9 @@ class TestSpinnerImage(unittest.TestCase):
 
   def test_bluepilot_code_leaves_sunnypilot_spinner_alone(self):
     paths = ["bluepilot", "openpilot/selfdrive/ui/bp", "openpilot/system/ui/bp_spinner.py", "scripts", "launch_chffrplus.sh"]
-    out = subprocess.run(["git", "grep", "-l", "spinner_sunnypilot", "--", *paths, ":!*/tests/*"],
-                         cwd=BASEDIR, capture_output=True, text=True).stdout
-    self.assertEqual(out.split(), [])
+    result = subprocess.run(["git", "grep", "-l", "spinner_sunnypilot", "--", *paths, ":!*/tests/*"],
+                            cwd=BASEDIR, capture_output=True, text=True)
+    self.assertEqual(result.returncode, 1, result.stdout + result.stderr)  # 1: no match; 0: matches; else git failed
 
 
 if __name__ == "__main__":
