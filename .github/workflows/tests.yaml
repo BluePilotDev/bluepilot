@@ -181,8 +181,9 @@ jobs:
       run: echo "label=$(gh api repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/labels --jq 'any(.[]; .name == "replay-accepted")')" >> "$GITHUB_OUTPUT"
     - name: Run replay
       timeout-minutes: ${{ contains(runner.name, 'nsc') && 2 || 20 }}
-      # BluePilot: a merge into the integration branch (or full BluePilot's work branch) publishes new refs whatever the diff
-      continue-on-error: ${{ github.ref == 'refs/heads/master' || github.ref == 'refs/heads/bp-sunnypilot' || (github.repository == 'BluePilotDev/bluepilot' && github.event_name == 'push' && (github.ref == 'refs/heads/bp-7.1-dev' || github.ref == 'refs/heads/bp-dev')) || steps.accepted.outputs.label == 'true' }}
+      # BluePilot: a merge into the integration branch (or any of full BluePilot's branches) passes whatever the diff; the
+      # work branches then publish new refs
+      continue-on-error: ${{ github.ref == 'refs/heads/master' || github.ref == 'refs/heads/bp-sunnypilot' || (github.repository == 'BluePilotDev/bluepilot' && github.event_name == 'push') || steps.accepted.outputs.label == 'true' }}
       run: openpilot/selfdrive/test/process_replay/test_processes.py -j$(nproc)
     - name: Print diff
       id: print-diff
