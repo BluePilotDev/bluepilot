@@ -16,13 +16,16 @@ from bpx_sync import REPO, Git, gh, push_url, remote_branch
 REQUIRED = ("tests / build release", "tests / static analysis", "tests / unit tests", "install smoke")
 
 
+VERSION = r"(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)"  # MAJOR.MINOR.PATCH, no leading zeros
+
+
 class Refused(Exception):
   """A release rule failed: one sentence saying which and what to do. Nothing has been written."""
 
 
 def parse_tag(tag: str, prefix: str) -> tuple[int, int, int]:
   """The tag is untrusted input: nothing uses it before this match."""
-  m = re.fullmatch(re.escape(prefix) + r"(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)", tag)
+  m = re.fullmatch(re.escape(prefix) + VERSION, tag)
   if not m:
     raise Refused(f"{tag!r} isn't a release tag: use {prefix}MAJOR.MINOR.PATCH, for example {prefix}7.1.0.")
   return int(m[1]), int(m[2]), int(m[3])
@@ -88,9 +91,11 @@ def plan(version: tuple[int, int, int], f: Facts, cfg: Config) -> list[Update]:
   """The branch writes the release takes, or Refused. An empty list: everything is where it should be already."""
   major, minor, patch = version
   tag, branch, short = f"{cfg.tag_prefix}{major}.{minor}.{patch}", version_branch(cfg, version), f.commit[:8]
+  if f.bpversion is None or not re.fullmatch(VERSION, f.bpversion):  # the file's content is shown only once it's a version
+    raise Refused(f"BPVERSION in {short} is missing or isn't MAJOR.MINOR.PATCH: fix it in a PR, or tag a commit that has a good one.")
   if f.bpversion != f"{major}.{minor}.{patch}":
     want = f"{major}.{minor}.{patch}"
-    raise Refused(f"{tag} doesn't match BPVERSION in {short} ({f.bpversion or 'none'}): set BPVERSION to {want} in a PR, or tag the commit that has it.")
+    raise Refused(f"{tag} doesn't match BPVERSION in {short} ({f.bpversion}): set BPVERSION to {want} in a PR, or tag the commit that has it.")
   updates = []
   if patch == 0:
     if not f.on_source:

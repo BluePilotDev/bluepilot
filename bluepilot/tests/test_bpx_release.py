@@ -111,10 +111,15 @@ class TestPatch(unittest.TestCase):
 
 class TestEveryRelease(unittest.TestCase):
   def test_the_tag_must_match_bpversion(self):
-    for bpversion, shown in (("7.0.0", "7.0.0"), (None, "none")):
-      with self.subTest(bpversion=bpversion), self.assertRaisesRegex(
-          rel.Refused, f"v7.1.0 doesn't match BPVERSION in aaaaaaaa .{shown}.: set BPVERSION to 7.1.0 in a PR, or tag the commit that has it"):
-        rel.plan((7, 1, 0), facts(bpversion=bpversion), CFG)
+    with self.assertRaisesRegex(rel.Refused, "v7.1.0 doesn't match BPVERSION in aaaaaaaa .7.0.0.: set BPVERSION to 7.1.0 in a PR"):
+      rel.plan((7, 1, 0), facts(bpversion="7.0.0"), CFG)
+
+  def test_bpversion_must_be_a_version(self):
+    # the file's content is never shown unless it is one
+    for bad in (None, "", "7.1", "v7.1.0", "07.1.0", "7.1.0\n::error::x", "7.1.0 "):
+      with self.subTest(bpversion=bad), self.assertRaisesRegex(
+          rel.Refused, "^BPVERSION in aaaaaaaa is missing or isn't MAJOR.MINOR.PATCH: fix it in a PR, or tag a commit that has a good one.$"):
+        rel.plan((7, 1, 0), facts(bpversion=bad), CFG)
 
   def test_the_checks_must_be_green(self):
     msg = "aaaaaaaa's push checks aren't all green .tests / unit tests, install smoke.: wait for them and run the job again, or fix them"
@@ -279,6 +284,24 @@ class TestRelease(unittest.TestCase):
     with mock.patch.object(rel, "gh", FakeGh(failing=["install smoke"])), self.assertRaisesRegex(rel.Refused, "install smoke"):
       self.release("v7.1.0")
     self.assertEqual(self.o.heads(), {"bp-dev": a})
+
+  def test_a_branch_that_moved_since_the_job_looked_stops_the_whole_push(self):
+    a = self.o.commit("7.1.0")
+    self.o.tag("v7.1.0", a)
+    self.release("v7.1.0")
+    between = self.o.commit("7.1.0")
+    b = self.o.commit("7.2.0")
+    self.o.tag("v7.2.0", b)
+    gather = rel.gather
+    def gather_then_someone_moves_bp_stable(*args, **kw):
+      facts = gather(*args, **kw)
+      # still an ancestor of b: without the lease the push would fast-forward over it
+      self.o.git("push", "-q", "origin", f"{between}:refs/heads/bp-stable")
+      return facts
+    self.o.job = self.o.job.with_name("job2")
+    with mock.patch.object(rel, "gather", gather_then_someone_moves_bp_stable), self.assertRaises(subprocess.CalledProcessError):
+      self.release("v7.2.0")
+    self.assertEqual(self.o.heads(), {"bp-dev": b, "bp-7.1": a, "bp-stable": between})  # no bp-7.2 either
 
   def test_the_tag_must_exist(self):
     self.o.commit("7.1.0")
