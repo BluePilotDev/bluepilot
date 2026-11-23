@@ -247,12 +247,19 @@ class RadRacerTheme:
       for i in order:
         lead = leads[i]
         lv = model_renderer._lead_vehicles[i] if i < len(model_renderer._lead_vehicles) else None
-        # the comma four's lead marker is a bar with no chevron: no lead sprite there
-        if not (lead and lead.present) or not getattr(lv, "chevron", None) or lead.dRel > LEAD_MAX_DRAW_M:
+        if not (lead and lead.present) or lv is None or lead.dRel > LEAD_MAX_DRAW_M:
           continue
-        cx = lv.chevron[1][0]
-        # Anchor lead bottom to chevron base, but never below the ego car icon
-        base_y = min(float(lv.chevron[0][1]), max_lead_bottom)
+        if getattr(lv, "chevron", None):  # 3X: chevron tip x, chevron base y (screen coordinates)
+          cx, base_y = lv.chevron[1][0], lv.chevron[0][1]
+        elif len(getattr(lv, "bar", ())) and lv.d_filter.initialized:
+          # comma four: middle of the bar's far edge (corners 0 and 3), the lead's rear at road level;
+          # the bar is relative to the rect, as upstream draws it. Upstream keeps a hidden lead's last
+          # bar to fade it out; its distance filter is initialized only in frames that moved the bar.
+          cx, base_y = (lv.bar[0] + lv.bar[3]) / 2 + (rect.x, rect.y)
+        else:
+          continue
+        # Anchor lead bottom to the marker, but never below the ego car icon
+        base_y = min(float(base_y), max_lead_bottom)
         px = float(np.interp(lead.dRel, [5.0, 40.0, 100.0], self.LEAD_SPRITE_PX))
         tex = self._lead_tex[i]
         w, h = tex.width * px, tex.height * px
