@@ -50,15 +50,17 @@ class ModelPathColorDialog(Widget):
       self.WHEEL_TEXTURE_SIZE_BIG if self._is_big else self.WHEEL_TEXTURE_SIZE_SMALL
     )
 
+    preset_font_size = 58 if self._is_big else 20
+    preset_text_padding = 20 if self._is_big else 4
     self._preset_buttons: dict[str, Button] = {}
     for name in PRESET_COLORS:
       button = Button(name, click_callback=lambda preset=name: self._choose_preset(preset),
                       button_style=ButtonStyle.PRIMARY if name == self._initial_value else ButtonStyle.NORMAL,
-                      font_size=58 if self._is_big else 20)
+                      font_size=preset_font_size, text_padding=preset_text_padding, elide_right=not self._is_big)
       self._preset_buttons[name] = button
     custom = Button(lambda: tr("Custom"), click_callback=self._show_picker,
                     button_style=ButtonStyle.PRIMARY if self._initial_value.startswith("#") else ButtonStyle.NORMAL,
-                    font_size=58 if self._is_big else 25)
+                    font_size=preset_font_size, text_padding=preset_text_padding, elide_right=not self._is_big)
     self._preset_buttons["Custom"] = custom
 
     font_size = 54 if self._is_big else 22
