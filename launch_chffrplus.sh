@@ -24,11 +24,24 @@ function agnos_init {
   if [ "$(< /VERSION)" != "$AGNOS_VERSION" ]; then
     AGNOS_PY="$DIR/openpilot/common/hardware/comma/agnos.py"
     MANIFEST="$DIR/openpilot/system/hardware/comma/agnos.json"
+    # BluePilot: `sudo reboot` only queues the reboot and returns. Ask until it is queued, then replace the shell, so no
+    # line of this script runs after it (the loop below would start the flasher again during the shutdown, and a
+    # second agnos.py --swap marks the slot just switched to unbootable)
     if "$AGNOS_PY" --verify "$MANIFEST"; then
-      sudo reboot
+      until sudo reboot; do sleep 5; done
+      exec sleep infinity
     fi
     while true; do
-      "$DIR/openpilot/common/hardware/comma/updater" "$AGNOS_PY" "$MANIFEST"
+      # BluePilot: the bundled updater is only a screen around `agnos.py --swap`. Where it can't start (its bundled
+      # UI code needs pyray's raygui, which a newer AGNOS's pyray lacks), flash without the screen: agnos.py writes the
+      # inactive slot, checks it by hash and swaps. On a failure the loop goes round again, as before; after the reboot
+      # request nothing of this script runs (as above).
+      if ! "$DIR/openpilot/common/hardware/comma/updater" "$AGNOS_PY" "$MANIFEST"; then
+        if "$AGNOS_PY" --swap "$MANIFEST"; then
+          until sudo reboot; do sleep 5; done
+          exec sleep infinity
+        fi
+      fi
     done
   fi
 }

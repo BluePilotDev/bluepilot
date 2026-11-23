@@ -9,11 +9,12 @@ pinned commit). **Not checked:** these steps on a comma four, and the clone comm
 
 - SSH access to the comma (Settings → Developer → Enable SSH, with your GitHub username's keys added).
   comma's guide: [docs/how-to/connect-to-comma.md](../how-to/connect-to-comma.md).
-- Read access to the private repository **github.com/jrneulight/bluepilot-clean** for the same GitHub
+- Read access to the private repository **github.com/ford-op/bluepilot-clean** for the same GitHub
   account. It holds all three parts of this build as branches: `clean/ford-lateral-pathangle`
   (BluePilot), `clean/opendbc-pathangle` and `clean/bluepilot-lateral-pathangle`. One recursive clone
   fetches all three. The build without path angle is `clean/ford-lateral`, the default branch.
 - The comma on Wi-Fi. The download is about 1 GB plus the driving models.
+- The build runs on AGNOS 19.9 (`launch_env.sh`), as sunnypilot and BluePilot bp-7.1-dev (its base) do; comma's current code needs 20.6 and BluePilot bp-dev 18.5. A comma on another AGNOS is moved to 19.9 at its first start, with the update screen.
 
 ## Install
 
@@ -43,7 +44,7 @@ This is how you go back later. Don't delete it.
 On the comma, one line:
 
 ```
-git -c url."git@github.com:jrneulight/".insteadOf="https://github.com/jrneulight/" clone --recurse-submodules --depth 1 --shallow-submodules -b clean/ford-lateral-pathangle git@github.com:jrneulight/bluepilot-clean.git openpilot
+git -c url."git@github.com:ford-op/".insteadOf="https://github.com/ford-op/" clone --recurse-submodules --depth 1 --shallow-submodules -b clean/ford-lateral-pathangle git@github.com:ford-op/bluepilot-clean.git openpilot
 ```
 
 Answer `yes` if it asks whether to trust github.com. The `-c … insteadOf` part sends the build's two
@@ -73,10 +74,16 @@ Connect with `ssh -A` again, then on the comma:
 
 ```
 cd /data/openpilot
-git pull
-git -c url."git@github.com:jrneulight/".insteadOf="https://github.com/jrneulight/" submodule update --init --recursive
+git -c url."git@github.com:ford-op/".insteadOf="https://github.com/jrneulight/" -c url."git@github.com:ford-op/".insteadOf="git@github.com:jrneulight/" -c url."git@github.com:ford-op/".insteadOf="https://github.com/ford-op/" pull
+git -c url."git@github.com:ford-op/".insteadOf="https://github.com/jrneulight/" -c url."git@github.com:ford-op/".insteadOf="git@github.com:jrneulight/" -c url."git@github.com:ford-op/".insteadOf="https://github.com/ford-op/" submodule update --init --recursive
 sudo reboot
 ```
+
+The three `-c … insteadOf` parts send every address the build has used (the old `jrneulight` names and the https
+form of `ford-op`) to `ford-op` over ssh, on both lines: `git pull` fetches the submodules too, so it needs them as
+well, and an install made before the move still has the old names stored. Checked by running both lines on an
+install made at the earlier testers' head (no global git settings, as on a comma). On an install made with this
+guide only the last of the three matches anything; that one was run on its own, the three together there were not.
 
 **Not checked:** what openpilot's own background updater does with a private repo it can't reach. It is
 expected to fail to fetch and change nothing.
@@ -104,4 +111,5 @@ BP Lateral Control** in the same Lateral Tuning section. It takes effect at the 
 | `Permission denied (publickey)` while cloning | Your GitHub account can't read the private repo, or the comma can't see your key: check `ssh-add -l` on your computer lists a key, and that you connected with `ssh -A` |
 | A submodule fails with a username or password prompt | The `-c … insteadOf` part of the line is missing, so the private parts were asked for over https |
 | The build fails on the device | Go back (above), then report the error screen's text |
+| It loops at first start with an updater error (`module 'pyray' has no attribute 'GuiTextAlignment'`) | The update screen bundled before this build (built from older code) can't start on a newer AGNOS. This build ships the screen rebuilt from its own code, and if the screen still can't start, its launch script flashes AGNOS 19.9 without it: the display then stays as it is for several minutes while about 4.7 GB of AGNOS is written (downloaded compressed, without asking, over whatever connection the comma has, cellular included), and the comma reboots. comma's own build is not affected. On a build without either fix, run it by hand over SSH: `cd /data/openpilot && openpilot/common/hardware/comma/agnos.py --swap openpilot/system/hardware/comma/agnos.json && sudo reboot`. It writes the unused slot, checks it by hash and only then switches to it |
 | Large files are missing or tiny text stubs | Run `git lfs pull` in `/data/openpilot` (or in the computer's clone, then copy again) |

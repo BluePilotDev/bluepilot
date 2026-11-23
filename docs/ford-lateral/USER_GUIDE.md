@@ -85,11 +85,20 @@ So this build does both:
 
 **Path angle is switched on in this version for:**
 
-- F-150 2021-23 on software version BD;
-- F-150 2021-23 on version BA with data file ML34-14D007-BDE, with its own numbers;
-- Explorer 2020-24;
-- Maverick 2022-24;
-- Escape 2020-22 and Bronco Sport 2021-22 on LX6C-14D003-AL.
+- F-150 2021-23 on software version BD (ML3V-14D003-BD);
+- F-150 2021-23 on version BA (ML3V-14D003-BA) with data file ML34-14D007-BDE, with its own numbers;
+- F-150 Lightning (RL38-14D003-AA), with the 2021-23 F-150's numbers, which its software holds bit for bit;
+- Explorer 2020-24 (M1MC-14D003-AC, L1MC-14D003-AL, P1MC-14D003-AA);
+- Maverick 2022-24 (NZ6C-14D003-AL);
+- Escape 2020-22 and Bronco Sport 2021-22 on LX6C-14D003-AL;
+- Ranger 2024-25 (RB3C-14D003-AA), with its own numbers. Its module takes no lane centering for the first 9
+  seconds after the truck starts (its own software, run in an emulator), and in a curve whose measured sideways
+  acceleration is above 2.7 m/s^2 its own limiter takes over and lets the steering go toward straight;
+- Mustang 2024 (PR3C-14D003-AD), with its own numbers. openpilot has no Mustang (2024) platform, so no car reaches
+  this row today.
+
+Not driven yet with path angle: the Lightning, the Ranger and the 2024 Mustang. The 2025 Mustang's steering step
+has been run too; its path angle waits on one more run of its own software.
 
 These are the rows whose module's software was read and holds what path angle needs: how far ahead the
 module looks, and how fast it lets curvature and path angle change. Every other car, and the fallback,
@@ -98,12 +107,14 @@ steers by curvature alone.
 **Why it is on.** The BluePilot developers' 50,000+ miles of steering by path angle alone show that it
 steers Fords well. Each row's numbers are read from that module's software files by a script, not typed
 in. For the 2021-23 F-150 on software BD the module's own steering code was also run in an emulator, and
-the computer model matches it; the Lightning runs the same code, though its own copy hasn't been run yet. For the Ranger and the
-2024 Mustang the main part of it was run, and for the 2020-24 Explorer its lane-centering code, from start-up (the data file
-on some of these trucks, MB5C-14D007-BA, read since from a 2021 Explorer, holds the same numbers). For the 2022-24
-Maverick, the 2020-22 Escape and Bronco Sport, the Mach-E 2021-24 and the 2025 cars on one shared program (Bronco
-Sport, Escape, Mach-E) the lane-centering code was run too. For the other rows the code has been read, not run,
-and BC's software has not been read at all.
+the computer model matches it. For the F-150 on BA, the Lightning, the Ranger and the 2024 Mustang the whole steering
+step of each module's own software was run, from its own start-up, and for the 2020-24 Explorer its lane-centering
+code, from start-up (the data file on some of these trucks, MB5C-14D007-BA, read since from a 2021 Explorer, holds the
+same numbers, and its whole step was run with it). For the 2022-24 Maverick, the 2020-22 Escape and Bronco Sport, the
+Mach-E 2021-24 and the 2025 cars on one shared program (Bronco Sport, Escape, Mach-E) the lane-centering code was run
+too, and so were the 2025 Mustang's whole steering step, the 2024-26 F-150's steering library and limiter, and the
+Super Duty's and the Transit's code. For the 2025 and 2026 Explorer the code has been read, not run. BC's program has been read and run with another version's data file in place of its own,
+which hasn't been read, so a BC truck runs the fallback.
 On two rows they have also been measured on the road with earlier BluePilot versions. On
 the 2020-24 Explorer the truck turned 0.95 to 0.97 times what the model predicts. On the 2021-23 F-150
 with software BD it turned 0.93 to 1.01 times what the row predicts, which passes the release check
@@ -169,11 +180,17 @@ On a row without path angle, the row can change up to three things compared with
 the row has the number:
 
 - the build never asks for more turning than your module allows;
-- openpilot starts from the reaction time measured on logged drives of your module's software;
-- on most rows, the build asks for the same ramp-out (how the module eases off its steering) that
-  earlier BluePilot used. Not every module uses it.
+- openpilot's reaction-time learner starts where it does on every car and learns your truck;
+- when you disengage, the build asks for the ramp-out (how fast the module lets go of its steering) its
+  firmware gives your module: a quicker one on the older modules that otherwise hold fading torque for
+  seconds. On the newer modules every ramp-out is the same quick one.
 
-On the rows with path angle, the row also sends path angle (section 3).
+On the rows with path angle, the row also sends path angle (section 3). On a 2021-23 F-150 (level BD), a Lightning or a
+Ranger, lane centering also takes hold faster when you engage in a curve (and when it picks up again after a dropped
+frame): the first steering frame carries as much of the curve as the safety check allows, because those modules take
+that frame whole (shown on Ford's own code; not driven yet). On the other rows with path angle (level BA, the 2020-24
+Explorer, the Maverick, the 2020-22 Escape, Corsair and Bronco Sport) it builds in at the module's own pace as before:
+their modules do that themselves.
 
 **Why exact:** the research compared Ford's data files, and files that look alike can hold different
 steering numbers. Guessing from the model name would use the wrong numbers.
@@ -181,11 +198,11 @@ steering numbers. Guessing from the model name would use the wrong numbers.
 ### The fallback
 
 If your module doesn't answer, or its part numbers aren't in the table, the build uses the
-**fallback**. It is stock openpilot's Ford steering, as it is: comma's own car controller, steering by
-curvature alone, including the smoothing comma's code adds on the 2021-23 F-150 and the Bronco Sport, and
+**fallback**. It is stock openpilot's Ford steering: comma's own car controller, steering by
+curvature alone (without the extra smoothing comma's code adds on the 2021-23 F-150 and the Bronco Sport), and
 the panda's stock check for your car. So it holds the command close to what the yaw sensor measures (as
 earlier BluePilot did, above), and on CAN FD cars it uses comma's limit on how hard the car turns, 3.6 m/s²
-rather than BluePilot's 2.4. It is the approach tested on the most Fords.
+(BluePilot's own steering uses your module's own limit, below). It is the approach tested on the most Fords.
 
 ### A health check
 
@@ -196,11 +213,12 @@ and reports. It never changes the steering (section 7).
 
 The build uses comma's limits on how hard the car may be pushed sideways in a curve, and how quickly
 that push may change, with one exception. On newer Fords with a faster internal network (called CAN
-FD), such as the F-150, Mach-E and Ranger, BluePilot keeps a lower limit of its own: about 2.4 against
-comma's 3.6 (in m/s², sideways acceleration). An old comment in comma's code gave the reason as their
-steering having more force; nothing measured shows that. Switching on **Disable BP Lateral Control**
-gives a CAN FD car comma's 3.6 again, and so does the fallback (stock openpilot's code steers it). Where your module allows less than the limit, the build asks for
-no more than your module allows.
+FD), such as the F-150, Mach-E and Ranger, the limit is your steering module's own, read from its software and
+run in an emulator, by speed, and never above comma's 3.6 (in m/s², sideways acceleration). On a 2021-23 F-150 that is
+3.0 up to 60 km/h, 2.5 at 100 and 2.0 at 160; on a Ranger 2.7; on an F-150 with steering software BA, whose module has
+no limit of its own, comma's 3.6. A module whose limit hasn't been run yet keeps BluePilot's earlier 2.4. Switching on
+**Disable BP Lateral Control** gives a CAN FD car comma's 3.6 again, and so does the fallback (stock openpilot's code
+steers it). The build asks for no more than your module allows.
 
 openpilot is told the same limit. The comma's safety chip, the **panda**, checks it too (section 8). So when a curve needs more than that, you see openpilot's usual
 "turn exceeds steering limit" warning instead of the car quietly turning less.
@@ -221,18 +239,19 @@ shows one of these:
 | **Lane centering denied by the steering module** | On the last drive your module refused lane centering. Either lane centering isn't set up on this truck, and the build can't steer a truck built without it, or the module stopped for a fault for that drive, which the next start clears. |
 | **Fallback** | Your module didn't answer, or its software isn't in the table. Steers by curvature with comma's settings. |
 | **Not supported** | The software is known and this build can't steer it, so the car only records, as a dashcam. The 2024 Transit's KK21-14D003-AM is marked this way: its module has no lane centering at all. |
-| **Off** | You switched on **Disable BP Lateral Control**. Stock openpilot steering runs. |
+| **Off** | You switched on **Disable BP Lateral Control**. Stock openpilot steering runs, exactly as comma wrote it, its extra smoothing on the 2021-23 F-150 and the Bronco Sport included. |
 | **Not read yet** | The car hasn't been started with this build yet. |
 
 Full and Curvature rows without path angle steer the same way. Only Full rows can have path angle.
 
 How sure each row's numbers are is a separate question. Every row's numbers are read from its
-module's own files. For the 2021-23 F-150 on BD (and, through the same code, the Lightning and most of
-the Ranger's) and for the 2020-24 Explorer the module's steering code was also run and matches. For the 2024 Mustang
-its controller chain, and for the 2024-26 F-150 its steering library and limiter, were run too, and so was
-the code of the 2022-24 Maverick, the 2020-22 Escape and Bronco Sport, the Mach-E 2021-24, the 2025 Bronco
-Sport, Escape and Mach-E, the Super Duty and the Transit. For the 2025 Explorer and Mustang and the 2026
-Explorer the code has been read but not run, and for the F-150 on BC no file has been read at all.
+module's own files. For the 2021-23 F-150 on BD and on BA, the Lightning, the Ranger, the 2024 and 2025 Mustang and
+the 2020-24 Explorer the module's steering code was also run and matches (each one's own software, from its own
+start-up). For the 2024-26 F-150 its steering library and limiter were run too, and so was the code of the 2022-24
+Maverick, the 2020-22 Escape and Bronco Sport, the Mach-E 2021-24, the 2025 Bronco Sport, Escape and Mach-E, the
+Super Duty and the Transit. For the 2025 and 2026 Explorer the code has been read but not run. For the F-150 on BC
+the program has been read and run with another version's data file in place of its own; its own data files haven't
+been read.
 
 The text under it (on a comma four, tap **steering support**) gives the reason, the part numbers your
 module answered, and how openpilot recognised your car. If it says **", degraded"** after the support level, the health check found a problem on
@@ -247,7 +266,6 @@ A row applies only when your module answers exactly these part numbers. Steering
 | Vehicle | Strategy | Data file |
 |---|---|---|
 | F-150 2021-23 | ML3V-14D003-BD | ML34-14D007-EDL or -BDL |
-| F-150 2021-23, version BC | ML3V-14D003-BC | any (see below) |
 | F-150 2021-23, version BA | ML3V-14D003-BA | ML34-14D007-BDE |
 | F-150 Lightning | RL38-14D003-AA | RL38-14D007-DD or -AD |
 | Explorer 2020-24 | M1MC-14D003-AC | MB5C-14D007-BD |
@@ -282,23 +300,21 @@ centering request at all, so no build can steer it that way. **Not checked:** wh
 recognised anyway.
 
 **2021-23 F-150s on version BC.** Most 2021-23 F-150s run software version BC (42 of the 45 in
-the drive logs studied). No copy of the BC software was available to decode, so unlike the other rows,
-its row comes from how 33 BC trucks behaved on public drives. They follow a curvature command just like
-version BD, and react 0.15 to 0.3 seconds sooner. The row steers with BD's path-angle numbers, because
-BC's own were never read, with comma's ramp-out and BC's own measured reaction time, and without the
-smoothing comma's code adds on these trucks. **Not checked:** whether BC's numbers really are BD's. A
-copy of a BC data file, or a BC drive with path angle, would show it. It accepts any data file, but **your module still has to answer the data-file question at
-start**.
+the drive logs studied). BC: program read and run, data file not held. The BC program (ML3V-14D003-BC) has
+been read and its steering step run in a computer model of the module, with another version's data file in
+place of its own; every number a row would steer with sits in the data file, and no BC data file has been read.
+So this build knows BC (Steering Support: "This steering software is known, and not yet supported") and a BC
+truck runs the fallback (comma's own steering, section 6) until a BC truck's data file is read.
 
 **An older F-150 version.** A 2021-23 F-150 on ML3V-14D003-BA with data file ML34-14D007-BDE has its own
 row, with path angle and its own numbers. Its steering messages ask for the quick let-go (ramp type 3), so
-after a bad message or a fault this module lets go of its torque as fast as version BD; on the other types it
-is several times slower. When you disengage it still lets go at the slower rate. On any
+when you disengage, and after a bad message or a fault, this module lets go of its torque as fast as version BD;
+on the other types it is several times slower. On any
 other data file Steering Support says the data file isn't in the table, and the car stays on the fallback.
 
 **Not checked yet:** whether steering modules answer the data-file question during a normal start. The
-software of every module with a row allows it, but it has not been tried on a real truck, and BC's
-software has never been read. If a module doesn't answer, that car runs on the fallback whatever the
+software of every module with a row allows it, but it has not been tried on a real truck, and a BC
+truck's data file has never been read. If a module doesn't answer, that car runs on the fallback whatever the
 table says, and Steering Support says "The steering module didn't answer".
 
 ### Your first drives
@@ -372,9 +388,10 @@ The check never changes the steering, so the car steers the same way while it sh
   comma's sideways limits. It refuses steering while openpilot isn't engaged, makes every engagement
   start from straight ahead, and refuses path angle on any car whose row doesn't have it switched on.
   That is every car except the rows in section 3.
-- **The panda waits 2 s after it is set up.** For 2 s after the panda's safety mode is set (at each
-  start, and after the comma reconnects to the panda) it refuses every steering message: it doesn't know
-  the car's speed yet, nor what the module was last sent. BluePilot waits that out too, so lane centering
+- **The panda waits 2 s after it is set up.** After the panda's safety mode is set (at each start, and
+  after the comma reconnects to the panda) it refuses every steering message until it has let one "not
+  steering" message through and 2 s more have passed: it doesn't know the car's speed yet, and only that
+  message makes the module forget what it was last sent. BluePilot waits that out too, so lane centering
   can't start in those 2 s ("waiting for the panda"). A message the panda refuses never counts as sent.
 - **The panda counts how the module follows a message.** The module doesn't jump to each new
   message. It moves its own copy of each value at a set pace, so for a moment it can hold an old turn
@@ -432,7 +449,7 @@ you tuned no longer apply.
 newer or older version, or another data file), or didn't answer. Steering Support shows what it answered.
 
 **Is the fallback worse?** On a row without path angle, the row differs from the fallback only in the
-things listed in section 4, under the table. The fallback is stock openpilot's Ford steering code and its own
-panda check, as they are: it holds the command to the yaw sensor, and on CAN FD cars it uses comma's limit.
+things listed in section 4, under the table. The fallback is stock openpilot's Ford steering code (without its extra
+smoothing on the 2021-23 F-150 and the Bronco Sport) and its own panda check: it holds the command to the yaw sensor, and on CAN FD cars it uses comma's limit.
 
 **Can I bring back the old settings or the angle mode?** Not in this build.

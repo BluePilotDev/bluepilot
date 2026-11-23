@@ -3,7 +3,7 @@
   url = https://github.com/sunnyhaibin/panda.git
 [submodule "opendbc"]
   path = opendbc_repo
-	url = https://github.com/jrneulight/bluepilot-clean.git
+	url = https://github.com/ford-op/bluepilot-clean.git
 	branch = clean/opendbc-pathangle
 [submodule "msgq"]
   path = msgq_repo

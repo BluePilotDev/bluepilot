@@ -186,11 +186,13 @@ class ControlsExt(ModelStateBase):
     # counts what it refused anyway. Filled whether or not the model fields below are.
     panda_states = sm['pandaStates']
     if sm.seen['pandaStates'] and len(panda_states) > 0:
-      li.pandaLateralAllowed = all(ps.controlsAllowed or ps.controlsAllowedLateral for ps in panda_states)
+      # the pandas that run the car's mode: a second panda the car isn't on runs noOutput (car/ford/interface.py)
+      car_pandas = [ps for ps in panda_states if str(ps.safetyModel) not in NON_CAR_SAFETY_MODELS]
+      li.pandaLateralAllowed = all(ps.controlsAllowed or ps.controlsAllowedLateral for ps in (car_pandas or panda_states))
       li.safetyTxBlocked = sum(ps.safetyTxBlocked for ps in panda_states)
-      # the panda takes no steering frame for a while after its safety mode is set: a panda in another mode, or no
+      # the panda takes no steering frame for a while after its safety mode is set: no panda in a car's mode, or no
       # current panda state (pandad restarting), tells the controller to wait that out once the car's mode is back
-      li.pandaCarSafety = bool(sm.alive['pandaStates']) and all(str(ps.safetyModel) not in NON_CAR_SAFETY_MODELS for ps in panda_states)
+      li.pandaCarSafety = bool(sm.alive['pandaStates']) and len(car_pandas) > 0
 
     md = sm['modelV2']
     lp = sm['vehicleParameters']
