@@ -35,7 +35,7 @@ print_success() {
     if [ "$QUIET_MODE" != "true" ]; then
         echo -e "${GREEN}$message${NC}"
     fi
-    [ -n "$LOG_FILE" ] && echo "$(date '+%Y-%m-%d %H:%M:%S') [SUCCESS] $message" >> "$LOG_FILE"
+    [ -z "$LOG_FILE" ] || echo "$(date '+%Y-%m-%d %H:%M:%S') [SUCCESS] $message" >> "$LOG_FILE"
 }
 
 print_error() {
@@ -43,7 +43,7 @@ print_error() {
     if [ "$QUIET_MODE" != "true" ]; then
         echo -e "${RED}$message${NC}" >&2
     fi
-    [ -n "$LOG_FILE" ] && echo "$(date '+%Y-%m-%d %H:%M:%S') [ERROR] $message" >> "$LOG_FILE"
+    [ -z "$LOG_FILE" ] || echo "$(date '+%Y-%m-%d %H:%M:%S') [ERROR] $message" >> "$LOG_FILE"
 }
 
 print_warning() {
@@ -51,7 +51,7 @@ print_warning() {
     if [ "$QUIET_MODE" != "true" ]; then
         echo -e "${YELLOW}$message${NC}"
     fi
-    [ -n "$LOG_FILE" ] && echo "$(date '+%Y-%m-%d %H:%M:%S') [WARNING] $message" >> "$LOG_FILE"
+    [ -z "$LOG_FILE" ] || echo "$(date '+%Y-%m-%d %H:%M:%S') [WARNING] $message" >> "$LOG_FILE"
 }
 
 print_info() {
@@ -59,7 +59,7 @@ print_info() {
     if [ "$QUIET_MODE" != "true" ]; then
         echo -e "${BLUE}$message${NC}"
     fi
-    [ -n "$LOG_FILE" ] && echo "$(date '+%Y-%m-%d %H:%M:%S') [INFO] $message" >> "$LOG_FILE"
+    [ -z "$LOG_FILE" ] || echo "$(date '+%Y-%m-%d %H:%M:%S') [INFO] $message" >> "$LOG_FILE"
 }
 
 # Convenient prompt-pause function (only in interactive mode)
@@ -90,15 +90,18 @@ DEVICE_TYPE="$(detect_device_type)"
 ###############################################################################
 # Path Constants
 ###############################################################################
-readonly BOOT_IMG="/usr/comma/bg.jpg"
+# AGNOS 19.9's display service (/usr/comma/magic.py) draws bg.png, stretched to screen width x width/2.
+# BOOT_LOGO_TARGET / BOOT_LOGO_SOURCE override the paths (tests).
+readonly BOOT_IMG="${BOOT_LOGO_TARGET:-/usr/comma/bg.png}"
 readonly BOOT_IMG_BKP="${BOOT_IMG}.backup"
 
 # Select the appropriate boot image based on device type
 if [ "$DEVICE_TYPE" = "mici" ]; then
-    readonly BLUEPILOT_BOOT_IMG="/data/openpilot/openpilot/selfdrive/assets/img_bluepilot_boot_mici.jpg"
+    DEFAULT_BOOT_IMG="/data/openpilot/bluepilot/assets/images/boot_logo_mici.png"
 else
-    readonly BLUEPILOT_BOOT_IMG="/data/openpilot/openpilot/selfdrive/assets/img_bluepilot_boot.jpg"
+    DEFAULT_BOOT_IMG="/data/openpilot/bluepilot/assets/images/boot_logo.png"
 fi
+readonly BLUEPILOT_BOOT_IMG="${BOOT_LOGO_SOURCE:-$DEFAULT_BOOT_IMG}"
 
 ###############################################################################
 # Partition Management Functions
@@ -156,16 +159,30 @@ clean_backups() {
 update_boot_image() {
     print_info "Updating boot image (device: $DEVICE_TYPE)..."
     print_info "Using image: $BLUEPILOT_BOOT_IMG"
-    mount_partition_rw "/"
 
-    # Ensure the original file exists before proceeding
+    # Ensure both files exist before proceeding
     if [ ! -f "$BOOT_IMG" ]; then
         print_error "Boot image ($BOOT_IMG) does not exist. Aborting update."
         [ "$HEADLESS_MODE" != "true" ] && pause_for_user
         return 1
     fi
+    if [ ! -f "$BLUEPILOT_BOOT_IMG" ]; then
+        print_error "BluePilot boot image ($BLUEPILOT_BOOT_IMG) not found."
+        [ "$HEADLESS_MODE" != "true" ] && pause_for_user
+        return 1
+    fi
 
-    # Create backup if it does not already exist
+    # Already in place (every boot after the first): leave the system partition alone
+    if cmp -s "$BLUEPILOT_BOOT_IMG" "$BOOT_IMG"; then
+        print_info "BluePilot boot image already in place."
+        [ "$HEADLESS_MODE" != "true" ] && pause_for_user
+        return 0
+    fi
+
+    mount_partition_rw "/" || return 1
+
+    # The backup holds comma's image: made only when none exists, i.e. before BluePilot's first copy.
+    # An existing one is kept when a newer BluePilot image replaces an older one.
     if [ ! -f "$BOOT_IMG_BKP" ]; then
         sudo cp "$BOOT_IMG" "$BOOT_IMG_BKP"
         print_success "Backup created for boot image at $BOOT_IMG_BKP"
@@ -173,23 +190,16 @@ update_boot_image() {
         print_info "Backup for boot image already exists at $BOOT_IMG_BKP"
     fi
 
-    # Ensure the BluePilot image exists
-    if [ ! -f "$BLUEPILOT_BOOT_IMG" ]; then
-        print_error "BluePilot boot image ($BLUEPILOT_BOOT_IMG) not found."
-        [ "$HEADLESS_MODE" != "true" ] && pause_for_user
-        return 1
-    fi
-
     # Overwrite the original file with the BluePilot image
     sudo cp "$BLUEPILOT_BOOT_IMG" "$BOOT_IMG"
     print_success "Boot image updated with BluePilot file."
     mount_partition_ro "/"
     [ "$HEADLESS_MODE" != "true" ] && pause_for_user
+    return 0
 }
 
 restore_boot_image() {
     print_info "Restoring boot image from backup..."
-    mount_partition_rw "/"
 
     # Check if backup exists before attempting restoration
     if [ ! -f "$BOOT_IMG_BKP" ]; then
@@ -197,6 +207,8 @@ restore_boot_image() {
         [ "$HEADLESS_MODE" != "true" ] && pause_for_user
         return 1
     fi
+
+    mount_partition_rw "/" || return 1
 
     # Restore backup to the original file location
     sudo cp "$BOOT_IMG_BKP" "$BOOT_IMG"
@@ -207,6 +219,7 @@ restore_boot_image() {
     print_success "Boot image restored from backup."
     mount_partition_ro "/"
     [ "$HEADLESS_MODE" != "true" ] && pause_for_user
+    return 0
 }
 
 check_custom_status() {
