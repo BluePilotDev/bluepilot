@@ -68,7 +68,8 @@ class Facts:
   on_source: bool  # reachable from the source branch's tip
   version_branch: str | None  # the version branch's tip, None when it doesn't exist
   stable: str | None
-  tags: list[str]  # every tag name in the repo
+  tags: list[str]  # release tags counted as released: higher versions whose version branch holds their commit (a stray or
+                   # refused tag doesn't count); lower ones never matter
   not_green: list[str]  # required push checks that didn't pass
 
 
@@ -105,10 +106,15 @@ def plan(version: tuple[int, int, int], f: Facts, cfg: Config) -> list[Update]:
   if f.not_green:
     failing = ", ".join(f.not_green)
     raise Refused(f"{short}'s push checks aren't all green ({failing}): wait for them and run the job again, or fix them and tag the fixed commit.")
-  released = [v for v in (_version(t, cfg.tag_prefix) for t in f.tags) if v]
-  if all(v <= version for v in released) and f.stable != f.commit:
+  if higher_release(version, f.tags, cfg.tag_prefix) is None and f.stable != f.commit:
     updates.append(Update(cfg.stable, f.commit, f.stable))
   return updates
+
+
+def higher_release(version: tuple[int, int, int], tags: list[str], prefix: str) -> str | None:
+  """The highest of the tags above this version: while there is one, bp-stable stays where it is."""
+  higher = sorted((v, t) for t in tags if (v := _version(t, prefix)) and v > version)
+  return higher[-1][1] if higher else None
 
 
 def _version(tag: str, prefix: str) -> tuple[int, int, int] | None:
@@ -122,10 +128,26 @@ def _version(tag: str, prefix: str) -> tuple[int, int, int] | None:
 
 def gather(git: Git, cfg: Config, tag: str, version: tuple[int, int, int], token: str) -> Facts:
   """What plan() decides on. token reads the Actions and Checks APIs (the App can't read Actions)."""
-  refs = [line.split("\t")[1] for line in git("ls-remote", "--tags", "origin").splitlines()]
-  tags = [r.removeprefix("refs/tags/") for r in refs if not r.endswith("^{}")]  # an annotated tag's commit is on its ^{} line
-  if tag not in tags:
+  commits: dict[str, str] = {}
+  for line in git("ls-remote", "--tags", "origin").splitlines():
+    sha, ref = line.split("\t")
+    name = ref.removeprefix("refs/tags/")
+    if name.endswith("^{}"):  # an annotated tag's commit is on its ^{} line
+      commits[name.removesuffix("^{}")] = sha
+    else:
+      commits.setdefault(name, sha)
+  if tag not in commits:
     raise Refused(f"There is no tag {tag}: push the tag first.")
+  tips: dict[str, str | None] = {}
+  def released(t: str) -> bool:
+    v = _version(t, cfg.tag_prefix)
+    if not v or v <= version:
+      return False
+    branch = version_branch(cfg, v)
+    if branch not in tips:
+      tips[branch] = remote_branch(git, branch)
+    tip = tips[branch]
+    return tip is not None and git.is_ancestor(commits[t], tip)
   git("fetch", "-q", "--no-tags", "origin", f"+refs/tags/{tag}:refs/tags/{tag}")
   commit = git("rev-parse", f"refs/tags/{tag}^{{commit}}")
   bpversion = git("show", f"{commit}:BPVERSION") if git.ok("cat-file", "-e", f"{commit}:BPVERSION") else None
@@ -135,7 +157,8 @@ def gather(git: Git, cfg: Config, tag: str, version: tuple[int, int, int], token
   runs = gh(token, "api", "--paginate", f"repos/{REPO}/commits/{commit}/check-runs?per_page=100",
             "-q", ".check_runs[] | {name, status, conclusion, suite: .check_suite.id}")
   return Facts(commit=commit, bpversion=bpversion, on_source=bool(source) and git.is_ancestor(commit, source),
-               version_branch=remote_branch(git, version_branch(cfg, version)), stable=remote_branch(git, cfg.stable), tags=tags,
+               version_branch=remote_branch(git, version_branch(cfg, version)), stable=remote_branch(git, cfg.stable),
+               tags=[tag, *filter(released, commits)],
                not_green=not_green([json.loads(line) for line in runs.splitlines()], {int(s) for s in suites.split()}))
 
 
@@ -143,8 +166,11 @@ def release(environ, git: Git) -> int:
   cfg = config(environ)
   tag = environ["TAG"]
   version = parse_tag(tag, cfg.tag_prefix)
-  updates = plan(version, gather(git, cfg, tag, version, environ["GH_TOKEN"]), cfg)
+  facts = gather(git, cfg, tag, version, environ["GH_TOKEN"])
+  updates = plan(version, facts, cfg)
   dry = environ.get("DRY_RUN") == "true"
+  if higher := higher_release(version, facts.tags, cfg.tag_prefix):
+    print(f"{cfg.stable} doesn't move: {higher} is a higher release.")
   if not updates:
     print(f"Nothing to do: the branches are already where {tag} puts them.")
   for u in updates:

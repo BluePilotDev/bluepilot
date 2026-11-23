@@ -1,5 +1,7 @@
 """The BluePilot release job's rules (.github/bpx_release.py, #227)."""
+import contextlib
 import importlib.util
+import io
 import json
 import os
 import subprocess
@@ -75,6 +77,17 @@ class TestNewVersion(unittest.TestCase):
   def test_an_older_new_version_leaves_bp_stable(self):
     # 7.1.0 released after 7.2.0: its branch is created, bp-stable stays on 7.2
     self.assertEqual(rel.plan((7, 1, 0), facts(stable=OLD, tags=["v7.1.0", "v7.2.0"]), CFG), [rel.Update("bp-7.1", A, None)])
+
+
+class TestHighestRelease(unittest.TestCase):
+  def test_versions_compare_as_numbers(self):
+    self.assertEqual(rel.plan((7, 9, 0), facts(bpversion="7.9.0", stable=OLD, tags=["v7.9.0", "v7.10.0"]), CFG), [rel.Update("bp-7.9", A, None)])
+    self.assertEqual(rel.plan((7, 10, 0), facts(bpversion="7.10.0", stable=OLD, tags=["v7.9.0", "v7.10.0"]), CFG),
+                     [rel.Update("bp-7.10", A, None), rel.Update("bp-stable", A, OLD)])
+
+  def test_names_the_release_that_keeps_bp_stable(self):
+    self.assertEqual(rel.higher_release((7, 9, 0), ["v7.9.0", "v7.10.0", "v7.10.1", "v7.8.3"], "v"), "v7.10.1")
+    self.assertIsNone(rel.higher_release((7, 10, 1), ["v7.9.0", "v7.10.0", "v7.10.1", "bpx-test/v9.0.0"], "v"))
 
 
 class TestPatch(unittest.TestCase):
@@ -271,6 +284,36 @@ class TestRelease(unittest.TestCase):
     self.o.commit("7.1.0")
     with self.assertRaisesRegex(rel.Refused, "There is no tag v7.1.0: push the tag first"):
       self.release("v7.1.0")
+
+  def test_only_tags_on_their_version_branch_count_as_released(self):
+    a = self.o.commit("7.1.0")
+    self.o.tag("v99.0.0", a)  # stray: no bp-99.0
+    self.o.tag("v7.1.0", a)
+    self.release("v7.1.0")
+    b = self.o.commit("7.2.0")
+    self.o.tag("v7.5.0", b)  # refused: bp-7.5 exists, but it doesn't hold the tag's commit
+    self.o.git("push", "-q", "origin", f"{a}:refs/heads/bp-7.5")
+    self.o.tag("v7.2.0", b)
+    self.o.job = self.o.job.with_name("job2")
+    self.release("v7.2.0")
+    self.assertEqual(self.o.heads()["bp-stable"], b)
+
+  def test_a_patch_on_an_older_version_says_what_keeps_bp_stable(self):
+    a = self.o.commit("7.1.0")
+    self.o.tag("v7.1.0", a)
+    self.release("v7.1.0")
+    b = self.o.commit("7.2.0")
+    self.o.tag("v7.2.0", b)
+    self.o.job = self.o.job.with_name("job2")
+    self.release("v7.2.0")
+    fix = self.o.commit("7.1.1", branch="bp-7.1")
+    self.o.tag("v7.1.1", fix)
+    self.o.job = self.o.job.with_name("job3")
+    out = io.StringIO()
+    with contextlib.redirect_stdout(out):
+      self.release("v7.1.1")
+    self.assertEqual(self.o.heads(), {"bp-dev": b, "bp-7.1": fix, "bp-7.2": b, "bp-stable": b})
+    self.assertIn("bp-stable doesn't move: v7.2.0 is a higher release.", out.getvalue())
 
   def test_throwaway_names(self):
     a = self.o.commit("7.1.0", branch="bpx-test/dev")
