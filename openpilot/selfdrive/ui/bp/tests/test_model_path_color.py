@@ -17,6 +17,8 @@ from openpilot.selfdrive.ui.bp.lib.model_path_color import (
 PARAMS_KEYS_H = Path(__file__).resolve().parents[4] / "common" / "params_keys.h"
 BP_SETTINGS = Path(__file__).resolve().parents[1] / "layouts" / "settings" / "bluepilot.py"
 SP_VISUALS = Path(__file__).resolve().parents[2] / "sunnypilot" / "layouts" / "settings" / "visuals.py"
+TICI_RENDERER = Path(__file__).resolve().parents[1] / "onroad" / "model_renderer_bp.py"
+MICI_RENDERER = Path(__file__).resolve().parents[1] / "mici" / "onroad" / "model_renderer_bp.py"
 
 
 def test_param_is_registered_with_legacy_name_and_default():
@@ -31,6 +33,15 @@ def test_selector_stays_in_bluepilot_visuals():
   assert "self._model_path_color," in bp_settings
   assert "Enable Tesla Rainbow Mode SunnyPilot Toggle and active theme packs" in bp_settings
   assert "ModelPathColorDialog" not in sp_visuals
+
+
+def test_both_renderers_reload_remote_param_changes():
+  for renderer in (TICI_RENDERER, MICI_RENDERER):
+    source = renderer.read_text()
+    assert "self._counter % 60 == 0" in source
+    assert "self._bp_params.get(MODEL_PATH_COLOR_PARAM, return_default=True)" in source
+    assert "if model_path_color != self._model_path_color:" in source
+    assert "self._custom_path_gradient = model_path_gradient(self._model_path_color)" in source
 
 
 def test_normalizes_presets_and_custom_hex():
