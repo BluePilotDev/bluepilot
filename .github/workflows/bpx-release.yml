@@ -2,8 +2,11 @@
 # new version and moves bp-stable when it's the highest version released. The rules are in .github/bpx_release.py; any
 # failed rule writes nothing. Full BluePilot only: this file doesn't exist in ford-op/bp-sunnypilot.
 #
-# The App token can push to bp-stable: only a reviewed workflow file may hold it. The bpx-sync environment's branch and tag
-# rules decide which refs a run may come from, and v* tags must be creatable by maintainers only (a tag ruleset).
+# The App token can push to bp-stable, so only the default branch's reviewed workflow file may hold it. A tag push runs the
+# tagged commit's copy of this file: there, `dispatch` only checks the tag's form and starts a workflow_dispatch run on the
+# default branch with the built-in token (one of the two events that token can start a run with). `release` runs only on
+# workflow_dispatch, in the bpx-sync environment, whose single rule (the default branch) needs no tag rule. A ruleset
+# limiting v* tags to admins is still wanted: a tag push is what releases.
 name: bpx release
 
 on:
@@ -44,10 +47,30 @@ env:
   GIT_CONFIG_VALUE_0: 'false'
 
 jobs:
-  release:
-    if: github.repository == 'BluePilotDev/bluepilot'
+  dispatch:
+    if: github.repository == 'BluePilotDev/bluepilot' && github.event_name == 'push'
     runs-on: ubuntu-24.04
-    environment: bpx-sync  # the App key
+    timeout-minutes: 5
+    permissions:
+      actions: write  # gh workflow run
+    steps:
+    - env:
+        TAG: ${{ github.ref_name }}  # untrusted
+        REPO: ${{ github.repository }}
+        DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        # the same form bpx_release.py accepts; the release run checks everything else
+        if ! [[ "$TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+          echo "::error::the tag isn't a release tag: use vMAJOR.MINOR.PATCH, for example v7.1.0"
+          exit 1
+        fi
+        gh workflow run bpx-release.yml -R "$REPO" --ref "$DEFAULT_BRANCH" -f tag="$TAG" -f dry_run=false
+
+  release:
+    if: github.repository == 'BluePilotDev/bluepilot' && github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    environment: bpx-sync  # the App key; the environment allows only the default branch
     timeout-minutes: 10
     permissions:
       contents: read  # the checkout
@@ -62,7 +85,9 @@ jobs:
         private-key: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
         owner: BluePilotDev
         repositories: bluepilot
-    # history and trees only, no LFS, and the working tree is just .github. Pushes use the App token's URL.
+        permission-contents: write  # the push; nothing else
+    # the dispatched ref (the default branch) is the code; the tag is only read as data. History and trees only, no LFS,
+    # and the working tree is just .github. Pushes use the App token's URL.
     - uses: actions/checkout@v7
       with:
         fetch-depth: 0
@@ -71,7 +96,7 @@ jobs:
         persist-credentials: false
     - name: Release
       env:
-        TAG: ${{ inputs.tag || github.ref_name }}  # untrusted: bpx_release.py checks it before using it
+        TAG: ${{ inputs.tag }}  # untrusted: bpx_release.py checks it before using it
         DRY_RUN: ${{ inputs.dry_run }}
         SOURCE_BRANCH: ${{ inputs.source }}
         STABLE_BRANCH: ${{ inputs.stable }}

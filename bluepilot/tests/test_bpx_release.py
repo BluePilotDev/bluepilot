@@ -11,6 +11,8 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
+import yaml
+
 from openpilot.common.basedir import BASEDIR
 
 GITHUB_DIR = Path(BASEDIR) / ".github"
@@ -336,13 +338,51 @@ class TestRelease(unittest.TestCase):
     with contextlib.redirect_stdout(out):
       self.release("v7.1.1")
     self.assertEqual(self.o.heads(), {"bp-dev": b, "bp-7.1": fix, "bp-7.2": b, "bp-stable": b})
-    self.assertIn("bp-stable doesn't move: v7.2.0 is a higher release.", out.getvalue())
+    self.assertTrue("bp-stable doesn't move: v7.2.0 is a higher release." in out.getvalue(), out.getvalue())
 
   def test_throwaway_names(self):
     a = self.o.commit("7.1.0", branch="bpx-test/dev")
     self.o.tag("bpx-test/v7.1.0", a)
     self.release("bpx-test/v7.1.0", **TEST_ENV)
     self.assertEqual(self.o.heads(), {"bpx-test/dev": a, "bpx-test/bp-7.1": a, "bpx-test/stable": a})
+
+
+class TestWorkflow(unittest.TestCase):
+  """The App key never reaches a run started by a tag push: that run uses the tagged commit's workflow file."""
+  def setUp(self):
+    self.jobs = yaml.safe_load((GITHUB_DIR / "workflows" / "bpx-release.yml").read_text())["jobs"]
+
+  def test_a_tag_push_only_starts_a_run_on_the_default_branch(self):
+    job = self.jobs["dispatch"]
+    self.assertTrue("github.event_name == 'push'" in job["if"])
+    self.assertNotIn("environment", job)
+    self.assertEqual(job["permissions"], {"actions": "write"})
+    self.assertEqual([list(step) for step in job["steps"]], [["env", "run"]])  # no checkout, no action
+    self.assertNotIn("${{", job["steps"][0]["run"])
+
+  def test_the_release_runs_only_when_dispatched(self):
+    job = self.jobs["release"]
+    self.assertTrue("github.event_name == 'workflow_dispatch'" in job["if"])
+    self.assertEqual(job["environment"], "bpx-sync")
+
+  def dispatch(self, tag):
+    """Run the dispatch step's script with a fake gh; the gh arguments, or None when it refused."""
+    with tempfile.TemporaryDirectory() as tmp:
+      log = Path(tmp) / "gh.log"
+      (Path(tmp) / "gh").write_text(f'#!/bin/sh\nprintf "%s\\n" "$@" > {log}\n')
+      (Path(tmp) / "gh").chmod(0o755)
+      step = self.jobs["dispatch"]["steps"][0]
+      env = {**os.environ, **{k: str(v) for k, v in step["env"].items()}, "TAG": tag, "REPO": "o/r", "DEFAULT_BRANCH": "bp-dev",
+             "PATH": f"{tmp}:{os.environ['PATH']}"}
+      ok = subprocess.run(["bash", "-e", "-c", step["run"]], env=env, capture_output=True).returncode == 0
+      return log.read_text().splitlines() if ok else None
+
+  def test_the_tag_check_agrees_with_the_script(self):
+    self.assertEqual(self.dispatch("v7.10.0"),
+                     ["workflow", "run", "bpx-release.yml", "-R", "o/r", "--ref", "bp-dev", "-f", "tag=v7.10.0", "-f", "dry_run=false"])
+    for tag in ("v7.1", "v7.01.0", "v7.1.0-rc1", "v7.1.0;id", "v7.1.0 x", "bpx-test/v7.1.0"):
+      with self.subTest(tag=tag):
+        self.assertIsNone(self.dispatch(tag))
 
 
 if __name__ == "__main__":
