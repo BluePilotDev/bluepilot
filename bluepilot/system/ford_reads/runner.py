@@ -35,6 +35,26 @@ def last_read() -> dict | None:
     return None
 
 
+def blocker(started: bool, engaged: bool, car_state) -> str | None:
+  """Why the button can't start a read now, or None. The modules answer only with the ignition on (openpilot
+  started), and the read stops openpilot, so the car must be stopped in Park and openpilot disengaged."""
+  if not started:
+    return "Turn the ignition on (engine off) first: the modules only answer with the ignition on."
+  if engaged:
+    return "Disengage openpilot first."
+  if not car_state.standstill or str(car_state.gearShifter) != "park":
+    return "Stop and put the car in Park first."
+  return None
+
+
+def last_read_text() -> str:
+  """The last button read, for the settings pages."""
+  last = last_read()
+  if not last:
+    return "No read yet."
+  return f"Last read {last.get('started', '?')}: {last.get('message', '?')}"
+
+
 def _write_last(state: dict) -> None:
   os.makedirs(OUT_DIR, exist_ok=True)
   tmp = LAST + ".tmp"

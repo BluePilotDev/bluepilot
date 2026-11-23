@@ -798,27 +798,16 @@ class BluePilotLayout(Widget):
 
   @staticmethod
   def _ford_reads_description() -> str:
-    from openpilot.bluepilot.system.ford_reads.runner import last_read
-    text = tr("Read-only: saves every module's part numbers, As-Built and fault codes to /data/ford-reads/ for the developers. " +
-              "Park with the ignition on and the engine off. openpilot stops for about a minute, then the device reboots.")
-    last = last_read()
-    if last:
-      text += " " + tr("Last read {when}: {message}").format(when=last.get("started", "?"),
-                                                            message=last.get("message", "?"))
-    return text
+    from openpilot.bluepilot.system.ford_reads.runner import last_read_text
+    return tr("Read-only: saves every module's part numbers, As-Built and fault codes to /data/ford-reads/ for the developers. " +
+              "Park with the ignition on and the engine off. openpilot stops for about a minute, then the device reboots.") + \
+      " " + tr(last_read_text())
 
   @staticmethod
   def _ford_reads_blocker() -> str | None:
-    """Why a read can't start now, or None. The modules answer only with the ignition on (openpilot started),
-    and the read stops openpilot, so the car must be parked and not engaged."""
-    if not ui_state.started:
-      return tr("Turn the ignition on (engine off) first: the modules only answer with the ignition on.")
-    if ui_state.engaged:
-      return tr("Disengage openpilot first.")
-    cs = ui_state.sm["carState"]
-    if not cs.standstill or str(cs.gearShifter) != "park":
-      return tr("Stop and put the car in Park first.")
-    return None
+    from openpilot.bluepilot.system.ford_reads.runner import blocker
+    reason = blocker(ui_state.started, ui_state.engaged, ui_state.sm["carState"])
+    return None if reason is None else tr(reason)
 
   def _start_ford_reads(self):
     blocker = self._ford_reads_blocker()

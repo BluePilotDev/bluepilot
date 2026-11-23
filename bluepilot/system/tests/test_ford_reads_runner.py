@@ -63,6 +63,19 @@ class TestFordReadsRunner(unittest.TestCase):
     self.assertEqual(self.calls, [["sudo", "reboot"]])
 
 
+class TestBlocker(unittest.TestCase):
+  @staticmethod
+  def _cs(standstill=True, gear="park"):
+    return mock.Mock(standstill=standstill, gearShifter=gear)
+
+  def test_a_read_starts_only_parked_with_the_ignition_on_and_disengaged(self):
+    self.assertIsNone(runner.blocker(True, False, self._cs()))
+    self.assertIn("ignition", runner.blocker(False, False, self._cs()))
+    self.assertIn("Disengage", runner.blocker(True, True, self._cs()))
+    self.assertIn("Park", runner.blocker(True, False, self._cs(gear="drive")))
+    self.assertIn("Park", runner.blocker(True, False, self._cs(standstill=False)))
+
+
 class TestGuard(unittest.TestCase):
   def test_only_read_only_services_reach_the_bus(self):
     sent = []
