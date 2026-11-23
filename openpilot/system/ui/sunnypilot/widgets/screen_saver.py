@@ -9,6 +9,7 @@ import time
 
 import pyray as rl
 
+from openpilot.common.bluepilot import NAME as BLUEPILOT_NAME  # BluePilot: screensaver text (#255)
 from openpilot.common.hardware import HARDWARE
 from openpilot.common.params import Params
 from openpilot.system.ui.lib.application import gui_app, FontWeight
@@ -30,7 +31,7 @@ class ScreenSaverSP(Widget):
     self._hue = 150
     self.color = rl.color_from_hsv(self._hue, 1, 1)
 
-    self.text = "sunnypilot"
+    self.text = BLUEPILOT_NAME  # BluePilot: "BluePilot", not "sunnypilot" (#255)
     self.font_size = 50 if self._is_mici else 200
     self._start_time = None
     self._dismiss = False

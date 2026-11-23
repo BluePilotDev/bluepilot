@@ -51,5 +51,6 @@ openpilot/system/tombstoned.py                                                  
 openpilot/system/ui/lib/application.py                                                 # guard against 0x0 images
 openpilot/system/ui/lib/networkmanager.py                                              # WPA2/WPA3 cipher flags
 openpilot/system/ui/lib/wifi_manager.py                                                # WPA2/WPA3 networks
+openpilot/system/ui/sunnypilot/widgets/screen_saver.py                                 # screensaver text is BluePilot (#255)
 pyproject.toml                                                                         # lint and spelling skip bluepilot/vendor
 tools/test_runner.py                                                                   # also collects bluepilot/ (#238)
