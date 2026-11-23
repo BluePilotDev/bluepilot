@@ -14,7 +14,6 @@ from openpilot.selfdrive.ui.bp.lib.ui_debug_logger import bp_ui_log
 from openpilot.selfdrive.ui.bp.lib import theme_pack
 from openpilot.selfdrive.ui.bp.lib.model_path_color import (
   PARAM_KEY as MODEL_PATH_COLOR_PARAM,
-  model_path_color_is_rainbow,
   model_path_color_rgb,
   model_path_gradient,
   normalize_model_path_color,
@@ -133,7 +132,7 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
   def _render(self, rect: rl.Rectangle):
     sm = ui_state.sm
 
-    if ui_state.rainbow_path or model_path_color_is_rainbow(self._model_path_color) or self._rainbow_lane_lines:
+    if ui_state.rainbow_path or self._rainbow_lane_lines:
       self._rainbow_v = np.clip(sm['carState'].vEgo, 2.5, 35) / 30
 
     if (sm.recv_frame["extrinsicsCalibration"] < ui_state.started_frame or
@@ -529,7 +528,7 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
     if self._rad_racer:
       return
 
-    if ui_state.rainbow_path or model_path_color_is_rainbow(self._model_path_color):
+    if ui_state.rainbow_path:
       draw_rainbow_polygon(self._rect, self._path.projected_points, rainbow_v=self._rainbow_v)
     elif (themed_gradient := self._themed_path_gradient()) is not None:
       # BluePilot: theme pack path colors replace the throttle/no-throttle gradient

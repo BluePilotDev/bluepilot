@@ -6,12 +6,20 @@ import re
 
 PARAM_KEY = "CustomModelPathColor"
 STOCK_VALUE = "Stock"
-RAINBOW_VALUE = "Rainbow"
+BP_BLUE_VALUE = "BP Blue"
+BP_BLUE_EDGE_HEX = "#48BEF1"
+BP_BLUE_GRADIENT_RGBA = (
+  (25, 135, 220, 170),
+  (73, 196, 246, 145),
+  (139, 226, 255, 0),
+)
+BP_BLUE_GRADIENT_STOPS = (0.0, 0.52, 1.0)
+_LEGACY_RAINBOW_VALUE = "Rainbow"
 
-# Keep the BP 6.0 choices while also accepting a literal #RRGGBB custom value.
+# Keep the historical BP choices while also accepting a literal #RRGGBB custom value.
 PRESET_COLORS: dict[str, str | None] = {
   STOCK_VALUE: None,
-  RAINBOW_VALUE: None,
+  BP_BLUE_VALUE: BP_BLUE_EDGE_HEX,
   "Blue": "#0086E9",
   "Green": "#0DF87A",
   "Purple": "#A855F7",
@@ -33,6 +41,10 @@ def normalize_model_path_color(value: str | bytes | None) -> str:
   preset = next((name for name in PRESET_COLORS if name.lower() == value.lower()), None)
   if preset is not None:
     return preset
+
+  # The picker previously exposed Rainbow; migrate that stored value to its BP Blue replacement.
+  if value.lower() == _LEGACY_RAINBOW_VALUE.lower():
+    return BP_BLUE_VALUE
 
   if match := _HEX_COLOR_RE.fullmatch(value):
     return f"#{match.group(1).upper()}"
@@ -58,10 +70,6 @@ def model_path_color_label(value: str | bytes | None) -> str:
   return f"Custom {normalized}" if normalized.startswith("#") else normalized
 
 
-def model_path_color_is_rainbow(value: str | bytes | None) -> bool:
-  return normalize_model_path_color(value) == RAINBOW_VALUE
-
-
 def model_path_color_is_visible(value: str | bytes | None) -> bool:
   """Reject colors dark enough to make the path effectively disappear."""
   rgb = model_path_color_rgb(value)
@@ -73,14 +81,24 @@ def model_path_color_is_visible(value: str | bytes | None) -> bool:
 
 def model_path_gradient(value: str | bytes | None):
   """Build the cached BP path gradient for a named or literal custom color."""
-  rgb = model_path_color_rgb(value)
-  if rgb is None:
+  normalized = normalize_model_path_color(value)
+  rgb = None if normalized == BP_BLUE_VALUE else model_path_color_rgb(normalized)
+  if normalized != BP_BLUE_VALUE and rgb is None:
     return None
 
   # Keep the parser importable in non-UI tooling where raylib is unavailable.
   import pyray as rl
   from openpilot.system.ui.lib.shader_polygon import Gradient
 
+  if normalized == BP_BLUE_VALUE:
+    return Gradient(
+      start=(0.0, 1.0),
+      end=(0.0, 0.0),
+      colors=[rl.Color(*rgba) for rgba in BP_BLUE_GRADIENT_RGBA],
+      stops=list(BP_BLUE_GRADIENT_STOPS),
+    )
+
+  assert rgb is not None
   r, g, b = rgb
   # A slightly brighter near edge improves depth perception while preserving hue.
   edge = tuple(round(channel + (255 - channel) * 0.18) for channel in rgb)
