@@ -100,10 +100,6 @@ else
     readonly BLUEPILOT_BOOT_IMG="/data/openpilot/openpilot/selfdrive/assets/img_bluepilot_boot.jpg"
 fi
 
-# Spinner logo (loading screen): source stored outside LFS; dest is what spinner.py loads
-readonly BLUEPILOT_SPINNER_SRC="/data/openpilot/bluepilot/assets/images/spinner_bluepilot.png"
-readonly SPINNER_DEST="/data/openpilot/openpilot/sunnypilot/selfdrive/assets/images/spinner_sunnypilot.png"
-
 ###############################################################################
 # Partition Management Functions
 ###############################################################################
@@ -221,19 +217,6 @@ check_custom_status() {
         echo "Default image is currently active"
         return 1
     fi
-}
-
-update_spinner_image() {
-    if [ ! -f "$BLUEPILOT_SPINNER_SRC" ]; then
-        print_warning "BluePilot spinner source not found ($BLUEPILOT_SPINNER_SRC), skipping."
-        return 0
-    fi
-    if [ ! -f "$SPINNER_DEST" ]; then
-        print_warning "Spinner destination not found ($SPINNER_DEST), skipping."
-        return 0
-    fi
-    cp "$BLUEPILOT_SPINNER_SRC" "$SPINNER_DEST"
-    print_success "Spinner image updated with BluePilot logo."
 }
 
 ###############################################################################
@@ -497,7 +480,6 @@ parse_arguments() {
     if [ -n "$action" ]; then
         case "$action" in
             update)
-                update_spinner_image
                 if update_boot_image; then
                     exit 0
                 else
