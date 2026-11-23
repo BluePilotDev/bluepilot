@@ -519,3 +519,20 @@ class TestReviewHandOff(unittest.TestCase):
   def test_the_review_job_is_asked_once_per_upstream_commit(self):
     self.assertTrue(self.want("").startswith("review<<"))
     self.assertEqual(self.want(f"<!-- bpx-sync-review {self.UP} -->"), "")
+
+
+class TestRemoteBranch(unittest.TestCase):
+  def setUp(self):
+    self.origin = Repo(self)
+    self.tip = self.origin.commit("root")
+    self.clone = Repo(self)
+    self.clone.run("remote", "add", "origin", str(self.origin.path))
+
+  def test_an_existing_branch(self):
+    self.origin.branch("bp-7.1")
+    self.assertEqual(bpx.remote_branch(self.clone.git, "bp-7.1"), self.tip)
+
+  def test_only_the_exact_name(self):
+    # ls-remote matches the end of a ref name: refs/heads/x/refs/heads/bp-7.1 isn't bp-7.1
+    self.origin.branch("x/refs/heads/bp-7.1")
+    self.assertIsNone(bpx.remote_branch(self.clone.git, "bp-7.1"))

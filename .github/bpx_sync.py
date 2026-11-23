@@ -293,7 +293,9 @@ def opendbc() -> Git:
 
 def remote_branch(git: Git, branch: str) -> str | None:
   """Fetch a branch if it exists; its head."""
-  if not git("ls-remote", "origin", f"refs/heads/{branch}"):
+  ref = f"refs/heads/{branch}"
+  # ls-remote matches the end of a ref name (refs/heads/x/refs/heads/bp-7.1 too): only the exact name counts
+  if not any(line.split("\t")[1] == ref for line in git("ls-remote", "origin", ref).splitlines()):
     return None
   git("fetch", "-q", "--no-tags", "origin", f"+refs/heads/{branch}:refs/remotes/origin/{branch}")
   return git("rev-parse", f"origin/{branch}")
