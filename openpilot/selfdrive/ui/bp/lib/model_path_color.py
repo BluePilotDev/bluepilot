@@ -62,7 +62,7 @@ def model_path_color_rgb(value: str | bytes | None) -> tuple[int, int, int] | No
   color_hex = model_path_color_hex(value)
   if color_hex is None:
     return None
-  return tuple(int(color_hex[i:i + 2], 16) for i in (1, 3, 5))
+  return (int(color_hex[1:3], 16), int(color_hex[3:5], 16), int(color_hex[5:7], 16))
 
 
 def model_path_color_label(value: str | bytes | None) -> str:

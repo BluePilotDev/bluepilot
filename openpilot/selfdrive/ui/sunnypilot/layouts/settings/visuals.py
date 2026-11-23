@@ -121,8 +121,7 @@ class VisualsLayout(Widget):
       inline=False
     )
 
-    items = list(self._toggles.values())
-    items += [
+    items = list(self._toggles.values()) + [
       self._chevron_info,
       self._dev_ui_info,
     ]
