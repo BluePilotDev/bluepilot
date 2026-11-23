@@ -104,9 +104,9 @@ class TestEveryRelease(unittest.TestCase):
         rel.plan((7, 1, 0), facts(bpversion=bpversion), CFG)
 
   def test_the_checks_must_be_green(self):
-    msg = "aaaaaaaa's push checks aren't all green .tests / process replay, install smoke.: wait for them and run the job again, or fix them"
+    msg = "aaaaaaaa's push checks aren't all green .tests / unit tests, install smoke.: wait for them and run the job again, or fix them"
     with self.assertRaisesRegex(rel.Refused, msg):
-      rel.plan((7, 1, 0), facts(not_green=["tests / process replay", "install smoke"]), CFG)
+      rel.plan((7, 1, 0), facts(not_green=["tests / unit tests", "install smoke"]), CFG)
 
 
 PUSH, PR = 1, 2  # check suite IDs: one push run, one PR run
@@ -116,22 +116,24 @@ def run(name, conclusion="success", suite=PUSH, status="completed"):
   return {"name": name, "status": status, "conclusion": conclusion if status == "completed" else None, "suite": suite}
 
 
-GREEN = [run(n) for n in ("tests / build release", "tests / static analysis", "tests / unit tests", "tests / process replay", "install smoke")]
+GREEN = [run(n) for n in ("tests / build release", "tests / static analysis", "tests / unit tests", "install smoke")]
 
 
 class TestNotGreen(unittest.TestCase):
-  def test_all_five_passed_on_push(self):
+  def test_all_four_passed_on_push(self):
     self.assertEqual(rel.not_green(GREEN + [run("tests / build macOS", "failure"), run("bluepilot-hooks", "failure", PR)], {PUSH}), [])
+
+  def test_process_replay_is_not_a_push_gate(self):
+    # the PR check is: a bp-dev push run publishes references instead of comparing
+    self.assertEqual(rel.not_green(GREEN + [run("tests / process replay", "failure")], {PUSH}), [])
 
   def test_a_pr_run_does_not_count(self):
     runs = [r for r in GREEN if r["name"] != "install smoke"] + [run("install smoke", suite=PR)]
     self.assertEqual(rel.not_green(runs, {PUSH}), ["install smoke"])
 
   def test_missing_running_failed_and_skipped_are_not_green(self):
-    runs = [run("tests / static analysis", status="in_progress"), run("tests / unit tests", "failure"),
-            run("tests / process replay", "skipped"), run("install smoke")]
-    self.assertEqual(rel.not_green(runs, {PUSH}),
-                     ["tests / build release", "tests / static analysis", "tests / unit tests", "tests / process replay"])
+    runs = [run("tests / static analysis", status="in_progress"), run("tests / unit tests", "failure"), run("install smoke", "skipped")]
+    self.assertEqual(rel.not_green(runs, {PUSH}), ["tests / build release", "tests / static analysis", "tests / unit tests", "install smoke"])
 
   def test_every_push_copy_must_pass(self):
     # the same commit pushed to two branches runs twice

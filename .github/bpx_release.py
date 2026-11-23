@@ -10,7 +10,10 @@ from dataclasses import dataclass
 from bpx_sync import REPO, Git, gh, push_url, remote_branch
 
 # a pushed commit's checks (#227): bp tests' calls to tests.yaml and install smoke. bluepilot-hooks runs on PRs only.
-REQUIRED = ("tests / build release", "tests / static analysis", "tests / unit tests", "tests / process replay", "install smoke")
+# Process replay isn't one: on bp-dev the push run publishes the references instead of comparing, and on a version branch
+# it compares against bp-dev's. The PR check (required by branch protection, passing with the replay-accepted label once a
+# difference is explained) is the replay gate.
+REQUIRED = ("tests / build release", "tests / static analysis", "tests / unit tests", "install smoke")
 
 
 class Refused(Exception):
