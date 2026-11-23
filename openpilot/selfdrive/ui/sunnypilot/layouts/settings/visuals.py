@@ -7,15 +7,9 @@ See the LICENSE.md file in the root directory for more details.
 from openpilot.common.params import Params
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.system.ui.lib.multilang import tr, tr_noop
-from openpilot.system.ui.lib.application import gui_app
-from openpilot.system.ui.sunnypilot.widgets.list_view import button_item_sp, toggle_item_sp, multiple_button_item_sp
+from openpilot.system.ui.sunnypilot.widgets.list_view import toggle_item_sp, multiple_button_item_sp
 from openpilot.system.ui.widgets.scroller_tici import Scroller
 from openpilot.system.ui.widgets import Widget
-
-# BluePilot: BP 6.0 model-path color selector and custom color picker.
-from openpilot.selfdrive.ui.bp.lib.model_path_color import PARAM_KEY as MODEL_PATH_COLOR_PARAM, model_path_color_label
-from openpilot.selfdrive.ui.bp.widgets.model_path_color_dialog import ModelPathColorDialog
-# End BluePilot
 
 CHEVRON_INFO_DESCRIPTION = {
   "enabled": tr_noop("Display useful metrics below the chevron that tracks the lead car " +
@@ -111,17 +105,6 @@ class VisualsLayout(Widget):
       )
       self._toggles[param] = toggle
 
-    # BluePilot: Restore BP 6.0 presets and add a custom wheel/HEX picker.
-    self._model_path_color_label = model_path_color_label(self._params.get(MODEL_PATH_COLOR_PARAM, return_default=True))
-    self._model_path_color = button_item_sp(
-      title=lambda: tr("Model Path Color"),
-      button_text=lambda: self._model_path_color_label,
-      description=lambda: tr("Choose a BluePilot 6.0 path color preset or create a custom color. " +
-                             "Rainbow Mode and active theme packs take priority over solid colors."),
-      callback=self._show_model_path_color_dialog,
-    )
-    # End BluePilot
-
     self._chevron_info = multiple_button_item_sp(
       title=lambda: tr("Display Metrics Below Chevron"),
       description="",
@@ -138,25 +121,12 @@ class VisualsLayout(Widget):
       inline=False
     )
 
-    items = []
-    for param, toggle in self._toggles.items():
-      # BluePilot: Keep the path color selector adjacent to the existing Rainbow Mode control.
-      if param == "RainbowMode":
-        items.append(self._model_path_color)
-      items.append(toggle)
+    items = list(self._toggles.values())
     items += [
       self._chevron_info,
       self._dev_ui_info,
     ]
     return items
-
-  # BluePilot: model-path color picker wiring.
-  def _show_model_path_color_dialog(self):
-    gui_app.push_widget(ModelPathColorDialog(on_saved=self._on_model_path_color_saved))
-
-  def _on_model_path_color_saved(self, value: str):
-    self._model_path_color_label = model_path_color_label(value)
-  # End BluePilot
 
   def _update_state(self):
     super()._update_state()
@@ -180,8 +150,6 @@ class VisualsLayout(Widget):
 
   def show_event(self):
     self._scroller.show_event()
-    # BluePilot: refresh the displayed preset/custom HEX value when returning to this panel.
-    self._model_path_color_label = model_path_color_label(self._params.get(MODEL_PATH_COLOR_PARAM, return_default=True))
     if not ui_state.has_longitudinal_control:
       self._chevron_info.set_description(tr(CHEVRON_INFO_DESCRIPTION["disabled"]))
       self._chevron_info.show_description(True)

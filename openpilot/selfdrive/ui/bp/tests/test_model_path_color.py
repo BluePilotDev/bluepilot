@@ -12,11 +12,22 @@ from openpilot.selfdrive.ui.bp.lib.model_path_color import (
 )
 
 PARAMS_KEYS_H = Path(__file__).resolve().parents[4] / "common" / "params_keys.h"
+BP_SETTINGS = Path(__file__).resolve().parents[1] / "layouts" / "settings" / "bluepilot.py"
+SP_VISUALS = Path(__file__).resolve().parents[2] / "sunnypilot" / "layouts" / "settings" / "visuals.py"
 
 
 def test_param_is_registered_with_legacy_name_and_default():
   registration = f'{{"{PARAM_KEY}", {{PERSISTENT | BACKUP, STRING, "Stock"}}}}'
   assert registration in PARAMS_KEYS_H.read_text()
+
+
+def test_selector_stays_in_bluepilot_visuals():
+  bp_settings = BP_SETTINGS.read_text()
+  sp_visuals = SP_VISUALS.read_text()
+
+  assert "self._model_path_color," in bp_settings
+  assert "Enable Tesla Rainbow Mode SunnyPilot Toggle and active theme packs" in bp_settings
+  assert "ModelPathColorDialog" not in sp_visuals
 
 
 def test_normalizes_presets_and_custom_hex():
