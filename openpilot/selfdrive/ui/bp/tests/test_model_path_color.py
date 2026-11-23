@@ -1,4 +1,7 @@
+from pathlib import Path
+
 from openpilot.selfdrive.ui.bp.lib.model_path_color import (
+  PARAM_KEY,
   PRESET_COLORS,
   model_path_color_hex,
   model_path_color_is_visible,
@@ -7,6 +10,13 @@ from openpilot.selfdrive.ui.bp.lib.model_path_color import (
   model_path_color_rgb,
   normalize_model_path_color,
 )
+
+PARAMS_KEYS_H = Path(__file__).resolve().parents[4] / "common" / "params_keys.h"
+
+
+def test_param_is_registered_with_legacy_name_and_default():
+  registration = f'{{"{PARAM_KEY}", {{PERSISTENT | BACKUP, STRING, "Stock"}}}}'
+  assert registration in PARAMS_KEYS_H.read_text()
 
 
 def test_normalizes_presets_and_custom_hex():
