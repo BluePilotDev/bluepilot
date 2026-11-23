@@ -11,6 +11,12 @@ from openpilot.bluepilot.ui.lib.bp_shaders import draw_rainbow_polygon
 from openpilot.selfdrive.ui.bp.onroad.rad_racer_road import RadRacerRoadMixin, RAD_RACER_DASH_LEN_M, RAD_RACER_GAP_LEN_M
 # BluePilot: seasonal theme packs (colors.json overrides for road colors)
 from openpilot.selfdrive.ui.bp.lib import theme_pack
+from openpilot.selfdrive.ui.bp.lib.model_path_color import (
+  PARAM_KEY as MODEL_PATH_COLOR_PARAM,
+  model_path_color_is_rainbow,
+  model_path_gradient,
+  normalize_model_path_color,
+)
 
 class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
   def __init__(self):
@@ -24,6 +30,9 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
     self._dash_phase = 0.0
     # BluePilot: seasonal theme pack (None when disabled)
     self._theme_pack = theme_pack.get_active_pack(force=True)
+    # BluePilot: BP 6.0 model-path color selector, including literal #RRGGBB values.
+    self._model_path_color = normalize_model_path_color(self._bp_params.get(MODEL_PATH_COLOR_PARAM, return_default=True))
+    self._custom_path_gradient = model_path_gradient(self._model_path_color)
 
   def prepare_projection(self, rect: rl.Rectangle) -> None:
     """Set clip region so _map_to_screen works before render().
@@ -56,8 +65,12 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
       self._rainbow_lane_lines = self._bp_params.get_bool("BPRainbowLines")
       self._rad_racer = theme_pack.rad_racer_active(self._bp_params)
       self._theme_pack = theme_pack.get_active_pack()
+      model_path_color = normalize_model_path_color(self._bp_params.get(MODEL_PATH_COLOR_PARAM, return_default=True))
+      if model_path_color != self._model_path_color:
+        self._model_path_color = model_path_color
+        self._custom_path_gradient = model_path_gradient(self._model_path_color)
 
-    if ui_state.rainbow_path or self._rainbow_lane_lines:
+    if ui_state.rainbow_path or model_path_color_is_rainbow(self._model_path_color) or self._rainbow_lane_lines:
       v = sm['carState'].vEgo
       self._rainbow_v = np.clip(v, 2.5, 35) / 30
 
@@ -70,7 +83,7 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
     # BluePilot: Rad Racer theme draws the path ribbon in _draw_rad_racer_road
     if self._rad_racer:
       return
-    if ui_state.rainbow_path:
+    if ui_state.rainbow_path or model_path_color_is_rainbow(self._model_path_color):
       draw_rainbow_polygon(self._rect, self._path.projected_points, rainbow_v=self._rainbow_v)
     elif (themed_gradient := self._themed_path_gradient()) is not None:
       # BluePilot: theme pack path colors replace the throttle/no-throttle gradient
@@ -81,6 +94,14 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
         draw_polygon(self._rect, path_pts, rl.Color(0, 0, 0, 90))
       else:
         draw_polygon(self._rect, path_pts, gradient=themed_gradient)
+    elif self._custom_path_gradient is not None:
+      if not self._path.projected_points.size:
+        return
+      path_pts = self._path.projected_points + np.array([self._rect.x, self._rect.y], dtype=np.float32)
+      if ui_state.status == UIStatus.DISENGAGED:
+        draw_polygon(self._rect, path_pts, rl.Color(0, 0, 0, 90))
+      else:
+        draw_polygon(self._rect, path_pts, gradient=self._custom_path_gradient)
     else:
       super()._draw_path()
 

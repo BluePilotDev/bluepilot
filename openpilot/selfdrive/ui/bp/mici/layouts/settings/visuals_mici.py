@@ -14,6 +14,7 @@ from openpilot.selfdrive.ui.bp.lib.dm_icon_style import (
   get_dm_icon_style,
 )
 from openpilot.selfdrive.ui.bp.mici.widgets.button_bp import (
+  BigButtonBP,
   BigParamControlBP,
   BigMultiParamToggleBP,
   BigMultiParamToggleBoolBP,
@@ -21,7 +22,10 @@ from openpilot.selfdrive.ui.bp.mici.widgets.button_bp import (
 )
 # BluePilot: seasonal theme packs (discovered on disk at panel build time)
 from openpilot.selfdrive.ui.bp.lib import theme_pack
+from openpilot.selfdrive.ui.bp.lib.model_path_color import PARAM_KEY as MODEL_PATH_COLOR_PARAM, model_path_color_label
+from openpilot.selfdrive.ui.bp.widgets.model_path_color_dialog import ModelPathColorDialog
 from openpilot.selfdrive.ui.ui_state import ui_state
+from openpilot.system.ui.lib.application import gui_app
 from openpilot.system.ui.widgets.scroller import NavScroller
 
 
@@ -36,6 +40,12 @@ class VisualsLayoutMici(NavScroller):
       ["off", "lead car speed", "speed", "lead car distance", "time to lead car"],
     )
     self.rainbow_mode = BigParamControlBP("Rainbow Mode", "RainbowMode")
+    self.model_path_color = BigButtonBP(
+      "Model Path Color",
+      model_path_color_label(Params().get(MODEL_PATH_COLOR_PARAM, return_default=True)),
+      value_size=24,
+    )
+    self.model_path_color.set_click_callback(self._show_model_path_color_dialog)
     # BluePilot: one theme selector for everything (8-Bit Racer + seasonal packs),
     # same entries and param as the C3X page — see theme_pack.selector_entries().
     _theme_entries = theme_pack.selector_entries()
@@ -69,6 +79,7 @@ class VisualsLayoutMici(NavScroller):
 
     self._scroller.add_widgets([
       self.show_lead_vehicle,
+      self.model_path_color,
       self.rainbow_mode,
       self.theme_pack_sel,
       self.theme_auto_seasonal,
@@ -108,6 +119,7 @@ class VisualsLayoutMici(NavScroller):
 
   def show_event(self):
     super().show_event()
+    self._update_model_path_color()
     self._update_toggles()
     self._update_buttons()
 
@@ -124,3 +136,10 @@ class VisualsLayoutMici(NavScroller):
     self.wheel_icon_style.set_value(self.wheel_icon_style._options[int(wheel_style)])
     dm_style = get_dm_icon_style(ui_state.params, DMIconStyle.COMMA_4)
     self.dm_icon_style.set_value(self.dm_icon_style._options[int(dm_style)])
+
+  def _show_model_path_color_dialog(self):
+    gui_app.push_widget(ModelPathColorDialog(on_saved=lambda _: self._update_model_path_color()))
+
+  def _update_model_path_color(self):
+    value = ui_state.params.get(MODEL_PATH_COLOR_PARAM, return_default=True)
+    self.model_path_color.set_value(model_path_color_label(value))
