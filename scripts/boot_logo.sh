@@ -35,7 +35,7 @@ print_success() {
     if [ "$QUIET_MODE" != "true" ]; then
         echo -e "${GREEN}$message${NC}"
     fi
-    [ -n "$LOG_FILE" ] && echo "$(date '+%Y-%m-%d %H:%M:%S') [SUCCESS] $message" >> "$LOG_FILE"
+    [ -z "$LOG_FILE" ] || echo "$(date '+%Y-%m-%d %H:%M:%S') [SUCCESS] $message" >> "$LOG_FILE"
 }
 
 print_error() {
@@ -43,7 +43,7 @@ print_error() {
     if [ "$QUIET_MODE" != "true" ]; then
         echo -e "${RED}$message${NC}" >&2
     fi
-    [ -n "$LOG_FILE" ] && echo "$(date '+%Y-%m-%d %H:%M:%S') [ERROR] $message" >> "$LOG_FILE"
+    [ -z "$LOG_FILE" ] || echo "$(date '+%Y-%m-%d %H:%M:%S') [ERROR] $message" >> "$LOG_FILE"
 }
 
 print_warning() {
@@ -51,7 +51,7 @@ print_warning() {
     if [ "$QUIET_MODE" != "true" ]; then
         echo -e "${YELLOW}$message${NC}"
     fi
-    [ -n "$LOG_FILE" ] && echo "$(date '+%Y-%m-%d %H:%M:%S') [WARNING] $message" >> "$LOG_FILE"
+    [ -z "$LOG_FILE" ] || echo "$(date '+%Y-%m-%d %H:%M:%S') [WARNING] $message" >> "$LOG_FILE"
 }
 
 print_info() {
@@ -59,7 +59,7 @@ print_info() {
     if [ "$QUIET_MODE" != "true" ]; then
         echo -e "${BLUE}$message${NC}"
     fi
-    [ -n "$LOG_FILE" ] && echo "$(date '+%Y-%m-%d %H:%M:%S') [INFO] $message" >> "$LOG_FILE"
+    [ -z "$LOG_FILE" ] || echo "$(date '+%Y-%m-%d %H:%M:%S') [INFO] $message" >> "$LOG_FILE"
 }
 
 # Convenient prompt-pause function (only in interactive mode)
@@ -74,7 +74,7 @@ pause_for_user() {
 # Device Detection
 ###############################################################################
 detect_device_type() {
-    local model_file="/sys/firmware/devicetree/base/model"
+    local model_file="${BOOT_LOGO_MODEL_FILE:-/sys/firmware/devicetree/base/model}"  # override: tests
     if [ -f "$model_file" ]; then
         local model
         model="$(tr -d '\0' < "$model_file")"
@@ -90,19 +90,18 @@ DEVICE_TYPE="$(detect_device_type)"
 ###############################################################################
 # Path Constants
 ###############################################################################
-readonly BOOT_IMG="/usr/comma/bg.jpg"
+# AGNOS 19.9's display service (/usr/comma/magic.py) draws bg.png, stretched to screen width x width/2.
+# BOOT_LOGO_TARGET / BOOT_LOGO_SOURCE / BOOT_LOGO_MODEL_FILE override the paths (tests).
+readonly BOOT_IMG="${BOOT_LOGO_TARGET:-/usr/comma/bg.png}"
 readonly BOOT_IMG_BKP="${BOOT_IMG}.backup"
 
 # Select the appropriate boot image based on device type
 if [ "$DEVICE_TYPE" = "mici" ]; then
-    readonly BLUEPILOT_BOOT_IMG="/data/openpilot/openpilot/selfdrive/assets/img_bluepilot_boot_mici.jpg"
+    DEFAULT_BOOT_IMG="/data/openpilot/bluepilot/assets/images/boot_logo_mici.png"
 else
-    readonly BLUEPILOT_BOOT_IMG="/data/openpilot/openpilot/selfdrive/assets/img_bluepilot_boot.jpg"
+    DEFAULT_BOOT_IMG="/data/openpilot/bluepilot/assets/images/boot_logo.png"
 fi
-
-# Spinner logo (loading screen): source stored outside LFS; dest is what spinner.py loads
-readonly BLUEPILOT_SPINNER_SRC="/data/openpilot/bluepilot/assets/images/spinner_bluepilot.png"
-readonly SPINNER_DEST="/data/openpilot/openpilot/sunnypilot/selfdrive/assets/images/spinner_sunnypilot.png"
+readonly BLUEPILOT_BOOT_IMG="${BOOT_LOGO_SOURCE:-$DEFAULT_BOOT_IMG}"
 
 ###############################################################################
 # Partition Management Functions
@@ -128,6 +127,17 @@ mount_partition_ro() {
     else
         print_warning "Failed to mount $partition as read-only"
     fi
+}
+
+# The device loses power at key-off: copy to a temp file next to the destination, flush, then rename over
+# it, so a power cut leaves the old file or the new one, never half of one. Mode 664 is comma's own.
+safe_copy() {
+    local src="$1" dest="$2" tmp="$2.tmp"
+    if sudo cp "$src" "$tmp" && sudo chmod 664 "$tmp" && sync && sudo mv -f "$tmp" "$dest"; then
+        return 0
+    fi
+    sudo rm -f "$tmp"
+    return 1
 }
 
 ###############################################################################
@@ -160,57 +170,78 @@ clean_backups() {
 update_boot_image() {
     print_info "Updating boot image (device: $DEVICE_TYPE)..."
     print_info "Using image: $BLUEPILOT_BOOT_IMG"
-    mount_partition_rw "/"
 
-    # Ensure the original file exists before proceeding
+    # Ensure both files exist before proceeding
     if [ ! -f "$BOOT_IMG" ]; then
         print_error "Boot image ($BOOT_IMG) does not exist. Aborting update."
         [ "$HEADLESS_MODE" != "true" ] && pause_for_user
         return 1
     fi
-
-    # Create backup if it does not already exist
-    if [ ! -f "$BOOT_IMG_BKP" ]; then
-        sudo cp "$BOOT_IMG" "$BOOT_IMG_BKP"
-        print_success "Backup created for boot image at $BOOT_IMG_BKP"
-    else
-        print_info "Backup for boot image already exists at $BOOT_IMG_BKP"
-    fi
-
-    # Ensure the BluePilot image exists
     if [ ! -f "$BLUEPILOT_BOOT_IMG" ]; then
         print_error "BluePilot boot image ($BLUEPILOT_BOOT_IMG) not found."
         [ "$HEADLESS_MODE" != "true" ] && pause_for_user
         return 1
     fi
 
+    # Already in place (every boot after the first): leave the system partition alone
+    if cmp -s "$BLUEPILOT_BOOT_IMG" "$BOOT_IMG"; then
+        print_info "BluePilot boot image already in place."
+        [ "$HEADLESS_MODE" != "true" ] && pause_for_user
+        return 0
+    fi
+
+    mount_partition_rw "/" || return 1
+
+    # The backup holds comma's image: made only when none exists, i.e. before BluePilot's first copy.
+    # An existing one is kept when a newer BluePilot image replaces an older one.
+    # Without a backup comma's image is never overwritten.
+    if [ ! -f "$BOOT_IMG_BKP" ]; then
+        if ! safe_copy "$BOOT_IMG" "$BOOT_IMG_BKP"; then
+            print_error "Failed to back up $BOOT_IMG; boot image left as it was."
+            mount_partition_ro "/"
+            return 1
+        fi
+        print_success "Backup created for boot image at $BOOT_IMG_BKP"
+    else
+        print_info "Backup for boot image already exists at $BOOT_IMG_BKP"
+    fi
+
     # Overwrite the original file with the BluePilot image
-    sudo cp "$BLUEPILOT_BOOT_IMG" "$BOOT_IMG"
+    if ! safe_copy "$BLUEPILOT_BOOT_IMG" "$BOOT_IMG"; then
+        print_error "Failed to copy $BLUEPILOT_BOOT_IMG to $BOOT_IMG; boot image left as it was."
+        mount_partition_ro "/"
+        return 1
+    fi
     print_success "Boot image updated with BluePilot file."
     mount_partition_ro "/"
     [ "$HEADLESS_MODE" != "true" ] && pause_for_user
+    return 0
 }
 
 restore_boot_image() {
     print_info "Restoring boot image from backup..."
-    mount_partition_rw "/"
 
-    # Check if backup exists before attempting restoration
-    if [ ! -f "$BOOT_IMG_BKP" ]; then
-        print_error "Backup for boot image not found at $BOOT_IMG_BKP"
+    # Check the backup exists and isn't empty before attempting restoration
+    if [ ! -s "$BOOT_IMG_BKP" ]; then
+        print_error "Backup for boot image not found or empty at $BOOT_IMG_BKP"
         [ "$HEADLESS_MODE" != "true" ] && pause_for_user
         return 1
     fi
 
-    # Restore backup to the original file location
-    sudo cp "$BOOT_IMG_BKP" "$BOOT_IMG"
+    mount_partition_rw "/" || return 1
 
-    # Remove the backup
+    # Restore backup to the original file location; the backup goes only once that worked
+    if ! safe_copy "$BOOT_IMG_BKP" "$BOOT_IMG"; then
+        print_error "Failed to restore $BOOT_IMG from $BOOT_IMG_BKP; both left as they were."
+        mount_partition_ro "/"
+        return 1
+    fi
     sudo rm -f "$BOOT_IMG_BKP"
 
     print_success "Boot image restored from backup."
     mount_partition_ro "/"
     [ "$HEADLESS_MODE" != "true" ] && pause_for_user
+    return 0
 }
 
 check_custom_status() {
@@ -221,19 +252,6 @@ check_custom_status() {
         echo "Default image is currently active"
         return 1
     fi
-}
-
-update_spinner_image() {
-    if [ ! -f "$BLUEPILOT_SPINNER_SRC" ]; then
-        print_warning "BluePilot spinner source not found ($BLUEPILOT_SPINNER_SRC), skipping."
-        return 0
-    fi
-    if [ ! -f "$SPINNER_DEST" ]; then
-        print_warning "Spinner destination not found ($SPINNER_DEST), skipping."
-        return 0
-    fi
-    cp "$BLUEPILOT_SPINNER_SRC" "$SPINNER_DEST"
-    print_success "Spinner image updated with BluePilot logo."
 }
 
 ###############################################################################
@@ -497,7 +515,6 @@ parse_arguments() {
     if [ -n "$action" ]; then
         case "$action" in
             update)
-                update_spinner_image
                 if update_boot_image; then
                     exit 0
                 else
