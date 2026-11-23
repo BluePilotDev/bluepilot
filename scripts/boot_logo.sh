@@ -74,7 +74,7 @@ pause_for_user() {
 # Device Detection
 ###############################################################################
 detect_device_type() {
-    local model_file="/sys/firmware/devicetree/base/model"
+    local model_file="${BOOT_LOGO_MODEL_FILE:-/sys/firmware/devicetree/base/model}"  # override: tests
     if [ -f "$model_file" ]; then
         local model
         model="$(tr -d '\0' < "$model_file")"
@@ -91,7 +91,7 @@ DEVICE_TYPE="$(detect_device_type)"
 # Path Constants
 ###############################################################################
 # AGNOS 19.9's display service (/usr/comma/magic.py) draws bg.png, stretched to screen width x width/2.
-# BOOT_LOGO_TARGET / BOOT_LOGO_SOURCE override the paths (tests).
+# BOOT_LOGO_TARGET / BOOT_LOGO_SOURCE / BOOT_LOGO_MODEL_FILE override the paths (tests).
 readonly BOOT_IMG="${BOOT_LOGO_TARGET:-/usr/comma/bg.png}"
 readonly BOOT_IMG_BKP="${BOOT_IMG}.backup"
 
@@ -127,6 +127,17 @@ mount_partition_ro() {
     else
         print_warning "Failed to mount $partition as read-only"
     fi
+}
+
+# The device loses power at key-off: copy to a temp file next to the destination, flush, then rename over
+# it, so a power cut leaves the old file or the new one, never half of one. Mode 664 is comma's own.
+safe_copy() {
+    local src="$1" dest="$2" tmp="$2.tmp"
+    if sudo cp "$src" "$tmp" && sudo chmod 664 "$tmp" && sync && sudo mv -f "$tmp" "$dest"; then
+        return 0
+    fi
+    sudo rm -f "$tmp"
+    return 1
 }
 
 ###############################################################################
@@ -183,15 +194,24 @@ update_boot_image() {
 
     # The backup holds comma's image: made only when none exists, i.e. before BluePilot's first copy.
     # An existing one is kept when a newer BluePilot image replaces an older one.
+    # Without a backup comma's image is never overwritten.
     if [ ! -f "$BOOT_IMG_BKP" ]; then
-        sudo cp "$BOOT_IMG" "$BOOT_IMG_BKP"
+        if ! safe_copy "$BOOT_IMG" "$BOOT_IMG_BKP"; then
+            print_error "Failed to back up $BOOT_IMG; boot image left as it was."
+            mount_partition_ro "/"
+            return 1
+        fi
         print_success "Backup created for boot image at $BOOT_IMG_BKP"
     else
         print_info "Backup for boot image already exists at $BOOT_IMG_BKP"
     fi
 
     # Overwrite the original file with the BluePilot image
-    sudo cp "$BLUEPILOT_BOOT_IMG" "$BOOT_IMG"
+    if ! safe_copy "$BLUEPILOT_BOOT_IMG" "$BOOT_IMG"; then
+        print_error "Failed to copy $BLUEPILOT_BOOT_IMG to $BOOT_IMG; boot image left as it was."
+        mount_partition_ro "/"
+        return 1
+    fi
     print_success "Boot image updated with BluePilot file."
     mount_partition_ro "/"
     [ "$HEADLESS_MODE" != "true" ] && pause_for_user
@@ -201,19 +221,21 @@ update_boot_image() {
 restore_boot_image() {
     print_info "Restoring boot image from backup..."
 
-    # Check if backup exists before attempting restoration
-    if [ ! -f "$BOOT_IMG_BKP" ]; then
-        print_error "Backup for boot image not found at $BOOT_IMG_BKP"
+    # Check the backup exists and isn't empty before attempting restoration
+    if [ ! -s "$BOOT_IMG_BKP" ]; then
+        print_error "Backup for boot image not found or empty at $BOOT_IMG_BKP"
         [ "$HEADLESS_MODE" != "true" ] && pause_for_user
         return 1
     fi
 
     mount_partition_rw "/" || return 1
 
-    # Restore backup to the original file location
-    sudo cp "$BOOT_IMG_BKP" "$BOOT_IMG"
-
-    # Remove the backup
+    # Restore backup to the original file location; the backup goes only once that worked
+    if ! safe_copy "$BOOT_IMG_BKP" "$BOOT_IMG"; then
+        print_error "Failed to restore $BOOT_IMG from $BOOT_IMG_BKP; both left as they were."
+        mount_partition_ro "/"
+        return 1
+    fi
     sudo rm -f "$BOOT_IMG_BKP"
 
     print_success "Boot image restored from backup."
