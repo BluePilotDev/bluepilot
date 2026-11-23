@@ -61,5 +61,5 @@ def test_inverted_radar_overlay_has_solid_fill_and_source_icon():
   assert len(texture_calls) == 1
   texture, dest, rotation = texture_calls[0]
   assert texture.id == renderer._radar_source_icon.id
-  assert dest.width > 0 and dest.height > 0
+  assert 0 < dest.width < 80 and 0 < dest.height < 80
   assert rotation == 90

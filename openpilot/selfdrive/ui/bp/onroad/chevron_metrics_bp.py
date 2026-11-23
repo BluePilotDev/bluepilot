@@ -230,7 +230,8 @@ class ChevronMetricsBP(ChevronMetrics):
       rl.draw_circle_v(chevron[2], r, glow_color)
 
       # BluePilot: The centroid remains inside both the normal and close-range triangles.
-      icon_size = min(90 * scale, CHEVRON_H * 0.70)
+      # Leave a little breathing room between the source glyph and triangle outline.
+      icon_size = min(78 * scale, CHEVRON_H * 0.60)
       icon_center = rl.Vector2(
         sum(point.x for point in chevron) / 3,
         sum(point.y for point in chevron) / 3,
