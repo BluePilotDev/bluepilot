@@ -85,7 +85,7 @@ def is_device_idle():
     """Check if device is idle (screen off + not driving)"""
     try:
         # Check if onroad (driving)
-        onroad = params.get_bool("IsOnroad")
+        onroad = not params.get_bool("IsOffroad")  # upstream has only IsOffroad
         if onroad:
             return False
 

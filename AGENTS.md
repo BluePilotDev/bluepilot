@@ -143,7 +143,7 @@ BluePilotDev/
 │   │   ├── cache/               # LRU metrics/thumbnail/remux caching
 │   │   ├── logs/                # Cereal message parsing
 │   │   ├── network/             # WiFi IP detection, onroad checks
-│   │   ├── storage/             # xattr-based route preservation
+│   │   ├── storage/             # preserve marker reading, deletion risk
 │   │   ├── system/              # CPU/memory/disk metrics
 │   │   ├── params/              # Parameter manager with fallback
 │   │   ├── handlers/            # HTTP endpoint handlers
@@ -348,7 +348,6 @@ The BluePilot Portal is a web-based interface for managing routes, viewing syste
 - `GET /api/routes` - List all routes with metadata (location, distance, duration)
 - `GET /api/video/:baseName/:segment/:camera` - Stream video with byte-range support
 - `GET /api/thumbnail/:baseName` - Get route thumbnail image
-- `POST /api/preserve/:baseName` - Toggle route preservation (prevent auto-deletion)
 - `DELETE /api/delete/:baseName` - Delete route (blocked when driving)
 
 #### System Information
@@ -736,7 +735,7 @@ pytest --cov=selfdrive --cov-report=html
 
 ### Test Locations
 - Process-specific tests in module directories
-- Portal testing: `bluepilot/test_web_routes.py` (uses mock Params for dev machines)
+- Portal testing: `python3 -m bluepilot.backend.bp_portal` (local server)
 - Integration tests in `selfdrive/test/`
 
 ### Writing Tests

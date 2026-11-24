@@ -123,7 +123,7 @@ else
     # After the swap, the rollback function handles cleanup
     cleanup_on_error() {
         local exit_code=$?
-        if [ $exit_code -ne 0 ]; then
+        if [ "$exit_code" -ne 0 ]; then
             echo ""
             echo "Script terminated unexpectedly (exit code: $exit_code)"
             # Only clean up temp dir if it still exists and we haven't swapped yet
@@ -385,7 +385,7 @@ verify_installation() {
         fi
     done
 
-    return $issues
+    return "$issues"
 }
 
 # Function to rollback on failure
@@ -495,7 +495,7 @@ else
 fi
 
 # Final safety check before cleaning up backup
-if [ $PERMISSION_ISSUES -eq 1 ]; then
+if [ "$PERMISSION_ISSUES" -eq 1 ]; then
     echo ""
     echo "⚠ WARNING: Permission issues detected!"
     echo "⚠ Keeping backup directory at: $OLD_DIR"
@@ -539,7 +539,7 @@ else
     echo "Commit: ${CLONED_COMMIT:0:10}"
     echo "Location: $TARGET_DIR"
     echo ""
-    if [ $PERMISSION_ISSUES -eq 1 ]; then
+    if [ "$PERMISSION_ISSUES" -eq 1 ]; then
         echo "⚠ WARNING: Some permission issues detected"
         echo "⚠ Backup kept at: $OLD_DIR"
         echo ""

@@ -35,7 +35,7 @@ def extract_log_messages(log_path, search_query=None, level_filter=None, max_mes
 
         # Add cereal to path if needed
         sys.path.append(os.path.join(os.path.dirname(__file__), "../../.."))
-        from cereal import log as capnp_log
+        from openpilot.cereal import log as capnp_log
 
         # Read and decompress log file
         with open(log_path, 'rb') as f:

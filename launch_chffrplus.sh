@@ -21,35 +21,21 @@ function agnos_init {
   sudo chmod 660 /dev/adsprpc-smd /dev/ion /dev/kgsl-3d0
 
   # Check if AGNOS update is required
-  if [ $(< /VERSION) != "$AGNOS_VERSION" ]; then
-    AGNOS_PY="$DIR/system/hardware/tici/agnos.py"
-    MANIFEST="$DIR/system/hardware/tici/agnos.json"
-    if $AGNOS_PY --verify $MANIFEST; then
+  if [ "$(< /VERSION)" != "$AGNOS_VERSION" ]; then
+    AGNOS_PY="$DIR/openpilot/common/hardware/comma/agnos.py"
+    MANIFEST="$DIR/openpilot/system/hardware/comma/agnos.json"
+    if "$AGNOS_PY" --verify "$MANIFEST"; then
       sudo reboot
     fi
-    $DIR/system/hardware/tici/updater $AGNOS_PY $MANIFEST
-  fi
-}
-
-function fix_egl_adreno {
-  # BluePilot: comma's on-screen URL installer points the GPU EGL/GLES libs at the Adreno
-  # drivers. ford-op/BluePilot installs by git clone (private repo), which skips that
-  # installer, so ldconfig's higher-versioned glvnd/Mesa libs win and magic.service (the
-  # AGNOS display server) fails eglGetDisplay -> no UI. Re-point them like the installer does.
-  local lib=/usr/lib/aarch64-linux-gnu
-  if [ "$(readlink $lib/libEGL.so.1)" != "libEGL.so.1.0.0" ] || \
-     [ "$(readlink $lib/libGLESv2.so.2)" != "libGLESv2.so.2.0.0" ]; then
-    sudo mount -o remount,rw /
-    sudo ln -sf libEGL.so.1.0.0 "$lib/libEGL.so.1"
-    sudo ln -sf libGLESv2.so.2.0.0 "$lib/libGLESv2.so.2"
-    sudo mount -o remount,ro /
-    sudo systemctl restart magic.service 2>/dev/null || true
+    while true; do
+      "$DIR/openpilot/common/hardware/comma/updater" "$AGNOS_PY" "$MANIFEST"
+    done
   fi
 }
 
 function launch {
   # Remove orphaned git lock if it exists on boot
-  [ -f "$DIR/.git/index.lock" ] && rm -f $DIR/.git/index.lock
+  [ -f "$DIR/.git/index.lock" ] && rm -f "$DIR/.git/index.lock"
 
   # Check to see if there's a valid overlay-based update available. Conditions
   # are as follows:
@@ -61,7 +47,7 @@ function launch {
   #    that completed successfully and synced to disk.
 
   if [ -f "${DIR}/.overlay_init" ]; then
-    find ${DIR}/.git -newer ${DIR}/.overlay_init | grep -q '.' 2> /dev/null
+    find "${DIR}/.git" -newer "${DIR}/.overlay_init" | grep -q '.' 2> /dev/null
     if [ $? -eq 0 ]; then
       echo "${DIR} has been modified, skipping overlay update installation"
     else
@@ -70,9 +56,11 @@ function launch {
           echo "Valid overlay update found, installing"
           LAUNCHER_LOCATION="${BASH_SOURCE[0]}"
 
-          mv $DIR /data/safe_staging/old_openpilot
-          mv "${STAGING_ROOT}/finalized" $DIR
-          cd $DIR
+          mv "$DIR" /data/safe_staging/old_openpilot
+          mv "${STAGING_ROOT}/finalized" "$DIR"
+          cd "$DIR"
+          # releases before the openpilot/ move can't swap AGNOS on newer AGNOS, use ours
+          [ ! -L system/hardware/tici/agnos.json ] && /data/safe_staging/old_openpilot/openpilot/common/hardware/comma/agnos.py --verify system/hardware/tici/agnos.json && sudo reboot
 
           echo "Restarting launch script ${LAUNCHER_LOCATION}"
           unset AGNOS_VERSION
@@ -86,21 +74,33 @@ function launch {
   fi
 
   # handle pythonpath
-  ln -sfn $(pwd) /data/pythonpath
+  ln -sfn "$(pwd)" /data/pythonpath
   export PYTHONPATH="$PWD"
+
+  # submodule package symlinks for PYTHONPATH imports on device.
+  # on PC these come from editable installs via pyproject.toml / uv.
+  ln -sfn msgq_repo/msgq msgq
+  ln -sfn opendbc_repo/opendbc opendbc
+  ln -sfn rednose_repo/rednose rednose
+  ln -sfn teleoprtc_repo/teleoprtc teleoprtc
+  ln -sfn tinygrad_repo/tinygrad tinygrad
+
+  # BluePilot: fill the nested bluepilot_lateral submodule if the installer's
+  # non-recursive clone left it empty (see openpilot/sunnypilot/bluepilot_ensure_submodules.sh)
+  bash openpilot/sunnypilot/bluepilot_ensure_submodules.sh || true
+  # End BluePilot
 
   # hardware specific init
   if [ -f /AGNOS ]; then
     agnos_init
-    fix_egl_adreno
   fi
 
   # write tmux scrollback to a file
   tmux capture-pane -pq -S-1000 > /tmp/launch_log
 
   # start manager
-  cd system/manager
-  if [ ! -f $DIR/prebuilt ]; then
+  cd openpilot/system/manager
+  if [ ! -f "$DIR/prebuilt" ]; then
     # BluePilot: verbose build UI (progress + live scons line + failure log). Falls back to the
     # stock build if bp_build.py can't start, so a UI bug can't leave the device unable to build.
     ./bp_build.py || ./build.py

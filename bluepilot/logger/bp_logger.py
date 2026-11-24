@@ -13,7 +13,7 @@ from pathlib import Path
 
 from openpilot.common.params import Params
 from openpilot.common.swaglog import cloudlog
-# from openpilot.system.hardware.hw import Paths
+# from openpilot.common.hardware.hw import Paths
 
 
 # Define log levels as an Enum for type safety
