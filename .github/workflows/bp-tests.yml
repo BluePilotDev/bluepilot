@@ -1,7 +1,7 @@
 # bp-sunnypilot: run tests.yaml on merges into the bp-sunnypilot branch too. Upstream's push trigger is
 # `master` only, which this repo doesn't have; calling it keeps upstream's file unchanged there.
-# The same file runs in BluePilotDev/bluepilot (full BluePilot), on merges into its work branches. Its bp-sunnypilot
-# branch is a mirror of this repo's and runs no CI.
+# The same file runs in BluePilotDev/bluepilot (full BluePilot), on merges into its work and version branches (bp-7.1;
+# bpx-test/ for testing its jobs). Its bp-sunnypilot branch is a mirror of this repo's and runs no CI.
 name: bp tests
 
 on:
@@ -10,12 +10,14 @@ on:
       - bp-sunnypilot
       - bp-7.1-dev
       - bp-dev
+      - 'bp-[0-9]+.[0-9]+'  # version branches: bp-7.1, not bp-7.1-dev
+      - 'bpx-test/**'
 
 jobs:
   tests:
     if: >-
       (github.repository == 'ford-op/bp-sunnypilot' && github.ref == 'refs/heads/bp-sunnypilot') ||
-      (github.repository == 'BluePilotDev/bluepilot' && (github.ref == 'refs/heads/bp-7.1-dev' || github.ref == 'refs/heads/bp-dev'))
+      (github.repository == 'BluePilotDev/bluepilot' && github.ref != 'refs/heads/bp-sunnypilot')
     permissions:  # what tests.yaml's process replay job asks for; a caller has to grant at least that
       contents: write  # BluePilotDev/bluepilot's process-replay publish step pushes with this token
       issues: read
