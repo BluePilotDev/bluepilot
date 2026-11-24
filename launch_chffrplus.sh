@@ -54,6 +54,22 @@ function agnos_init {
       sudo reboot
     fi
     bootlog_stop  # BluePilot: updater needs the display
+
+    # BluePilot TRON test branch: flash.comma.ai now ships AGNOS 20.x, where the "magic" service owns
+    # the display (/tmp/drmfd.sock). Our 19.9-era raylib UIs (updater included) can't draw there, so the
+    # UI updater never shows and the device sits on magic's comma logo forever. Downgrade headless
+    # instead: 19.9 vs 20.6 differ only in boot + system (bootloaders identical), same as the
+    # documented headless agnos.py --swap recipe. Invisible (~5-15 min), then reboots into 19.9.
+    if [ -S /tmp/drmfd.sock ] || [ -f /usr/comma/magic.py ]; then
+      echo "BluePilot: AGNOS $(< /VERSION) has magic display; headless swap to $AGNOS_VERSION"
+      until "$AGNOS_PY" --swap "$MANIFEST"; do
+        echo "BluePilot: headless AGNOS swap failed, retrying in 10s"
+        sleep 10
+      done
+      sudo reboot
+      sleep 60
+    fi
+    # End BluePilot
     while true; do
       "$DIR/openpilot/common/hardware/comma/updater" "$AGNOS_PY" "$MANIFEST"
     done
