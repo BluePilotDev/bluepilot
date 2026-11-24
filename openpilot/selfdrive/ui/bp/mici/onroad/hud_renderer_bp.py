@@ -17,13 +17,15 @@ from openpilot.selfdrive.ui.bp.lib.steering_wheel_style import (
 from openpilot.selfdrive.ui.bp.lib.ui_debug_logger import bp_ui_log
 # BluePilot: seasonal theme packs (steering wheel icon override)
 from openpilot.selfdrive.ui.bp.lib import theme_pack
-from openpilot.system.ui.lib.text_measure import measure_text_cached
 from openpilot.system.ui.lib.application import gui_app
-from openpilot.bluepilot.ui.lib.bp_shaders import draw_shader_circle_gradient
+from openpilot.selfdrive.ui.bp.lib.lateral_mode_badge import draw_lateral_mode_badge
 # BluePilot: Override upstream Mici torque bar with BP shared state math.
 from openpilot.selfdrive.ui.bp.mici.onroad.torque_bar_bp import TorqueBarBP as TorqueBar
 
 LateralMode = custom.ControllerStateBP.LateralMode
+# BluePilot: the lateral mode badge on the 50 px wheel
+LATERAL_BADGE_TEXT_SIZE = 22
+LATERAL_BADGE_OVERHANG = 12
 
 class MiciHudRendererBP(HudRendererSP):
   """BluePilot MICI HudRenderer with brake status coloring and powerflow gauge."""
@@ -173,25 +175,10 @@ class MiciHudRendererBP(HudRendererSP):
                     FONT_SIZES.max_speed, 0, max_color)
 
   def _draw_lateral_control_overlay(self, center_x: int, center_y: int, wheel_size: int) -> None:
-    """Draw a letter overlay indicating current lateral control mode (only when wheel is visible)."""
-    if not self.show_lateral_control or self._wheel_alpha_filter.x <= 0 or self.lateral_mode is None:
+    """The current lateral control mode as a level badge at the wheel's lower right (the wheel turns), faded with it.
+    Left out under the critical wheel, whose exclamation point sits on that side."""
+    if not self.show_lateral_control or self._show_wheel_critical or self.lateral_mode is None:
       return
-
-    text_size = int(wheel_size * 0.65)
-
-    if self.lateral_mode == LateralMode.angle:
-      letter, color = "A", rl.Color(50, 100, 255, 220)  # Blue-ish
-    elif self.lateral_mode == LateralMode.curvature:
-      letter, color = "C", rl.Color(255, 165, 0, 220)  # Orange
-    else:
-      letter, color = "OP", rl.Color(100, 100, 100, 220)  # Grey
-
-    text_dims = measure_text_cached(self._font_bold, letter, text_size)
-    text_x = center_x - text_dims.x / 2
-    text_y = center_y - text_dims.y / 2
-
-    top = rl.Color(250, 250, 250, 200)
-    bottom = rl.Color(200, 200, 200, 200)
-    draw_shader_circle_gradient(center_x, center_y, text_size / 2, top, bottom)
-
-    rl.draw_text_ex(self._font_bold, letter, rl.Vector2(text_x, text_y), text_size, 0, color)
+    half = wheel_size / 2
+    draw_lateral_mode_badge(self._font_bold, self.lateral_mode, center_x + half + LATERAL_BADGE_OVERHANG,
+                            center_y + half + LATERAL_BADGE_OVERHANG, LATERAL_BADGE_TEXT_SIZE, self._wheel_alpha_filter.x)

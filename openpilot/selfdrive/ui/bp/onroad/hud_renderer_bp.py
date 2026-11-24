@@ -1,13 +1,13 @@
 import pyray as rl
 from openpilot.common.params import Params
 from openpilot.cereal import custom
-from openpilot.bluepilot.ui.lib.bp_shaders import draw_shader_circle_gradient
 from openpilot.selfdrive.ui.onroad.hud_renderer import UI_CONFIG, FONT_SIZES, COLORS
 from openpilot.selfdrive.ui.sunnypilot.onroad.hud_renderer import HudRendererSP
 from openpilot.selfdrive.ui.bp.onroad.steering_wheel_bp import SteeringWheelBP
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.system.ui.lib.text_measure import measure_text_cached
 from openpilot.selfdrive.ui.bp.lib.ui_debug_logger import bp_ui_log
+from openpilot.selfdrive.ui.bp.lib.lateral_mode_badge import draw_lateral_mode_badge
 
 LateralMode = custom.ControllerStateBP.LateralMode
 
@@ -18,6 +18,9 @@ SPEED_UNIT_CENTER_Y = 290
 BORDER_SIZE = 30
 BUTTON_SIZE = 192
 WHEEL_ICON_SIZE = 144
+# BluePilot: the lateral mode badge on the wheel button (40+ px text on the 3X's display)
+LATERAL_BADGE_TEXT_SIZE = 48
+LATERAL_BADGE_OVERHANG = 12
 
 
 class HudRendererBP(HudRendererSP):
@@ -117,25 +120,12 @@ class HudRendererBP(HudRendererSP):
     self.rocket_fuel.render(rect, ui_state.sm)
 
   def _draw_lateral_control_overlay(self, center_x: float, center_y: float, wheel_size: int) -> None:
-    """Draw the current lateral control mode over the steering wheel icon."""
+    """The current lateral control mode as a level badge at the wheel button's lower right (the wheel turns)."""
     if not self._show_lateral_control or self._lateral_mode is None:
       return
-
-    text_size = int(wheel_size * 0.4)
-    if self._lateral_mode == LateralMode.angle:
-      letter, color = "A", rl.Color(50, 100, 255, 220)
-    elif self._lateral_mode == LateralMode.curvature:
-      letter, color = "C", rl.Color(255, 165, 0, 220)
-    else:
-      letter, color = "OP", rl.Color(100, 100, 100, 220)
-
-    text_dims = measure_text_cached(self._font_bold, letter, text_size)
-    text_pos = rl.Vector2(center_x - text_dims.x / 2, center_y - text_dims.y / 2)
-
-    top = rl.Color(250, 250, 250, 200)
-    bottom = rl.Color(200, 200, 200, 200)
-    draw_shader_circle_gradient(center_x, center_y, text_size / 2, top, bottom)
-    rl.draw_text_ex(self._font_bold, letter, text_pos, text_size, 0, color)
+    half = wheel_size / 2
+    draw_lateral_mode_badge(self._font_bold, self._lateral_mode, center_x + half + LATERAL_BADGE_OVERHANG,
+                            center_y + half + LATERAL_BADGE_OVERHANG, LATERAL_BADGE_TEXT_SIZE)
 
   def _draw_current_speed(self, rect: rl.Rectangle) -> None:
     """Override to add brake status red coloring and track speed_right."""
