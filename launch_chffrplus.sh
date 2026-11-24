@@ -4,6 +4,32 @@ DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
 
 source "$DIR/launch_env.sh"
 
+# BluePilot TRON test branch: verbose boot. Everything this script (and the build/manager) prints is
+# tee'd into /data/bp_boot.log, and bp_bootlog.py shows its tail on screen until another UI needs the
+# display (AGNOS updater, build spinner, manager's ui). If the build or manager dies, it comes back.
+BP_BOOTLOG=/data/bp_boot.log
+[ -f "$BP_BOOTLOG" ] && mv -f "$BP_BOOTLOG" "$BP_BOOTLOG.prev"
+exec > >(tee -a "$BP_BOOTLOG") 2>&1
+export PS4='+ $(date +%T) '
+set -x
+BP_BOOTLOG_PID=""
+function bootlog_start {
+  if [ -f /AGNOS ] && [ -z "$BP_BOOTLOG_PID" ]; then
+    python3 "$DIR/openpilot/system/ui/bp_bootlog.py" "$BP_BOOTLOG" > /dev/null 2>&1 &
+    BP_BOOTLOG_PID=$!
+  fi
+}
+function bootlog_stop {
+  if [ -n "$BP_BOOTLOG_PID" ]; then
+    kill "$BP_BOOTLOG_PID" 2>/dev/null
+    wait "$BP_BOOTLOG_PID" 2>/dev/null
+    BP_BOOTLOG_PID=""
+  fi
+}
+echo "BluePilot boot $(date) $(cat /VERSION 2>/dev/null) $(git -C "$DIR" log --oneline -1 2>/dev/null)"
+bootlog_start
+# End BluePilot
+
 # BluePilot: set boot and logo images (non-interactive, safe to call repeatedly)
 "$DIR/scripts/boot_logo.sh" --headless --update --force --quiet
 
@@ -27,6 +53,7 @@ function agnos_init {
     if "$AGNOS_PY" --verify "$MANIFEST"; then
       sudo reboot
     fi
+    bootlog_stop  # BluePilot: updater needs the display
     while true; do
       "$DIR/openpilot/common/hardware/comma/updater" "$AGNOS_PY" "$MANIFEST"
     done
@@ -64,6 +91,7 @@ function launch {
 
           echo "Restarting launch script ${LAUNCHER_LOCATION}"
           unset AGNOS_VERSION
+          bootlog_stop  # BluePilot: the re-exec'd launcher starts its own
           exec "${LAUNCHER_LOCATION}"
         else
           echo "openpilot backup found, not updating"
@@ -90,6 +118,11 @@ function launch {
   bash openpilot/sunnypilot/bluepilot_ensure_submodules.sh || true
   # End BluePilot
 
+  # BluePilot TRON test branch: opendbc_repo is a plain folder here. comma's cached-fetch installer
+  # leaves the old submodule's .git pointer file inside it; drop it so git doesn't see a nested repo.
+  [ -f opendbc_repo/.git ] && rm -f opendbc_repo/.git
+  # End BluePilot
+
   # hardware specific init
   if [ -f /AGNOS ]; then
     agnos_init
@@ -101,11 +134,15 @@ function launch {
   # start manager
   cd openpilot/system/manager
   if [ ! -f "$DIR/prebuilt" ]; then
+    bootlog_stop  # BluePilot: build spinner needs the display
     # BluePilot: verbose build UI (progress + live scons line + failure log). Falls back to the
     # stock build if bp_build.py can't start, so a UI bug can't leave the device unable to build.
     ./bp_build.py || ./build.py
   fi
+  bootlog_stop  # BluePilot: prebuilt path skips the block above; ui needs the display
   ./manager.py
+  echo "BluePilot: manager.py exited ($?)"
+  bootlog_start  # BluePilot: show why
 
   # if broken, keep on screen error
   while true; do sleep 1; done
