@@ -1,0 +1,4 @@
+# IQPilot's own failing tests at the pinned commit, skipped by host.sh test so they don't fail this library's CI.
+# Each one fails on IQPilot without the hooks or the library too. Remove a line once IQPilot fixes it.
+test_tesla_legacy.py::TestTeslaHW2ExternalPandaSafety::test_enable_control_allowed_with_manual_aol_button_state
+test_tesla_legacy.py::TestTeslaHW3ExternalPandaSafety::test_enable_control_allowed_with_manual_aol_button_state

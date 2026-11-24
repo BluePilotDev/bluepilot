@@ -1,0 +1,270 @@
+diff --git a/iqdbc/car/ford/carcontroller.py b/iqdbc/car/ford/carcontroller.py
+index e00869f..cf8e4ba 100644
+--- a/iqdbc/car/ford/carcontroller.py
++++ b/iqdbc/car/ford/carcontroller.py
+@@ -5,6 +5,7 @@ from iqdbc.car import ACCELERATION_DUE_TO_GRAVITY, Bus, DT_CTRL, apply_hysteresi
+ from iqdbc.car.ford import fordcan
+ from iqdbc.car.ford.values import CarControllerParams, FordFlags, CAR
+ from iqdbc.car.interfaces import CarControllerBase, V_CRUISE_MAX
++from iqdbc.bluepilot_lateral.hosts.iqpilot.lateral import BluePilotLateral  # BluePilot
+ 
+ LongCtrlState = structs.CarControl.Actuators.LongControlState
+ VisualAlert = structs.CarControl.HUDControl.VisualAlert
+@@ -38,6 +39,7 @@ class CarController(CarControllerBase):
+     super().__init__(dbc_names, CP, CP_IQ)
+     self.packer = CANPacker(dbc_names[Bus.pt])
+     self.CAN = fordcan.CanBus(CP)
++    self.bp = BluePilotLateral(CP, CP_IQ, self.packer, self.CAN)  # BluePilot
+ 
+     self.apply_curvature_last = 0
+     self.anti_overshoot_curvature_last = 0
+@@ -52,6 +54,7 @@ class CarController(CarControllerBase):
+ 
+   def update(self, CC, CC_IQ, CS, now_nanos):
+     can_sends = []
++    bp_active = self.bp.update(CC_IQ, self.frame)  # BluePilot
+ 
+     actuators = CC.actuators
+     hud_control = CC.hudControl
+@@ -74,7 +77,10 @@ class CarController(CarControllerBase):
+ 
+     ### lateral control ###
+     # send steer msg at 20Hz
+-    if (self.frame % CarControllerParams.STEER_STEP) == 0:
++    if bp_active and (self.frame % CarControllerParams.STEER_STEP) == 0:  # BluePilot
++      lat_sends, self.apply_curvature_last = self.bp.step_lateral(CC, CS, actuators, self.apply_curvature_last)
++      can_sends.extend(lat_sends)
++    elif (self.frame % CarControllerParams.STEER_STEP) == 0:
+       # Bronco and some other cars consistently overshoot curv requests
+       # Apply some deadzone + smoothing convergence to avoid oscillations
+       if self.CP.carFingerprint in (CAR.FORD_BRONCO_SPORT_MK1, CAR.FORD_F_150_MK14):
+@@ -108,7 +114,9 @@ class CarController(CarControllerBase):
+         can_sends.append(fordcan.create_lat_ctl_msg(self.packer, self.CAN, CC.latActive, 0., 0., -self.apply_curvature_last, 0.))
+ 
+     # send lka msg at 33Hz
+-    if (self.frame % CarControllerParams.LKA_STEP) == 0:
++    if bp_active and (self.frame % CarControllerParams.LKA_STEP) == 0:  # BluePilot
++      can_sends.append(self.bp.step_lka(CC, hud_control))
++    elif (self.frame % CarControllerParams.LKA_STEP) == 0:
+       can_sends.append(fordcan.create_lka_msg(self.packer, self.CAN))
+ 
+     ### longitudinal control ###
+diff --git a/iqdbc/car/structs.py b/iqdbc/car/structs.py
+index 924d3e5..56b67fc 100644
+--- a/iqdbc/car/structs.py
++++ b/iqdbc/car/structs.py
+@@ -4,6 +4,7 @@ from typing import dataclass_transform, get_origin
+ import os
+ import capnp
+ from iqdbc.car.common.basedir import BASEDIR
++from iqdbc.bluepilot_lateral.host_types import LateralInputs  # BluePilot: the per-frame inputs controlsd fills
+ try:
+   from iqpilot.cereal import car
+ except ImportError:
+@@ -54,6 +55,7 @@ class IQCarParams:
+   longitudinalStoppingSpeedOverride: float = auto_field()
+   stoppingDecelRateOverride: float = auto_field()
+   longActiveWithGasOverride: bool = auto_field()
++  lateralInputsRequired: bool = auto_field()  # BluePilot: controlsd fills IQCarControl.lateralInputs and params
+   longitudinalActuation: 'IQCarParams.LongitudinalActuation' = field(default_factory=lambda: IQCarParams.LongitudinalActuation())
+ 
+   @auto_dataclass
+@@ -136,6 +138,7 @@ class IQCarControl:
+   useRadarAccel: bool = auto_field()
+   radarSetSpeedKph: float = auto_field()
+   radarGapBars: int = auto_field()
++  lateralInputs: 'LateralInputs' = field(default_factory=lambda: LateralInputs())  # BluePilot
+   longitudinalComfort: 'IQCarControl.LongitudinalComfort' = field(default_factory=lambda: IQCarControl.LongitudinalComfort())
+ 
+   @auto_dataclass
+diff --git a/iqdbc/lvbs/car/interfaces.py b/iqdbc/lvbs/car/interfaces.py
+index 5ca575a..aafd822 100644
+--- a/iqdbc/lvbs/car/interfaces.py
++++ b/iqdbc/lvbs/car/interfaces.py
+@@ -8,6 +8,7 @@ from collections.abc import Callable
+ 
+ from iqdbc.car import structs
+ from iqdbc.car.can_definitions import CanRecvCallable, CanSendCallable
++from iqdbc.bluepilot_lateral.hosts.iqpilot.safety_param import init_ford_safety_param_iq  # BluePilot
+ from iqdbc.car.subaru.values import SubaruFlags
+ from iqdbc.car.tesla.values import LEGACY_CARS
+ from iqdbc.lvbs.car.subaru.iq_values import SubaruFlagsIQ, SubaruSafetyFlagsIQ
+@@ -80,6 +81,7 @@ def apply_iq_car_config(CI, CP: structs.CarParams, CP_IQ: structs.IQCarParams,
+   _apply_tesla_options(CP, CP_IQ, params_dict)
+   _apply_creep_assist(CP, CP_IQ, params_dict)
+   _apply_toyota_options(CP, CP_IQ, params_dict)
++  init_ford_safety_param_iq(CP, CP_IQ, params_dict)  # BluePilot
+ 
+ 
+ def _apply_long_tuning(CI, CP: structs.CarParams, CP_IQ: structs.IQCarParams,
+diff --git a/iqdbc/safety/modes/ford.h b/iqdbc/safety/modes/ford.h
+index 26ec0af..5e5c0c4 100644
+--- a/iqdbc/safety/modes/ford.h
++++ b/iqdbc/safety/modes/ford.h
+@@ -9,6 +9,7 @@
+ #define FORD_BrakeSysFeatures      0x415U   // RX from ABS, for vehicle speed
+ #define FORD_EngVehicleSpThrottle2 0x202U   // RX from PCM, for second vehicle speed
+ #define FORD_Yaw_Data_FD1          0x91U    // RX from RCM, for yaw rate
++#define FORD_SteeringPinion_Data   0x7EU    // RX from PSCM, optional angle_meas source (BluePilot STEER_ANGLE_CURVATURE)
+ #define FORD_Steering_Data_FD1     0x083U   // TX by OP, various driver switches and LKAS/CC buttons
+ #define FORD_ACCDATA               0x186U   // TX by OP, ACC controls
+ #define FORD_ACCDATA_3             0x18AU   // TX by OP, ACC/TJA user interface
+@@ -29,6 +30,9 @@ static uint8_t ford_get_counter(const CANPacket_t *msg) {
+   } else if (msg->addr == FORD_Yaw_Data_FD1) {
+     // Signal: VehRollYaw_No_Cnt
+     cnt = msg->data[5];
++  } else if (msg->addr == FORD_SteeringPinion_Data) {
++    // Signal: StePinAn_No_Cnt (47|4@0+)
++    cnt = (msg->data[5] >> 4) & 0xFU;
+   } else {
+   }
+   return cnt;
+@@ -74,6 +78,8 @@ static bool ford_get_quality_flag_valid(const CANPacket_t *msg) {
+     valid = ((msg->data[4] >> 5) & 0x3U) == 0x3U;  // VehVActlEng_D_Qf
+   } else if (msg->addr == FORD_Yaw_Data_FD1) {
+     valid = ((msg->data[6] >> 4) & 0x3U) == 0x3U;  // VehYawWActl_D_Qf
++  } else if (msg->addr == FORD_SteeringPinion_Data) {
++    valid = ((msg->data[5] >> 2) & 0x3U) == 0x3U;  // StePinCompAnEst_D_Qf (3=OK)
+   } else {
+   }
+   return valid;
+@@ -94,6 +100,16 @@ static const NativeCurvatureSteeringLimits FORD_STEERING_LIMITS = {
+   .curvature_error_min_speed = 10.0,
+ };
+ 
++// BluePilot: the Ford 4-signal lateral checks, pinion angle_meas source and angle-mode state, from the
++// bluepilot_lateral subtree. The bindings point the library at IQ's native-curvature names.
++#define BP_HOST_CURVATURE_LIMITS NativeCurvatureSteeringLimits
++#define BP_HOST_CURVATURE_STATE native_curvature_state
++#define BP_HOST_RT_CURVATURE_RATE_CHECK rt_native_curvature_rate_limit_check
++#define BP_HOST_LAT_ALLOWED() is_lat_active()
++#define BP_HOST_SPEED_MISMATCH_CHECK() ((void)0)  // ford_rx_hook runs it on FORD_EngVehicleSpThrottle2
++// cppcheck-suppress misra-c2012-20.1; needs the Ford constants defined above
++#include "iqdbc/bluepilot_lateral/safety/ford.h"
++
+ static void ford_rx_hook(const CANPacket_t *msg) {
+   if (msg->bus == FORD_MAIN_BUS) {
+     // Update in motion state from standstill signal
+@@ -117,7 +133,7 @@ static void ford_rx_hook(const CANPacket_t *msg) {
+     }
+ 
+     // Update vehicle yaw rate
+-    if (msg->addr == FORD_Yaw_Data_FD1) {
++    if ((msg->addr == FORD_Yaw_Data_FD1) && !ford_bp_pinion_curvature) {  // BluePilot: pinion source replaces yaw
+       // Signal: VehYaw_W_Actl
+       // TODO: we should use the speed which results in the closest angle measurement to the desired angle
+       float ford_yaw_rate = (((msg->data[2] << 8U) | msg->data[3]) * 0.0002) - 6.5;
+@@ -149,6 +165,8 @@ static void ford_rx_hook(const CANPacket_t *msg) {
+       aol_button_press = GET_BIT(msg, 40U) ? AOL_BUTTON_PRESSED : AOL_BUTTON_NOT_PRESSED;
+     }
+   }
++
++  ford_bp_rx_hook(msg);  // BluePilot: pinion angle_meas source
+ }
+ 
+ static bool ford_tx_hook(const CANPacket_t *msg) {
+@@ -223,6 +241,8 @@ static bool ford_tx_hook(const CANPacket_t *msg) {
+     if (action != 0U) {
+       tx = false;
+     }
++
++    ford_bp_lka_tx(msg);  // BluePilot: angle-mode state from the frame's unused bits
+   }
+ 
+   // Safety check for LateralMotionControl action
+@@ -234,12 +254,17 @@ static bool ford_tx_hook(const CANPacket_t *msg) {
+     unsigned int raw_path_angle = (msg->data[3] << 3) | (msg->data[4] >> 5);
+     unsigned int raw_path_offset = (msg->data[5] << 2) | (msg->data[6] >> 6);
+ 
+-    // These signals are not yet tested with the current safety limits
+-    bool violation = (raw_curvature_rate != FORD_INACTIVE_CURVATURE_RATE) || (raw_path_angle != FORD_INACTIVE_PATH_ANGLE) || (raw_path_offset != FORD_INACTIVE_PATH_OFFSET);
+-
+-    // Check angle error and steer_control_enabled
+-    int desired_curvature = raw_curvature - FORD_INACTIVE_CURVATURE;  // /FORD_STEERING_LIMITS.curvature_to_can to get real curvature
+-    violation |= steer_native_curvature_cmd_checks(desired_curvature, steer_control_enabled, FORD_STEERING_LIMITS);
++    bool violation = false;
++    if (ford_bp_lateral) {  // BluePilot: 4-signal lateral
++      violation = ford_bp_lmc_tx(false, raw_curvature, raw_curvature_rate, raw_path_offset, raw_path_angle, steer_control_enabled);
++    } else {
++      // These signals are not yet tested with the current safety limits
++      violation = (raw_curvature_rate != FORD_INACTIVE_CURVATURE_RATE) || (raw_path_angle != FORD_INACTIVE_PATH_ANGLE) || (raw_path_offset != FORD_INACTIVE_PATH_OFFSET);
++
++      // Check angle error and steer_control_enabled
++      int desired_curvature = raw_curvature - FORD_INACTIVE_CURVATURE;  // /FORD_STEERING_LIMITS.curvature_to_can to get real curvature
++      violation |= steer_native_curvature_cmd_checks(desired_curvature, steer_control_enabled, FORD_STEERING_LIMITS);
++    }
+ 
+     if (violation) {
+       tx = false;
+@@ -255,12 +280,17 @@ static bool ford_tx_hook(const CANPacket_t *msg) {
+     unsigned int raw_path_angle = ((msg->data[3] & 0x1FU) << 6) | (msg->data[4] >> 2);
+     unsigned int raw_path_offset = ((msg->data[4] & 0x3U) << 8) | msg->data[5];
+ 
+-    // These signals are not yet tested with the current safety limits
+-    bool violation = (raw_curvature_rate != FORD_CANFD_INACTIVE_CURVATURE_RATE) || (raw_path_angle != FORD_INACTIVE_PATH_ANGLE) || (raw_path_offset != FORD_INACTIVE_PATH_OFFSET);
+-
+-    // Check angle error and steer_control_enabled
+-    int desired_curvature = raw_curvature - FORD_INACTIVE_CURVATURE;  // /FORD_STEERING_LIMITS.curvature_to_can to get real curvature
+-    violation |= steer_native_curvature_cmd_checks(desired_curvature, steer_control_enabled, FORD_STEERING_LIMITS);
++    bool violation = false;
++    if (ford_bp_lateral) {  // BluePilot: 4-signal lateral
++      violation = ford_bp_lmc_tx(true, raw_curvature, raw_curvature_rate, raw_path_offset, raw_path_angle, steer_control_enabled);
++    } else {
++      // These signals are not yet tested with the current safety limits
++      violation = (raw_curvature_rate != FORD_CANFD_INACTIVE_CURVATURE_RATE) || (raw_path_angle != FORD_INACTIVE_PATH_ANGLE) || (raw_path_offset != FORD_INACTIVE_PATH_OFFSET);
++
++      // Check angle error and steer_control_enabled
++      int desired_curvature = raw_curvature - FORD_INACTIVE_CURVATURE;  // /FORD_STEERING_LIMITS.curvature_to_can to get real curvature
++      violation |= steer_native_curvature_cmd_checks(desired_curvature, steer_control_enabled, FORD_STEERING_LIMITS);
++    }
+ 
+     if (violation) {
+       tx = false;
+@@ -287,6 +317,20 @@ static safety_config ford_init(uint16_t param) {
+     {.msg = {{FORD_Steering_Data_FD1, 0, 8, 10U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, { 0 }, { 0 }}},
+   };
+ 
++  // BluePilot: ford_rx_checks plus the pinion message, enforced only while the pinion angle_meas source is
++  // on (ford_bp_init). Written out rather than shared through a macro: cppcheck's MISRA 5.8 check misreads one.
++  static RxCheck ford_rx_checks_pinion[] = {
++    {.msg = {{FORD_BrakeSysFeatures, 0, 8, 50U, .max_counter = 15U}, { 0 }, { 0 }}},
++    {.msg = {{FORD_EngVehicleSpThrottle2, 0, 8, 50U, .ignore_checksum = true, .ignore_counter = true}, { 0 }, { 0 }}},
++    {.msg = {{FORD_Yaw_Data_FD1, 0, 8, 100U, .max_counter = 255U}, { 0 }, { 0 }}},
++    {.msg = {{FORD_EngBrakeData, 0, 8, 10U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, { 0 }, { 0 }}},
++    {.msg = {{FORD_EngVehicleSpThrottle, 0, 8, 100U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, { 0 }, { 0 }}},
++    {.msg = {{FORD_DesiredTorqBrk, 0, 8, 50U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, { 0 }, { 0 }}},
++    {.msg = {{FORD_Steering_Data_FD1, 0, 8, 10U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, { 0 }, { 0 }}},
++    // StePinAn_No_Cs matches no Ford checksum pattern on real frames: integrity via counter (0-15) + quality flag + 100 Hz
++    {.msg = {{FORD_SteeringPinion_Data, 0, 8, 100U, .max_counter = 15U, .ignore_checksum = true}, { 0 }, { 0 }}},
++  };
++
+   #define FORD_COMMON_TX_MSGS \
+     {FORD_Steering_Data_FD1, 0, 8, .check_relay = false}, \
+     {FORD_Steering_Data_FD1, 2, 8, .check_relay = false}, \
+@@ -331,6 +375,11 @@ static safety_config ford_init(uint16_t param) {
+   } else {
+     ret = BUILD_SAFETY_CFG(ford_rx_checks, FORD_LONG_TX_MSGS);
+   }
++
++  // BluePilot: IQ safety flags (BP lateral, pinion source); the pinion RX check applies only when it is consumed
++  if (ford_bp_init(current_safety_param_iq)) {
++    SET_RX_CHECKS(ford_rx_checks_pinion, ret);
++  }
+   return ret;
+ }
+ 
+diff --git a/iqdbc/safety/tests/test.sh b/iqdbc/safety/tests/test.sh
+index 1ff4ee8..9c8b425 100755
+--- a/iqdbc/safety/tests/test.sh
++++ b/iqdbc/safety/tests/test.sh
+@@ -10,8 +10,8 @@ source ../../../setup.sh
+ rm -f ./libsafety/*.gcda
+ scons -j$(nproc) -D
+ 
+-# run safety tests and generate coverage data
+-pytest -n8 --ignore-glob=misra/*
++# run safety tests and generate coverage data (and the BluePilot ones, from the bluepilot_lateral subtree)
++pytest -n8 --ignore-glob=misra/* . ../../bluepilot_lateral/safety/tests
+ 
+ if [ "$(uname)" = "Darwin" ]; then
+   GCOV_EXEC="/opt/homebrew/opt/llvm@18/bin/llvm-cov gcov"

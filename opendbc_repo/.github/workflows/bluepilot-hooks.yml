@@ -1,0 +1,26 @@
+# BluePilot: fail a PR to bp-opendbc or bp-full whose merge result leaves an upstream file differing from
+# master without being on .github/bluepilot-hooks.txt (spec: #47). Required on bp-opendbc and bp-full as
+# `bluepilot-hooks`: keep the job name, and keep it running on every PR (a required check that doesn't run
+# blocks the PR).
+name: bluepilot hooks
+
+on:
+  pull_request:
+    branches:
+      - bp-opendbc
+      - bp-full  # full BluePilot's car code (#15)
+
+permissions:
+  contents: read
+
+jobs:
+  bluepilot-hooks:
+    name: bluepilot-hooks
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+    - uses: actions/checkout@v7
+      with:
+        fetch-depth: 0  # full history: the check diffs against the merge base with master
+    - run: git fetch --no-tags origin +refs/heads/master:refs/remotes/origin/master
+    - run: python3 .github/bluepilot_hooks.py origin/master

@@ -1,0 +1,195 @@
+# BluePilot: the nightly IQPilot pin check (#18). When IQ.Lvbs's beta has moved past the commit pinned in
+# hosts/iqpilot/host.sh, it builds and tests the library on the new head (host.sh tree + test, as the iqpilot job).
+# Green: a PR moving the pin (and dropping hooks.patch once IQPilot carries the hooks), merged by the job once the
+# library's required checks and the iqpilot job pass. Red: one standing issue saying which step failed; the pin stays
+# where it passed, and the job closes the issue once a later beta passes. Runs between ford-op/opendbc's sync
+# (03:17) and bp-sunnypilot's (07:17). IQPilot's code (its setup.sh, build and tests) runs in its own job with no
+# secrets; the job with the App token starts on a fresh runner and a fresh checkout.
+name: iqpilot pin check
+
+on:
+  schedule:
+    - cron: '17 5 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: iqpilot-pin
+  cancel-in-progress: false
+
+jobs:
+  check:
+    if: github.repository == 'BluePilotDev/bluepilot-lateral'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    outputs:
+      head: ${{ steps.head.outputs.head }}
+      pin: ${{ steps.head.outputs.pin }}
+      moved: ${{ steps.head.outputs.moved }}
+      changed: ${{ steps.changed.outputs.changed }}
+      tree: ${{ steps.tree.outcome }}
+      test: ${{ steps.test.outcome }}
+      state: ${{ steps.state.outputs.state }}
+    steps:
+    - uses: actions/checkout@v7
+      with:
+        path: lib
+    - name: Has beta moved?
+      id: head
+      run: |
+        set -euo pipefail
+        repo=$(sed -n 's/^REPO=//p' lib/hosts/iqpilot/host.sh)
+        pin=$(sed -n 's/^PIN=\([0-9a-f]*\).*/\1/p' lib/hosts/iqpilot/host.sh)
+        head=$(git ls-remote "$repo" refs/heads/beta | cut -f1)
+        if ! [[ "$head" =~ ^[0-9a-f]{40}$ ]]; then echo "::error::couldn't read beta from $repo"; exit 1; fi
+        echo "pinned ${pin:0:8}, beta ${head:0:8}"
+        { echo "head=$head"; echo "pin=$pin"; echo "moved=$([ "$head" != "$pin" ] && echo yes || echo no)"; } >> "$GITHUB_OUTPUT"
+    - name: Host tree at the new beta
+      id: tree
+      if: steps.head.outputs.moved == 'yes'
+      continue-on-error: true
+      env:
+        HEAD_SHA: ${{ steps.head.outputs.head }}
+      run: lib/hosts/iqpilot/host.sh tree w "$HEAD_SHA"
+    - name: Hooked files that moved
+      id: changed
+      if: steps.head.outputs.moved == 'yes'
+      env:
+        HEAD_SHA: ${{ steps.head.outputs.head }}
+        PIN: ${{ steps.head.outputs.pin }}
+      run: |
+        # the files hooks.patch edits, as IQPilot lays them out; for the issue
+        project=$(sed -n 's/^PROJECT=\([^ ]*\).*/\1/p' lib/hosts/iqpilot/host.sh)
+        files=$(sed -n "s#^diff --git a/\([^ ]*\) .*#$project/\1#p" lib/hosts/iqpilot/hooks.patch)
+        # shellcheck disable=SC2086 # a list of paths
+        stat=$(git -C w/iq diff --stat "$PIN" "$HEAD_SHA" -- $files 2>/dev/null || echo "(no tree to diff)")
+        { echo "changed<<EOF"; echo "${stat:-none}"; echo "EOF"; } >> "$GITHUB_OUTPUT"
+    - name: Tests at the new beta
+      id: test
+      if: steps.head.outputs.moved == 'yes' && steps.tree.outcome == 'success'
+      continue-on-error: true
+      run: lib/hosts/iqpilot/host.sh test w
+    - name: Hook state
+      id: state
+      if: steps.head.outputs.moved == 'yes'
+      run: |
+        state=$(head -n1 w/state 2>/dev/null || echo "unknown: the tree stopped before the hooks")
+        echo "state=${state//[^a-zA-Z0-9 :().,_\/-]/}" >> "$GITHUB_OUTPUT"
+
+  report:
+    needs: check
+    if: needs.check.outputs.moved == 'yes'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      ISSUE_TITLE: IQPilot beta breaks the library's IQPilot host
+    steps:
+    - uses: actions/checkout@v7
+      with:
+        path: lib
+        persist-credentials: false  # the push below uses the App token; a kept Actions token would win and be refused
+    - uses: actions/create-github-app-token@v2
+      id: app
+      with:
+        app-id: ${{ secrets.SYNC_APP_ID }}
+        private-key: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
+    - name: Pin PR, or the issue
+      env:
+        GH_TOKEN: ${{ steps.app.outputs.token }}
+        REPO: ${{ github.repository }}
+        HEAD_SHA: ${{ needs.check.outputs.head }}
+        PIN: ${{ needs.check.outputs.pin }}
+        CHANGED: ${{ needs.check.outputs.changed }}
+        TREE: ${{ needs.check.outputs.tree }}
+        TEST: ${{ needs.check.outputs.test }}
+        STATE: ${{ needs.check.outputs.state }}
+        RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+      run: |
+        set -euo pipefail
+        state="$STATE"
+        issue=$(gh issue list -R "$REPO" --state open --search "in:title \"$ISSUE_TITLE\"" --json number,title \
+                -q 'map(select(.title == env.ISSUE_TITLE)) | .[0].number // empty')
+
+        # red: one standing issue, rewritten each night; the pin stays where it passed
+        if [ "$TREE" != success ] || [ "$TEST" != success ]; then
+          web=$(sed -n 's/^REPO=//p' lib/hosts/iqpilot/host.sh | sed 's/\.git$//')
+          if [ "$TREE" != success ]; then step="the host tree (\`host.sh tree\`)"; else step="the tests (\`host.sh test\`)"; fi
+          case "$TREE/$state" in
+            success/*) what="The tree built and the hooks applied, but the tests failed (\`host.sh test\`): see the run. Fix what broke, or add a test IQPilot itself breaks to \`hosts/iqpilot/known_failures.txt\`." ;;
+            */drifted:\ hooks.patch*) what="IQPilot changed one of the files the hook patch edits, so the patch no longer applies (IQPilot doesn't carry the hooks itself). Rebase the patch: in \`<dir>/host\`, \`git apply --reject hosts/iqpilot/hooks.patch\`, fix the \`.rej\` hunks by hand, then \`host.sh make <dir>\` rewrites \`hooks.patch\`." ;;
+            */drifted:*) what="IQPilot carries a copy of the library that differs from the release its \`VERSION\` names: \`tools/check_vendored.sh\` says what they edited. Get the edits into the library (or IQPilot back to a release) before moving the pin." ;;
+            *) what="The host tree didn't build (\`host.sh tree\`): see the run. Usually IQPilot moved or renamed something \`host.sh\` expects (iqdbc's folder, setup.sh, the imported packages)." ;;
+          esac
+          {
+            echo "IQ.Lvbs's \`beta\` moved from the pinned [\`${PIN:0:8}\`]($web/commit/$PIN) to [\`${HEAD_SHA:0:8}\`]($web/commit/$HEAD_SHA) ([compare]($web/compare/$PIN...$HEAD_SHA)), and $step failed on it: $RUN_URL"
+            echo
+            echo "**What happened:** $what"
+            echo
+            echo "Hooks: $state."
+            echo
+            echo "Files the hooks patch edits that changed between the two:"
+            echo
+            echo '```'
+            echo "$CHANGED"
+            echo '```'
+            echo
+            echo "**What to do:** \`hosts/iqpilot/host.sh tree <dir> $HEAD_SHA\` builds the tree at the new commit (it stops at the same failure), then \`host.sh test <dir>\` runs the tests. With it green, move \`PIN\` in \`hosts/iqpilot/host.sh\` to \`$HEAD_SHA\` and open a PR with the fix."
+            echo
+            echo "The pin stays at \`${PIN:0:8}\` until then, so the library's own CI isn't affected. This issue closes itself once a later \`beta\` passes."
+          } > issue.md
+          if [ -n "$issue" ]; then gh issue edit "$issue" -R "$REPO" --body-file issue.md; else gh issue create -R "$REPO" --title "$ISSUE_TITLE" --body-file issue.md; fi
+          echo "::error::IQPilot beta ${HEAD_SHA:0:8}: $step failed; see the issue"
+          exit 1
+        fi
+
+        # green: a PR moving the pin, merged once the checks pass
+        cd lib
+        branch="iqpilot/pin-${HEAD_SHA:0:8}"
+        sed -i "s/^PIN=[0-9a-f]*  # beta, .*/PIN=$HEAD_SHA  # beta, $(date -u +%F)/" hosts/iqpilot/host.sh
+        note=""
+        if [ "$state" = adopted ] && [ -f hosts/iqpilot/hooks.patch ]; then
+          git rm -q hosts/iqpilot/hooks.patch
+          note=" IQPilot now carries the hooks, so \`hooks.patch\` goes and CI tests IQPilot's tree as it is."
+        fi
+        git checkout -q -b "$branch"
+        git -c user.name="bluepilot-sync[bot]" -c user.email="348581487+bluepilot-sync[bot]@users.noreply.github.com" \
+          commit -qam "hosts/iqpilot: pin IQPilot beta ${HEAD_SHA:0:8}"
+        if ! git ls-remote --exit-code "https://x-access-token:${GH_TOKEN}@github.com/$REPO.git" "refs/heads/$branch" >/dev/null; then
+          git push -q "https://x-access-token:${GH_TOKEN}@github.com/$REPO.git" "$branch"
+        fi
+        pr=$(gh pr list -R "$REPO" --head "$branch" --state open --json number -q '.[0].number // empty')
+        if [ -z "$pr" ]; then
+          echo "IQ.Lvbs's \`beta\` moved to \`${HEAD_SHA:0:8}\` and the library passes on it (hooks: $state): $RUN_URL. Moves the pin in \`hosts/iqpilot/host.sh\`.$note The job merges this once the required checks and \`iqpilot\` pass." > pr.md
+          pr=$(gh pr create -R "$REPO" --base main --head "$branch" --title "hosts/iqpilot: pin IQPilot beta ${HEAD_SHA:0:8}" --body-file pr.md)
+          pr=${pr##*/}
+        fi
+        up=$(git rev-parse HEAD)
+
+        # the library's required checks plus the iqpilot job (the App can't read branch protection, so they're listed)
+        REQUIRED=("./test.sh" "safety" "bluepilot-safety" "iqpilot")
+        wait_checks() {  # 0 all passed, 1 one failed, 2 still running after about 50 minutes
+          local out n state
+          for _ in $(seq 150); do
+            if [ "$(gh pr view "$pr" -R "$REPO" --json headRefOid -q .headRefOid 2>/dev/null)" != "$up" ]; then sleep 20; continue; fi
+            out=$(gh pr checks "$pr" -R "$REPO" --json name,bucket 2>/dev/null || true)
+            n=0
+            for name in "${REQUIRED[@]}"; do
+              state=$(jq -r --arg n "$name" 'first(.[] | select(.name == $n) | .bucket) // empty' <<<"${out:-[]}")
+              case "$state" in pass) n=$((n + 1)) ;; fail|cancel) echo "failed: $name"; return 1 ;; esac
+            done
+            [ "$n" = "${#REQUIRED[@]}" ] && return 0
+            sleep 20
+          done
+          return 2
+        }
+        rc=0; wait_checks || rc=$?
+        case $rc in
+          0) gh pr merge "$pr" -R "$REPO" --squash --delete-branch --match-head-commit "$up" \
+               --body "Moves the IQPilot pin to beta ${HEAD_SHA:0:8}."  # its own message: the default adds the App as a co-author
+             echo "merged #$pr"
+             if [ -n "$issue" ]; then gh issue close "$issue" -R "$REPO" -c "IQPilot \`beta\` \`${HEAD_SHA:0:8}\` passes; the pin moved in #$pr."; fi ;;
+          1) echo "::error::#$pr: a check failed; it stays open"; exit 1 ;;
+          2) echo "::notice::#$pr: checks still running after 50 minutes; the next night's run tries again" ;;
+        esac

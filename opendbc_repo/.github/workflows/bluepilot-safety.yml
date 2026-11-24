@@ -1,0 +1,29 @@
+# BluePilot: coverage and mutation for the BluePilot safety headers (spec: #53). Upstream's safety and
+# mutation jobs only see files under opendbc/safety/; the headers live in opendbc/bluepilot_lateral/safety/.
+# Required on bp-opendbc as `bluepilot-safety`: keep the job name.
+name: bluepilot safety
+
+on:
+  push:
+    branches:
+      - bp-opendbc
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  bluepilot-safety:
+    name: bluepilot-safety
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+    - uses: actions/checkout@v7
+      with:
+        submodules: true  # the library (opendbc/bluepilot_lateral)
+    - name: Coverage
+      run: ./opendbc/bluepilot_lateral/safety/tests/bluepilot_coverage.sh
+    - name: Mutation
+      run: |
+        source setup.sh
+        python opendbc/bluepilot_lateral/safety/tests/bluepilot_mutation.py

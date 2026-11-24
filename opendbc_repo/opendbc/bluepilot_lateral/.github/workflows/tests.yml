@@ -1,0 +1,92 @@
+# The library on sunnypilot/opendbc with ford-op/opendbc's hook patch, through the checks it runs on
+# it (spec: ford-op/bg-opendbc#83). Required on main as `./test.sh`, `safety` and `bluepilot-safety`:
+# keep the job names, and keep them running on every PR (a required check that doesn't run blocks the PR).
+name: tests
+
+on:
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      base:
+        description: sunnypilot/opendbc ref to test on (default the upstream commit bp-opendbc contains)
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: ./test.sh
+            run: ./test.sh
+          - name: safety
+            run: ./opendbc/safety/tests/test.sh
+          - name: bluepilot-safety
+            run: |
+              ./opendbc/bluepilot_lateral/safety/tests/bluepilot_coverage.sh
+              source setup.sh
+              python opendbc/bluepilot_lateral/safety/tests/bluepilot_mutation.py
+              for d in "-DALLOW_DEBUG" "" "-DALLOW_DEBUG -DFORD_BP_DEBUG"; do
+                echo "safety build: ${d:-default}"
+                # shellcheck disable=SC2086 # $d is a list of flags
+                cc -fPIC -Wall -Wextra -Werror -nostdlib -fno-builtin -std=gnu11 -Wfatal-errors -Wno-pointer-to-int-cast -O0 $d \
+                  -I . -c opendbc/safety/tests/libsafety/safety.c -o /tmp/safety.os
+              done
+    steps:
+    - uses: actions/checkout@v7
+      with:
+        path: lib
+    - uses: actions/checkout@v7
+      with:
+        repository: ford-op/opendbc
+        ref: bp-opendbc
+        path: bg
+        fetch-depth: 0  # the hook patch is a diff against the merge base with master
+    - name: Host tree (upstream, hook patch, library)
+      env:
+        BASE: ${{ inputs.base }}
+      run: |
+        if [ -n "$BASE" ]; then
+          git -C bg fetch -q https://github.com/sunnypilot/opendbc "$BASE"
+          BASE=$(git -C bg rev-parse FETCH_HEAD)
+        else
+          BASE=$(git -C bg merge-base origin/master HEAD)
+        fi
+        (cd bg && ../lib/tools/make_hook_patch.sh origin/master) > hooks.patch
+        git -C bg worktree add -q --detach ../host "$BASE"
+        git -C host apply ../hooks.patch
+        mkdir -p host/opendbc/bluepilot_lateral
+        git -C lib archive HEAD | tar -x -C host/opendbc/bluepilot_lateral
+        rm -rf host/opendbc/bluepilot_lateral/.github
+        # committed, so checks that list files with git (codespell) see the library and the patch
+        git -C host add -A
+        git -C host -c user.name=ci -c user.email=ci@localhost commit -q -m "hook patch and library"
+        echo "host $BASE, hook patch ($(grep -c '^diff --git' hooks.patch) files), library $(git -C lib rev-parse --short HEAD)"
+    - working-directory: host
+      run: ${{ matrix.run }}
+
+  # The library on IQPilot (#18): iqdbc from IQ.Lvbs's repo at hosts/iqpilot/host.sh's pinned commit, with
+  # hosts/iqpilot/hooks.patch and this library. Not a required check (yet): IQPilot's side can break it.
+  iqpilot:
+    name: iqpilot
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+    - uses: actions/checkout@v7
+      with:
+        path: lib
+    - name: Host tree (IQPilot at the pin, hook patch, library)
+      run: lib/hosts/iqpilot/host.sh tree iq-host
+    - name: Library tests, safety suite, coverage
+      run: lib/hosts/iqpilot/host.sh test iq-host

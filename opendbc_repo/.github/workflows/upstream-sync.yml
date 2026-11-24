@@ -1,0 +1,167 @@
+# BluePilot: nightly upstream sync (spec: ford-op/bg-opendbc#18). Fast-forwards `master` to sunnypilot/opendbc
+# `master` and keeps one PR open from `master` into `bp-opendbc`. It merges that PR itself (merge commit)
+# only when it's clean (no conflicts; files both sides changed are listed but don't block) and
+# `bp-opendbc`'s required checks pass (#3); a conflict waits for a person. It never force-pushes:
+# if `master` is not a fast-forward of upstream it stops and opens an issue.
+name: upstream sync
+
+on:
+  schedule:
+    - cron: '17 3 * * *'  # nightly, 03:17 UTC: four hours ahead of bp-sunnypilot's sync, which reads bp-opendbc
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: upstream-sync
+
+jobs:
+  sync:
+    if: github.repository == 'ford-op/opendbc'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 75
+    steps:
+    # GITHUB_TOKEN can't be used: pushes and PRs made with it don't start CI. The ford-op-sync
+    # App can push `master` (branch protection allows only it) and its PRs run CI normally.
+    - uses: actions/create-github-app-token@v2
+      id: app
+      with:
+        app-id: ${{ secrets.SYNC_APP_ID }}
+        private-key: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
+    - uses: actions/checkout@v7
+      with:
+        fetch-depth: 0
+        token: ${{ steps.app.outputs.token }}
+    - name: Sync
+      id: sync
+      env:
+        GH_TOKEN: ${{ steps.app.outputs.token }}
+        REPO: ${{ github.repository }}
+        UPSTREAM_URL: https://github.com/sunnypilot/opendbc.git
+        MIRROR: master
+        INTEGRATION: bp-opendbc
+      run: |
+        set -euo pipefail
+        git fetch --no-tags origin "$MIRROR" "$INTEGRATION"
+        git fetch --no-tags "$UPSTREAM_URL" master
+        up=$(git rev-parse FETCH_HEAD)
+        mirror=$(git rev-parse "origin/$MIRROR")
+        integration=$(git rev-parse "origin/$INTEGRATION")
+
+        # 1. Fast-forward the mirror, or stop and say why.
+        if [ "$mirror" != "$up" ]; then
+          if ! git merge-base --is-ancestor "$mirror" "$up"; then
+            title="$MIRROR is not a mirror of upstream"
+            {
+              echo "The nightly sync stopped: \`$MIRROR\` is not a fast-forward of sunnypilot/opendbc \`master\` ($up)."
+              echo
+              echo "Commits on \`$MIRROR\` that upstream doesn't have:"
+              echo '```'
+              git log --format='%h %ad %an | %s' --date=short "$up..$mirror"
+              echo '```'
+              echo "Fix \`$MIRROR\` by hand (it may only ever equal upstream), then re-run the job. The job never force-pushes."
+            } > issue.md
+            num=$(gh issue list -R "$REPO" --state open --search "in:title \"$title\"" --json number,title \
+                  -q "map(select(.title == \"$title\")) | .[0].number // empty")
+            if [ -n "$num" ]; then gh issue edit "$num" -R "$REPO" --body-file issue.md; else gh issue create -R "$REPO" --title "$title" --body-file issue.md; fi
+            echo "::error::$MIRROR is not a fast-forward of upstream; see the issue"
+            exit 1
+          fi
+          git push origin "$up:refs/heads/$MIRROR"
+        fi
+
+        # 2. Nothing to do if the integration branch already has upstream.
+        if git merge-base --is-ancestor "$up" "$integration"; then
+          echo "$INTEGRATION already contains upstream $up"
+          exit 0
+        fi
+
+        # 3. Open or refresh the one sync PR (head = the mirror itself).
+        base=$(git merge-base "$up" "$integration")
+        out=$(git merge-tree --write-tree --name-only --no-messages "$integration" "$up") || true
+        # exit 1 means conflicts or an error; only a real result starts with the merged tree's ID
+        grep -qE '^[0-9a-f]{40}$' <<<"$(head -n1 <<<"$out")" || { echo "::error::merge-tree failed"; exit 1; }
+        conflicts=$(tail -n +2 <<<"$out" | sed 's/^/- /')
+        overlap=$(comm -12 <(git diff --name-only "$base" "$up" | sort) <(git diff --name-only "$base" "$integration" | sort) | sed 's/^/- /')
+        clean=$([ -z "$conflicts" ] && echo yes || echo no)
+        {
+          echo "Automated nightly sync of sunnypilot/opendbc \`master\` into \`$INTEGRATION\` (ford-op/bg-opendbc#18). Upstream \`${base:0:8}..${up:0:8}\`."
+          echo
+          echo "**Merge with a merge commit, not squash, and don't delete the branch.** The head is \`$MIRROR\` itself; a squash leaves upstream's commits out of \`$INTEGRATION\` and the job reopens this PR every night."
+          echo
+          if [ "$clean" = yes ]; then
+            echo "✅ No conflicts: the job merges this itself once the required checks pass (#3). Files both sides changed are listed below; the required checks cover them."
+          else
+            echo "❌ Conflicts: this waits for a person (#3)."
+          fi
+          echo
+          echo "### Upstream commits"
+          git log -n 200 --format='- %h %s' "$integration..$up"
+          echo
+          echo "### Files upstream changed that BluePilot also changes"
+          echo "${overlap:-None.}"
+          echo
+          if [ -n "$conflicts" ]; then
+            echo "### Conflicts"
+            echo "$conflicts"
+          else
+            echo "No conflicts."
+          fi
+        } > pr.md
+        pr=$(gh pr list -R "$REPO" --head "$MIRROR" --base "$INTEGRATION" --state open --json number -q '.[0].number // empty')
+        if [ -n "$pr" ]; then
+          gh pr edit "$pr" -R "$REPO" --body-file pr.md
+        else
+          pr=$(gh pr create -R "$REPO" --head "$MIRROR" --base "$INTEGRATION" --title "sync: sunnypilot/opendbc master → $INTEGRATION" --body-file pr.md)
+          pr=${pr##*/}
+        fi
+        { echo "pr=$pr"; echo "up=$up"; echo "clean=$clean"; } >> "$GITHUB_OUTPUT"
+    # BluePilot (#3): a clean sync can't change what bp-sunnypilot runs (it pins opendbc_repo) or lateral
+    # behavior (the library), and bp-opendbc's required checks still gate it, so it merges itself on green.
+    # a fresh App token: the wait below can outlast the first one (App tokens last an hour)
+    - uses: actions/create-github-app-token@v2
+      id: app2
+      if: steps.sync.outputs.clean == 'yes'
+      with:
+        app-id: ${{ secrets.SYNC_APP_ID }}
+        private-key: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
+    - name: Merge when clean
+      if: steps.sync.outputs.clean == 'yes'
+      env:
+        GH_TOKEN: ${{ steps.app2.outputs.token }}
+        REPO: ${{ github.repository }}
+        PR: ${{ steps.sync.outputs.pr }}
+        UP: ${{ steps.sync.outputs.up }}
+      run: |
+        set -euo pipefail
+        # bp-opendbc's required checks (its branch protection; the App can't read protection, so they're
+        # listed, as in bluepilot-lateral's release_bumps.sh)
+        REQUIRED=("./test.sh (Linux)" "safety" "bluepilot-safety" "bluepilot-hooks")
+        wait_required() {  # 0 all passed, 1 one failed, 2 still running after about 50 minutes
+          local out n state
+          for _ in $(seq 150); do
+            # only trust checks for the new head: right after the push the PR can still show the old one's
+            if [ "$(gh pr view "$PR" -R "$REPO" --json headRefOid -q .headRefOid 2>/dev/null)" != "$UP" ]; then sleep 20; continue; fi
+            out=$(gh pr checks "$PR" -R "$REPO" --required --json name,bucket 2>/dev/null || true)
+            if jq -e 'any(.[]; .bucket == "fail" or .bucket == "cancel")' <<<"${out:-[]}" >/dev/null; then
+              jq -r '.[] | select(.bucket == "fail" or .bucket == "cancel") | "failed: \(.name)"' <<<"$out"; return 1
+            fi
+            n=0
+            for name in "${REQUIRED[@]}"; do
+              # a name passes only when every check run with it has: upstream's `tests` runs twice on the sync
+              # commit (the push to the mirror and the PR), and GitHub refuses the merge while either copy runs
+              state=$(jq -r --arg n "$name" '[.[] | select(.name == $n) | .bucket] | if length > 0 and all(. == "pass") then "pass" else empty end' <<<"${out:-[]}")
+              [ "$state" = pass ] && n=$((n + 1))
+            done
+            [ "$n" = "${#REQUIRED[@]}" ] && return 0
+            sleep 20
+          done
+          return 2
+        }
+        rc=0; wait_required || rc=$?
+        case $rc in
+          0) gh pr merge "$PR" -R "$REPO" --merge --match-head-commit "$UP"
+             echo "merged #$PR with a merge commit" ;;
+          1) echo "::error::#$PR: a required check failed; it stays open"; exit 1 ;;
+          2) echo "::notice::#$PR: required checks still running after 50 minutes; the next night's run tries again" ;;
+        esac

@@ -1,0 +1,52 @@
+# Moves the `release` branch to each published release's commit (fast-forward only: a release that
+# isn't ahead of `release` fails here instead of rewriting the branch), then carries the release to
+# bp-sunnypilot (.github/release_bumps.sh, spec ford-op/bg-opendbc#97): ford-op/opendbc's bump PR, merged
+# here once its required checks pass, and a bp-sunnypilot PR left for review. A manual run takes the tag.
+name: release branch
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: release tag to move `release` to (e.g. v0.1.0)
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:  # one release at a time, in order
+  group: release-bumps
+  cancel-in-progress: false
+
+jobs:
+  release-branch:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60  # waits for ford-op/opendbc's required checks
+    steps:
+    - uses: actions/checkout@v7
+      with:
+        fetch-depth: 0
+    - name: Fast-forward release to the tag
+      env:
+        TAG: ${{ github.event.release.tag_name || inputs.tag }}
+      run: |
+        sha=$(git rev-parse "refs/tags/$TAG^{commit}")
+        git merge-base --is-ancestor origin/release "$sha"
+        git push origin "$sha:refs/heads/release"
+        echo "release -> $TAG ($sha)"
+        echo "TAG=$TAG" >> "$GITHUB_ENV"
+        echo "SHA=$sha" >> "$GITHUB_ENV"
+    - uses: actions/create-github-app-token@v2
+      id: app
+      with:
+        app-id: ${{ secrets.SYNC_APP_ID }}
+        private-key: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
+        owner: ford-op
+        repositories: opendbc,bp-sunnypilot
+    - name: opendbc bump (merged on green), then the bp-sunnypilot PR
+      env:
+        GH_TOKEN: ${{ steps.app.outputs.token }}
+        CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+      run: .github/release_bumps.sh "$TAG" "$SHA"

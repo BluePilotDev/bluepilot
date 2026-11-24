@@ -1,0 +1,26 @@
+name: Update CARS.md
+
+on:
+  schedule:
+    - cron: '0 8 * * *'  # 12am PST (8am UTC)
+  workflow_dispatch:
+
+jobs:
+  update-cars:
+    # BluePilot: upstream automation, inert in forks
+    if: github.repository == 'sunnypilot/opendbc'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - name: Generate Car Docs
+        run: |
+          pip install -e .
+          python -m pip install jinja2==3.1.4
+          python opendbc/car/docs.py
+      - uses: stefanzweifel/git-auto-commit-action@4a55954c782fc1ea30b9056cd3e7a2b40ca8887d
+        with:
+          commit_message: 'docs: Scheduled auto-update CARS.md'
+          file_pattern: 'docs/CARS.md'
+          
