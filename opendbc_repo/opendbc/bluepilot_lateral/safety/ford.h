@@ -40,6 +40,7 @@ const AngleSteeringParams ford_pinion_geometry[FORD_PINION_GEOMETRY_ROWS] = {
   {.slip_factor = -0.00058852001f, .steer_ratio = 14.8f, .wheelbase = 2.850f},    // 10: FORD_MONDEO_MK5
   {.slip_factor = -0.00056209187f, .steer_ratio = 17.0f, .wheelbase = 2.984f},    // 11: FORD_MUSTANG_MACH_E_MK1
   {.slip_factor = -0.00051293030f, .steer_ratio = 17.0f, .wheelbase = 3.270f},    // 12: FORD_RANGER_MK2
+  {.slip_factor = -0.00043679222f, .steer_ratio = 17.0f, .wheelbase = 3.840f},    // 13: FORD_F_150_MK14_5 (TRON test branch, same as MK14)
 };
 
 bool ford_bp_angle_mode_engaged = false;

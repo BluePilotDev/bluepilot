@@ -183,6 +183,11 @@ static bool ford_tx_hook(const CANPacket_t *msg) {
 
   bool tx = true;
 
+  // TRON test branch: the 16-byte lane messages carry the DBC payload in bytes 0-7, the rest must be zero
+  if ((GET_LEN(msg) == 16U) && (GET_BYTES_64_LE(msg, 8, 8) != 0U)) {
+    tx = false;
+  }
+
   // Safety check for ACCDATA accel and brake requests
   if (msg->addr == FORD_ACCDATA) {
     // Signal: AccPrpl_A_Rq
@@ -325,6 +330,34 @@ static safety_config ford_init(uint16_t param) {
     {.msg = {{FORD_SteeringPinion_Data, 0, 8, 100U, .max_counter = 15U, .ignore_checksum = true}, { 0 }, { 0 }}},
   };
 
+  // TRON test branch: these are 16 bytes with the DBC payload in bytes 0-7; Yaw_Data_FD1, Steering_Data_FD1
+  // and SteeringPinion_Data are still 8 bytes
+  #define FORD_TRON_RX_CHECKS \
+    {.msg = {{FORD_BrakeSysFeatures, 0, 16, 50U, .max_counter = 15U}, { 0 }, { 0 }}}, \
+    {.msg = {{FORD_EngVehicleSpThrottle2, 0, 16, 50U, .ignore_checksum = true, .ignore_counter = true}, { 0 }, { 0 }}}, \
+    {.msg = {{FORD_Yaw_Data_FD1, 0, 8, 100U, .max_counter = 255U}, { 0 }, { 0 }}}, \
+    {.msg = {{FORD_EngBrakeData, 0, 16, 10U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, { 0 }, { 0 }}}, \
+    {.msg = {{FORD_EngVehicleSpThrottle, 0, 16, 100U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, { 0 }, { 0 }}}, \
+    {.msg = {{FORD_DesiredTorqBrk, 0, 16, 50U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, { 0 }, { 0 }}}, \
+    {.msg = {{FORD_Steering_Data_FD1, 0, 8, 10U, .ignore_checksum = true, .ignore_counter = true, .ignore_quality_flag = true}, { 0 }, { 0 }}}, \
+
+  static RxCheck ford_tron_rx_checks[] = {
+    FORD_TRON_RX_CHECKS
+  };
+
+  static RxCheck ford_tron_rx_checks_pinion[] = {
+    FORD_TRON_RX_CHECKS
+    {.msg = {{FORD_SteeringPinion_Data, 0, 8, 100U, .max_counter = 15U, .ignore_checksum = true}, { 0 }, { 0 }}},
+  };
+
+  // TRON test branch: the lane messages are 16 bytes too, ACCDATA_3 and IPMA_Data stay the camera's
+  static const CanMsg FORD_TRON_TX_MSGS[] = {
+    {FORD_Steering_Data_FD1, 0, 8, .check_relay = false},
+    {FORD_Steering_Data_FD1, 2, 8, .check_relay = false},
+    {FORD_Lane_Assist_Data1, 0, 16, .check_relay = true},
+    {FORD_LateralMotionControl2, 0, 16, .check_relay = true},
+  };
+
   #define FORD_COMMON_TX_MSGS \
     {FORD_Steering_Data_FD1, 0, 8, .check_relay = false}, \
     {FORD_Steering_Data_FD1, 2, 8, .check_relay = false}, \
@@ -360,6 +393,8 @@ static safety_config ford_init(uint16_t param) {
 
   const uint16_t FORD_PARAM_CANFD = 2;
   const bool ford_canfd = GET_FLAG(param, FORD_PARAM_CANFD);
+  const uint16_t FORD_PARAM_TRON = 4;  // TRON test branch
+  const bool ford_tron = ford_canfd && GET_FLAG(param, FORD_PARAM_TRON);
 
   safety_config ret;
   if (ford_canfd) {
@@ -370,6 +405,10 @@ static safety_config ford_init(uint16_t param) {
       ret = BUILD_SAFETY_CFG(ford_rx_checks, FORD_CANFD_LONG_TX_MSGS);
     }
 #endif
+    // TRON test branch: stock ACC only, outside ALLOW_DEBUG so it works on any panda build
+    if (ford_tron) {
+      ret = BUILD_SAFETY_CFG(ford_tron_rx_checks, FORD_TRON_TX_MSGS);
+    }
   } else {
     // BluePilot (bp-full): BluePilot's own bit, set only when the alpha longitudinal toggle is off;
     // without it a CAN Ford is upstream's (always the longitudinal TX set)
@@ -383,7 +422,11 @@ static safety_config ford_init(uint16_t param) {
 
   // BluePilot: SP safety param (BP lateral, pinion source); the pinion RX check applies only when it is consumed
   if (ford_bp_init(current_safety_param_sp)) {
-    SET_RX_CHECKS(ford_rx_checks_pinion, ret);
+    if (ford_tron) {
+      SET_RX_CHECKS(ford_tron_rx_checks_pinion, ret);  // TRON test branch
+    } else {
+      SET_RX_CHECKS(ford_rx_checks_pinion, ret);
+    }
   }
   return ret;
 }

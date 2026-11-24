@@ -59,6 +59,7 @@ FORD_PINION_GEOMETRY_INDEX = {
   "FORD_MONDEO_MK5": 10,
   "FORD_MUSTANG_MACH_E_MK1": 11,
   "FORD_RANGER_MK2": 12,
+  "FORD_F_150_MK14_5": 13,  # TRON test branch: same geometry as the MK14
 }
 
 
@@ -98,6 +99,7 @@ def ford_safety_param(CP: structs.CarParams, params_dict: dict[str, str]) -> int
 # the car tells them apart; the average keeps either within about 4% (#21).
 FORD_PINION_WHEELBASE = {
   "FORD_F_150_MK14": 3.84,
+  "FORD_F_150_MK14_5": 3.84,  # TRON test branch
 }
 
 
@@ -150,6 +152,7 @@ ANGLE_GAIN_CANFD_SUV = (1.00, 1.05)
 
 ANGLE_GAIN_CANFD_BOF_CARS = frozenset({
   "FORD_F_150_MK14",
+  "FORD_F_150_MK14_5",  # TRON test branch
   "FORD_F_150_LIGHTNING_MK1",
   "FORD_RANGER_MK2",
 })

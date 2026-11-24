@@ -443,6 +443,27 @@ class TestFordCANFDStockSafety(TestFordSafetyBase):
 
   FWD_BLACKLISTED_ADDRS = {2: [MSG_ACCDATA_3, MSG_Lane_Assist_Data1, MSG_LateralMotionControl2,
                                MSG_IPMA_Data]}
+class TestFordCANFDTronSafety(TestFordCANFDStockSafety):
+  # TRON test branch: 2026 F-150 sends 16-byte frames
+  DBC = "ford_lincoln_base_pt_tron_generated"
+  SAFETY_PARAM = FordSafetyFlags.CANFD | FordSafetyFlags.TRON
+
+  # ACCDATA_3 and IPMA_Data stay the camera's
+  TX_MSGS = [
+    [MSG_Steering_Data_FD1, 0], [MSG_Steering_Data_FD1, 2], [MSG_Lane_Assist_Data1, 0], [MSG_LateralMotionControl2, 0],
+  ]
+  RELAY_MALFUNCTION_ADDRS = {0: (MSG_Lane_Assist_Data1, MSG_LateralMotionControl2)}
+
+  FWD_BLACKLISTED_ADDRS = {2: [MSG_Lane_Assist_Data1, MSG_LateralMotionControl2]}
+
+  def test_zero_tail(self):
+    # bytes 8-15 of the lane messages must be zero
+    for msg in (self._lat_ctl_msg(False, 0, 0, 0, 0), self._lkas_command_msg(0)):
+      self.assertTrue(self._tx(msg))
+      msg[0].data[8] = 1
+      self.assertFalse(self._tx(msg))
+
+
 class TestFordLongitudinalSafetyBase(TestFordSafetyBase):
   MAX_ACCEL = 2.0  # accel is used for brakes, but openpilot can set positive values
   MIN_ACCEL = -3.5

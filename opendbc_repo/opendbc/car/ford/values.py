@@ -42,6 +42,7 @@ class CarControllerParams:
 class FordSafetyFlags(IntFlag):
   LONG_CONTROL = 1
   CANFD = 2
+  TRON = 4  # TRON test branch: 16-byte lane messages (2026 F-150 et al.)
 
 
 class FordFlags(IntFlag):
@@ -51,6 +52,7 @@ class FordFlags(IntFlag):
   # Static flags
   CANFD = 1
   ALT_STEER_ANGLE = 4  # BluePilot: no SteeringPinion_Data (sunnypilot/car/ford/carstate_ext.py)
+  TRON = 32  # TRON test branch: 16 byte messages (upstream PR uses 4, taken by ALT_STEER_ANGLE here)
 
 
 class RADAR:
@@ -80,7 +82,7 @@ class FordCarDocs(CarDocs):
     if harness == CarHarness.ford_q4:
       self.setup_video = "https://www.youtube.com/watch?v=uUGkH6C_EQU"
 
-    if CP.carFingerprint in (CAR.FORD_F_150_MK14, CAR.FORD_F_150_LIGHTNING_MK1, CAR.FORD_EXPEDITION_MK4):
+    if CP.carFingerprint in (CAR.FORD_F_150_MK14, CAR.FORD_F_150_MK14_5, CAR.FORD_F_150_LIGHTNING_MK1, CAR.FORD_EXPEDITION_MK4):
       self.setup_video = "https://www.youtube.com/watch?v=MewJc9LYp9M"
 
 
@@ -161,6 +163,12 @@ class CAR(Platforms):
   FORD_F_150_MK14 = FordCANFDPlatformConfig(
     [FordCarDocs("Ford F-150 2021-23", "Co-Pilot360 Assist 2.0", hybrid=True)],
     CarSpecs(wheelbase=3.69, steerRatio=17.0),
+  )
+  FORD_F_150_MK14_5 = FordCANFDPlatformConfig(
+    [FordCarDocs("Ford F-150 2026", "Co-Pilot360 Assist 2.0")],
+    FORD_F_150_MK14.specs,
+    {Bus.pt: 'ford_lincoln_base_pt_tron_generated'},
+    flags=FordFlags.TRON,
   )
   FORD_F_150_LIGHTNING_MK1 = FordF150LightningPlatform(
     [FordCarDocs("Ford F-150 Lightning 2022-25", "Co-Pilot360 Assist 2.0")],  # BluePilot (bp-full): BP7's years

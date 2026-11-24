@@ -28,6 +28,9 @@ class HudExt:
   def update(self, CC, CC_SP, CS, main_on: bool, steer_alert: bool, fcw_alert: bool, packer, CAN, frame: int) -> list:
     hud_control = CC.hudControl
     can_sends = []
+    # TRON test branch: the camera's IPMA_Data and ACCDATA_3 are not replaced on TRON platforms
+    if self.CP.flags & FordFlags.TRON:
+      return can_sends
 
     send_ui = (self.main_on_last != main_on) or (self.lkas_enabled_last != CC.latActive) or (self.steer_alert_last != steer_alert)
     if (frame % CarControllerParams.LKAS_UI_STEP) == 0 or send_ui:

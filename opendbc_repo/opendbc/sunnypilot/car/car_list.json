@@ -671,6 +671,16 @@
     ],
     "package": "Co-Pilot360 Assist 2.0"
   },
+  "Ford F-150 2026": {
+    "platform": "FORD_F_150_MK14_5",
+    "make": "Ford",
+    "brand": "ford",
+    "model": "F-150",
+    "year": [
+      "2026"
+    ],
+    "package": "Co-Pilot360 Assist 2.0"
+  },
   "Ford F-150 Hybrid 2021-23": {
     "platform": "FORD_F_150_MK14",
     "make": "Ford",

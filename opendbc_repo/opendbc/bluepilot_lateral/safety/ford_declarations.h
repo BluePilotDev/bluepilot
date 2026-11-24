@@ -29,10 +29,10 @@
 
 // BluePilot: steering-angle curvature measurement (bad-yaw-sensor workaround). Index 0 of
 // ford_pinion_geometry is reserved as invalid; see ford_bp_init in ford.h.
-#define FORD_PINION_GEOMETRY_COUNT 12U
+#define FORD_PINION_GEOMETRY_COUNT 13U
 // Row count including the reserved index-0 entry. Kept as a plain literal: the mutation
 // harness rewrites arithmetic in array sizes into runtime expressions, which cannot compile.
-#define FORD_PINION_GEOMETRY_ROWS 13U
+#define FORD_PINION_GEOMETRY_ROWS 14U
 
 // Control signal limits -- curvature magnitude must match MAX_CURVATURE; rate tables must match
 // bluepilot_lateral/core/values_ext.py BP_ANGLE_LIMITS.

@@ -19,8 +19,10 @@ FORD_SAFETY_BP_STOCK_LONG = 0x8000
 
 
 def apply_ford_ext_params(ret: structs.CarParams, alpha_long: bool, fingerprint) -> None:
-  ret.alphaLongitudinalAvailable = True
-  ret.openpilotLongitudinalControl = bool(alpha_long)
+  # TRON test branch: ACC stays stock on TRON platforms (ACCDATA is 16 bytes + SecOC)
+  tron = bool(ret.flags & FordFlags.TRON)
+  ret.alphaLongitudinalAvailable = not tron
+  ret.openpilotLongitudinalControl = bool(alpha_long) and not tron
 
   safety = ret.safetyConfigs[-1]
   if ret.openpilotLongitudinalControl:
