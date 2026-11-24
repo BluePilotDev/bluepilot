@@ -15,8 +15,7 @@ on:
   workflow_dispatch:
     inputs:
       target:
-        description: branch to sync into
-        default: bp-7.1-dev
+        description: branch to sync into (empty = the default branch)
 
 permissions: {}
 
@@ -24,7 +23,7 @@ concurrency:
   group: bpx-sync
 
 env:
-  TARGET: ${{ inputs.target || 'bp-7.1-dev' }}
+  TARGET: ${{ inputs.target || github.event.repository.default_branch }}  # follows the default branch, so the cutover to bp-dev needs no edit here (#227)
   GIT_LFS_SKIP_SMUDGE: 1
   # no submodules are checked out: a fetch that recursed into a moved gitlink would fail
   GIT_CONFIG_COUNT: 1
