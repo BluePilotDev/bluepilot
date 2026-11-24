@@ -535,6 +535,17 @@
     ],
     "package": "Co-Pilot360 Assist+"
   },
+  "Ford Bronco Sport 2025-26": {
+    "platform": "FORD_BRONCO_SPORT_MK1_5",
+    "make": "Ford",
+    "brand": "ford",
+    "model": "Bronco Sport",
+    "year": [
+      "2025",
+      "2026"
+    ],
+    "package": "TRON (SecOC)"
+  },
   "Ford Edge 2019-24": {
     "platform": "FORD_EDGE_MK2",
     "make": "Ford",
@@ -631,6 +642,17 @@
     ],
     "package": "Co-Pilot360 Assist 2.0"
   },
+  "Ford Expedition 2025-26": {
+    "platform": "FORD_EXPEDITION_MK5_5",
+    "make": "Ford",
+    "brand": "ford",
+    "model": "Expedition",
+    "year": [
+      "2025",
+      "2026"
+    ],
+    "package": "TRON (SecOC)"
+  },
   "Ford Explorer 2020-24": {
     "platform": "FORD_EXPLORER_MK6",
     "make": "Ford",
@@ -644,6 +666,17 @@
       "2024"
     ],
     "package": "Co-Pilot360 Assist+"
+  },
+  "Ford Explorer 2025-26": {
+    "platform": "FORD_EXPLORER_MK6_5",
+    "make": "Ford",
+    "brand": "ford",
+    "model": "Explorer",
+    "year": [
+      "2025",
+      "2026"
+    ],
+    "package": "TRON (SecOC)"
   },
   "Ford Explorer Hybrid 2020-24": {
     "platform": "FORD_EXPLORER_MK6",
@@ -679,7 +712,7 @@
     "year": [
       "2026"
     ],
-    "package": "Co-Pilot360 Assist 2.0"
+    "package": "TRON (SecOC)"
   },
   "Ford F-150 Hybrid 2021-23": {
     "platform": "FORD_F_150_MK14",
@@ -705,6 +738,19 @@
       "2025"
     ],
     "package": "Co-Pilot360 Assist 2.0"
+  },
+  "Ford F-Series Super Duty 2023-26": {
+    "platform": "FORD_F_SUPER_DUTY_MK5",
+    "make": "Ford",
+    "brand": "ford",
+    "model": "F-Series Super Duty",
+    "year": [
+      "2023",
+      "2024",
+      "2025",
+      "2026"
+    ],
+    "package": "TRON (SecOC)"
   },
   "Ford Focus 2018-22": {
     "platform": "FORD_FOCUS_MK4",
@@ -814,6 +860,17 @@
     ],
     "package": "Co-Pilot360 Assist"
   },
+  "Ford Maverick 2025-26": {
+    "platform": "FORD_MAVERICK_MK1_5",
+    "make": "Ford",
+    "brand": "ford",
+    "model": "Maverick",
+    "year": [
+      "2025",
+      "2026"
+    ],
+    "package": "TRON (SecOC)"
+  },
   "Ford Maverick Hybrid 2022": {
     "platform": "FORD_MAVERICK_MK1",
     "make": "Ford",
@@ -853,6 +910,18 @@
     ],
     "package": "Adaptive Cruise Control with Lane Centering"
   },
+  "Ford Mustang 2024-26": {
+    "platform": "FORD_MUSTANG_MK7",
+    "make": "Ford",
+    "brand": "ford",
+    "model": "Mustang",
+    "year": [
+      "2024",
+      "2025",
+      "2026"
+    ],
+    "package": "TRON (SecOC)"
+  },
   "Ford Mustang Mach-E 2021-24": {
     "platform": "FORD_MUSTANG_MACH_E_MK1",
     "make": "Ford",
@@ -866,6 +935,17 @@
     ],
     "package": "All"
   },
+  "Ford Mustang Mach-E 2025-26": {
+    "platform": "FORD_MUSTANG_MACH_E_MK1_5",
+    "make": "Ford",
+    "brand": "ford",
+    "model": "Mustang Mach-E",
+    "year": [
+      "2025",
+      "2026"
+    ],
+    "package": "TRON (SecOC)"
+  },
   "Ford Ranger 2024": {
     "platform": "FORD_RANGER_MK2",
     "make": "Ford",
@@ -875,6 +955,17 @@
       "2024"
     ],
     "package": "Adaptive Cruise Control with Lane Centering"
+  },
+  "Ford Transit 2025-26": {
+    "platform": "FORD_TRANSIT_MK4_5",
+    "make": "Ford",
+    "brand": "ford",
+    "model": "Transit",
+    "year": [
+      "2025",
+      "2026"
+    ],
+    "package": "TRON (SecOC)"
   },
   "Genesis G70 2018": {
     "platform": "GENESIS_G70",

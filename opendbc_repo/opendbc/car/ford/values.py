@@ -124,6 +124,9 @@ class FordF150LightningPlatform(FordCANFDPlatformConfig):
     self.car_docs = []
 
 
+TRON_DBC = {Bus.pt: 'ford_lincoln_base_pt_tron_generated'}  # TRON test branch
+
+
 class CAR(Platforms):
   FORD_BRONCO_SPORT_MK1 = FordPlatformConfig(
     [FordCarDocs("Ford Bronco Sport 2021-24")],
@@ -165,9 +168,9 @@ class CAR(Platforms):
     CarSpecs(wheelbase=3.69, steerRatio=17.0),
   )
   FORD_F_150_MK14_5 = FordCANFDPlatformConfig(
-    [FordCarDocs("Ford F-150 2026", "Co-Pilot360 Assist 2.0")],
+    [FordCarDocs("Ford F-150 2026", "TRON (SecOC)")],
     FORD_F_150_MK14.specs,
-    {Bus.pt: 'ford_lincoln_base_pt_tron_generated'},
+    TRON_DBC,
     flags=FordFlags.TRON,
   )
   FORD_F_150_LIGHTNING_MK1 = FordF150LightningPlatform(
@@ -196,6 +199,57 @@ class CAR(Platforms):
   FORD_RANGER_MK2 = FordCANFDPlatformConfig(
     [FordCarDocs("Ford Ranger 2024", "Adaptive Cruise Control with Lane Centering", setup_video="https://www.youtube.com/watch?v=2oJlXCKYOy0")],
     CarSpecs(wheelbase=3.27, steerRatio=17.0),
+  )
+
+  # TRON test branch: CAN FD SecOC (TRON) platforms, selectable from the vehicle selector. No FW fingerprints yet;
+  # all share the 16-byte DBC generated from the 2026 F-150's message sizes, and specs are best-known/borrowed values.
+  FORD_BRONCO_SPORT_MK1_5 = FordCANFDPlatformConfig(
+    [FordCarDocs("Ford Bronco Sport 2025-26", "TRON (SecOC)")],
+    FORD_BRONCO_SPORT_MK1.specs,
+    TRON_DBC,
+    flags=FordFlags.TRON,
+  )
+  FORD_EXPLORER_MK6_5 = FordCANFDPlatformConfig(
+    [FordCarDocs("Ford Explorer 2025-26", "TRON (SecOC)")],
+    FORD_EXPLORER_MK6.specs,
+    TRON_DBC,
+    flags=FordFlags.TRON,
+  )
+  FORD_EXPEDITION_MK5_5 = FordCANFDPlatformConfig(
+    [FordCarDocs("Ford Expedition 2025-26", "TRON (SecOC)")],
+    FORD_EXPEDITION_MK4.specs,  # TODO: 2025 Expedition is 3.11 m (3.34 m MAX); MK4's 3.69 kept so BP tuning carries over
+    TRON_DBC,
+    flags=FordFlags.TRON,
+  )
+  FORD_F_SUPER_DUTY_MK5 = FordCANFDPlatformConfig(
+    [FordCarDocs("Ford F-Series Super Duty 2023-26", "TRON (SecOC)")],
+    CarSpecs(wheelbase=4.06, steerRatio=17.0),  # TODO: crew cab short bed wheelbase; steer ratio is a guess
+    TRON_DBC,
+    flags=FordFlags.TRON,
+  )
+  FORD_MAVERICK_MK1_5 = FordCANFDPlatformConfig(
+    [FordCarDocs("Ford Maverick 2025-26", "TRON (SecOC)")],
+    FORD_MAVERICK_MK1.specs,
+    TRON_DBC,
+    flags=FordFlags.TRON,
+  )
+  FORD_MUSTANG_MK7 = FordCANFDPlatformConfig(
+    [FordCarDocs("Ford Mustang 2024-26", "TRON (SecOC)")],
+    CarSpecs(wheelbase=2.72, steerRatio=15.5),  # TODO: check steer ratio
+    TRON_DBC,
+    flags=FordFlags.TRON,
+  )
+  FORD_MUSTANG_MACH_E_MK1_5 = FordCANFDPlatformConfig(
+    [FordCarDocs("Ford Mustang Mach-E 2025-26", "TRON (SecOC)")],
+    FORD_MUSTANG_MACH_E_MK1.specs,
+    TRON_DBC,
+    flags=FordFlags.TRON,
+  )
+  FORD_TRANSIT_MK4_5 = FordCANFDPlatformConfig(
+    [FordCarDocs("Ford Transit 2025-26", "TRON (SecOC)")],
+    CarSpecs(wheelbase=3.76, steerRatio=17.0),  # TODO: 148 in medium wheelbase; steer ratio is a guess
+    TRON_DBC,
+    flags=FordFlags.TRON,
   )
 
 

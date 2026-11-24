@@ -43,6 +43,9 @@ FORD_NO_PINION_PLATFORMS: frozenset[str] = frozenset({
   "FORD_EDGE_MK2",
   # LKA steering through Lane_Assist_Data1 alone: no BluePilot lateral at all
   "FORD_TRANSIT_MK5",
+  # TRON test branch: the 4-bit geometry index has 2 rows left, so the new TRON platforms keep the yaw source
+  "FORD_BRONCO_SPORT_MK1_5", "FORD_EXPLORER_MK6_5", "FORD_EXPEDITION_MK5_5", "FORD_F_SUPER_DUTY_MK5",
+  "FORD_MAVERICK_MK1_5", "FORD_MUSTANG_MK7", "FORD_MUSTANG_MACH_E_MK1_5", "FORD_TRANSIT_MK4_5",
 })
 
 FORD_PINION_GEOMETRY_SHIFT = 1
@@ -153,13 +156,16 @@ ANGLE_GAIN_CANFD_SUV = (1.00, 1.05)
 ANGLE_GAIN_CANFD_BOF_CARS = frozenset({
   "FORD_F_150_MK14",
   "FORD_F_150_MK14_5",  # TRON test branch
+  "FORD_F_SUPER_DUTY_MK5",  # TRON test branch
   "FORD_F_150_LIGHTNING_MK1",
   "FORD_RANGER_MK2",
 })
 ANGLE_GAIN_EXPEDITION_CARS = frozenset({
   "FORD_EXPEDITION_MK4",
+  "FORD_EXPEDITION_MK5_5",  # TRON test branch
 })
 ANGLE_GAIN_CANFD_SUV_CARS = frozenset({
   "FORD_MUSTANG_MACH_E_MK1",
+  "FORD_MUSTANG_MACH_E_MK1_5",  # TRON test branch
   "FORD_ESCAPE_MK4_5",
 })

@@ -43,7 +43,7 @@ class TestPlatformTables(unittest.TestCase):
   def test_expedition_keeps_bluepilot_7s_base_gain(self):
     """BluePilotDev/bluepilot#220: 1.5x the body-on-frame gains, so BP7 settings carry over. The
     literal is pinned, and the Expedition is alone in its group."""
-    self.assertEqual(ANGLE_GAIN_EXPEDITION_CARS, frozenset({"FORD_EXPEDITION_MK4"}))
+    self.assertEqual(ANGLE_GAIN_EXPEDITION_CARS, frozenset({"FORD_EXPEDITION_MK4", "FORD_EXPEDITION_MK5_5"}))  # TRON test branch
     self.assertAlmostEqual(ANGLE_GAIN_EXPEDITION[0], 1.425)
     self.assertAlmostEqual(ANGLE_GAIN_EXPEDITION[1], 1.425)
 
