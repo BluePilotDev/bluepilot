@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """BluePilot: the release job (#227). A pushed release tag creates the version's branch and moves bp-stable.
-usage: bpx_release.py   (env: see bpx-release.yml)"""
+usage: bp_release.py   (env: see bp-release.yml)"""
 import json
 import os
 import re

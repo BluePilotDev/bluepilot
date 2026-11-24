@@ -1,5 +1,5 @@
 # BluePilot: the release job (spec: #227). A pushed release tag (v7.2.0, v7.2.1) creates the version's branch (bp-7.2) for a
-# new version and moves bp-stable when it's the highest version released. The rules are in .github/bpx_release.py; any
+# new version and moves bp-stable when it's the highest version released. The rules are in .github/bp_release.py; any
 # failed rule writes nothing. Full BluePilot only: this file doesn't exist in ford-op/bp-sunnypilot.
 #
 # The App token can push to bp-stable, so only the default branch's reviewed workflow file may hold it. A tag push runs the
@@ -40,7 +40,7 @@ on:
 permissions: {}
 
 concurrency:
-  group: bpx-release
+  group: bp-release
 
 env:
   GIT_LFS_SKIP_SMUDGE: 1
@@ -62,12 +62,12 @@ jobs:
         DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
         GH_TOKEN: ${{ github.token }}
       run: |
-        # the same form bpx_release.py accepts; the release run checks everything else
+        # the same form bp_release.py accepts; the release run checks everything else
         if ! [[ "$TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
           echo "::error::the tag isn't a release tag: use vMAJOR.MINOR.PATCH, for example v7.1.0"
           exit 1
         fi
-        gh workflow run bpx-release.yml -R "$REPO" --ref "$DEFAULT_BRANCH" -f tag="$TAG" -f dry_run=false
+        gh workflow run bp-release.yml -R "$REPO" --ref "$DEFAULT_BRANCH" -f tag="$TAG" -f dry_run=false
 
   release:
     if: github.repository == 'BluePilotDev/bluepilot' && github.event_name == 'workflow_dispatch'
@@ -98,7 +98,7 @@ jobs:
         persist-credentials: false
     - name: Release
       env:
-        TAG: ${{ inputs.tag }}  # untrusted: bpx_release.py checks it before using it
+        TAG: ${{ inputs.tag }}  # untrusted: bp_release.py checks it before using it
         DRY_RUN: ${{ inputs.dry_run }}
         SOURCE_BRANCH: ${{ inputs.source }}
         STABLE_BRANCH: ${{ inputs.stable }}
@@ -106,4 +106,4 @@ jobs:
         TAG_PREFIX: ${{ inputs.tag_prefix }}
         GH_TOKEN: ${{ github.token }}
         BP_TOKEN: ${{ steps.bp.outputs.token }}  # empty on a dry run
-      run: python3 .github/bpx_release.py
+      run: python3 .github/bp_release.py

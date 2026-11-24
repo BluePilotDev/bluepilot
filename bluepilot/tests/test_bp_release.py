@@ -1,4 +1,4 @@
-"""The BluePilot release job's rules (.github/bpx_release.py, #227)."""
+"""The BluePilot release job's rules (.github/bp_release.py, #227)."""
 import contextlib
 import importlib.util
 import io
@@ -21,7 +21,7 @@ GIT_ENV = {"GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t", "GIT_COMMITTER_NAM
 
 def load_script():
   sys.path.insert(0, str(GITHUB_DIR))  # the script imports bpx_sync from its own folder
-  spec = importlib.util.spec_from_file_location("bpx_release", GITHUB_DIR / "bpx_release.py")
+  spec = importlib.util.spec_from_file_location("bp_release", GITHUB_DIR / "bp_release.py")
   assert spec and spec.loader
   module = importlib.util.module_from_spec(spec)
   spec.loader.exec_module(module)
@@ -390,7 +390,7 @@ class TestRelease(unittest.TestCase):
 class TestWorkflow(unittest.TestCase):
   """The App key never reaches a run started by a tag push: that run uses the tagged commit's workflow file."""
   def setUp(self):
-    self.jobs = yaml.safe_load((GITHUB_DIR / "workflows" / "bpx-release.yml").read_text())["jobs"]
+    self.jobs = yaml.safe_load((GITHUB_DIR / "workflows" / "bp-release.yml").read_text())["jobs"]
 
   def test_a_tag_push_only_starts_a_run_on_the_default_branch(self):
     job = self.jobs["dispatch"]
@@ -419,7 +419,7 @@ class TestWorkflow(unittest.TestCase):
 
   def test_the_tag_check_agrees_with_the_script(self):
     self.assertEqual(self.dispatch("v7.10.0"),
-                     ["workflow", "run", "bpx-release.yml", "-R", "o/r", "--ref", "bp-dev", "-f", "tag=v7.10.0", "-f", "dry_run=false"])
+                     ["workflow", "run", "bp-release.yml", "-R", "o/r", "--ref", "bp-dev", "-f", "tag=v7.10.0", "-f", "dry_run=false"])
     for tag in ("v7.1", "v7.01.0", "v7.1.0-rc1", "v7.1.0;id", "v7.1.0 x", "bpx-test/v7.1.0"):
       with self.subTest(tag=tag):
         self.assertIsNone(self.dispatch(tag))
