@@ -39,8 +39,8 @@ class ChevronMetricsBP(ChevronMetrics):
     self.overlay_scale: float = 1.0
 
     # BluePilot: Restore the BP 6.0 source symbols and cache their GPU textures once.
-    self._radar_source_icon = gui_app.texture("../../../bluepilot/assets/images/img_radar.png", 64, 64)
-    self._vision_source_icon = gui_app.texture("../../../bluepilot/assets/images/img_vision.png", 64, 64)
+    self._radar_source_icon = gui_app.texture("../../../bluepilot/assets/images/img_radar.png", 128, 128)
+    self._vision_source_icon = gui_app.texture("../../../bluepilot/assets/images/img_vision.png", 128, 128)
 
   def should_render(self) -> bool:
     # Render if chevron metrics is enabled OR if Ford overlay is enabled
