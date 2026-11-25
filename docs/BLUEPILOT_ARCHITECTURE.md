@@ -51,7 +51,7 @@ arrive here as git submodules under `opendbc_repo/`.
 | `bluepilot/system/` | Crash reporting (`sentry.py`, to glitchtip.bluepilot.dev) and Wi-Fi helpers. |
 | `bluepilot/backend_switch.py` | Where the device sends drives: comma connect, Konik, or nowhere (offline). |
 | `bluepilot/vendor/` | Third-party Python shipped with BluePilot. |
-| `bluepilot/assets/` | Images, sounds and theme packs. |
+| `bluepilot/assets/` | Images and icons (boot logo, spinner). Theme packs are in `openpilot/selfdrive/assets/bp_themes/`. |
 | `bluepilot/tests/`, `openpilot/selfdrive/ui/bp/tests/` | Tests. |
 
 Everything outside these folders is upstream's.
