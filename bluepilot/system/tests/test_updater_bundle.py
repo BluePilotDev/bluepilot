@@ -15,13 +15,20 @@ from pathlib import Path
 from openpilot.common.basedir import BASEDIR
 
 BUNDLE = Path(BASEDIR) / "openpilot/common/hardware/comma/updater"
-HOME_PATH = re.compile(rb"/(?:home|Users)/[A-Za-z0-9._-]+/|/root/")
+# (written so that this file, which the bundle carries too, does not match itself)
+HOME_PATH = re.compile(rb"/(?:home|Users)/[A-Za-z0-9._-]+/|/(?:root)/")
 
 
 def tracked(root: Path) -> set[str]:
   """Every file git tracks in root and in its checked-out submodules, as paths relative to root."""
   out = subprocess.run(["git", "-C", str(root), "ls-files", "-z", "--recurse-submodules"], capture_output=True, check=True)
   return {p for p in out.stdout.decode().split("\0") if p}
+
+
+def missing_submodules(root: Path) -> list[str]:
+  """The submodules the tree records but has not checked out (git marks them '-'), as paths relative to root."""
+  out = subprocess.run(["git", "-C", str(root), "submodule", "status", "--recursive"], capture_output=True, check=True)
+  return [line[1:].split()[1] for line in out.stdout.decode().splitlines() if line.startswith("-")]
 
 
 class TestUpdaterBundle(unittest.TestCase):
@@ -32,9 +39,15 @@ class TestUpdaterBundle(unittest.TestCase):
       raise unittest.SkipTest("not a git checkout")
     cls.root = root.resolve()
     cls.files = tracked(cls.root)
+    cls.missing = missing_submodules(cls.root)
     cls.zip = zipfile.ZipFile(BUNDLE)
 
   def test_every_file_is_one_the_tree_tracks(self):
+    # a submodule not checked out has no tracked files to compare its bundled ones with: skip, as comma's tests do
+    # without their submodules' data
+    missing = [m for m in self.missing if any(name.startswith(m + "/") for name in self.zip.namelist())]
+    if missing:
+      self.skipTest(f"submodules not checked out: {', '.join(missing)}")
     extra = []
     for name in self.zip.namelist():
       if name.endswith("/") or name == "__main__.py":
