@@ -27,6 +27,7 @@ from pathlib import Path
 from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs
+import ipaddress
 import logging
 import re
 import asyncio
@@ -435,6 +436,27 @@ class ReuseAddressHTTPServer(ThreadingHTTPServer):
     # Limit concurrent threads to prevent resource exhaustion
     # Video streaming can use a lot of memory, so cap at reasonable limit
     request_queue_size = 10
+
+
+def path_inside(base, relative):
+    """`base / relative` resolved (symlinks and '..'), or None when that leaves `base`.
+
+    The server binds every interface and does not normalise request paths, so a joined request path must be
+    checked after resolving, not before."""
+    try:
+        base = Path(base).resolve()
+        candidate = (base / relative).resolve()
+    except (OSError, ValueError, RuntimeError):  # a NUL byte, a symlink loop
+        return None
+    return candidate if candidate.is_relative_to(base) else None
+
+
+def is_local_client(host):
+    """True for a client on this device (127.0.0.0/8, ::1)."""
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return False
 
 
 class WebRoutesHandler(BaseHTTPRequestHandler):
@@ -2094,9 +2116,9 @@ class WebRoutesHandler(BaseHTTPRequestHandler):
 
                 try:
                     panel_dir = Path(__file__).parent.parent.parent / 'selfdrive' / 'ui' / 'bluepilot' / 'menus'
-                    panel_file = panel_dir / f'{panel_id}.json'
+                    panel_file = path_inside(panel_dir, f'{panel_id}.json')
 
-                    if not panel_file.exists():
+                    if panel_file is None or not panel_file.exists():
                         self.send_json_response({'success': False, 'error': 'Panel not found'}, 404)
                         return
 
@@ -2577,8 +2599,8 @@ class WebRoutesHandler(BaseHTTPRequestHandler):
 
                     abs_path = os.path.abspath(file_path)
 
-                    # Check if path is in allowed directories
-                    is_allowed = any(abs_path.startswith(allowed_dir) for allowed_dir in allowed_dirs)
+                    # Check if path is in allowed directories (the folder itself, not a name that starts like it)
+                    is_allowed = any(os.path.commonpath([abs_path, allowed_dir]) == allowed_dir for allowed_dir in allowed_dirs)
 
                     if not is_allowed:
                         self.send_json_response({
@@ -2643,8 +2665,9 @@ class WebRoutesHandler(BaseHTTPRequestHandler):
             elif path.startswith('/api/thumbnail/'):
                 route_base = path.split('/api/thumbnail/')[1].strip('/')
 
-                # Try to generate thumbnail if it doesn't exist
-                thumbnail_path = generate_thumbnail(route_base)
+                # Try to generate thumbnail if it doesn't exist; a route name is one path component, so the
+                # thumbnail and segment paths built from it stay in their folders
+                thumbnail_path = generate_thumbnail(route_base) if '/' not in route_base else None
 
                 if thumbnail_path and os.path.exists(thumbnail_path):
                     self.send_file_response(thumbnail_path, 'image/jpeg')
@@ -2659,9 +2682,9 @@ class WebRoutesHandler(BaseHTTPRequestHandler):
                     self.wfile.write(b'\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\nIDATx\x9cc\x00\x01\x00\x00\x05\x00\x01\r\n-\xb4\x00\x00\x00\x00IEND\xaeB`\x82')
 
             else:
-                # Serve static files or SPA routes
-                file_path = WEBAPP_DIR / path.lstrip('/')
-                if file_path.exists() and file_path.is_file():
+                # Serve static files or SPA routes; only files inside WEBAPP_DIR
+                file_path = path_inside(WEBAPP_DIR, path.lstrip('/'))
+                if file_path is not None and file_path.is_file():
                     # Serve static file (JS, CSS, images, etc.)
                     self.send_file_response(str(file_path))
                 else:
@@ -2776,8 +2799,11 @@ class WebRoutesHandler(BaseHTTPRequestHandler):
                 return
 
             # Internal broadcast endpoint (for cross-process communication)
-            # No authentication check - only listens on localhost
+            # The server binds every interface: accept it only from this device
             if path == '/_internal/broadcast':
+                if not is_local_client(self.client_address[0]):
+                    self.send_json_response({'error': 'Forbidden'}, 403)
+                    return
                 try:
                     content_length = int(self.headers.get('Content-Length', 0))
                     if content_length > 0:
