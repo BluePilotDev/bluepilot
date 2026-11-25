@@ -1,4 +1,4 @@
-![](selfdrive/assets/img_bluepilot_boot.jpg)
+![](openpilot/selfdrive/assets/img_bluepilot_boot.jpg)
 
 Table of Contents
 =======================
@@ -51,11 +51,11 @@ will install the **bp-7.0** branch (current release, synced with sunnypilot mast
 
 ---
 
-Join the official #ford channel at the sunnypilot Discord server to stay up to date with all the latest features and be a part of shaping the future of bluepilot!
-* [sunnypilot Discord server](https://discord.gg/sunnypilot)
+Join the BluePilot Discord server to stay up to date with all the latest features and be a part of shaping the future of bluepilot!
+* [BluePilot Discord server](https://discord.gg/z8KAQ4qrkW)
 
 Other places to get information:
-* [BluePilot website — Release Notes and Announcements](https://bluepilot.dev/announcements)
+* [BluePilot website](https://bluepilot.dev) — [Release Notes and Announcements](https://bluepilot.dev/announcements)
 * [BluePilot FAQ](https://bluepilot.dev/FAQ/)
 * [GitHub Issues](https://github.com/BluePilotDev/bluepilot/issues)
 * [sunnypilot community forum](https://community.sunnypilot.ai/)
@@ -116,7 +116,7 @@ Ford has shipped two different lane-assist generations, and only one of them wor
 * **Lane Keep Assist (LKA)** — older system that only nudges the car back toward the lane in short bursts when you drift near a line. Openpilot cannot use it with stock PSCM firmware: Ford's power steering module enforces an "LKA lockout" that stops accepting commands if too many arrive in a time window. Working under that limit was tested extensively and produced unusable swerving. (Experimental, unreleased PSCM-firmware modification work has demonstrated lockout removal on one vehicle — follow the [announcements](https://bluepilot.dev/announcements) for progress.)
 * **Lane Centering Assist (LCA)** — newer system that steers continuously. This is what BluePilot requires.
 
-Compatibility varies by year, model, and trim — even between similar vehicles. When in doubt, ask in the #ford Discord channel before buying hardware.
+Compatibility varies by year, model, and trim — even between similar vehicles. When in doubt, ask in the [BluePilot Discord](https://discord.gg/z8KAQ4qrkW) before buying hardware.
 
 ### TRON — Ford's encrypted CAN bus
 
@@ -206,7 +206,7 @@ The harness plugs in-line with the **IPMA** (Ford's camera module); it only fits
 2. Select your exact Ford model if prompted (Settings ▶️ Vehicle).
 3. Start with the default driving model and default tuning for your first drives.
 
-Need help with the install? Join the [sunnypilot Discord server](https://discord.gg/sunnypilot) and ask in the `#ford` channel.
+Need help with the install? Join the [BluePilot Discord server](https://discord.gg/z8KAQ4qrkW) and ask there.
 
 </details>
 
@@ -592,7 +592,7 @@ More: [BluePilot FAQ](https://bluepilot.dev/FAQ/) · [Release Notes and Announce
 
 ---
 
-BluePilot is volunteer-run — help us help you. When reporting a problem in the Discord #ford channel:
+BluePilot is volunteer-run — help us help you. When reporting a problem in the [BluePilot Discord](https://discord.gg/z8KAQ4qrkW):
 
 1. **State which BluePilot branch you are on** (e.g. bp-7.0).
 2. **Photograph your menus** (especially the BluePilot menus) or type out all of your values.
@@ -718,7 +718,7 @@ bluepilot/backend/
 ├── realtime/                # WebSocket broadcasting
 ├── logs/                    # Cereal log parsing
 ├── cache/                   # Metrics/thumbnail/remux caching
-├── storage/                 # Route preservation
+├── storage/                 # Preserved-route markers (read only), deletion order
 ├── network/                 # Network utilities
 ├── system/                  # CPU/memory/disk metrics
 ├── core/                    # Thread-safe state and lifecycle
@@ -726,6 +726,8 @@ bluepilot/backend/
 ```
 
 ### Development
+
+Contributing code? Start with [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md); the working rules for people and AI agents are in [AGENTS.md](AGENTS.md).
 
 **Backend testing:**
 ```bash

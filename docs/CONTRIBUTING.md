@@ -1,76 +1,78 @@
-> sunnypilot follows [commaai/openpilot](https://github.com/commaai/openpilot)'s contributing guidelines. The following applies to all contributions here.
+# Contributing to BluePilot
 
-# How to contribute
+BluePilot is a Ford-focused fork of [sunnypilot](https://github.com/sunnypilot/sunnypilot), which is a fork of
+[openpilot](https://github.com/commaai/openpilot). It steers and controls the speed of real cars, so the priorities
+are safety, stability, quality and features, in that order ([SAFETY.md](SAFETY.md)).
 
-Our software is open source so you can solve your own problems without needing help from others. And if you solve a problem and are so kind, you can upstream it for the rest of the world to use. Check out our [post about externalization](https://blog.comma.ai/a-2020-theme-externalization/).
+Development is coordinated on GitHub and on the [BluePilot Discord](https://discord.gg/z8KAQ4qrkW). The project's
+website is [bluepilot.dev](https://bluepilot.dev).
 
-Development is coordinated through [Discord](https://discord.comma.ai) and GitHub.
+## Before you write code
 
-### Getting Started
+1. **Find the right repo.** BluePilot is four repos, and Ford steering and Ford car code live outside this one. The
+   routing table at the top of [AGENTS.md](../AGENTS.md) says where a change belongs and which branch to target.
+2. **Ask first for anything large.** Open an issue or ask on Discord before a new feature, a new process, new
+   third-party code or a change to driving behavior. A small, tested fix needs no discussion.
+3. **Send upstream fixes upstream.** A bug in sunnypilot's or openpilot's own code is fixed there, and reaches
+   BluePilot with the next sync.
 
-* Set up your [development environment](/tools/)
-* Join our [Discord](https://discord.comma.ai)
-* Docs are at https://docs.comma.ai and https://blog.comma.ai
+Two pages to read once:
 
-## What contributions are we looking for?
+* [How BluePilot is put together](BLUEPILOT_ARCHITECTURE.md): the layers, the UI, the portal, and where to start
+  for common changes.
+* [AGENTS.md](../AGENTS.md): the working rules for people and AI agents: where code goes, how to change an upstream
+  file, the tests, and the mistakes that have already cost someone a PR.
 
-**openpilot's priorities are [safety](SAFETY.md), stability, quality, and features, in that order.**
-openpilot is part of comma's mission to *solve self-driving cars while delivering shippable intermediaries*, and all development is towards that goal.
+## Pull requests
 
-### What gets merged?
+Open pull requests against `bp-dev` and fill in the [template](../.github/pull_request_template.md). The setup guide
+is in [tools/](../tools/).
 
-The probability of a pull request being merged is a function of its value to the project and the effort it will take us to get it merged.
-If a PR offers *some* value but will take lots of time to get merged, it will be closed.
-Simple, well-tested bug fixes are the easiest to merge, and new features are the hardest to get merged.
+To update a pull request, merge `bp-dev` into your branch. Don't rebase or force-push: pull requests are squashed on
+merge, and a force-push breaks the review comments.
 
-All of these are examples of good PRs:
-* typo fix: https://github.com/commaai/openpilot/pull/30678
-* removing unused code: https://github.com/commaai/openpilot/pull/30573
-* simple car model port: https://github.com/commaai/openpilot/pull/30245
-* car brand port: https://github.com/commaai/openpilot/pull/23331
+Everything on GitHub is public. Keep VINs, home or work locations (addresses, coordinates, maps or video near them),
+license plates, Wi-Fi names and any key or token out of pull requests, issues and screenshots.
 
-### What doesn't get merged?
+A pull request that gets merged has:
 
-* **style changes**: code is art, and it's up to the author to make it beautiful
-* **500+ line PRs**: clean it up, break it up into smaller PRs, or both
-* **PRs without a clear goal**: every PR must have a singular and clear goal
-* **UI design**: we do not have a good review process for this yet
-* **New features**: We believe openpilot is mostly feature-complete, and the rest is a matter of refinement and fixing bugs. As a result of this, most feature PRs will be immediately closed, however the beauty of open source is that forks can and do offer features that upstream openpilot doesn't.
-* **Negative expected value**: This is a class of PRs that makes an improvement, but the risk or validation costs more than the improvement. The risk can be mitigated by first getting a failing test merged.
-* **AI-generated contributions**: see our [AI policy](AI_POLICY.md)
+* **One purpose.** Every changed line serves it. A feature and an unrelated fix are two pull requests.
+* **A description that says why**, what changes for users who leave the feature off, and how it was tested.
+* **All six required checks green**: `build release`, `static analysis`, `unit tests`, `process replay`,
+  `install smoke`, `bluepilot-hooks`. A fork's checks start after a maintainer approves the run.
+* **A `## Validation` checklist** at the end of the description, listing the six checks and any device or drive
+  check, with only the passed ones ticked.
+* **Evidence for driving changes**: the route, the car, the device, and what the logs show. Say plainly what was and
+  wasn't driven. A change to what the car does is off by default unless it fixes existing behavior.
+* **A device check for UI changes**, naming the device. The comma 3X and the comma four run different UI code.
 
-### First contribution
+What doesn't get merged:
 
-[Projects / openpilot bounties](https://github.com/orgs/commaai/projects/26/views/1?pane=info) is the best place to get started and goes in-depth on what's expected when working on a bounty.
-There are a lot of bounties that don't require a comma four or a car.
+* **Style-only changes** and reformatting of code that isn't otherwise being changed.
+* **Large pull requests.** Past a few hundred lines, split it.
+* **Pull requests without one clear goal.**
+* **Changes to upstream's files that could live in BluePilot's own folders**, or that belong upstream.
+* **Risk that outweighs the gain**: an improvement that would cost more to validate than it is worth. A failing
+  test merged first lowers that cost.
+* **Code the author can't explain**, however it was written.
 
-## Pull Requests
+## Using AI tools
 
-Pull requests should be against the master branch.
+AI tools are welcome under the [AI policy](AI_POLICY.md): understand and test everything you submit, and disclose
+AI help with an `Assisted-by:` line in the commit message.
 
-A good pull request has all of the following:
-* a clearly stated purpose
-* every line changed directly contributes to the stated purpose
-* verification, i.e. how did you test your PR?
-* justification
-  * if you've optimized something, post benchmarks to prove it's better
-  * if you've improved your car's tuning, post before and after plots
-* passes the CI tests
+One exception: BluePilot does not accept code written by Gemini models other than Gemini 4 Neon, because of their
+hallucination rate. Those models can still write text for people, such as a pull request description or
+documentation.
 
-## Contributing without Code
+## Contributing without code
 
-* Report bugs in GitHub issues.
-* Report driving issues in the `#driving-feedback` Discord channel.
-* Consider opting into cabin camera uploads to improve the driver monitoring model.
-* Connect your device to Wi-Fi regularly, so that we can pull data for training better driving models.
-* Run the `nightly` branch and report issues. This branch is like `master` but it's built just like a release.
-* Annotate images in the [comma10k dataset](https://github.com/commaai/comma10k).
+* Report bugs in [GitHub issues](https://github.com/BluePilotDev/bluepilot/issues) with your car, model year, device,
+  BluePilot version and, for a driving problem, the route.
+* Test a new build before it is released and report what you find. Owners of Fords the maintainers don't drive are
+  the only way those cars get checked.
 
-## Contributing Training Data
+## Thanks
 
-### A guide for forks
-
-In order for your fork's data to be eligible for the training set:
-* **Your cereal messaging structs must be [compatible](../openpilot/cereal#custom-forks)**
-* **The definitions of all the stock messaging structs must not change**: Do not change how any of the fields are set, including everything from `selfdriveState.enabled` to `carState.steeringAngleDeg`. Instead, create your own structs and set them however you'd like.
-* **Do not include cars that are not supported in upstream platforms**: Instead, create new opendbc platforms for cars that you'd like to support outside of upstream, even if it's just a trim-level difference.
+BluePilot exists because comma and sunnypilot publish their work. Improvements that help every car belong upstream
+with them.
