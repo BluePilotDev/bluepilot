@@ -31,7 +31,7 @@ Car code in opendbc never imports openpilot. A setting or value the car code nee
 
 - `bp-dev`: the source of truth and the default branch. Every PR targets it.
 - `bp-stable` and the version branches (`bp-7.1`, ...): written by the release job. A version branch takes only
-  cherry-picks of fixes already on `bp-dev`.
+  cherry-picks of fixes already on `bp-dev`. How a release is made: [docs/RELEASING.md](docs/RELEASING.md).
 - `bp-sunnypilot`: an automated mirror of ford-op/bp-sunnypilot. It is "upstream" for the hook check below.
 - `bp-7.0` and older: frozen releases.
 
