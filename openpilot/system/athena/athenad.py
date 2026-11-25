@@ -801,8 +801,13 @@ def getGithubUsername() -> str:
 def getNotCar() -> bool:
   cp_bytes = Params().get("CarParamsPersistent")
   if cp_bytes is not None:
-    with car.CarParams.from_bytes(cp_bytes) as CP:
-      return CP.notCar
+    # BluePilot: an unreadable cached CarParams (e.g. another fork's format) is treated as a car
+    try:
+      with car.CarParams.from_bytes(cp_bytes) as CP:
+        return CP.notCar
+    except Exception:
+      cloudlog.exception("athenad: unreadable CarParamsPersistent")
+    # End BluePilot
   return False
 
 
@@ -831,9 +836,14 @@ def startStream(sdp: str, enabled: bool) -> dict:
   # stale car params case taken care of by webrtcd being shut off on ignition
   cp_bytes = params.get("CarParamsPersistent")
   if cp_bytes is not None:
-    with car.CarParams.from_bytes(cp_bytes) as CP:
-      if CP.notCar:
-        bridge_services_in.append("testJoystick")
+    # BluePilot: an unreadable cached CarParams (e.g. another fork's format) is treated as a car
+    try:
+      with car.CarParams.from_bytes(cp_bytes) as CP:
+        if CP.notCar:
+          bridge_services_in.append("testJoystick")
+    except Exception:
+      cloudlog.exception("athenad: unreadable CarParamsPersistent")
+    # End BluePilot
 
   if params.get_bool("IsOffroad"):
     # manager owns camerad/stream_encoderd/webrtcd; flip the param and let it bring them up.

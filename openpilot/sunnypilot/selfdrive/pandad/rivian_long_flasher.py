@@ -29,7 +29,14 @@ def _is_rivian() -> bool:
   # check cached fingerprint
   CP_bytes = params.get("CarParamsPersistent")
   if CP_bytes is not None:
-    CP = messaging.log_from_bytes(CP_bytes, car.CarParams)
+    # BluePilot: an unreadable cached CarParams (e.g. left in another fork's format) means "not known to be a Rivian";
+    # raising here kills pandad before card can run and rewrite the param, so pandad would crash-loop forever
+    try:
+      CP = messaging.log_from_bytes(CP_bytes, car.CarParams)
+    except Exception:
+      cloudlog.exception("rivian_long_flasher: unreadable CarParamsPersistent, treating as not Rivian")
+      return False
+    # End BluePilot
     if CP.brand == "rivian":
       return True
 
