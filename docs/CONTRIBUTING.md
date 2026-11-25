@@ -4,7 +4,8 @@ BluePilot is a Ford-focused fork of [sunnypilot](https://github.com/sunnypilot/s
 [openpilot](https://github.com/commaai/openpilot). It steers and controls the speed of real cars, so the priorities
 are safety, stability, quality and features, in that order ([SAFETY.md](SAFETY.md)).
 
-Development is coordinated on GitHub and on Discord (the link is in the [README](../README.md)).
+Development is coordinated on GitHub and on the [BluePilot Discord](https://discord.gg/S5R6sVzMz). The project's
+website is [bluepilot.dev](https://bluepilot.dev).
 
 ## Before you write code
 
