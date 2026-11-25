@@ -437,7 +437,7 @@ def main(demo=False):
     }
 
     # BluePilot: JetLink hands a lagging big model back on the share of dropped camera frames
-    model.frame_drop_ratio = frame_drop_ratio
+    model.frame_drop_ratio = frame_drop_ratio  # ty: ignore[invalid-assignment]  # read by JetLink's joined model
     # End BluePilot
     mt1 = time.perf_counter()
     try:

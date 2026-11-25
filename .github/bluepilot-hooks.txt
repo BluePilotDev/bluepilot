@@ -5,18 +5,22 @@
 
 .gitattributes                                                                         # BluePilot's own binaries are plain git files, not LFS
 .gitignore                                                                             # local agent docs and tools
+.gitmodules                                                                            # JetLink submodule (jetlink_repo)
 README.md                                                                              # BluePilot's README
 launch_chffrplus.sh                                                                    # boot logo
 launch_env.sh                                                                          # connect backend (comma / Konik / offline)
 opendbc_repo                                                                           # points at ford-op/opendbc bp-full (BluePilot's Ford car code), not bp-opendbc
 openpilot/cereal/custom.capnp                                                          # controllerStateBP, carStateBP and BluePilot's other structs
 openpilot/cereal/log.capnp                                                             # controllerStateBP, carStateBP in customReserved13/14
+openpilot/cereal/messaging/tests/test_messaging.py                                     # test forks its subprocess, so it runs on macOS
 openpilot/cereal/services.py                                                           # controllerStateBP, carStateBP services
 openpilot/common/hardware/comma/hardware.py                                            # no core frequency cap (thermal framework throttles)
 openpilot/common/params_keys.h                                                         # BluePilot params
 openpilot/selfdrive/car/card.py                                                        # publishes controllerStateBP / carStateBP; crash reporting
 openpilot/selfdrive/car/cruise.py                                                      # ICBM target follows the Ford cluster set speed (#232)
 openpilot/selfdrive/controls/lib/desire_helper.py                                      # blinker lane change pause
+openpilot/selfdrive/modeld/modeld.py                                                   # JetLink: the big model on a USB host
+openpilot/selfdrive/selfdrived/alerts_offroad.json                                     # JetLink's offroad alert
 openpilot/selfdrive/selfdrived/selfdrived.py                                           # commIssue debounce
 openpilot/selfdrive/ui/layouts/main.py                                                 # BluePilot sidebar, home, onroad view, debug panel
 openpilot/selfdrive/ui/mici/layouts/main.py                                            # BluePilot home and onroad view (comma four)
@@ -24,12 +28,15 @@ openpilot/selfdrive/ui/mici/layouts/settings/device/prime.py                    
 openpilot/selfdrive/ui/sunnypilot/layouts/settings/settings.py                         # BluePilot and portal settings panels
 openpilot/selfdrive/ui/sunnypilot/layouts/settings/vehicle/__init__.py                 # BluePilot platform selector
 openpilot/selfdrive/ui/sunnypilot/mici/layouts/settings.py                             # BluePilot settings button (comma four)
+openpilot/selfdrive/ui/sunnypilot/model_info.py                                        # JetLink's default big model in the pickers
 openpilot/selfdrive/ui/sunnypilot/ui_state.py                                          # subscribes to controllerStateBP
 openpilot/selfdrive/ui/ui.py                                                           # UI at CTRL_LOW priority (reverts comma #37984)
 openpilot/selfdrive/ui/ui_state.py                                                     # subscribes to carStateBP
 openpilot/selfdrive/ui/widgets/pairing_dialog.py                                       # pairing on the selected connect backend
+openpilot/sunnypilot/mads/state.py                                                     # MADS pauses, not refuses, in JetLink's second after a model swap
 openpilot/sunnypilot/mapd/mapd_installer.py                                            # crash reporting
-openpilot/sunnypilot/modeld_v2/modeld.py                                               # crash reporting
+openpilot/sunnypilot/modeld_v2/modeld.py                                               # crash reporting; JetLink: the big model on a USB host
+openpilot/sunnypilot/models/manager.py                                                 # JetLink's big-model list
 openpilot/sunnypilot/selfdrive/car/intelligent_cruise_button_management/controller.py  # ICBM target cap at the cluster set speed
 openpilot/sunnypilot/selfdrive/controls/controlsd_ext.py                               # publishes the BPx settings to the car code
 openpilot/sunnypilot/selfdrive/controls/lib/blinker_pause_lateral.py                   # enable param can be chosen
@@ -40,8 +47,10 @@ openpilot/sunnypilot/sunnylink/settings_ui_src/_macros.yaml                     
 openpilot/sunnypilot/sunnylink/settings_ui_src/pages/vehicle.yaml                      # BluePilot's Ford settings
 openpilot/sunnypilot/sunnylink/tests/test_settings_changes.py                          # tests for BluePilot's Ford settings page
 openpilot/sunnypilot/system/params_migration.py                                        # BluePilot lateral param renames
+openpilot/sunnypilot/system/statsd.py                                                  # closes the stat socket before the zmq context ends (exit hang)
 openpilot/system/athena/registration.py                                                # dongle ID per connect backend
 openpilot/system/hardware/fan_controller.py                                            # fan setpoint 77C
+openpilot/system/hardware/hardwared.py                                                 # JetLink's host powers off before the comma does
 openpilot/system/manager/build.py                                                      # re-syncs the venv when uv.lock changes
 openpilot/system/manager/manager.py                                                    # crash reporting
 openpilot/system/manager/process.py                                                    # crash reporting
@@ -54,4 +63,7 @@ openpilot/system/ui/lib/wifi_manager.py                                         
 openpilot/system/ui/spinner.py                                                         # loads BluePilot's spinner logo (#255)
 openpilot/system/ui/sunnypilot/widgets/screen_saver.py                                 # screensaver text is BluePilot (#255)
 pyproject.toml                                                                         # lint and spelling skip bluepilot/vendor
+tools/release/build_release.sh                                                         # JetLink on the release build's PYTHONPATH
+tools/release/check-submodules.sh                                                      # JetLink's pin must be a tagged release
+tools/release/release_files.py                                                         # ships only JetLink's device code
 tools/test_runner.py                                                                   # also collects bluepilot/ (#238)
