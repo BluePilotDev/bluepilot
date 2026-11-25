@@ -77,6 +77,9 @@ def can_messages(CP) -> tuple[list, list]:
     pt += [(m, float('nan')) for m in ("Battery_Traction_1_FD1", "Battery_Traction_3_FD1", "Battery_Traction_4_FD1", "MtrTracData_1_FD1")]
   # the posted limit: optional on every Ford (BP7 required it on CAN FD, so a CAN FD Ford without sign recognition lost CAN validity)
   cam = [("Traffic_RecognitnData", float('nan'))]
+  # IPMA_Data is 1 Hz but the camera bursts it at startup: left to learn its rate, the parser can learn
+  # ~11 Hz and drop CAN validity every second (canError, engagement killed). Declare it.
+  cam.append(("IPMA_Data", 1))
   # what the CAN FD reads below need, required at BP7's frequencies
   if _canfd_automatic(CP):
     # BP7 still requires PowertrainData_10 on every automatic but the Edge, though CAN FD no longer reads it
