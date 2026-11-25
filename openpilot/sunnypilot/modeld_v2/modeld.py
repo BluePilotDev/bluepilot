@@ -485,7 +485,7 @@ def main(demo=False):
       inputs['action_t'] = np.array([lat_action_t, long_action_t], dtype=np.float32)
 
     # BluePilot: JetLink hands a lagging big model back on the share of dropped camera frames
-    model.frame_drop_ratio = frame_drop_ratio
+    model.frame_drop_ratio = frame_drop_ratio  # ty: ignore[invalid-assignment]  # read by JetLink's joined model
     # End BluePilot
     mt1 = time.perf_counter()
     try:
