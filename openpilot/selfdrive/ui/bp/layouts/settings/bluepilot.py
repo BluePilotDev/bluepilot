@@ -26,8 +26,8 @@ from openpilot.selfdrive.ui.bp.lib.dm_icon_style import (
   get_dm_icon_style,
 )
 from openpilot.selfdrive.ui.bp.lib.custom_sound import get_custom_sound_selection
-from openpilot.selfdrive.ui.bp.lib.model_path_color import PARAM_KEY as MODEL_PATH_COLOR_PARAM, model_path_color_label
-from openpilot.selfdrive.ui.bp.widgets.model_path_color_dialog import ModelPathColorDialog
+from openpilot.selfdrive.ui.bp.lib.model_path_color_bp import PARAM_KEY as MODEL_PATH_COLOR_PARAM, model_path_color_label
+from openpilot.selfdrive.ui.bp.widgets.model_path_color_dialog_bp import ModelPathColorDialogBP
 from opendbc.bluepilot_lateral.core.lateral_curv_ext import PrimaryLateralControl
 from openpilot.selfdrive.ui.bp.onroad.augmented_road_view_bp import GaugeStyle
 
@@ -1121,7 +1121,7 @@ class BluePilotLayout(Widget):
     gui_app.push_widget(self._theme_dialog)
 
   def _show_model_path_color_dialog(self):
-    gui_app.push_widget(ModelPathColorDialog(on_saved=self._on_model_path_color_saved))
+    gui_app.push_widget(ModelPathColorDialogBP(on_saved=self._on_model_path_color_saved))
 
   def _on_model_path_color_saved(self, value: str):
     self._model_path_color_label = model_path_color_label(value)

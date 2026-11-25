@@ -365,10 +365,10 @@ def main() -> None:
     )
     renderer_draw_polygon = renderer_module.draw_polygon
 
-    def model_path_polygon(*a, **k):
-      if k.get("gradient") is not None:
+    def model_path_polygon(*args, **kwargs):
+      if kwargs.get("gradient") is not None:
         calls["model path gradient"] += 1
-      return renderer_draw_polygon(*a, **k)
+      return renderer_draw_polygon(*args, **kwargs)
     renderer_module.draw_polygon = model_path_polygon
     # polygons drawn by sunnypilot's lane-center line itself (BlendfulRenderer.draw returns early when lateral is off)
     from openpilot.selfdrive.ui.sunnypilot.onroad import blendful

@@ -233,8 +233,7 @@ class TestBluePilotVehicleVisuals(OpenpilotTestCase):
 
   def test_model_path_color_is_available_for_both_device_families(self, schema):
     # BluePilot: keep the feature-specific dependency inside the tagged test.
-    from openpilot.selfdrive.ui.bp.lib.model_path_color import PRESET_COLORS
-    # End BluePilot
+    from openpilot.selfdrive.ui.bp.lib.model_path_color_bp import PRESET_COLORS
     items = schema["vehicle_settings"]["ford"]["items"]
     keys = [item["key"] for item in items]
     assert keys.index("BPHideCameraView") < keys.index("CustomModelPathColor") < keys.index("BPRadRacerTheme")
@@ -245,6 +244,7 @@ class TestBluePilotVehicleVisuals(OpenpilotTestCase):
     assert item["title"] == "[Visuals] Model Path Color"
     assert [option["value"] for option in item["options"]] == list(PRESET_COLORS)
     assert "visibility" not in item, "model path colors must remain visible on both comma 3X and comma 4"
+    # End BluePilot
 
 
 class TestBluePilotLateralToggle(OpenpilotTestCase):

@@ -1,9 +1,10 @@
 import unittest
 
-from openpilot.selfdrive.ui.bp.lib.model_path_color import (
+from openpilot.selfdrive.ui.bp.lib.model_path_color_bp import (
   BP_BLUE_EDGE_HEX,
   BP_BLUE_GRADIENT_RGBA,
   BP_BLUE_GRADIENT_STOPS,
+  MIN_VISIBLE_VALUE,
   PRESET_COLORS,
   model_path_color_hex,
   model_path_color_is_visible,
@@ -40,6 +41,10 @@ class TestModelPathColor(unittest.TestCase):
   def test_custom_label_and_visibility_floor(self):
     assert model_path_color_label("#12abef") == "Custom #12ABEF"
     assert not model_path_color_is_visible("#000000")
+    floor_channel = round(MIN_VISIBLE_VALUE * 255)
+    assert not model_path_color_is_visible(f"#{floor_channel - 1:02X}0000")
+    assert model_path_color_is_visible(f"#{floor_channel:02X}0000")
+    assert normalize_model_path_color(f"#{floor_channel:02X}0000") == f"#{floor_channel:02X}0000"
     assert model_path_color_is_visible("#0000FF")
     assert model_path_color_is_visible("#12ABEF")
 

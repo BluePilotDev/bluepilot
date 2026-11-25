@@ -14,6 +14,7 @@ BP_BLUE_GRADIENT_RGBA = (
   (139, 226, 255, 0),
 )
 BP_BLUE_GRADIENT_STOPS = (0.0, 0.52, 1.0)
+MIN_VISIBLE_VALUE = 0.24
 # Keep the historical BP choices while also accepting a literal #RRGGBB custom value.
 PRESET_COLORS: dict[str, str | None] = {
   STOCK_VALUE: None,
@@ -32,8 +33,8 @@ _HEX_COLOR_RE = re.compile(r"^#?([0-9a-fA-F]{6})$")
 
 def _hex_color_is_visible(color_hex: str) -> bool:
   rgb = tuple(int(color_hex[i:i + 2], 16) for i in (1, 3, 5))
-  # Allow saturated hues (including pure blue) while rejecting near-black values.
-  return max(rgb) >= 60 and sum(rgb) >= 100
+  # Match the picker floor for every hue while rejecting externally written near-black values.
+  return max(rgb) >= round(MIN_VISIBLE_VALUE * 255)
 
 
 def normalize_model_path_color(value: str | bytes | None) -> str:

@@ -12,7 +12,7 @@ from openpilot.bluepilot.ui.lib.bp_shaders import draw_rainbow_polygon
 from openpilot.selfdrive.ui.bp.lib.ui_debug_logger import bp_ui_log
 # BluePilot: seasonal theme packs (colors.json overrides for road colors)
 from openpilot.selfdrive.ui.bp.lib import theme_pack
-from openpilot.selfdrive.ui.bp.lib.model_path_color import (
+from openpilot.selfdrive.ui.bp.lib.model_path_color_bp import (
   PARAM_KEY as MODEL_PATH_COLOR_PARAM,
   model_path_color_rgb,
   model_path_gradient,

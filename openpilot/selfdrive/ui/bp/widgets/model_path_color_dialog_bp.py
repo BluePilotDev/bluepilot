@@ -9,7 +9,8 @@ from collections.abc import Callable
 import pyray as rl
 
 from openpilot.common.params import Params
-from openpilot.selfdrive.ui.bp.lib.model_path_color import (
+from openpilot.selfdrive.ui.bp.lib.model_path_color_bp import (
+  MIN_VISIBLE_VALUE,
   PARAM_KEY,
   PRESET_COLORS,
   model_path_color_hex,
@@ -23,12 +24,12 @@ from openpilot.system.ui.widgets.button import Button, ButtonStyle
 from openpilot.system.ui.widgets.label import gui_label
 
 
-class ModelPathColorDialog(Widget):
+class ModelPathColorDialogBP(Widget):
   """Preset selector with an HSV wheel and dedicated hexadecimal keypad."""
 
-  MIN_VALUE = 0.24
-  WHEEL_TEXTURE_SIZE_BIG = 256
-  WHEEL_TEXTURE_SIZE_SMALL = 192
+  _MIN_VALUE = MIN_VISIBLE_VALUE
+  _WHEEL_TEXTURE_SIZE_BIG = 256
+  _WHEEL_TEXTURE_SIZE_SMALL = 192
   _wheel_texture_cache: dict[int, rl.Texture] = {}
 
   def __init__(self, on_saved: Callable[[str], None] | None = None):
@@ -49,7 +50,7 @@ class ModelPathColorDialog(Widget):
     self._wheel_rect = rl.Rectangle(0, 0, 0, 0)
     self._value_rect = rl.Rectangle(0, 0, 0, 0)
     self._wheel_texture = self._get_wheel_texture(
-      self.WHEEL_TEXTURE_SIZE_BIG if self._is_big else self.WHEEL_TEXTURE_SIZE_SMALL
+      self._WHEEL_TEXTURE_SIZE_BIG if self._is_big else self._WHEEL_TEXTURE_SIZE_SMALL
     )
 
     preset_font_size = 58 if self._is_big else 20
@@ -343,7 +344,7 @@ class ModelPathColorDialog(Widget):
 
   def _set_from_value(self, pos: MousePos):
     fraction = min(1.0, max(0.0, (pos.y - self._value_rect.y) / self._value_rect.height))
-    self._value = max(self.MIN_VALUE, 1.0 - fraction)
+    self._value = max(self._MIN_VALUE, 1.0 - fraction)
     self._sync_hex_from_hsv()
 
   def _handle_mouse_press(self, mouse_pos: MousePos):

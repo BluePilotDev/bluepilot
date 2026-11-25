@@ -319,7 +319,7 @@ sections:
     widget: toggle
     title: '[Visuals] Minimal Driving View'
     description: Disable camera feed & only show lane lines and model path.
-  # BluePilot: Keep SunnyLink's named choices in sync with model_path_color.PRESET_COLORS.
+  # BluePilot: Keep SunnyLink's named choices in sync with model_path_color_bp.PRESET_COLORS.
   # Custom #RRGGBB values remain available through the on-device color picker because
   # the SunnyLink schema does not currently provide a free-form text/color input widget.
   - key: CustomModelPathColor
@@ -345,6 +345,7 @@ sections:
       label: Cyan
     - value: Yellow
       label: Yellow
+  # End BluePilot
   - key: BPRadRacerTheme
     widget: toggle
     title: '[Visuals] 8-Bit Racer Theme (C3X)'

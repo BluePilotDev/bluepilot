@@ -11,7 +11,7 @@ from openpilot.bluepilot.ui.lib.bp_shaders import draw_rainbow_polygon
 from openpilot.selfdrive.ui.bp.onroad.rad_racer_road import RadRacerRoadMixin, RAD_RACER_DASH_LEN_M, RAD_RACER_GAP_LEN_M
 # BluePilot: seasonal theme packs (colors.json overrides for road colors)
 from openpilot.selfdrive.ui.bp.lib import theme_pack
-from openpilot.selfdrive.ui.bp.lib.model_path_color import (
+from openpilot.selfdrive.ui.bp.lib.model_path_color_bp import (
   PARAM_KEY as MODEL_PATH_COLOR_PARAM,
   model_path_gradient,
   normalize_model_path_color,
