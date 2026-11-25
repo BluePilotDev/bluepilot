@@ -25,7 +25,14 @@ Two pages to read once:
 
 ## Pull requests
 
-Open pull requests against `bp-dev`. The setup guide is in [tools/](../tools/).
+Open pull requests against `bp-dev` and fill in the [template](../.github/pull_request_template.md). The setup guide
+is in [tools/](../tools/).
+
+To update a pull request, merge `bp-dev` into your branch. Don't rebase or force-push: pull requests are squashed on
+merge, and a force-push breaks the review comments.
+
+Everything on GitHub is public. Keep VINs, home or work locations (addresses, coordinates, maps or video near them),
+license plates, Wi-Fi names and any key or token out of pull requests, issues and screenshots.
 
 A pull request that gets merged has:
 
@@ -53,6 +60,10 @@ What doesn't get merged:
 
 AI tools are welcome under the [AI policy](AI_POLICY.md): understand and test everything you submit, and disclose
 AI help with an `Assisted-by:` line in the commit message.
+
+One exception: BluePilot does not accept code written by Gemini models other than Gemini 4 Neon, because of their
+hallucination rate. Those models can still write text for people, such as a pull request description or
+documentation.
 
 ## Contributing without code
 
