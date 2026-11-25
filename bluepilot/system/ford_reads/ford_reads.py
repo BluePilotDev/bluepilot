@@ -68,6 +68,8 @@ def read_modules(panda, bus, scan=False):
       m["errors"]["session"] = repr(e)
       if isinstance(e, MessageTimeoutError):
         continue  # module not answering on this bus
+    except Exception as e:  # an unexpected answer (a late one, a wrong service): record it and read on
+      m["errors"]["session"] = repr(e)
     dids = ID_DIDS + ASBUILT_DIDS + (PSCM_EXTRA_DIDS if addr == 0x730 else []) + (SCAN_DIDS if (scan and addr == 0x730) else [])
     for d in dids:
       try:
@@ -76,9 +78,11 @@ def read_modules(panda, bus, scan=False):
         m["errors"][f"{d:04X}"] = str(e)
       except MessageTimeoutError:
         m["errors"][f"{d:04X}"] = "timeout"
+      except Exception as e:  # e.g. a late answer for the previous identifier: skip this one, keep the rest
+        m["errors"][f"{d:04X}"] = repr(e)
     try:
       m["dtc_raw"] = c.read_dtc_information(DTC_REPORT_TYPE.DTC_BY_STATUS_MASK, DTC_STATUS_MASK_TYPE.ALL).hex()
-    except (NegativeResponseError, MessageTimeoutError) as e:
+    except Exception as e:  # a negative answer, a time-out or an unexpected answer
       m["errors"]["dtc"] = repr(e)
   return out
 

@@ -76,6 +76,47 @@ class TestBlocker(unittest.TestCase):
     self.assertIn("Park", runner.blocker(True, False, self._cs(standstill=False)))
 
 
+class FakeUdsClient:
+  """Answers every request, except the identifiers in `odd`, whose answer is a late one for another identifier."""
+  odd: dict = {}
+
+  def __init__(self, panda, addr, bus=0, timeout=0.3):
+    self.addr = addr
+
+  def _uds_request(self, service_type, subfunction=None, data=None):
+    return b""
+
+  def diagnostic_session_control(self, session_type):
+    return b""
+
+  def read_data_by_identifier(self, did):
+    if did in self.odd.get(self.addr, ()):
+      raise ValueError(f"invalid response data identifier: {hex(did - 1)} expected: {hex(did)}")
+    return did.to_bytes(2, "big")
+
+  def read_dtc_information(self, report_type, mask):
+    return b"\xff"
+
+
+class TestReadModules(unittest.TestCase):
+  def test_an_unexpected_answer_skips_that_identifier_and_the_read_goes_on(self):
+    FakeUdsClient.odd = {0x730: {0xF111}}
+    with mock.patch("opendbc.car.uds.UdsClient", FakeUdsClient):
+      try:
+        out = ford_reads.read_modules(panda=None, bus=0)
+      except ValueError as e:
+        self.fail(f"one unexpected answer ended the whole read, and nothing would be saved: {e}")
+    pscm = out["modules"]["PSCM"]
+    self.assertIn("F111", pscm["errors"])
+    self.assertIn("invalid response data identifier", pscm["errors"]["F111"])
+    self.assertNotIn("F111", pscm["dids"])
+    every = len(ford_reads.ID_DIDS) + len(ford_reads.ASBUILT_DIDS)
+    self.assertEqual(len(pscm["dids"]), every - 1)
+    self.assertEqual(pscm["dtc_raw"], "ff")
+    for name in ford_reads.MODULES.values():
+      self.assertEqual(len(out["modules"][name]["dids"]), every - (name == "PSCM"), name)
+
+
 class TestGuard(unittest.TestCase):
   def test_only_read_only_services_reach_the_bus(self):
     sent = []
