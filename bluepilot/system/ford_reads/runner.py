@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """BluePilot: run ford_reads.py from the settings button, then reboot.
 
-ford_reads.py (Jacob's read-only module reader, unchanged next to this file) stops openpilot to take the panda,
+ford_reads.py (the read-only module reader next to this file) stops openpilot to take the panda,
 so it can't run inside the UI. The button starts this runner in its own session, which survives the tmux
 session being killed. The runner:
   - reads every module once, saving /data/ford-reads/<name>.json as ford_reads.py does;
