@@ -71,10 +71,8 @@ class TestOnroadOverrides(OpenpilotTestCase):
       renderer._render(RECT)
     draw_path.assert_called_once_with()
 
-  def test_tici_rainbow_path_suppresses_custom_edge_color(self):
-    from openpilot.selfdrive.ui.bp.onroad import model_renderer_bp
+  def _tici_path_edge_renderer(self):
     from openpilot.selfdrive.ui.bp.onroad.model_renderer_bp import ModelRendererBP
-    from openpilot.selfdrive.ui.ui_state import UIStatus
     renderer = ModelRendererBP.__new__(ModelRendererBP)
     renderer._rect = RECT
     renderer._path = SimpleNamespace(projected_points=np.array([  # ty: ignore[invalid-assignment]  # focused draw seam
@@ -84,6 +82,12 @@ class TestOnroadOverrides(OpenpilotTestCase):
     renderer._theme_pack = None
     renderer._model_path_color = "#FF334B"
     renderer._disable_lane_line_status_color = False
+    return renderer
+
+  def test_tici_rainbow_path_suppresses_custom_edge_color(self):
+    from openpilot.selfdrive.ui.bp.onroad import model_renderer_bp
+    from openpilot.selfdrive.ui.ui_state import UIStatus
+    renderer = self._tici_path_edge_renderer()
 
     with (mock.patch.object(self.ui_state, "rainbow_path", True),
           mock.patch.object(self.ui_state, "status", UIStatus.ENGAGED),
@@ -93,6 +97,22 @@ class TestOnroadOverrides(OpenpilotTestCase):
       renderer._draw_path_edges()
 
     custom_color.assert_not_called()
+
+  def test_tici_custom_color_replaces_disengaged_path_edges(self):
+    from openpilot.selfdrive.ui.bp.onroad import model_renderer_bp
+    from openpilot.selfdrive.ui.ui_state import UIStatus
+    renderer = self._tici_path_edge_renderer()
+
+    with (mock.patch.object(self.ui_state, "rainbow_path", False),
+          mock.patch.object(self.ui_state, "status", UIStatus.DISENGAGED),
+          mock.patch.object(model_renderer_bp, "model_path_color_rgb", return_value=(255, 51, 75)),
+          mock.patch.object(model_renderer_bp, "draw_polygon") as draw_polygon,
+          mock.patch.object(rl, "draw_line_ex")):
+      renderer._draw_path_edges()
+
+    edge_colors = [call.args[2] for call in draw_polygon.call_args_list]
+    self.assertGreater(len(edge_colors), 0)
+    self.assertTrue(all((color.r, color.g, color.b) == (255, 51, 75) for color in edge_colors))
 
   def test_tici_hud_places_the_wheel_like_bp7(self):
     from openpilot.selfdrive.ui.bp.onroad.hud_renderer_bp import HudRendererBP
