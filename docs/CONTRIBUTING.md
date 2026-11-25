@@ -16,8 +16,12 @@ website is [bluepilot.dev](https://bluepilot.dev).
 3. **Send upstream fixes upstream.** A bug in sunnypilot's or openpilot's own code is fixed there, and reaches
    BluePilot with the next sync.
 
-[AGENTS.md](../AGENTS.md) holds the working rules: where code goes, how to change an upstream file, the tests, and
-the mistakes that have already cost someone a PR. It is written for AI agents and for people; read it once.
+Two pages to read once:
+
+* [How BluePilot is put together](BLUEPILOT_ARCHITECTURE.md): the layers, the UI, the portal, and where to start
+  for common changes.
+* [AGENTS.md](../AGENTS.md): the working rules for people and AI agents: where code goes, how to change an upstream
+  file, the tests, and the mistakes that have already cost someone a PR.
 
 ## Pull requests
 
@@ -35,7 +39,15 @@ A pull request that gets merged has:
   wasn't driven. A change to what the car does is off by default unless it fixes existing behavior.
 * **A device check for UI changes**, naming the device. The comma 3X and the comma four run different UI code.
 
-Large pull requests are slow to review and easy to get wrong. If one grows past a few hundred lines, split it.
+What doesn't get merged:
+
+* **Style-only changes** and reformatting of code that isn't otherwise being changed.
+* **Large pull requests.** Past a few hundred lines, split it.
+* **Pull requests without one clear goal.**
+* **Changes to upstream's files that could live in BluePilot's own folders**, or that belong upstream.
+* **Risk that outweighs the gain**: an improvement that would cost more to validate than it is worth. A failing
+  test merged first lowers that cost.
+* **Code the author can't explain**, however it was written.
 
 ## Using AI tools
 

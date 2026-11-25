@@ -2,6 +2,8 @@
 
 Rules for agents and people changing BluePilot. This file holds what you can't find by reading the tree: where a
 change belongs, what CI enforces, and the mistakes that have already cost someone a PR.
+For a map of the code (the layers, the UI classes, the portal, where to start for common changes), read
+[docs/BLUEPILOT_ARCHITECTURE.md](docs/BLUEPILOT_ARCHITECTURE.md).
 
 BluePilot is a Ford-focused fork of sunnypilot (itself a fork of openpilot) that steers and controls the speed of real
 cars. openpilot's priorities apply in this order: safety, stability, quality, features ([docs/SAFETY.md](docs/SAFETY.md)).
