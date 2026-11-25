@@ -239,7 +239,7 @@ class BluePilotLayout(Widget):
       lambda: tr("Model Path Color"),
       lambda: self._model_path_color_label,
       lambda: tr("Choose a BluePilot 6.0 path color preset or create a custom color. " +
-                 "Enable Tesla Rainbow Mode SunnyPilot Toggle and active theme packs take priority over solid colors."),
+                 "Tesla Rainbow Mode and active theme packs take priority over custom colors."),
       callback=self._show_model_path_color_dialog,
     )
     # End BluePilot

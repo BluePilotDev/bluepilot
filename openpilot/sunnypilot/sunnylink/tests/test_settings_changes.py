@@ -25,7 +25,6 @@ from openpilot.sunnypilot.sunnylink.tools.generate_settings_schema import (
   generate_schema,
 )
 from openpilot.common.test import OpenpilotTestCase
-from openpilot.selfdrive.ui.bp.lib.model_path_color import PRESET_COLORS
 
 
 SCHEMA_VALIDATOR_PATH = os.path.join(os.path.dirname(DEFINITION_PATH), "settings_ui.schema.json")
@@ -233,6 +232,9 @@ class TestBluePilotVehicleVisuals(OpenpilotTestCase):
     assert item["description"] == "Inner lane lines become rainbow colored when longitudinal control is active."
 
   def test_model_path_color_is_available_for_both_device_families(self, schema):
+    # BluePilot: keep the feature-specific dependency inside the tagged test.
+    from openpilot.selfdrive.ui.bp.lib.model_path_color import PRESET_COLORS
+    # End BluePilot
     items = schema["vehicle_settings"]["ford"]["items"]
     keys = [item["key"] for item in items]
     assert keys.index("BPHideCameraView") < keys.index("CustomModelPathColor") < keys.index("BPRadRacerTheme")

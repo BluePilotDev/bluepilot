@@ -14,8 +14,6 @@ BP_BLUE_GRADIENT_RGBA = (
   (139, 226, 255, 0),
 )
 BP_BLUE_GRADIENT_STOPS = (0.0, 0.52, 1.0)
-_LEGACY_RAINBOW_VALUE = "Rainbow"
-
 # Keep the historical BP choices while also accepting a literal #RRGGBB custom value.
 PRESET_COLORS: dict[str, str | None] = {
   STOCK_VALUE: None,
@@ -32,6 +30,12 @@ PRESET_COLORS: dict[str, str | None] = {
 _HEX_COLOR_RE = re.compile(r"^#?([0-9a-fA-F]{6})$")
 
 
+def _hex_color_is_visible(color_hex: str) -> bool:
+  rgb = tuple(int(color_hex[i:i + 2], 16) for i in (1, 3, 5))
+  # Allow saturated hues (including pure blue) while rejecting near-black values.
+  return max(rgb) >= 60 and sum(rgb) >= 100
+
+
 def normalize_model_path_color(value: str | bytes | None) -> str:
   """Return a canonical preset name or uppercase #RRGGBB value."""
   if isinstance(value, bytes):
@@ -42,12 +46,9 @@ def normalize_model_path_color(value: str | bytes | None) -> str:
   if preset is not None:
     return preset
 
-  # The picker previously exposed Rainbow; migrate that stored value to its BP Blue replacement.
-  if value.lower() == _LEGACY_RAINBOW_VALUE.lower():
-    return BP_BLUE_VALUE
-
   if match := _HEX_COLOR_RE.fullmatch(value):
-    return f"#{match.group(1).upper()}"
+    color_hex = f"#{match.group(1).upper()}"
+    return color_hex if _hex_color_is_visible(color_hex) else STOCK_VALUE
 
   return STOCK_VALUE
 
@@ -72,11 +73,16 @@ def model_path_color_label(value: str | bytes | None) -> str:
 
 def model_path_color_is_visible(value: str | bytes | None) -> bool:
   """Reject colors dark enough to make the path effectively disappear."""
-  rgb = model_path_color_rgb(value)
-  if rgb is None:
-    return True
-  # Allow saturated hues (including pure blue) while rejecting near-black values.
-  return max(rgb) >= 60 and sum(rgb) >= 100
+  if isinstance(value, bytes):
+    value = value.decode("utf-8", errors="replace")
+  value = (value or STOCK_VALUE).strip()
+  preset = next((name for name in PRESET_COLORS if name.lower() == value.lower()), None)
+  if preset is not None:
+    color_hex = PRESET_COLORS[preset]
+    return color_hex is None or _hex_color_is_visible(color_hex)
+  if match := _HEX_COLOR_RE.fullmatch(value):
+    return _hex_color_is_visible(f"#{match.group(1).upper()}")
+  return False
 
 
 def model_path_gradient(value: str | bytes | None):

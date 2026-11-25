@@ -89,18 +89,12 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
       if not self._path.projected_points.size:
         return
       path_pts = self._path.projected_points + np.array([self._rect.x, self._rect.y], dtype=np.float32)
-      if ui_state.status == UIStatus.DISENGAGED:
-        draw_polygon(self._rect, path_pts, rl.Color(0, 0, 0, 90))
-      else:
-        draw_polygon(self._rect, path_pts, gradient=themed_gradient)
+      draw_polygon(self._rect, path_pts, gradient=themed_gradient)
     elif self._custom_path_gradient is not None:
       if not self._path.projected_points.size:
         return
       path_pts = self._path.projected_points + np.array([self._rect.x, self._rect.y], dtype=np.float32)
-      if ui_state.status == UIStatus.DISENGAGED:
-        draw_polygon(self._rect, path_pts, rl.Color(0, 0, 0, 90))
-      else:
-        draw_polygon(self._rect, path_pts, gradient=self._custom_path_gradient)
+      draw_polygon(self._rect, path_pts, gradient=self._custom_path_gradient)
     else:
       super()._draw_path()
 

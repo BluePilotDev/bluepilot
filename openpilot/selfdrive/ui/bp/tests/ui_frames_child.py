@@ -81,7 +81,7 @@ DISPLAY_PARAMS = ("FordPrefShowRadarLeadOverlay", "BPThemePack", "BPThemeAutoSea
                   "BPSteeringWheelIconStyle", "BPAnimateSteeringWheel", "BpShowLateralControl", "BlindSpot",
                   "ShowBlindspotOverlay", "ShowBrakeStatus", "BPRainbowLines", "BPHideCameraView", "BPHideOnroadBorder",
                   "FordPrefHybridBatteryStatus", "FordPrefHybridPowerFlow", "FordPrefGaugeStyle", "RainbowMode",
-                  "NavigationEnabled", "NavDestination")
+                  "NavigationEnabled", "NavDestination", "CustomModelPathColor")
 
 
 def onroad_cases(family: str, theme_packs: list[str]) -> list[tuple[str, dict, dict, list[str]]]:
@@ -130,6 +130,8 @@ def onroad_cases(family: str, theme_packs: list[str]) -> list[tuple[str, dict, d
      model + hud + ["BlindspotRendererMixin._draw_blindspot_screen_edges"] +
      (["BlindSpotIndicators.render"] if family == "mici" else [])),
     ("brake status", {"ShowBrakeStatus": True}, {"brakes": True}, model + hud),
+    ("model path color preset", {"CustomModelPathColor": "BP Blue"}, {}, model + hud + ["model path gradient"]),
+    ("model path color hex", {"CustomModelPathColor": "#FF334B"}, {}, model + hud + ["model path gradient"]),
     ("rainbow lines and path", {"BPRainbowLines": True, "RainbowMode": True}, {}, model + hud),
     ("minimal view, no border", {"BPHideCameraView": True, "BPHideOnroadBorder": True}, {}, model + hud),
   ]
@@ -356,6 +358,17 @@ def main() -> None:
     # COUNTED wraps go on after the main layout exists, so module-level draw_polygon imports are all loaded
     for spec in COUNTED[FAMILY]:
       wrap(*spec)
+    renderer_module = importlib.import_module(
+      "openpilot.selfdrive.ui.bp.onroad.model_renderer_bp" if FAMILY == "tici"
+      else "openpilot.selfdrive.ui.bp.mici.onroad.model_renderer_bp"
+    )
+    renderer_draw_polygon = renderer_module.draw_polygon
+
+    def model_path_polygon(*a, **k):
+      if k.get("gradient") is not None:
+        calls["model path gradient"] += 1
+      return renderer_draw_polygon(*a, **k)
+    renderer_module.draw_polygon = model_path_polygon
     # polygons drawn by sunnypilot's lane-center line itself (BlendfulRenderer.draw returns early when lateral is off)
     from openpilot.selfdrive.ui.sunnypilot.onroad import blendful
     blendful_polygon = blendful.draw_polygon

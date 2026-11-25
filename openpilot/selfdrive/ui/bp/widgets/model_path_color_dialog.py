@@ -26,9 +26,10 @@ from openpilot.system.ui.widgets.label import gui_label
 class ModelPathColorDialog(Widget):
   """Preset selector with an HSV wheel and dedicated hexadecimal keypad."""
 
-  MIN_VALUE = 0.20
+  MIN_VALUE = 0.24
   WHEEL_TEXTURE_SIZE_BIG = 256
   WHEEL_TEXTURE_SIZE_SMALL = 192
+  _wheel_texture_cache: dict[int, rl.Texture] = {}
 
   def __init__(self, on_saved: Callable[[str], None] | None = None):
     super().__init__()
@@ -40,13 +41,14 @@ class ModelPathColorDialog(Widget):
     self._error = ""
 
     self._initial_value = normalize_model_path_color(self._params.get(PARAM_KEY, return_default=True))
-    initial_hex = model_path_color_hex(self._initial_value) or PRESET_COLORS["Green"] or "#0DF87A"
+    initial_hex = model_path_color_hex(self._initial_value) or PRESET_COLORS["Green"]
+    assert initial_hex is not None
     self._set_hex(initial_hex)
     self._hex_digits = self._hex[1:]
 
     self._wheel_rect = rl.Rectangle(0, 0, 0, 0)
     self._value_rect = rl.Rectangle(0, 0, 0, 0)
-    self._wheel_texture = self._create_wheel_texture(
+    self._wheel_texture = self._get_wheel_texture(
       self.WHEEL_TEXTURE_SIZE_BIG if self._is_big else self.WHEEL_TEXTURE_SIZE_SMALL
     )
 
@@ -78,8 +80,10 @@ class ModelPathColorDialog(Widget):
                                        button_style=ButtonStyle.KEYBOARD, font_size=64 if self._is_big else 25,
                                        multi_touch=True)
 
-  @staticmethod
-  def _create_wheel_texture(size: int) -> rl.Texture:
+  @classmethod
+  def _get_wheel_texture(cls, size: int) -> rl.Texture:
+    if texture := cls._wheel_texture_cache.get(size):
+      return texture
     image = rl.gen_image_color(size, size, rl.BLANK)
     center = (size - 1) / 2
     radius = size / 2
@@ -95,18 +99,14 @@ class ModelPathColorDialog(Widget):
     texture = rl.load_texture_from_image(image)
     rl.set_texture_filter(texture, rl.TextureFilter.TEXTURE_FILTER_BILINEAR)
     rl.unload_image(image)
+    cls._wheel_texture_cache[size] = texture
     return texture
-
-  def hide_event(self):
-    super().hide_event()
-    if self._wheel_texture.id:
-      rl.unload_texture(self._wheel_texture)
-      self._wheel_texture.id = 0
 
   def _set_hex(self, color_hex: str):
     normalized = normalize_model_path_color(color_hex)
     if not normalized.startswith("#"):
-      normalized = PRESET_COLORS["Green"] or "#0DF87A"
+      normalized = PRESET_COLORS["Green"]
+      assert normalized is not None
     self._hex = normalized
     r, g, b = (int(normalized[i:i + 2], 16) / 255 for i in (1, 3, 5))
     self._hue, self._saturation, self._value = colorsys.rgb_to_hsv(r, g, b)
@@ -137,9 +137,6 @@ class ModelPathColorDialog(Widget):
       self._show_presets()
 
   def _choose_preset(self, preset: str):
-    if preset == "Custom":
-      self._show_picker()
-      return
     self._params.put(PARAM_KEY, preset, block=False)
     gui_app.pop_widget()
     if self._on_saved:
@@ -156,7 +153,7 @@ class ModelPathColorDialog(Widget):
       self._set_hex(f"#{self._hex_digits}")
 
     if not model_path_color_is_visible(self._hex):
-      self._error = tr("Choose a brighter color for visibility")
+      self._error = tr("Choose a brighter color")
       return
 
     value = normalize_model_path_color(self._hex)
@@ -277,7 +274,8 @@ class ModelPathColorDialog(Widget):
 
     gap = 28 if self._is_big else 7
     buttons_y = swatch.y + swatch.height + gap
-    button_h = (actions.y + actions.height - buttons_y - gap) / 2
+    error_space = (self._error_height() + gap) if self._error else 0
+    button_h = (actions.y + actions.height - error_space - buttons_y - gap) / 2
     button_w = (actions.width - gap) / 2
     buttons = (self._presets_button, self._hex_button, self._cancel_button, self._save_button)
     for i, button in enumerate(buttons):
@@ -326,10 +324,13 @@ class ModelPathColorDialog(Widget):
   def _draw_error(self, rect: rl.Rectangle, bottom_padding: float = 0):
     if not self._error:
       return
-    error_h = 55 if self._is_big else 18
+    error_h = self._error_height()
     error_rect = rl.Rectangle(rect.x, rect.y + rect.height - error_h - bottom_padding, rect.width, error_h)
-    gui_label(error_rect, self._error, font_size=34 if self._is_big else 13, font_weight=FontWeight.NORMAL,
+    gui_label(error_rect, self._error, font_size=34 if self._is_big else 11, font_weight=FontWeight.NORMAL,
               color=rl.Color(255, 105, 105, 255), alignment=TextAlignment.CENTER)
+
+  def _error_height(self) -> float:
+    return 55 if self._is_big else 18
 
   def _set_from_wheel(self, pos: MousePos):
     cx = self._wheel_rect.x + self._wheel_rect.width / 2
