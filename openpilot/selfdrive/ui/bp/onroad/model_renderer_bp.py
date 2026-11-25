@@ -578,7 +578,7 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
     right_edge = points[mid_point:][::-1]
 
     pack_edge = self._theme_pack.rl_colors().get("PathEdge") if self._theme_pack is not None else None
-    custom_rgb = model_path_color_rgb(self._model_path_color)
+    custom_rgb = None if ui_state.rainbow_path else model_path_color_rgb(self._model_path_color)
     if pack_edge is not None and ui_state.status != UIStatus.DISENGAGED:
       # BluePilot: theme pack path edge color (disengaged keeps the status blackout)
       edge_color = pack_edge

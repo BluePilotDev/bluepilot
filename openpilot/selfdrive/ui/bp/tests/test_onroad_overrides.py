@@ -71,6 +71,29 @@ class TestOnroadOverrides(OpenpilotTestCase):
       renderer._render(RECT)
     draw_path.assert_called_once_with()
 
+  def test_tici_rainbow_path_suppresses_custom_edge_color(self):
+    from openpilot.selfdrive.ui.bp.onroad import model_renderer_bp
+    from openpilot.selfdrive.ui.bp.onroad.model_renderer_bp import ModelRendererBP
+    from openpilot.selfdrive.ui.ui_state import UIStatus
+    renderer = ModelRendererBP.__new__(ModelRendererBP)
+    renderer._rect = RECT
+    renderer._path = SimpleNamespace(projected_points=np.array([  # ty: ignore[invalid-assignment]  # focused draw seam
+      [900.0, 300.0], [850.0, 700.0], [800.0, 1000.0],
+      [1360.0, 1000.0], [1310.0, 700.0], [1260.0, 300.0],
+    ], dtype=np.float32))
+    renderer._theme_pack = None
+    renderer._model_path_color = "#FF334B"
+    renderer._disable_lane_line_status_color = False
+
+    with (mock.patch.object(self.ui_state, "rainbow_path", True),
+          mock.patch.object(self.ui_state, "status", UIStatus.ENGAGED),
+          mock.patch.object(model_renderer_bp, "model_path_color_rgb", return_value=(255, 51, 75)) as custom_color,
+          mock.patch.object(model_renderer_bp, "draw_polygon"),
+          mock.patch.object(rl, "draw_line_ex")):
+      renderer._draw_path_edges()
+
+    custom_color.assert_not_called()
+
   def test_tici_hud_places_the_wheel_like_bp7(self):
     from openpilot.selfdrive.ui.bp.onroad.hud_renderer_bp import HudRendererBP
     with mock.patch("openpilot.selfdrive.ui.bp.onroad.hud_renderer_bp.SteeringWheelBP") as steering_wheel:
