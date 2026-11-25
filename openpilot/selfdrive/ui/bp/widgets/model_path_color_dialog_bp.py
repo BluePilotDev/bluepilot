@@ -147,15 +147,18 @@ class ModelPathColorDialogBP(Widget):
     gui_app.pop_widget()
 
   def _save(self):
+    color_hex = self._hex
     if self._mode == "hex":
       if len(self._hex_digits) != 6:
         self._error = tr("Enter all 6 hexadecimal digits")
         return
-      self._set_hex(f"#{self._hex_digits}")
+      color_hex = f"#{self._hex_digits}"
 
-    if not model_path_color_is_visible(self._hex):
+    if not model_path_color_is_visible(color_hex):
       self._error = tr("Choose a brighter color")
       return
+    if self._mode == "hex":
+      self._set_hex(color_hex)
 
     value = normalize_model_path_color(self._hex)
     self._params.put(PARAM_KEY, value, block=False)

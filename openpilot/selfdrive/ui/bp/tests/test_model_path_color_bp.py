@@ -1,4 +1,5 @@
 import unittest
+from unittest import mock
 
 from openpilot.selfdrive.ui.bp.lib.model_path_color_bp import (
   BP_BLUE_EDGE_HEX,
@@ -12,6 +13,7 @@ from openpilot.selfdrive.ui.bp.lib.model_path_color_bp import (
   model_path_color_rgb,
   normalize_model_path_color,
 )
+from openpilot.selfdrive.ui.bp.widgets.model_path_color_dialog_bp import ModelPathColorDialogBP
 
 class TestModelPathColor(unittest.TestCase):
   def test_normalizes_presets_and_custom_hex(self):
@@ -47,6 +49,21 @@ class TestModelPathColor(unittest.TestCase):
     assert normalize_model_path_color(f"#{floor_channel:02X}0000") == f"#{floor_channel:02X}0000"
     assert model_path_color_is_visible("#0000FF")
     assert model_path_color_is_visible("#12ABEF")
+
+  def test_dark_hex_entry_warns_without_saving_a_fallback_color(self):
+    dialog = ModelPathColorDialogBP.__new__(ModelPathColorDialogBP)
+    dialog._mode = "hex"
+    dialog._hex_digits = "000000"
+    dialog._hex = "#0DF87A"
+    dialog._error = ""
+    dialog._params = mock.Mock()
+    dialog._on_saved = mock.Mock()
+
+    dialog._save()
+
+    assert dialog._error == "Choose a brighter color"
+    dialog._params.put.assert_not_called()
+    dialog._on_saved.assert_not_called()
 
 
 if __name__ == "__main__":
