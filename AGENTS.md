@@ -104,9 +104,9 @@ different UI code.
 
 ## Things that have already gone wrong
 
-- **Params.** A new param is declared in `openpilot/common/params_keys.h` (the BluePilot block) and in
-  `bluepilot/params/params.json`. An undeclared key raises when it is read. The Ford lateral lines in
-  `params_keys.h` are generated from the library's manifest: change them there.
+- **Params.** A new param is declared in `openpilot/common/params_keys.h` (the BluePilot block). An undeclared key
+  raises when it is read. `bluepilot/params/params.json` is a BP7 leftover: leave it alone. The Ford lateral lines
+  in `params_keys.h` are generated from the library's manifest: change them there.
 - **Cereal.** BluePilot's messages take reserved slots in `custom.capnp` / `log.capnp` (`controllerStateBP` is
   `customReserved13`, `carStateBP` is `customReserved14`). sunnypilot claims slots from the low numbers upward, so
   take the highest free one and name it in the PR. Moving a message to another slot makes older logs unreadable for
