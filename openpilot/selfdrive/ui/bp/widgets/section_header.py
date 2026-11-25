@@ -1,6 +1,6 @@
 """Section header widgets for TICI BluePilot settings menu."""
 import math
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 
 import pyray as rl
 from openpilot.system.ui.widgets import Widget
@@ -111,7 +111,7 @@ class CollapsibleSectionHeader(Widget):
     super().set_parent_rect(parent_rect)
     self._rect.width = parent_rect.width
 
-  def set_items(self, items: list[Widget]) -> None:
+  def set_items(self, items: Sequence[Widget]) -> None:
     """Register the items this header controls and apply initial visibility."""
     self._managed_items = list(items)
     self._apply_visibility()
@@ -119,6 +119,10 @@ class CollapsibleSectionHeader(Widget):
   def set_nested_headers(self, headers: list["CollapsibleSectionHeader"]) -> None:
     """Register nested sub-headers so collapsing this section also collapses them."""
     self._nested_headers = list(headers)
+
+  def owns_header(self, header: "CollapsibleSectionHeader") -> bool:
+    """True when header is one of this section's nested sub-headers (drawn inside this section's card)."""
+    return any(h is header for h in self._nested_headers)
 
   def set_toggle_callback(self, callback: Callable[["CollapsibleSectionHeader"], None] | None) -> None:
     """Called after the user opens or closes this section (not on collapse())."""
@@ -244,8 +248,9 @@ class SectionScroller(Scroller):
   """Scroller for lists of CollapsibleSectionHeader groups.
 
   An open section's items are drawn inset inside one card under their header, with separators only
-  between those items (none around headers). Items before the first header lay out like the stock
-  Scroller. scroll_to() brings a widget to the top of the view (clamped to the end of the list).
+  between those items (none around headers). A section's nested sub-headers and their items sit inside its
+  card. Items before the first header lay out like the stock Scroller. scroll_to() brings a widget to the top
+  of the view (clamped to the end of the list).
   """
 
   def __init__(self, items, line_separator: bool = True):
@@ -259,7 +264,8 @@ class SectionScroller(Scroller):
     header: CollapsibleSectionHeader | None = None
     prev: Widget | None = None
     for item in self._items:
-      if isinstance(item, CollapsibleSectionHeader):
+      # A nested sub-header (and its items) belongs to the open section above it, inside that section's card
+      if isinstance(item, CollapsibleSectionHeader) and not (header is not None and header.owns_header(item)):
         if header is not None and header.expanded and prev is not None and prev is not header:
           y += SECTION_BODY_PAD_BOTTOM  # room for the open section's card under its last item
         header = item

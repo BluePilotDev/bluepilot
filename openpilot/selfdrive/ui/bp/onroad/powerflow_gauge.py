@@ -10,9 +10,8 @@ from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.system.ui.lib.application import gui_app, FontWeight
 from openpilot.system.ui.lib.text_measure import measure_text_cached
 from openpilot.system.ui.widgets import Widget
-from openpilot.selfdrive.ui.mici.onroad.torque_bar import arc_bar_pts, TORQUE_ANGLE_SPAN
-from openpilot.selfdrive.ui.mici.onroad import blend_colors
-from openpilot.system.ui.lib.shader_polygon import draw_polygon, Gradient
+from openpilot.selfdrive.ui.mici.onroad.torque_bar import arc_bar_pts
+from openpilot.system.ui.lib.shader_polygon import draw_polygon
 from openpilot.selfdrive.ui.bp.lib.hev_text import hev_engine_on_reason_text, hev_power_flow_text
 
 # Constants
@@ -298,7 +297,7 @@ class PowerflowGauge(Widget):
 
         # Draw each character along the arch
         cumulative_width = 0
-        for i, char in enumerate(power_flow_text):
+        for char in power_flow_text:
           # Measure width of current character
           char_text = char
           char_size = measure_text_cached(self._font_bold, char_text, POWERFLOW_TEXT_FONT_SIZE)
@@ -359,7 +358,7 @@ class PowerflowGauge(Widget):
 
         # Draw each character along the arch
         cumulative_width = 0
-        for i, char in enumerate(engine_reason_text):
+        for char in engine_reason_text:
           # Measure width of current character
           char_text = char
           char_size = measure_text_cached(self._font_bold, char_text, POWERFLOW_TEXT_FONT_SIZE)

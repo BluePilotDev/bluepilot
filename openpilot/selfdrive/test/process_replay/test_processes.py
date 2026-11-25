@@ -12,6 +12,7 @@ from openpilot.common.git import get_commit
 from openpilot.tools.lib.openpilotci import get_url
 from openpilot.selfdrive.test.process_replay.compare_logs import compare_logs, format_diff
 from openpilot.selfdrive.test.process_replay.diff_report import diff_process, diff_report
+from openpilot.selfdrive.test.process_replay.bp_refs import bp_ref_repo  # BluePilot
 from openpilot.selfdrive.test.process_replay.process_replay import CONFIGS, PROC_REPLAY_DIR, FAKEDATA, replay_process, \
                                                                    check_most_messages_valid
 from openpilot.tools.lib.filereader import FileReader
@@ -68,9 +69,10 @@ excluded_interfaces = {brand for brand, platforms in interface_names.items()
                        if all(interfaces[platform].get_non_essential_params(platform).dashcamOnly for platform in platforms)} | {"body"}
 
 BASE_URL = "https://raw.githubusercontent.com/sunnypilot/ci-artifacts/refs/heads/process-replay/"
-# BluePilot: these brands run BluePilot lateral, so they compare against bp-sunnypilot's own output from its
-# last merge (tests.yaml publishes it), not stock sunnypilot's
-BP_BASE_URL = "https://raw.githubusercontent.com/ford-op/bp-sunnypilot/refs/heads/process-replay/"
+# BluePilot: these brands run BluePilot lateral, so they compare against bp-sunnypilot's (or full BluePilot's) own
+# output from its last merge (tests.yaml publishes it), not stock sunnypilot's; bp_refs.py picks the repo
+BP_REF_REPO = bp_ref_repo()
+BP_BASE_URL = f"https://raw.githubusercontent.com/{BP_REF_REPO}/refs/heads/process-replay/"
 BP_REF_CARS = {"FORD"}
 REF_COMMIT_FN = os.path.join(PROC_REPLAY_DIR, "ref_commit")
 EXCLUDED_PROCS = {"modeld", "dmonitoringmodeld"}
@@ -179,7 +181,7 @@ if __name__ == "__main__":
       bp_ref_commit = URLFile(BP_BASE_URL + "ref_commit", cache=False).read().decode().strip()
     except URLFileException:
       bp_ref_commit = "none-published"  # their references then fail to load, so the test fails
-    print(f"***** testing {', '.join(sorted(BP_REF_CARS))} against bp-sunnypilot commit {bp_ref_commit} *****")
+    print(f"***** testing {', '.join(sorted(BP_REF_CARS))} against {BP_REF_REPO} commit {bp_ref_commit} *****")
 
   cur_commit = get_commit()
   if not cur_commit:

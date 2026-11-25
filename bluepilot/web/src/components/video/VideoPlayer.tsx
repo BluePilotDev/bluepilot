@@ -25,7 +25,7 @@ interface VideoPlayerProps {
 
 export const VideoPlayer: React.FC<VideoPlayerProps> = ({ route, onClose }) => {
   const navigate = useNavigate()
-  const { deleteRoute, preserveRoute } = useRoutesStore()
+  const { deleteRoute } = useRoutesStore()
   const { addToast } = useToastStore()
   const [showExportModal, setShowExportModal] = useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
@@ -798,17 +798,6 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ route, onClose }) => {
     navigate('/routes')
   }
 
-  const handlePreserve = async (e: React.MouseEvent) => {
-    e.stopPropagation()
-    try {
-      await preserveRoute(route.baseName || route.id || '')
-      addToast('Route preservation toggled successfully', 'success')
-    } catch (error: any) {
-      console.error('Failed to preserve route:', error)
-      addToast(error?.message || 'Failed to preserve route', 'error')
-    }
-  }
-
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation()
     setShowDeleteConfirm(true)
@@ -1035,10 +1024,6 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ route, onClose }) => {
           <div className="sidebar-group">
             <h3 className="sidebar-group-title">Actions</h3>
             <div className="route-actions-sidebar">
-              <button type="button" className={`btn btn-secondary ${route.preserved ? 'active' : ''}`} onClick={handlePreserve} title={route.preserved ? 'Preserved' : 'Preserve this route'}>
-                <Icon name={route.preserved ? 'star' : 'star_border'} size={18} />
-                <span>{route.preserved ? 'Preserved' : 'Preserve'}</span>
-              </button>
               <button type="button" className="btn btn-primary" title="Export videos and backup route data" onClick={() => setShowExportModal(true)}>
                 <Icon name="download" size={18} />
                 Export Videos & Logs
@@ -1047,9 +1032,6 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({ route, onClose }) => {
                 <Icon name="delete" size={18} />
                 Delete Route
               </button>
-            </div>
-            <div className="route-actions-info">
-              <strong>Tip:</strong> Preserved routes are protected from automatic deletion but still count towards storage usage.
             </div>
           </div>
         </div>

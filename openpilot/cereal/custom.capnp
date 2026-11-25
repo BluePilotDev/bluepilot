@@ -510,9 +510,39 @@ struct ModelDataV2SP @0xa1680744031fdb2d {
   }
 }
 
+struct GpsLocationSP @0xcb9fd56c7057593a {
+  latitude @0 :Float64;
+  longitude @1 :Float64;
+  speed @2 :Float32;
+  bearingDeg @3 :Float32;
+  horizontalAccuracy @4 :Float32;  # m
+  bearingAccuracyDeg @5 :Float32;
+  hasFix @6 :Bool;
+  gpsOK @7 :Bool;  # a raw fix arrived in the last 2 s
+  fused @8 :Bool;  # false while passing the raw fix through
+}
+
+# BluePilot: JetLink's big model as modeld saw it, every model frame, for logs and route review (D2 b; claims the
+# CustomReserved11 slot). Which model drove a frame is modelV2.big. bluepilot/jetlink_adapter/telemetry.py fills it
+struct ModelDataV2BP @0xc2243c65e0340384 {
+  acceleratorState @0 :AcceleratorState;  # jetlink.openpilot STATES; none with the link off or no usable JetLink
+  handovers @1 :UInt32;  # swaps and hand-backs since this modeld started: each step is a change of driving model
+
+  # zoompilot's ModelDataV2ZP.AcceleratorState ordinals, so one reader serves both forks' logs
+  enum AcceleratorState {
+    none @0;
+    joining @1;      # the big model is being prepared or connected
+    running @2;      # the big model drives
+    retrying @3;     # the link dropped; the small model drives while it reconnects
+    unavailable @4;  # the big model cannot run on this device or link
+    ready @5;        # link up and the big model loaded, waiting for a window to switch (re-engage)
+  }
+}
+# End BluePilot
+
 # BluePilot: BluePilot's own onroad events, which selfdrived turns into alerts beside sunnypilot's (claims the
-# CustomReserved10 slot). JetLink's two first (bluepilot/selfdrive/selfdrived/events_bp.py)
-struct OnroadEventBP @0xcb9fd56c7057593a {
+# CustomReserved12 slot). JetLink's two first (bluepilot/selfdrive/selfdrived/events_bp.py)
+struct OnroadEventBP @0x9ccdc8676701b412 {
   events @0 :List(Event);
 
   struct Event {
@@ -537,27 +567,6 @@ struct OnroadEventBP @0xcb9fd56c7057593a {
   }
 }
 # End BluePilot
-
-# BluePilot: JetLink's big model as modeld saw it, every model frame, for logs and route review (D2 b; claims the
-# CustomReserved11 slot). Which model drove a frame is modelV2.big. bluepilot/jetlink_adapter/telemetry.py fills it
-struct ModelDataV2BP @0xc2243c65e0340384 {
-  acceleratorState @0 :AcceleratorState;  # jetlink.openpilot STATES; none with the link off or no usable JetLink
-  handovers @1 :UInt32;  # swaps and hand-backs since this modeld started: each step is a change of driving model
-
-  # zoompilot's ModelDataV2ZP.AcceleratorState ordinals, so one reader serves both forks' logs
-  enum AcceleratorState {
-    none @0;
-    joining @1;      # the big model is being prepared or connected
-    running @2;      # the big model drives
-    retrying @3;     # the link dropped; the small model drives while it reconnects
-    unavailable @4;  # the big model cannot run on this device or link
-    ready @5;        # link up and the big model loaded, waiting for a window to switch (re-engage)
-  }
-}
-# End BluePilot
-
-struct CustomReserved12 @0x9ccdc8676701b412 {
-}
 
 struct ControllerStateBP @0xcd96dafb67a082d0 {
   lateralUncertainty @0 :Float32;  # BluePilot: lateral uncertainty for angleState (e.g. torque bar)

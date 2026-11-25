@@ -1,0 +1,109 @@
+# BluePilot: the release job (spec: #227). A pushed release tag (v7.2.0, v7.2.1) creates the version's branch (bp-7.2) for a
+# new version and moves bp-stable when it's the highest version released. The rules are in .github/bp_release.py; any
+# failed rule writes nothing. Full BluePilot only: this file doesn't exist in ford-op/bp-sunnypilot.
+#
+# The App token can push to bp-stable, so only the default branch's reviewed workflow file may hold it. A tag push runs the
+# tagged commit's copy of this file: there, `dispatch` only checks the tag's form and starts a workflow_dispatch run on the
+# default branch with the built-in token (one of the two events that token can start a run with). `release` runs only on
+# workflow_dispatch, in the bpx-sync environment, whose single rule (the default branch) needs no tag rule. A ruleset
+# limiting v* tags to admins is still wanted: a tag push is what releases. Version branches (bp-7.1, ...) must be protected
+# against deletion and force pushes: the job trusts a version branch that holds a tag's commit as that release's record
+# (bp-stable never moves back regardless: the job also reads BPVERSION on bp-stable itself).
+name: bpx release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: release tag to run for (it must exist)
+        required: true
+      dry_run:
+        description: only print what it would do
+        type: boolean
+        default: true
+      # throwaway names for testing the job; when any is changed, the stable branch and the prefix must start with bpx-test/
+      source:
+        description: branch a new version's commit must be on
+        default: bp-dev
+      stable:
+        description: stable branch
+        default: bp-stable
+      branch_prefix:
+        description: version branch prefix
+        default: bp-
+      tag_prefix:
+        description: release tag prefix
+        default: v
+
+permissions: {}
+
+concurrency:
+  group: bp-release
+
+env:
+  GIT_LFS_SKIP_SMUDGE: 1
+  GIT_CONFIG_COUNT: 1
+  GIT_CONFIG_KEY_0: fetch.recurseSubmodules
+  GIT_CONFIG_VALUE_0: 'false'
+
+jobs:
+  dispatch:
+    if: github.repository == 'BluePilotDev/bluepilot' && github.event_name == 'push'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      actions: write  # gh workflow run
+    steps:
+    - env:
+        TAG: ${{ github.ref_name }}  # untrusted
+        REPO: ${{ github.repository }}
+        DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        # the same form bp_release.py accepts; the release run checks everything else
+        if ! [[ "$TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+          echo "::error::the tag isn't a release tag: use vMAJOR.MINOR.PATCH, for example v7.1.0"
+          exit 1
+        fi
+        gh workflow run bp-release.yml -R "$REPO" --ref "$DEFAULT_BRANCH" -f tag="$TAG" -f dry_run=false
+
+  release:
+    if: github.repository == 'BluePilotDev/bluepilot' && github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    environment: bpx-sync  # the App key; the environment allows only the default branch
+    timeout-minutes: 10
+    permissions:
+      contents: read  # the checkout
+      actions: read  # which runs on the commit came from a push (the App can't read Actions)
+      checks: read
+    steps:
+    - uses: actions/create-github-app-token@v2
+      id: bp
+      if: inputs.dry_run != true
+      with:
+        app-id: ${{ secrets.SYNC_APP_ID }}
+        private-key: ${{ secrets.SYNC_APP_PRIVATE_KEY }}
+        owner: BluePilotDev
+        repositories: bluepilot
+        permission-contents: write  # the push; nothing else
+    # the dispatched ref (the default branch) is the code; the tag is only read as data. History and trees only, no LFS,
+    # and the working tree is just .github. Pushes use the App token's URL.
+    - uses: actions/checkout@v7
+      with:
+        fetch-depth: 0
+        filter: blob:none
+        sparse-checkout: .github
+        persist-credentials: false
+    - name: Release
+      env:
+        TAG: ${{ inputs.tag }}  # untrusted: bp_release.py checks it before using it
+        DRY_RUN: ${{ inputs.dry_run }}
+        SOURCE_BRANCH: ${{ inputs.source }}
+        STABLE_BRANCH: ${{ inputs.stable }}
+        BRANCH_PREFIX: ${{ inputs.branch_prefix }}
+        TAG_PREFIX: ${{ inputs.tag_prefix }}
+        GH_TOKEN: ${{ github.token }}
+        BP_TOKEN: ${{ steps.bp.outputs.token }}  # empty on a dry run
+      run: python3 .github/bp_release.py

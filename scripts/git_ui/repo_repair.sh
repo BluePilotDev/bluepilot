@@ -54,7 +54,7 @@ remove_repo() {
 clone_repo() {
     log_info "Cloning repository..."
     cd /data
-    timeout $TIMEOUT_CLONE git clone -v --progress --branch "$CURRENT_BRANCH" "$REMOTE_URL" "openpilot" 2>&1
+    timeout "$TIMEOUT_CLONE" git clone -v --progress --branch "$CURRENT_BRANCH" "$REMOTE_URL" "openpilot" 2>&1
     if [ $? -ne 0 ]; then
         log_error "Failed to clone repository (timeout: ${TIMEOUT_CLONE}s)"
         return 1
@@ -64,7 +64,7 @@ clone_repo() {
 update_submodules() {
     log_info "Updating submodules..."
     cd "$OPENPILOT_DIR"
-    timeout $TIMEOUT_SUBMODULE git submodule update --init --recursive --progress 2>&1
+    timeout "$TIMEOUT_SUBMODULE" git submodule update --init --recursive --progress 2>&1
     if [ $? -ne 0 ]; then
         log_error "Failed to update submodules (timeout: ${TIMEOUT_SUBMODULE}s)"
         return 1
@@ -74,7 +74,7 @@ update_submodules() {
 build_scons() {
     log_info "Building with scons..."
     cd "$OPENPILOT_DIR"
-    scons -j$(nproc) 2>&1
+    scons -j"$(nproc)" 2>&1
     # if [ $? -ne 0 ]; then
     #     log_error "Failed to build with scons (timeout: ${TIMEOUT_SCONS}s)"
     #     return 1

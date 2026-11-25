@@ -14,14 +14,13 @@ interface RoutesViewProps {
 }
 
 export const RoutesView = ({ deviceStatus = 'checking' }: RoutesViewProps) => {
-  const { routes, loading, fetchRoutes, fetchRouteDetails, preserveRoute, deleteRoute } = useRoutesStore()
+  const { routes, loading, fetchRoutes, fetchRouteDetails, deleteRoute } = useRoutesStore()
   const { addToast } = useToastStore()
   const [selectedRoute, setSelectedRoute] = useState<RouteDetails | null>(null)
   const [showMetricsModal, setShowMetricsModal] = useState(false)
   const [showExportModal, setShowExportModal] = useState(false)
   const [exportRoute, setExportRoute] = useState<RouteDetails | null>(null)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
-  const [showPreserveConfirm, setShowPreserveConfirm] = useState(false)
   const [pendingActionRoute, setPendingActionRoute] = useState<string | null>(null)
 
   useEffect(() => {
@@ -37,42 +36,6 @@ export const RoutesView = ({ deviceStatus = 'checking' }: RoutesViewProps) => {
 
   const handleCloseVideo = () => {
     setSelectedRoute(null)
-  }
-
-  const handlePreserveToggle = async (e: React.MouseEvent, baseName: string) => {
-    e.stopPropagation()
-    // Check if the route is currently preserved
-    const route = routes.find(r => r.baseName === baseName)
-    const isCurrentlyPreserved = route ? (route.preserved || (route as any).isStarred) : false
-
-    if (isCurrentlyPreserved) {
-      // If already preserved, show confirmation to unpreserve
-      setPendingActionRoute(baseName)
-      setShowPreserveConfirm(true)
-    } else {
-      // If not preserved, preserve without confirmation
-      try {
-        await preserveRoute(baseName)
-        addToast('Route preserved successfully', 'success')
-      } catch (error: any) {
-        console.error('Failed to preserve route:', error)
-        addToast(error?.message || 'Failed to preserve route', 'error')
-      }
-    }
-  }
-
-  const handleConfirmUnpreserve = async () => {
-    if (!pendingActionRoute) return
-
-    try {
-      await preserveRoute(pendingActionRoute)
-      addToast('Route unpreserved successfully', 'success')
-    } catch (error: any) {
-      console.error('Failed to unpreserve route:', error)
-      addToast(error?.message || 'Failed to unpreserve route', 'error')
-    } finally {
-      setPendingActionRoute(null)
-    }
   }
 
   const handleExportClick = async (e: React.MouseEvent, baseName: string) => {
@@ -301,19 +264,6 @@ export const RoutesView = ({ deviceStatus = 'checking' }: RoutesViewProps) => {
         cancelText="Cancel"
         variant="danger"
       />
-      <ConfirmDialog
-        isOpen={showPreserveConfirm}
-        onClose={() => {
-          setShowPreserveConfirm(false)
-          setPendingActionRoute(null)
-        }}
-        onConfirm={handleConfirmUnpreserve}
-        title="Unpreserve Route"
-        message="Are you sure you want to unpreserve this route? The route may be automatically deleted when disk space is needed."
-        confirmText="Unpreserve"
-        cancelText="Cancel"
-        variant="warning"
-      />
       {selectedRoute && (
         <VideoPlayer route={selectedRoute} onClose={handleCloseVideo} />
       )}
@@ -457,16 +407,6 @@ export const RoutesView = ({ deviceStatus = 'checking' }: RoutesViewProps) => {
 
                           {/* Route Actions */}
                           <div className="route-actions">
-                            <button
-                              type="button"
-                              className={`route-preserve-btn ${preserved ? 'active' : ''}`}
-                              aria-pressed={!!preserved}
-                              title={preserved ? 'Preserved' : 'Preserve'}
-                              onClick={(e) => handlePreserveToggle(e, baseName)}
-                            >
-                              <Icon name={preserved ? 'star' : 'star_outline'} size={14} />
-                              <span>{preserved ? 'Preserved' : 'Preserve'}</span>
-                            </button>
                             <button
                               type="button"
                               className="route-export-btn"

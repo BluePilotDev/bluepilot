@@ -80,7 +80,7 @@ class SettingsLayoutSP(OP.SettingsLayout):
     # BluePilot: BluePilot settings button, after models and the next stock item
     if is_bluepilot():
       bp_panel = BluePilotLayoutMici(back_callback=gui_app.pop_widget)
-      bluepilot_btn = BigButtonBP("bluepilot", "", gui_app.texture("icons_mici/settings/car_icon.png", ICON_SIZE, ICON_SIZE))
+      bluepilot_btn = BigButtonBP("bluepilot", "", gui_app.texture("../../../bluepilot/assets/icons_mici/settings/car_icon.png", ICON_SIZE, ICON_SIZE))
       bluepilot_btn.set_click_callback(lambda: gui_app.push_widget(bp_panel))
       items.insert(3, bluepilot_btn)
 

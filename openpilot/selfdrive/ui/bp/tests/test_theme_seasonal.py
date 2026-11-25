@@ -1,6 +1,10 @@
 """Auto seasonal theme: pack-declared season.json windows, movable feasts, user-pack parity."""
 import datetime
 import json
+import tempfile
+import unittest
+from pathlib import Path
+from unittest import mock
 
 from openpilot.selfdrive.ui.bp.lib import theme_pack
 from openpilot.selfdrive.ui.bp.lib.theme_pack import _easter, _thanksgiving, seasonal_pack
@@ -8,7 +12,7 @@ from openpilot.selfdrive.ui.bp.lib.theme_pack import _easter, _thanksgiving, sea
 d = datetime.date
 
 
-class TestMovableFeasts:
+class TestMovableFeasts(unittest.TestCase):
   def test_easter_dates(self):
     # Known Easter Sundays (Gregorian)
     assert _easter(2024) == d(2024, 3, 31)
@@ -23,7 +27,7 @@ class TestMovableFeasts:
     assert _thanksgiving(2026) == d(2026, 11, 26)
 
 
-class TestSeasonalWindows:
+class TestSeasonalWindows(unittest.TestCase):
   def test_bundled_windows(self):
     assert seasonal_pack(d(2026, 1, 3)) == "new_years"      # wraps the year boundary
     assert seasonal_pack(d(2026, 2, 14)) == "valentines_day"
@@ -56,20 +60,26 @@ class TestSeasonalWindows:
       day += datetime.timedelta(days=1)
 
 
-class TestUserPackParity:
-  def test_user_pack_participates_equally(self, tmp_path, monkeypatch):
+class TestUserPackParity(unittest.TestCase):
+  def setUp(self):
+    tmp = tempfile.TemporaryDirectory()
+    self.addCleanup(tmp.cleanup)
+    self.tmp_path = Path(tmp.name)
+    patcher = mock.patch.object(theme_pack, "USER_DIR", str(self.tmp_path))
+    patcher.start()
+    self.addCleanup(patcher.stop)
+
+  def test_user_pack_participates_equally(self):
     # A user-dropped pack with a season.json joins auto rotation like any bundled pack
-    root = tmp_path / "team_week"
+    root = self.tmp_path / "team_week"
     root.mkdir()
     (root / "season.json").write_text(json.dumps({"start": "09-01", "end": "09-07"}))
-    monkeypatch.setattr(theme_pack, "USER_DIR", str(tmp_path))
     assert seasonal_pack(d(2026, 9, 3)) == "team_week"
     assert seasonal_pack(d(2026, 9, 20)) == ""
 
-  def test_user_pack_shadows_bundled_window(self, tmp_path, monkeypatch):
+  def test_user_pack_shadows_bundled_window(self):
     # Same-name user pack overrides the bundled one entirely, window included
-    root = tmp_path / "christmas_week"
+    root = self.tmp_path / "christmas_week"
     root.mkdir()
     (root / "season.json").write_text(json.dumps({"start": "12-01", "end": "12-31"}))
-    monkeypatch.setattr(theme_pack, "USER_DIR", str(tmp_path))
     assert seasonal_pack(d(2026, 12, 5)) == "christmas_week"

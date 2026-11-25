@@ -173,7 +173,7 @@ class _HelpSection(Widget):
 
     features = [
       ("Dashboard:", "Device status, system health, driving statistics"),
-      ("Routes:", "Browse drives, multi-camera video, preserve favorites, export"),
+      ("Routes:", "Browse drives, multi-camera video, export"),
       ("Settings:", "Manage settings with favorites, search, backup/restore"),
       ("Parameters:", "View and edit all system parameters with live sync"),
       ("Logs:", "Live system diagnostics with real-time streaming"),

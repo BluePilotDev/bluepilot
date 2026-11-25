@@ -76,11 +76,12 @@ class BigParamStepControl(BigButtonBP):
   """Shared +/- stepper for a numeric param. Tapping minus/plus adjusts the value by
   `step`; tapping the body of the button does nothing (no keyboard value entry)."""
 
-  def __init__(self, text: str, param: str, is_active_param: str = None, is_active: Callable[[], bool] = None,
-               min=None, max=None, step=1, tint: rl.Color = rl.WHITE):
+  def __init__(self, text: str, param: str, is_active_param: str | None = None, is_active: Callable[[], bool] | None = None,
+               min=None, max=None, step=1, tint: rl.Color = rl.WHITE):  # noqa: A002  # callers pass min=/max= by keyword
     active_fn = is_active
     if active_fn is None and is_active_param is not None:
-      active_fn = lambda: Params().get_bool(is_active_param)
+      def active_fn():
+        return Params().get_bool(is_active_param)
     super().__init__(text, "", tint=tint, is_active=active_fn)
     self.min = min
     self.max = max
@@ -170,8 +171,8 @@ class BigParamStepControl(BigButtonBP):
 
 
 class BigParamFloatControl(BigParamStepControl):
-  def __init__(self, text: str, param: str, is_active_param: str = None, is_active: Callable[[], bool] = None,
-               min: float = None, max: float = None, step: float = 0.05, tint: rl.Color = rl.WHITE):
+  def __init__(self, text: str, param: str, is_active_param: str | None = None, is_active: Callable[[], bool] | None = None,
+               min: float | None = None, max: float | None = None, step: float = 0.05, tint: rl.Color = rl.WHITE):  # noqa: A002
     super().__init__(text, param, is_active_param, is_active, min, max, step, tint)
 
   def get_param(self) -> float:
@@ -209,7 +210,7 @@ class BigParamFloatControl(BigParamStepControl):
 
 
 class BigParamIntControl(BigParamStepControl):
-  def __init__(self, text: str, param: str, is_active_param: str = None, min: int = None, max: int = None,
+  def __init__(self, text: str, param: str, is_active_param: str | None = None, min: int | None = None, max: int | None = None,  # noqa: A002
                step: int = 1, tint: rl.Color = rl.WHITE):
     super().__init__(text, param, is_active_param, None, min, max, step, tint)
 

@@ -111,18 +111,18 @@ class SidebarBP(Widget):
     self._sunnylink_card = MetricCard(compact=False)
 
     # Buttons
-    self._settings_btn = IconButton("offroad/icon_settings.png")
+    self._settings_btn = IconButton("../../../bluepilot/assets/offroad/icon_settings.png")
     self._settings_btn.set_on_click(self._handle_settings_click)
     self._settings_btn.set_scale(0.55)
 
-    self._flag_btn = IconButton("offroad/icon_flag.png")
+    self._flag_btn = IconButton("../../../bluepilot/assets/offroad/icon_flag.png")
     self._flag_btn.set_on_click(self._handle_flag_click)
     self._flag_btn.set_scale(0.45)
 
     self._info_btn = InfoButton()
     self._info_btn.set_on_click(self._handle_info_click)
 
-    self._debug_btn = IconButton("offroad/icon_debug.png")
+    self._debug_btn = IconButton("../../../bluepilot/assets/offroad/icon_debug.png")
     self._debug_btn.set_on_click(self._handle_debug_click)
     self._debug_btn.set_scale(0.65)
 

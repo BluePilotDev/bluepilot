@@ -2,7 +2,6 @@ import pyray as rl
 from typing import Union
 from collections.abc import Callable
 from openpilot.selfdrive.ui.mici.widgets.button import BigButton, BigParamControl, BigToggle, BigMultiToggle, BigMultiParamToggle
-from openpilot.system.ui import text
 from openpilot.system.ui.widgets.scroller import DO_ZOOM
 from openpilot.system.ui.lib.application import gui_app
 
@@ -14,7 +13,7 @@ PRESSED_SCALE = 1.15 if DO_ZOOM else 1.07
 
 class BigButtonBP(BigButton):
   def __init__(self, text: str, value: str = "", icon: Union[str, rl.Texture, None] = None,
-               scroll: bool = False, tint: rl.Color = rl.WHITE, is_active: Callable[[], bool] = None,
+               scroll: bool = False, tint: rl.Color = rl.WHITE, is_active: Callable[[], bool] | None = None,
                value_size: int = COMPLICATION_SIZE, icon_size: int | None = None):
     # BluePilot: Convert string icon paths to pre-loaded textures (upstream removed string support)
     if isinstance(icon, str) and icon:
@@ -90,13 +89,13 @@ class BigButtonBP(BigButton):
 
       active = self.get_is_active()
       if active:
-        rl.draw_texture(self._is_active, int(x), int(y), rl.GREEN)
+        rl.draw_texture_ex(self._is_active, rl.Vector2(int(x), int(y)), 0.0, 1.0, rl.GREEN)
       else:
-        rl.draw_texture(self._is_non_active, int(x), int(y), rl.WHITE)
+        rl.draw_texture_ex(self._is_non_active, rl.Vector2(int(x), int(y)), 0.0, 1.0, rl.WHITE)
 
 class BigToggleBP(BigButtonBP, BigToggle):
-  def __init__(self, text: str, value: str = "", initial_state: bool = False, toggle_callback: Callable = None,
-               tint: rl.Color = rl.WHITE, is_active: Callable[[], bool] = None):
+  def __init__(self, text: str, value: str = "", initial_state: bool = False, toggle_callback: Callable | None = None,
+               tint: rl.Color = rl.WHITE, is_active: Callable[[], bool] | None = None):
     BigButtonBP.__init__(self, text, value, None, tint=tint, is_active=is_active)
     BigToggle.__init__(self, text, value, initial_state=initial_state, toggle_callback=toggle_callback)
 
@@ -105,8 +104,8 @@ class BigToggleBP(BigButtonBP, BigToggle):
     BigToggle._load_images(self)
 
 class BigMultiToggleBP(BigToggleBP, BigMultiToggle):
-  def __init__(self, text: str, options: list[str], toggle_callback: Callable = None,
-               select_callback: Callable = None, is_active: Callable[[], bool] = None):
+  def __init__(self, text: str, options: list[str], toggle_callback: Callable | None = None,
+               select_callback: Callable | None = None, is_active: Callable[[], bool] | None = None):
     BigToggleBP.__init__(self, text, "", toggle_callback=toggle_callback, is_active=is_active)
     BigMultiToggle.__init__(self, text, options, toggle_callback=toggle_callback, select_callback=select_callback)
 
@@ -142,8 +141,8 @@ class BigMultiToggleBP(BigToggleBP, BigMultiToggle):
       y += dist
 
 class BigMultiParamToggleBP(BigMultiToggleBP, BigMultiParamToggle):
-  def __init__(self, text: str, param: str, options: list[str], toggle_callback: Callable = None,
-               select_callback: Callable = None, value_size: int = 30, is_active: Callable[[], bool] = None):
+  def __init__(self, text: str, param: str, options: list[str], toggle_callback: Callable | None = None,
+               select_callback: Callable | None = None, value_size: int = 30, is_active: Callable[[], bool] | None = None):
     BigMultiToggleBP.__init__(self, text, options, toggle_callback, select_callback, is_active=is_active)
     BigMultiParamToggle.__init__(self, text, param, options, toggle_callback, select_callback)
     self._sub_label.set_font_size(value_size)
@@ -201,7 +200,7 @@ class BigMultiParamToggleStrBP(BigMultiParamToggleBP):
 
 
 class BigParamControlBP(BigToggleBP, BigParamControl):
-  def __init__(self, text: str, param: str, is_active_param: str = None, toggle_callback: Callable = None,
+  def __init__(self, text: str, param: str, is_active_param: str | None = None, toggle_callback: Callable | None = None,
                tint: rl.Color = rl.WHITE):
     BigToggleBP.__init__(self, text, "", toggle_callback=toggle_callback, tint=tint,
                          is_active=(lambda: self.params.get_bool(is_active_param)) if is_active_param is not None else None)

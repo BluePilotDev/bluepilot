@@ -3,18 +3,18 @@ import json
 import math
 import os
 import unittest
+from typing import Any
 from unittest import mock
 
 from openpilot.common.basedir import BASEDIR
 from openpilot.selfdrive.ui.bp.lib import theme_pack, theme_scene
 from openpilot.selfdrive.ui.bp.lib.theme_scene import (
-  MAX_BURST_POOL, MAX_PARTICLES_MINIMAL, PackScene, RadRacerScene, SceneSpec,
-  _resolve_tint, load_scene_spec,
+  MAX_BURST_POOL, MAX_PARTICLES_MINIMAL, PackScene, RadRacerScene, _resolve_tint, load_scene_spec,
 )
 
 PACKS_DIR = os.path.join(BASEDIR, "openpilot", "selfdrive", "assets", "bp_themes")
 
-GOOD = {
+GOOD: dict[str, Any] = {
   "version": 1,
   "sky": {"camera_tint_alpha": 40},
   "layers": [
@@ -96,11 +96,11 @@ class TestSceneSpecParsing(unittest.TestCase):
 
 class TestSimulation(unittest.TestCase):
   def _scene(self, name="p1"):
-    spec = load_scene_spec.__wrapped__ if hasattr(load_scene_spec, "__wrapped__") else None
     import tempfile
     tmp = tempfile.mkdtemp()
     p = _write(tmp, GOOD)
     s = load_scene_spec(p, {})
+    assert s is not None
     pack = _FakePack()
     pack.name = name
     return PackScene(pack, s)

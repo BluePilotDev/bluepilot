@@ -665,9 +665,6 @@ class GuiApplication(GuiApplicationExt):
         if self._scale != 1.0:
           rl.rl_pop_matrix()
 
-        if self._scale != 1.0:
-          rl.rl_pop_matrix()
-
         if self._render_texture:
           rl.end_texture_mode()
           rl.begin_drawing()

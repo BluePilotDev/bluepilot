@@ -3,6 +3,9 @@ import importlib
 import os
 from functools import cache
 
+NAME = "BluePilot"  # shown where sunnypilot shows its name (screensaver, #255)
+
+
 @cache
 def is_bluepilot() -> bool:
   return os.path.isfile(os.path.join(os.path.dirname(__file__), '..', '..', 'BPVERSION'))  # BPVERSION is at the repo root

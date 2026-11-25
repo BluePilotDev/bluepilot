@@ -186,8 +186,7 @@ procs += [
   NativeProcess("mapd", Paths.mapd_root(), ["bash", "-c", f"{MAPD_PATH} > /dev/null 2>&1"], mapd_ready),
   PythonProcess("mapd_manager", "openpilot.sunnypilot.mapd.mapd_manager", always_run),
 
-  # locationd
-  NativeProcess("locationd_llk", "openpilot/sunnypilot/selfdrive/locationd", ["./locationd"], only_onroad),
+  PythonProcess("gps_fuser", "openpilot.sunnypilot.selfdrive.locationd.gps_fuser", only_onroad),
 ]
 
 # BluePilot: portal and route preprocessor processes

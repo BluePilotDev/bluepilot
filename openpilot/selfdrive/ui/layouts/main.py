@@ -16,7 +16,7 @@ from openpilot.common.bluepilot import is_bluepilot
 if is_bluepilot():
   from bluepilot.ui.widgets.sidebar import SidebarBP as Sidebar
   from bluepilot.ui.lib.constants import BPConstants
-  SIDEBAR_WIDTH = BPConstants.SIDEBAR_WIDTH
+  SIDEBAR_WIDTH = BPConstants.SIDEBAR_WIDTH  # ty: ignore[invalid-assignment]  # upstream's is the literal 300
   from openpilot.selfdrive.ui.bp.onroad.augmented_road_view_bp import AugmentedRoadViewBP as AugmentedRoadView
   from bluepilot.ui.widgets.debug import ControlsDebugPanel
 

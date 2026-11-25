@@ -149,7 +149,7 @@ class FanWidget(Widget):
   def _load_fan_icon(self):
     """Load the fan texture"""
     try:
-      self._fan_texture = gui_app.texture("images/button_fan.png", BPConstants.FAN_SIZE, BPConstants.FAN_SIZE)
+      self._fan_texture = gui_app.texture("../../../bluepilot/assets/images/button_fan.png", BPConstants.FAN_SIZE, BPConstants.FAN_SIZE)
     except Exception:
       self._fan_texture = None
 

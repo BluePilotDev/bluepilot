@@ -2648,9 +2648,9 @@ struct Event {
     carStateSP @114 :Custom.CarStateSP;
     liveMapDataSP @115 :Custom.LiveMapDataSP;
     modelDataV2SP @116 :Custom.ModelDataV2SP;
-    onroadEventsBP @136 :Custom.OnroadEventBP;  # BluePilot: claims customReserved10 slot
+    gpsLocationSP @136 :Custom.GpsLocationSP;
     modelDataV2BP @137 :Custom.ModelDataV2BP;  # BluePilot: claims customReserved11 slot
-    customReserved12 @138 :Custom.CustomReserved12;
+    onroadEventsBP @138 :Custom.OnroadEventBP;  # BluePilot: claims customReserved12 slot
     controllerStateBP @139 :Custom.ControllerStateBP;  # BluePilot: claims customReserved13 slot
     carStateBP @140 :Custom.CarStateBP;  # BluePilot: claims customReserved14 slot
     customReserved15 @141 :Custom.CustomReserved15;
@@ -2701,7 +2701,7 @@ struct Event {
     lateralPlanDEPRECATED @64 :LateralPlan;
     navModelDEPRECATED @104 :Deprecated.NavModelData;
     uiPlanDEPRECATED @106 :UiPlan;
-    liveLocationKalman @72 :LiveLocationKalman;
+    liveLocationKalmanDEPRECATED @72 :LiveLocationKalman;
     liveTracksDEPRECATED @16 :List(Deprecated.LiveTracksDEPRECATED);
     onroadEventsDEPRECATED @68: List(Car.OnroadEventDEPRECATED);
     gyroscope2DEPRECATED @100 :SensorEventData;

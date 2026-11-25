@@ -9,7 +9,7 @@ LOCAL_LOG="./concurrent_tasks_$(date +%Y%m%d_%H%M%S).log"
 
 # Download log from device
 echo "=== Downloading concurrent tasks log from device ==="
-if scp comma@10.0.1.125:${LOG_FILE} ${LOCAL_LOG} 2>/dev/null; then
+if scp "comma@10.0.1.125:${LOG_FILE}" "${LOCAL_LOG}" 2>/dev/null; then
     echo "Downloaded to ${LOCAL_LOG}"
 else
     echo "Failed to download log. Make sure device is accessible at comma@10.0.1.125"
@@ -106,7 +106,7 @@ awk -F',' '$6 > 5 {print $1 "," $6 "," $4}' "${LOCAL_LOG}" | \
     head -20 | \
     awk -F',' '{print "Time: " $1 " | Active: " $2 " | Latest: " $3}'
 
-if [ $(awk -F',' '$6 > 5' "${LOCAL_LOG}" | wc -l) -gt 0 ]; then
+if [ "$(awk -F',' '$6 > 5' "${LOCAL_LOG}" | wc -l)" -gt 0 ]; then
     echo ""
     echo "⚠️  WARNING: Thread pool saturation detected! This can cause UI freezes."
 fi

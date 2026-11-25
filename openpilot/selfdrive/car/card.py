@@ -81,7 +81,8 @@ class Car:
     self.can_sock = messaging.sub_sock('can', timeout=20)
     self.sm = messaging.SubMaster(['pandaStates', 'carControl', 'onroadEvents'] + ['carControlSP', 'longitudinalPlanSP'])
     # BluePilot: added controllerStateBP, carStateBP to PubMaster
-    self.pm = messaging.PubMaster(['sendcan', 'carState', 'carParams', 'carOutput', 'radarTracks'] + ['carParamsSP', 'carStateSP', 'controllerStateBP', 'carStateBP'])
+    self.pm = messaging.PubMaster(['sendcan', 'carState', 'carParams', 'carOutput', 'radarTracks'] + ['carParamsSP', 'carStateSP',
+                                                                                                  'controllerStateBP', 'carStateBP'])
 
     self.can_rcv_cum_timeout_counter = 0
 

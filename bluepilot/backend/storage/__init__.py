@@ -11,7 +11,6 @@ from .preservation import (
     calculate_route_deletion_risk,
     get_cached_deletion_data,
     check_route_preserve_status,
-    set_route_preserve,
     clear_deletion_data_cache,
 )
 
@@ -23,6 +22,5 @@ __all__ = [
     'calculate_route_deletion_risk',
     'get_cached_deletion_data',
     'check_route_preserve_status',
-    'set_route_preserve',
     'clear_deletion_data_cache',
 ]

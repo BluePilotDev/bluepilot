@@ -21,8 +21,6 @@ class WebSocketEvent:
     ROUTES_UPDATED = 'routes_updated'
     ROUTE_ADDED = 'route_added'
     ROUTE_DELETED = 'route_deleted'
-    ROUTE_PRESERVED = 'route_preserved'
-    ROUTE_UNPRESERVED = 'route_unpreserved'
     STATUS_CHANGED = 'status_changed'
     PROCESSING_UPDATE = 'processing_update'
     PROCESSING_STARTED = 'processing_started'

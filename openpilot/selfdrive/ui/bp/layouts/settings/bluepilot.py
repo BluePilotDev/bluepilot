@@ -374,7 +374,8 @@ class BluePilotLayout(Widget):
     self._connect_backend_action.set_value(lambda: self._get_connect_backend_display())
     self._connect_backend_btn = ListItem(
       lambda: tr("Connect Backend"),
-      description=lambda: tr("Comma Connect uses stock servers. Konik Stable sends routes to stable.konik.ai (dongle ID switches automatically). Offline Mode points at unreachable hosts so uploads never succeed. Reboot to apply."),  # noqa: E501
+      description=lambda: tr("Comma Connect uses stock servers. Konik Stable sends routes to stable.konik.ai (dongle ID switches automatically). " +
+                             "Offline Mode points at unreachable hosts so uploads never succeed. Reboot to apply."),
       action_item=self._connect_backend_action,
       callback=self._select_connect_backend
     )
@@ -385,7 +386,8 @@ class BluePilotLayout(Widget):
     self._restore_dongle_action.set_value(lambda: self._get_recoverable_dongle_id_preview())
     self._restore_dongle_btn = ListItem(
       lambda: tr("Restore Cached Dongle ID"),
-      description=lambda: tr("If switching backends left this device unregistered, restore a previously registered ID found cached here. Only enabled when one is found."),  # noqa: E501
+      description=lambda: tr("If switching backends left this device unregistered, restore a previously registered ID found cached here. " +
+                             "Only enabled when one is found."),
       action_item=self._restore_dongle_action,
       callback=self._restore_dongle_id
     )
@@ -680,7 +682,7 @@ class BluePilotLayout(Widget):
     self._toggle_callback(state, "BlinkerPauseLaneChange")
     self._blinker_min_speed.action_item.set_enabled(state)
 
-  def _update_toggles(self, just_toggled: dict | None = None):
+  def _update_toggles(self, just_toggled: dict[str, bool] | None = None):
     """Update toggle states from params. just_toggled: {param: value} for params we just wrote (avoids refresh race)."""
     ui_state.update_params()
     fresh = just_toggled or {}

@@ -20,13 +20,13 @@ class WebServerQRDialogTici(Widget):
     self._params = Params()
     self._qr_texture: rl.Texture | None = None
     self._last_url = ""
-    
+
     # Toggle to disable server
     self._disable_toggle = Toggle(
       initial_state=self._params.get_bool("EnableWebRoutesServer"),
       callback=self._handle_toggle
     )
-    
+
     # Close button
     self._close_btn = IconButton(gui_app.texture("icons/close.png", 80, 80))
     self._close_btn.set_click_callback(gui_app.pop_widget)
@@ -84,13 +84,13 @@ class WebServerQRDialogTici(Widget):
     if not url:
       self._qr_texture = None
       return
-    
+
     # Only regenerate if URL changed
     if url == self._last_url and self._qr_texture:
       return
-    
+
     self._last_url = url
-    
+
     try:
       if self._qr_texture and self._qr_texture.id != 0:
         rl.unload_texture(self._qr_texture)
@@ -132,7 +132,7 @@ class WebServerQRDialogTici(Widget):
     title = "Web Routes Server"
     title_font = gui_app.font(FontWeight.NORMAL)
     left_width = int(content_rect.width * 0.5 - 15)
-    
+
     rl.draw_text_ex(title_font, title, rl.Vector2(content_rect.x, y), 75, 0.0, rl.BLACK)
     y += 100
 
@@ -156,7 +156,7 @@ class WebServerQRDialogTici(Widget):
         font_weight=FontWeight.MEDIUM,
         color=rl.BLACK
       )
-      
+
       gui_label(
         rl.Rectangle(qr_x, url_y + 50, qr_size, 40),
         "Scan to connect",
@@ -170,7 +170,7 @@ class WebServerQRDialogTici(Widget):
     toggle_rect = rl.Rectangle(content_rect.x, toggle_y, left_width, 80)
     self._disable_toggle.set_rect(toggle_rect)
     self._disable_toggle.render()
-    
+
     # Toggle label
     gui_label(
       rl.Rectangle(content_rect.x, toggle_y + 90, left_width, 50),

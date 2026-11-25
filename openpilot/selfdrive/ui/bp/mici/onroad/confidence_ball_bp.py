@@ -3,7 +3,6 @@ from openpilot.selfdrive.ui.mici.onroad.confidence_ball import ConfidenceBall
 from openpilot.selfdrive.ui.ui_state import ui_state, UIStatus
 # BluePilot: GPU circle shader moved to BP module after upstream removal
 from openpilot.bluepilot.ui.lib.bp_shaders import draw_shader_circle_gradient
-from openpilot.selfdrive.ui.bp.lib.ui_debug_logger import bp_ui_log
 
 class ConfidenceBallBP(ConfidenceBall):
   def __init__(self, demo: bool = False, radius: float=24, width: float = 60, align_right: bool = True):
@@ -13,29 +12,29 @@ class ConfidenceBallBP(ConfidenceBall):
     self._status_dot_radius = radius
 
   def draw_mads_beam(self, x: int, y: int, width: int, height: int, color: rl.Color):
-      transparent = rl.Color(color.r, color.g, color.b, 0)
-      segments = 3
-      seg_width = width // segments
+    transparent = rl.Color(color.r, color.g, color.b, 0)
+    segments = 3
+    seg_width = width // segments
 
-      # Center segment: solid color
-      rl.draw_rectangle(
-          x + seg_width, y, seg_width, height,
-          color
-      )
+    # Center segment: solid color
+    rl.draw_rectangle(
+        x + seg_width, y, seg_width, height,
+        color
+    )
 
-      # Left segment: fade from transparent -> solid
-      rl.draw_rectangle_gradient_h(
-          x, y, seg_width, height,
-          transparent,  # bottom-left
-          color         # top-right
-      )
+    # Left segment: fade from transparent -> solid
+    rl.draw_rectangle_gradient_h(
+        x, y, seg_width, height,
+        transparent,  # bottom-left
+        color         # top-right
+    )
 
-      # Right segment: fade from solid -> transparent
-      rl.draw_rectangle_gradient_h(
-          x + seg_width * (segments-1), y, width - seg_width, height,
-          color,        # bottom-left
-          transparent   # top-right
-      )
+    # Right segment: fade from solid -> transparent
+    rl.draw_rectangle_gradient_h(
+        x + seg_width * (segments-1), y, width - seg_width, height,
+        color,        # bottom-left
+        transparent   # top-right
+    )
 
   def _render(self, _):
     bar_width = self._width

@@ -120,7 +120,8 @@ def onroad_cases(family: str, theme_packs: list[str]) -> list[tuple[str, dict, d
   cases += [
     ("rad racer", {"BPThemePack": "rad_racer"}, {}, ["RadRacerTheme.render_background", "RadRacerTheme.render_foreground"]),
     ("rad racer, openpilot long", {"BPThemePack": "rad_racer"}, {"op_long": True},
-     ["RadRacerTheme.render_background", "RadRacerTheme.render_foreground"]),
+     ["RadRacerTheme.render_background", "RadRacerTheme.render_foreground"] +
+     (["!ModelRenderer._draw_lead_indicator"] if family == "mici" else [])),
     ("wheel comma four, still", {"BPSteeringWheelIconStyle": 0, "BPAnimateSteeringWheel": False}, {}, model + hud),
     ("wheel comma 3X, animated", {"BPSteeringWheelIconStyle": 1, "BPAnimateSteeringWheel": True}, {}, model + hud),
     ("wheel comma 3X, still", {"BPSteeringWheelIconStyle": 1, "BPAnimateSteeringWheel": False}, {}, model + hud),
@@ -254,7 +255,7 @@ def feed(msgs: dict) -> None:
         sm.recv_time[service] = now
         sm.recv_frame[service] = sm.frame
     sm.frame += 1
-  sm.update = update
+  sm.update = update  # ty: ignore[invalid-assignment]  # synthetic messages instead of sockets
 
 
 def reset_theme_caches() -> None:
@@ -363,7 +364,7 @@ def main() -> None:
     def lane_center_polygon(*a, **k):
       calls["lane-center line polygon"] += 1
       return blendful_polygon(*a, **k)
-    blendful.draw_polygon = lane_center_polygon
+    blendful.draw_polygon = lane_center_polygon  # ty: ignore[invalid-assignment]  # counts the calls
     if FAMILY == "mici":  # textures the model-source (chestnut) icon really draws; the method returns early when there's none
       from openpilot.selfdrive.ui.mici.onroad.hud_renderer import HudRenderer
       draw_model_source = HudRenderer._draw_model_source
@@ -481,7 +482,9 @@ def main() -> None:
     else:
       draw_mici_settings(layout, draw, attempt)
 
-  print("RESULTS " + json.dumps(results))
+  # flush: a line longer than the pipe buffer is written straight through while its newline stays buffered,
+  # and raylib's close_window log (flushed C stdout) would land on the same line
+  print("RESULTS " + json.dumps(results), flush=True)
   rl.close_window()
 
 
@@ -528,14 +531,14 @@ def draw_mici_settings(layout, draw, attempt) -> None:
 
   def press_and_collect(item) -> list:
     pushed: list = []
-    gui_app.push_widget = pushed.append
+    gui_app.push_widget = pushed.append  # ty: ignore[invalid-assignment]  # collect the pages a press opens
     try:
       if hasattr(item, "plus_clicked"):
         item.plus_clicked()
       else:
         item._handle_mouse_release(rl.Vector2(0, 0))
     finally:
-      gui_app.push_widget = real_push
+      gui_app.push_widget = real_push  # ty: ignore[invalid-assignment]
     return pushed
 
   def visit(widget, path: str, press_all: bool, depth: int = 0) -> None:
