@@ -13,6 +13,7 @@ session being killed. The runner:
   python3 -m openpilot.bluepilot.system.ford_reads.runner --no-reboot   the same, and stay up (over SSH)
 """
 import contextlib
+import fcntl
 import json
 import os
 import signal
@@ -71,8 +72,17 @@ def launch() -> None:
 
 def run(reboot: bool = True) -> int:
   signal.signal(signal.SIGHUP, signal.SIG_IGN)
-  name = time.strftime("read-%Y%m%dT%H%M%S")
   os.makedirs(OUT_DIR, exist_ok=True)
+  # One read at a time: a second runner would otherwise reboot the device in the middle of the first one's read.
+  # The lock goes with this process (the reboot ends it).
+  lock = open(os.path.join(OUT_DIR, ".lock"), "w")
+  try:
+    fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+  except BlockingIOError:
+    lock.close()
+    print("a read is already running")
+    return 1
+  name = time.strftime("read-%Y%m%dT%H%M%S")
   state = {"name": name, "started": time.strftime("%Y-%m-%dT%H:%M:%S"), "ok": False, "message": "running"}
   _write_last(state)
   log = os.path.join(OUT_DIR, f"{name}.log")
@@ -102,6 +112,7 @@ def run(reboot: bool = True) -> int:
     if reboot:
       time.sleep(2)
       subprocess.run(["sudo", "reboot"])
+    lock.close()
   return 0 if state["ok"] else 1
 
 

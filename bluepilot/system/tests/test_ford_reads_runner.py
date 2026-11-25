@@ -1,7 +1,9 @@
 """The settings button's runner around ford_reads.py: what it records, that it always reboots, and that the reader's
 guard lets only read-only requests through."""
+import fcntl
 import json
 import os
+import shutil
 import tempfile
 import unittest
 from unittest import mock
@@ -12,6 +14,7 @@ from openpilot.bluepilot.system.ford_reads import ford_reads, runner
 class TestFordReadsRunner(unittest.TestCase):
   def setUp(self):
     self.dir = tempfile.mkdtemp()
+    self.addCleanup(shutil.rmtree, self.dir, ignore_errors=True)
     for target, value in ((runner, "OUT_DIR"), (runner, "LAST"), (ford_reads, "OUT_DIR")):
       p = mock.patch.object(target, value, os.path.join(self.dir, "last.json") if value == "LAST" else self.dir)
       p.start()
@@ -61,6 +64,17 @@ class TestFordReadsRunner(unittest.TestCase):
     self.assertFalse(last["ok"])
     self.assertIn("panda not found", last["message"])
     self.assertEqual(self.calls, [["sudo", "reboot"]])
+
+  def test_a_second_start_while_a_read_runs_does_nothing(self):
+    # The first runner holds the lock (here: this test); a second one must not read, record or reboot.
+    with open(os.path.join(self.dir, ".lock"), "w") as held:
+      fcntl.flock(held, fcntl.LOCK_EX | fcntl.LOCK_NB)
+      main = mock.Mock(return_value=0)
+      rc, last = self._run(main)
+    self.assertEqual(rc, 1)
+    main.assert_not_called()
+    self.assertIsNone(last)
+    self.assertEqual(self.calls, [])
 
 
 class TestBlocker(unittest.TestCase):
