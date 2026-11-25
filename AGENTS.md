@@ -635,7 +635,7 @@ scons -j$(nproc) selfdrive/ui/
 scons -c
 
 # Run tests
-pytest -n auto
+python tools/test_runner.py
 ```
 
 ### Development Environment
@@ -701,36 +701,19 @@ Follow these conventions to maintain codebase consistency and enable clean upstr
 
 ## Testing
 
-BluePilot uses pytest for testing.
-
-### Test Configuration
-**Location:** `pyproject.toml`
-
-```toml
-[tool.pytest.ini_options]
-testpaths = ["selfdrive", "system", "tools", "common"]
-addopts = "-n auto"
-markers = [
-    "slow: marks tests as slow",
-    "tici: marks tests that require TICI device"
-]
-```
+Tests are `unittest.TestCase` classes, run by `tools/test_runner.py` (CI's `unit tests` check runs the same runner).
+The runner collects with `unittest.TestLoader`: a pytest-style test (a bare `test_*` function, or a class that is not a
+`TestCase`) is not collected, and `bluepilot/tests/test_test_files.py` fails the check for any test file that contributes no tests.
 
 ### Running Tests
 
 ```bash
-# Run all tests with parallelization
-pytest -n auto
+# Run everything
+python tools/test_runner.py
 
-# Run specific test file
-pytest selfdrive/test/test_car_models.py
-
-# Run with markers
-pytest -m "not slow"  # Skip slow tests
-pytest -m tici        # Only device tests
-
-# Run with coverage
-pytest --cov=selfdrive --cov-report=html
+# Run one file or folder
+python tools/test_runner.py openpilot/selfdrive/ui/bp/tests/test_ui_classes.py
+python tools/test_runner.py bluepilot/tests
 ```
 
 ### Test Locations

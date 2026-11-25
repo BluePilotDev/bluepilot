@@ -98,6 +98,11 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
     else:
       super()._draw_path()
 
+  def _draw_lead_indicator(self):
+    # BluePilot: Rad Racer draws a lead car sprite on the bar instead (rad_racer_theme.py)
+    if not self._rad_racer:
+      super()._draw_lead_indicator()
+
   def _themed_path_gradient(self) -> Gradient | None:
     """Bottom-to-top path gradient from the active theme pack, or None.
 

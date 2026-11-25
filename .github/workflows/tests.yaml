@@ -142,7 +142,8 @@ jobs:
     - name: Build openpilot
       run: scons
     - name: Run unit tests
-      timeout-minutes: ${{ contains(runner.name, 'nsc') && 2 || 999 }}
+      # bp-sunnypilot: 15, not upstream's 999: the tests take about four minutes, and a hang should fail fast
+      timeout-minutes: ${{ contains(runner.name, 'nsc') && 2 || 15 }}
       env:
         RAYLIB_BACKEND: headless
       run: tools/op.sh test
