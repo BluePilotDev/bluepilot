@@ -6,7 +6,7 @@
 .gitattributes                                                                         # BluePilot's own binaries are plain git files, not LFS
 .gitignore                                                                             # local agent docs and tools
 README.md                                                                              # BluePilot's README
-launch_chffrplus.sh                                                                    # boot logo, EGL/GLES library fix
+launch_chffrplus.sh                                                                    # boot logo
 launch_env.sh                                                                          # connect backend (comma / Konik / offline)
 opendbc_repo                                                                           # points at ford-op/opendbc bp-full (BluePilot's Ford car code), not bp-opendbc
 openpilot/cereal/custom.capnp                                                          # controllerStateBP, carStateBP and BluePilot's other structs
@@ -38,7 +38,6 @@ openpilot/sunnypilot/sunnylink/docs/README.md                                   
 openpilot/sunnypilot/sunnylink/settings_ui.json                                        # compiled from the settings_ui_src changes below
 openpilot/sunnypilot/sunnylink/settings_ui_src/_macros.yaml                            # comma-four-only and Edge MK2 rules
 openpilot/sunnypilot/sunnylink/settings_ui_src/pages/vehicle.yaml                      # BluePilot's Ford settings
-openpilot/sunnypilot/sunnylink/tests/test_ford_settings.py                             # the Ford section also holds full BluePilot's own settings
 openpilot/sunnypilot/sunnylink/tests/test_settings_changes.py                          # tests for BluePilot's Ford settings page
 openpilot/sunnypilot/system/params_migration.py                                        # BluePilot lateral param renames
 openpilot/system/athena/registration.py                                                # dongle ID per connect backend
@@ -52,5 +51,7 @@ openpilot/system/tombstoned.py                                                  
 openpilot/system/ui/lib/application.py                                                 # guard against 0x0 images
 openpilot/system/ui/lib/networkmanager.py                                              # WPA2/WPA3 cipher flags
 openpilot/system/ui/lib/wifi_manager.py                                                # WPA2/WPA3 networks
+openpilot/system/ui/spinner.py                                                         # loads BluePilot's spinner logo (#255)
+openpilot/system/ui/sunnypilot/widgets/screen_saver.py                                 # screensaver text is BluePilot (#255)
 pyproject.toml                                                                         # lint and spelling skip bluepilot/vendor
 tools/test_runner.py                                                                   # also collects bluepilot/ (#238)
