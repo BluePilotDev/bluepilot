@@ -57,6 +57,8 @@ COUNTED = {
     ("openpilot.selfdrive.ui.bp.onroad.rendered_world", "RenderedWorld", "_draw_lane_lines"),
     ("openpilot.selfdrive.ui.bp.onroad.rendered_world", "RenderedWorld", "_draw_posts"),
     ("openpilot.selfdrive.ui.bp.onroad.rendered_world", "RenderedWorld", "draw_lead_vehicle"),
+    ("openpilot.selfdrive.ui.bp.onroad.model_renderer_bp", "ModelRendererBP", "_draw_lane_change"),
+    ("openpilot.selfdrive.ui.bp.onroad.lane_change_bp", "LaneChangeOverlay", "shapes"),
     ("openpilot.selfdrive.ui.bp.widgets.section_header", "CollapsibleSectionHeader", "_render"),
     ("openpilot.selfdrive.ui.bp.widgets.float_control_item", "FloatControlAction", "_render"),
   ],
@@ -87,7 +89,7 @@ DISPLAY_PARAMS = ("FordPrefShowRadarLeadOverlay", "BPThemePack", "BPThemeAutoSea
                   "ShowBlindspotOverlay", "ShowBrakeStatus", "BPRainbowLines", "BPHideCameraView", "BPHideOnroadBorder",
                   "FordPrefHybridBatteryStatus", "FordPrefHybridPowerFlow", "FordPrefGaugeStyle", "RainbowMode",
                   "NavigationEnabled", "NavDestination", "BPDrivingScene", "BPSceneRoadMotion", "BPSceneDashedLines",
-                  "BPSceneLeadVehicle")
+                  "BPSceneLeadVehicle", "BPLaneChangeAnimation")
 
 
 def onroad_cases(family: str, theme_packs: list[str]) -> list[tuple[str, dict, dict, list[str]]]:
@@ -110,6 +112,20 @@ def onroad_cases(family: str, theme_packs: list[str]) -> list[tuple[str, dict, d
     world = {"BPHideCameraView": True, "BPDrivingScene": 1}
     scene = ["RenderedWorld.draw", "RenderedWorld._draw_road", "RenderedWorld._draw_lane_lines", "RenderedWorld._draw_posts",
              "!ModelRendererBP._draw_lane_lines", "!BlendfulRenderer.draw"]
+    # The lane change animation: the lane you move into, in the camera view and in the rendered world
+    lc = {"BPLaneChangeAnimation": True}
+    cases += [
+      ("lane change animation, changing right", lc, {"lane_change": ("laneChangeStarting", "right")},
+       model + hud + ["ModelRendererBP._draw_lane_change", "LaneChangeOverlay.shapes"]),
+      ("lane change animation, waiting left, blind spot", lc,
+       {"lane_change": ("preLaneChange", "left"), "blind_spot": True}, model + hud + ["ModelRendererBP._draw_lane_change"]),
+      ("lane change animation, minimal view", {**lc, "BPHideCameraView": True}, {"lane_change": ("laneChangeStarting", "left")},
+       model + hud + ["ModelRendererBP._draw_lane_change"]),
+      ("lane change animation, rendered world", {**lc, **world}, {"lane_change": ("laneChangeStarting", "right")},
+       scene + hud + ["LaneChangeOverlay.shapes", "!ModelRendererBP._draw_lane_change"]),
+      ("lane change animation off", {}, {"lane_change": ("laneChangeStarting", "right")},
+       model + hud + ["!LaneChangeOverlay.shapes"]),
+    ]
     cases += [
       ("rendered world", world, {}, scene + hud + lead + ["RenderedWorld.draw_lead_vehicle"]),
       ("rendered world, openpilot long, overlay off", {**world, "FordPrefShowRadarLeadOverlay": False}, {"op_long": True},
@@ -220,6 +236,8 @@ def build_messages(opts: dict) -> dict:
   for lane, offset in zip(lanes, (-5.4, -1.8, 1.8, 5.4), strict=True):
     lane.x, lane.y, lane.z = x.tolist(), (offset + 0.0005 * x ** 2).tolist(), [0.0] * n
   md.laneLineProbs = [0.9, 0.95, 0.95, 0.9]
+  if opts.get("lane_change"):  # (state, direction), e.g. ("laneChangeStarting", "right")
+    md.meta.laneChangeState, md.meta.laneChangeDirection = opts["lane_change"]
   md.laneLineStds = [0.2, 0.1, 0.1, 0.2]
   edges = md.init("roadEdges", 2)
   for edge, offset in zip(edges, (-7.0, 7.0), strict=True):

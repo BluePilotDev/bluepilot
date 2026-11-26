@@ -18,6 +18,7 @@ from dataclasses import dataclass, field
 import numpy as np
 import pyray as rl
 
+from openpilot.selfdrive.ui.bp.onroad.lane_change_bp import LaneChangeOverlay, draw_ribbons
 from openpilot.system.ui.lib.shader_polygon import draw_polygon, Gradient
 
 DRIVING_SCENE_RENDERED = 1  # BPDrivingScene value that picks the rendered world (0 is the plain view)
@@ -321,7 +322,8 @@ class RenderedWorld:
     return float(p[0]), float(p[1])
 
   def draw(self, rect: rl.Rectangle, model: SceneModel, leads: list[SceneLead], opts: SceneOptions,
-           paint_path: PathPainter | None = None, path_half_w: float = PATH_HALF_W) -> None:
+           paint_path: PathPainter | None = None, path_half_w: float = PATH_HALF_W,
+           lane_change: LaneChangeOverlay | None = None) -> None:
     """paint_path draws the path polygon (screen points, left edge near to far, then right edge far to near), so
     the path can look as it does in the camera view; without it the path is a plain translucent ribbon."""
     cam = self.camera(rect)
@@ -335,6 +337,9 @@ class RenderedWorld:
       if bounds is not None:
         self._draw_road(rect, cam, xs, bounds)
         self._draw_seams(cam, model)
+      if lane_change is not None:
+        draw_ribbons(rect, lane_change.shapes(near_x=NEAR_X, far_x=max_x),
+                     lambda p: cam.project(p[:, 0], p[:, 1]).astype(np.float32))
       lead_d = min((ld.d_rel for ld in leads), default=None) if opts.lead_vehicle else None
       ribbon = self.path_ribbon(cam, model, max_x, lead_d, path_half_w)
       if ribbon is not None:

@@ -41,6 +41,7 @@ MINIMAL_VIEW_NEUTRAL_LANE_COLOR = rl.Color(185, 205, 225, 255)
 from openpilot.selfdrive.ui.bp.onroad.rad_racer_road import (
   RadRacerRoadMixin, RAD_RACER_ROAD_EDGE_WIDTH, RAD_RACER_DASH_LEN_M, RAD_RACER_GAP_LEN_M,
 )
+from openpilot.selfdrive.ui.bp.onroad.lane_change_bp import LaneChangeOverlay, draw_ribbons
 from openpilot.selfdrive.ui.bp.onroad.rendered_world import (
   PATH_HALF_W,
   DRIVING_SCENE_RENDERED, RenderedWorld, SceneLead, SceneModel, SceneOptions,
@@ -82,6 +83,9 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
     # BluePilot: rendered world, the drawn road scene for the Minimal Driving View (BPDrivingScene)
     self._rendered_world = RenderedWorld()
     self._path_half_w = PATH_HALF_W
+    # BluePilot: lane change animation, in the camera view and the rendered world (BPLaneChangeAnimation)
+    self._lane_change = LaneChangeOverlay()
+    self._lane_change_anim = False
     self._driving_scene = 0
     self._scene_opts = SceneOptions()
     self._scene_model = SceneModel()
@@ -144,6 +148,7 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
       dashed_lines=flag("BPSceneDashedLines"),
       lead_vehicle=flag("BPSceneLeadVehicle"),
     )
+    self._lane_change_anim = flag("BPLaneChangeAnimation")
 
   @property
   def rendered_world_active(self) -> bool:
@@ -222,14 +227,17 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
       period = RAD_RACER_DASH_LEN_M + RAD_RACER_GAP_LEN_M
       self._dash_phase = (self._dash_phase + max(0.0, v_ego) / gui_app.target_fps) % period
 
+    lane_change = self._update_lane_change(sm, model_updated)
     if rendered_world:
       # BluePilot: the rendered world draws the road, lines, path and leads itself
       v_ego = sm['carState'].vEgo if sm.valid['carState'] else 0.0
       self._rendered_world.advance(v_ego, 1 / gui_app.target_fps, self._scene_opts.road_motion)
       self._rendered_world.draw(self._rect, self._scene_model, self._scene_leads(radar_state), self._scene_opts,
-                                self._paint_scene_path, self._path_half_w)
+                                self._paint_scene_path, self._path_half_w, lane_change)
     else:
       self._draw_lane_lines()
+      if lane_change is not None:
+        self._draw_lane_change(lane_change)
       self._draw_path()
       self.blendful.draw(self._rect)  # sunnypilot's lane-center line, as upstream's _render draws it
 
@@ -252,6 +260,34 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
       path=self._path.raw_points,
       path_max_x=float(np.clip(path_x_array[-1], MIN_DRAW_DISTANCE, MAX_DRAW_DISTANCE)),
     )
+
+  def _update_lane_change(self, sm, model_updated: bool) -> LaneChangeOverlay | None:
+    """Advance the lane change animation; the overlay when it has something to draw this frame, else None."""
+    if not self._lane_change_anim or self._rad_racer:
+      return None
+    meta = sm['modelV2'].meta
+    cs = sm['carState']
+    lines = [ln.raw_points for ln in self._lane_lines] if model_updated else None
+    probs = list(self._lane_line_probs) if model_updated else None
+    self._lane_change.update(meta.laneChangeState, meta.laneChangeDirection, cs.leftBlindspot, cs.rightBlindspot,
+                             lines, probs, 1 / gui_app.target_fps)
+    return self._lane_change if self._lane_change.visible else None
+
+  def _draw_lane_change(self, lane_change: LaneChangeOverlay) -> None:
+    """The lane change animation in the camera view, projected through the road camera like the lane lines."""
+    clip = self._clip_region
+
+    def project(points: np.ndarray) -> np.ndarray:
+      proj = self._car_space_transform @ points.T
+      out = np.full((points.shape[0], 2), np.nan, dtype=np.float32)
+      ok = proj[2] > 1e-3
+      out[ok] = (proj[:2, ok] / proj[2, ok]).T
+      inside = ((out[:, 0] >= clip.x) & (out[:, 0] <= clip.x + clip.width) &
+                (out[:, 1] >= clip.y) & (out[:, 1] <= clip.y + clip.height))
+      out[~inside] = np.nan
+      return out
+
+    draw_ribbons(self._rect, lane_change.shapes(near_x=2.0), project)
 
   def _get_path_half_width(self) -> float:
     # BluePilot: keep the width the camera view's path was given, for the rendered world's path
