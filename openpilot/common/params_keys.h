@@ -346,6 +346,7 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"BPUseCustomSounds", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"BPCustSoundsSelection", {PERSISTENT | BACKUP, INT, "0"}},  // 0=Comma 4, 1=Comma 3x, 2=Tesla
     {"BpShowLateralControl", {PERSISTENT | BACKUP, BOOL, "0"}},
+    {"BPLaneChangeBlinkerHold", {PERSISTENT | BACKUP, BOOL, "1"}},  // BluePilot: TRON holds the blinker through openpilot's lane change
     {"BPDisableLaneLineStatusColor", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"BPUIDebugLog", {PERSISTENT, BOOL, "0"}},
     {"Blindspot", {PERSISTENT | BACKUP, BOOL, "0"}},

@@ -1,4 +1,4 @@
-"""BluePilot MICI: Lateral panel — BluePilot or stock steering, lane change pause, mode display."""
+"""BluePilot MICI: Lateral panel — BluePilot or stock steering, lane changes, lane change pause, mode display."""
 
 from collections.abc import Callable
 
@@ -11,6 +11,29 @@ from openpilot.system.ui.lib.application import gui_app
 from openpilot.system.ui.widgets.scroller import NavScroller
 from openpilot.bluepilot.selfdrive.car.ford_lateral_support import SUPPORT_PARAM, support_row
 from openpilot.bluepilot.system.ford_reads.runner import blocker, last_read, last_read_text, launch
+from openpilot.sunnypilot.selfdrive.controls.lib.auto_lane_change import AutoLaneChangeMode
+
+# sunnypilot's AutoLaneChangeTimer values, as its settings screen names them
+AUTO_LANE_CHANGE_LABELS = {
+  AutoLaneChangeMode.OFF: "off",
+  AutoLaneChangeMode.NUDGE: "nudge",
+  AutoLaneChangeMode.NUDGELESS: "nudgeless",
+  AutoLaneChangeMode.HALF_SECOND: "0.5 s",
+  AutoLaneChangeMode.ONE_SECOND: "1 s",
+  AutoLaneChangeMode.TWO_SECONDS: "2 s",
+  AutoLaneChangeMode.THREE_SECONDS: "3 s",
+}
+
+
+class AutoLaneChangeControl(BigParamIntControl):
+  """AutoLaneChangeTimer: off, nudge (the driver pushes the wheel), or a change on its own after the blinker,
+  at once (nudgeless) or after a delay."""
+  def __init__(self):
+    super().__init__("Auto Lane Change by Blinker", "AutoLaneChangeTimer",
+                     min=AutoLaneChangeMode.OFF, max=AutoLaneChangeMode.THREE_SECONDS)
+
+  def _format_value(self, value: int) -> str:
+    return AUTO_LANE_CHANGE_LABELS.get(value, str(value))
 
 
 class LateralLayoutMici(NavScroller):
@@ -35,10 +58,19 @@ class LateralLayoutMici(NavScroller):
       "Minimum Speed to Pause Lane Change", "BlinkerMinLateralControlSpeed", min=5, max=50, step=5,
     )
     self.show_lateral_control = BigParamControlBP("Show Lateral Control Mode", "BpShowLateralControl")
+    # Lane changes like BlueCruise: tap the blinker, the truck keeps it on, and the change waits for a clear blind spot
+    self.auto_lane_change = AutoLaneChangeControl()
+    self.lane_change_bsm_delay = BigParamControlBP("Lane Change: Wait 1 s After Blind Spot Clears", "AutoLaneChangeBsmDelay")
+    self.lane_change_road_edge = BigParamControlBP("Block Lane Change Toward Road Edge", "RoadEdgeLaneChangeEnabled")
+    self.lane_change_blinker_hold = BigParamControlBP("Hold Blinker Through Lane Change", "BPLaneChangeBlinkerHold")
 
     self._scroller.add_widgets([
       self.support,
       self.ford_reads,
+      self.auto_lane_change,
+      self.lane_change_blinker_hold,
+      self.lane_change_bsm_delay,
+      self.lane_change_road_edge,
       self.disable_lane_change_under_speed,
       self.blinker_min_speed,
       self.show_lateral_control,
@@ -49,6 +81,9 @@ class LateralLayoutMici(NavScroller):
       ("disable_BP_lat_UI", self.disable_BP_lat),
       ("BlinkerPauseLaneChange", self.disable_lane_change_under_speed),
       ("BpShowLateralControl", self.show_lateral_control),
+      ("BPLaneChangeBlinkerHold", self.lane_change_blinker_hold),
+      ("AutoLaneChangeBsmDelay", self.lane_change_bsm_delay),
+      ("RoadEdgeLaneChangeEnabled", self.lane_change_road_edge),
     )
 
     ui_state.add_offroad_transition_callback(self._update_toggles)

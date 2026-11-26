@@ -6,7 +6,7 @@ from openpilot.sunnypilot.selfdrive.controls.lib.lane_turn_desire import LaneTur
 # BluePilot: blinker-based lane change pause during turn signals
 from openpilot.common.bluepilot import is_bluepilot
 if is_bluepilot():
-  from openpilot.bluepilot.selfdrive.controls.bp_desire_helper import BPBlinkerPause
+  from openpilot.bluepilot.selfdrive.controls.bp_desire_helper import BPBlinkerPause, BPLaneChangeHold
 
 LaneChangeState = log.LaneChangeState
 LaneChangeDirection = log.LaneChangeDirection
@@ -35,6 +35,9 @@ class DesireHelper:
     # BluePilot: blinker-based lane change pause
     if is_bluepilot():
       self._bp_blinker_pause = BPBlinkerPause()
+      # BluePilot: a Ford that holds the blinker for the lane change, as BlueCruise does
+      self._bp_hold = BPLaneChangeHold()
+      # End BluePilot
 
   @staticmethod
   def get_lane_change_direction(CS):
@@ -43,6 +46,11 @@ class DesireHelper:
   def update(self, carstate, lateral_active, lane_change_prob, left_edge_detected=False, right_edge_detected=False):
     self.alc.update_params()
     self.lane_turn_controller.update_params()
+    # BluePilot: the car holds the blinker through the lane change
+    bp_hold = is_bluepilot() and self._bp_hold.active
+    if is_bluepilot():
+      self._bp_hold.update_params()
+    # End BluePilot
     v_ego = carstate.vEgo
     one_blinker = carstate.leftBlinker != carstate.rightBlinker
     below_lane_change_speed = v_ego < LANE_CHANGE_SPEED_MIN
@@ -66,7 +74,10 @@ class DesireHelper:
 
       elif self.lane_change_state == LaneChangeState.preLaneChange:
         # Update lane change direction
-        self.lane_change_direction = self.get_lane_change_direction(carstate)
+        # BluePilot: with the blinker held, the direction stays the one the driver signalled
+        if not bp_hold:
+          self.lane_change_direction = self.get_lane_change_direction(carstate)
+        # End BluePilot
 
         torque_applied = carstate.steeringPressed and \
                          ((carstate.steeringTorque > 0 and self.lane_change_direction == LaneChangeDirection.left) or
@@ -80,7 +91,9 @@ class DesireHelper:
 
         self.alc.update_lane_change(blindspot_detected, edge_detected, carstate.brakePressed, torque_applied)
 
-        if not one_blinker or below_lane_change_speed:
+        # BluePilot: with the blinker held, the driver cancels by braking, the other blinker or steering against it
+        if not one_blinker or below_lane_change_speed or \
+           (bp_hold and self._bp_hold.cancel_pre_lane_change(carstate, self.lane_change_direction, DT_MDL)):
           self.lane_change_state = LaneChangeState.off
           self.lane_change_direction = LaneChangeDirection.none
           self.lane_change_timer = 0.0
@@ -93,7 +106,7 @@ class DesireHelper:
 
         if lane_change_prob < 0.02 and self.lane_change_timer >= LANE_CHANGE_START_TIME:
           self.lane_change_timer = 0.0
-          if one_blinker:
+          if one_blinker and not bp_hold:  # BluePilot: a held blinker is the car's, not a request for another lane change
             self.lane_change_state = LaneChangeState.preLaneChange
             self.lane_change_direction = self.get_lane_change_direction(carstate)
           else:
@@ -101,6 +114,10 @@ class DesireHelper:
             self.lane_change_direction = LaneChangeDirection.none
 
     self.prev_one_blinker = one_blinker and lateral_active
+    # BluePilot: the wait timer runs only while the lane change waits to start
+    if is_bluepilot():
+      self._bp_hold.update_state(self.lane_change_state)
+    # End BluePilot
 
     if self.lane_turn_direction != TurnDirection.none:
       self.desire = TURN_DESIRES[self.lane_turn_direction]

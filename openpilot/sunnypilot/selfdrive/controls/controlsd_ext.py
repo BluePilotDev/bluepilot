@@ -147,7 +147,11 @@ class ControlsExt(ModelStateBase):
       from opendbc.sunnypilot.car.ford.bluepilot.longitudinal_ext import BPX_LONG_PARAMS
     except ImportError:  # an opendbc without the BPx car code: it has no reader for these either
       return []
-    return self.read_params([*BPX_LONG_PARAMS, *HUD_PARAMS])
+    try:
+      from opendbc.sunnypilot.car.ford.bluepilot.turn_request import TURN_REQUEST_PARAMS
+    except ImportError:  # an opendbc from before the turn request
+      TURN_REQUEST_PARAMS = {}
+    return self.read_params([*BPX_LONG_PARAMS, *HUD_PARAMS, *TURN_REQUEST_PARAMS])
 
   def read_params(self, keys: list[str]) -> list[dict]:
     """BluePilot: settings for the opendbc car code, as CarControlSP.params entries. A key never

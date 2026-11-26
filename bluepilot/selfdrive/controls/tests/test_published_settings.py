@@ -96,3 +96,17 @@ class TestPublishedSettingsAreCached(OpenpilotTestCase):
       ext.published_params()
       self.assertEqual(len(calls), 2 * reads)
 
+
+
+class TestBlinkerHoldPublished(OpenpilotTestCase):
+  """BPLaneChangeBlinkerHold reaches the Ford car code (turn_request.py); on unless the driver turns it off."""
+
+  def setup_method(self):
+    self.params = Params()
+    self.params.remove("BPLaneChangeBlinkerHold")
+
+  def test_default_on(self):
+    self.assertEqual(_published(self.params, bluepilot=True)["BPLaneChangeBlinkerHold"], b"1")
+
+  def test_menu_off_is_published(self):
+    self.assertEqual(_published(_Written(self.params, BPLaneChangeBlinkerHold=False), bluepilot=True)["BPLaneChangeBlinkerHold"], b"0")
