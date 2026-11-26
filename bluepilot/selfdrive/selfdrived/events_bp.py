@@ -1,5 +1,5 @@
 """
-BluePilot's own onroad events (cereal OnroadEventBP, in the customReserved10 slot), which selfdrived turns into alerts
+BluePilot's own onroad events (cereal OnroadEventBP, in the customReserved12 slot), which selfdrived turns into alerts
 beside openpilot's and sunnypilot's and publishes as onroadEventsBP. JetLink's two first (jetlink_events.py).
 
 A separate enum rather than new names in sunnypilot's OnroadEventSP, whose ordinals a sunnypilot merge would clash
