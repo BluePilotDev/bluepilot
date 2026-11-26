@@ -52,6 +52,11 @@ COUNTED = {
     ("openpilot.selfdrive.ui.bp.onroad.rad_racer_theme", "RadRacerTheme", "render_background"),
     ("openpilot.selfdrive.ui.bp.onroad.rad_racer_theme", "RadRacerTheme", "render_foreground"),
     ("openpilot.selfdrive.ui.bp.onroad.blindspot_renderer", "BlindspotRendererMixin", "_draw_blindspot_screen_edges"),
+    ("openpilot.selfdrive.ui.bp.onroad.rendered_world", "RenderedWorld", "draw"),
+    ("openpilot.selfdrive.ui.bp.onroad.rendered_world", "RenderedWorld", "_draw_road"),
+    ("openpilot.selfdrive.ui.bp.onroad.rendered_world", "RenderedWorld", "_draw_lane_lines"),
+    ("openpilot.selfdrive.ui.bp.onroad.rendered_world", "RenderedWorld", "_draw_posts"),
+    ("openpilot.selfdrive.ui.bp.onroad.rendered_world", "RenderedWorld", "draw_lead_vehicle"),
     ("openpilot.selfdrive.ui.bp.widgets.section_header", "CollapsibleSectionHeader", "_render"),
     ("openpilot.selfdrive.ui.bp.widgets.float_control_item", "FloatControlAction", "_render"),
   ],
@@ -81,7 +86,8 @@ DISPLAY_PARAMS = ("FordPrefShowRadarLeadOverlay", "BPThemePack", "BPThemeAutoSea
                   "BPSteeringWheelIconStyle", "BPAnimateSteeringWheel", "BpShowLateralControl", "BlindSpot",
                   "ShowBlindspotOverlay", "ShowBrakeStatus", "BPRainbowLines", "BPHideCameraView", "BPHideOnroadBorder",
                   "FordPrefHybridBatteryStatus", "FordPrefHybridPowerFlow", "FordPrefGaugeStyle", "RainbowMode",
-                  "NavigationEnabled", "NavDestination")
+                  "NavigationEnabled", "NavDestination", "BPDrivingScene", "BPSceneRoadMotion", "BPSceneDashedLines",
+                  "BPSceneLeadVehicle")
 
 
 def onroad_cases(family: str, theme_packs: list[str]) -> list[tuple[str, dict, dict, list[str]]]:
@@ -98,6 +104,25 @@ def onroad_cases(family: str, theme_packs: list[str]) -> list[tuple[str, dict, d
       ("hybrid gauges flat", {"FordPrefHybridBatteryStatus": True, "FordPrefHybridPowerFlow": True}, {"hybrid": True}, model + hud),
       ("hybrid gauges arched", {"FordPrefHybridBatteryStatus": True, "FordPrefHybridPowerFlow": True, "FordPrefGaugeStyle": 1},
        {"hybrid": True}, model + hud),
+    ]
+    # The rendered world replaces the minimal view's lines and chevron with its own scene; its path is drawn by the
+    # camera view's path code (_draw_path), so the colors match
+    world = {"BPHideCameraView": True, "BPDrivingScene": 1}
+    scene = ["RenderedWorld.draw", "RenderedWorld._draw_road", "RenderedWorld._draw_lane_lines", "RenderedWorld._draw_posts",
+             "!ModelRendererBP._draw_lane_lines", "!BlendfulRenderer.draw"]
+    cases += [
+      ("rendered world", world, {}, scene + hud + lead + ["RenderedWorld.draw_lead_vehicle"]),
+      ("rendered world, openpilot long, overlay off", {**world, "FordPrefShowRadarLeadOverlay": False}, {"op_long": True},
+       scene + hud + lead + ["RenderedWorld.draw_lead_vehicle", "!ModelRendererBP._draw_lead_indicator"]),
+      ("rendered world, lead car without the overlay", {**world, "FordPrefShowRadarLeadOverlay": False}, {},
+       scene + hud + ["ModelRendererBP._update_leads", "RenderedWorld.draw_lead_vehicle", "!ChevronMetricsBP.draw_lead_status"]),
+      ("rendered world, dashed lines, parts off",
+       {**world, "BPSceneDashedLines": True, "BPSceneRoadMotion": False, "BPSceneLeadVehicle": False},
+       {}, scene + hud + ["!RenderedWorld.draw_lead_vehicle"]),
+      ("rendered world, disengaged", world, {"engaged": False}, ["RenderedWorld.draw"] + hud),
+      ("rendered world, camera view on", {"BPDrivingScene": 1}, {}, model + hud + ["!RenderedWorld.draw"]),
+      ("rendered world under rad racer", {**world, "BPThemePack": "rad_racer"}, {},
+       ["RadRacerTheme.render_background", "!RenderedWorld.draw"]),
     ]
   else:
     hud = ["MiciHudRendererBP._draw_steering_wheel", "HudRenderer._draw_model_source", "LongIndicator._render"]

@@ -41,6 +41,10 @@ MINIMAL_VIEW_NEUTRAL_LANE_COLOR = rl.Color(185, 205, 225, 255)
 from openpilot.selfdrive.ui.bp.onroad.rad_racer_road import (
   RadRacerRoadMixin, RAD_RACER_ROAD_EDGE_WIDTH, RAD_RACER_DASH_LEN_M, RAD_RACER_GAP_LEN_M,
 )
+from openpilot.selfdrive.ui.bp.onroad.rendered_world import (
+  PATH_HALF_W,
+  DRIVING_SCENE_RENDERED, RenderedWorld, SceneLead, SceneModel, SceneOptions,
+)
 
 
 class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
@@ -75,6 +79,13 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
     self._transform_dirty = True
     # BluePilot: seasonal theme pack (None when disabled)
     self._theme_pack = theme_pack.get_active_pack(force=True)
+    # BluePilot: rendered world, the drawn road scene for the Minimal Driving View (BPDrivingScene)
+    self._rendered_world = RenderedWorld()
+    self._path_half_w = PATH_HALF_W
+    self._driving_scene = 0
+    self._scene_opts = SceneOptions()
+    self._scene_model = SceneModel()
+    self._read_scene_params()
 
     # BluePilot: Lead position smoothing filters to reduce radar jitter
     dt = 1 / gui_app.target_fps
@@ -115,6 +126,29 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
     if (new_pack is None) != (self._theme_pack is None):
       self._transform_dirty = True  # themed lane widths differ; re-project on toggle
     self._theme_pack = new_pack
+    was_rendered = self.rendered_world_active
+    self._read_scene_params()
+    if self.rendered_world_active != was_rendered:
+      self._transform_dirty = True  # lead anchors move between the camera projection and the chase camera
+
+  def _read_scene_params(self) -> None:
+    try:
+      self._driving_scene = int(self._bp_params.get("BPDrivingScene", return_default=True) or 0)
+    except (TypeError, ValueError):
+      self._driving_scene = 0
+    def flag(key: str) -> bool:  # unset reads as the declared default (two of these default on)
+      return bool(self._bp_params.get(key, return_default=True))
+
+    self._scene_opts = SceneOptions(
+      road_motion=flag("BPSceneRoadMotion"),
+      dashed_lines=flag("BPSceneDashedLines"),
+      lead_vehicle=flag("BPSceneLeadVehicle"),
+    )
+
+  @property
+  def rendered_world_active(self) -> bool:
+    """The rendered world replaces the plain Minimal Driving View; Rad Racer, a road of its own, wins over it."""
+    return self._hide_camera_view and self._driving_scene == DRIVING_SCENE_RENDERED and not self._rad_racer
 
   def _render(self, rect: rl.Rectangle):
     sm = ui_state.sm
@@ -159,6 +193,9 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
     # BluePilot: Ford radar overlay feature - show leads even without longitudinal control
     render_lead_indicator = (self._longitudinal_control or self.ford_overlay_enabled) and radar_state is not None
     bp_ui_log.state("ModelRenderer", "render_lead", render_lead_indicator)
+    rendered_world = self.rendered_world_active
+    # BluePilot: the rendered world draws the lead as a car whenever its lead vehicle option is on
+    track_leads = render_lead_indicator or (rendered_world and self._scene_opts.lead_vehicle and radar_state is not None)
 
     model_updated = sm.updated['modelV2']
     if model_updated or sm.updated['radarState'] or self._transform_dirty:
@@ -170,10 +207,12 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
         return
 
       self._update_model(lead_one, path_x_array)
-      if render_lead_indicator:
+      if track_leads:
         self._update_leads(radar_state, path_x_array)
         # BluePilot: Track radar vs vision status for lead coloring
         self._update_lead_radar_status(radar_state)
+      if rendered_world:
+        self._update_scene_model(path_x_array)
 
       self._transform_dirty = False
 
@@ -183,18 +222,63 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
       period = RAD_RACER_DASH_LEN_M + RAD_RACER_GAP_LEN_M
       self._dash_phase = (self._dash_phase + max(0.0, v_ego) / gui_app.target_fps) % period
 
-    self._draw_lane_lines()
-    self._draw_path()
-    self.blendful.draw(self._rect)  # sunnypilot's lane-center line, as upstream's _render draws it
+    if rendered_world:
+      # BluePilot: the rendered world draws the road, lines, path and leads itself
+      v_ego = sm['carState'].vEgo if sm.valid['carState'] else 0.0
+      self._rendered_world.advance(v_ego, 1 / gui_app.target_fps, self._scene_opts.road_motion)
+      self._rendered_world.draw(self._rect, self._scene_model, self._scene_leads(radar_state), self._scene_opts,
+                                self._paint_scene_path, self._path_half_w)
+    else:
+      self._draw_lane_lines()
+      self._draw_path()
+      self.blendful.draw(self._rect)  # sunnypilot's lane-center line, as upstream's _render draws it
 
     # BluePilot: In Rad Racer theme, leads are drawn as sprites by RadRacerTheme
     if render_lead_indicator and radar_state and not self._rad_racer:
-      self._draw_lead_indicator()
+      if not rendered_world:
+        self._draw_lead_indicator()
       # BluePilot: Pass radar/overlay state to BP chevron metrics for boxed layout
       self.chevron_metrics.ford_overlay_enabled = self.ford_overlay_enabled
       self.chevron_metrics.lead_is_radar = self._lead_is_radar
       self.chevron_metrics.overlay_scale = self._overlay_scale
       self.chevron_metrics.draw_lead_status(sm, radar_state, self._rect, self._lead_vehicles)
+
+  def _update_scene_model(self, path_x_array) -> None:
+    """The model lines the rendered world draws (x forward, y right, camera offset applied)."""
+    self._scene_model = SceneModel(
+      lane_lines=[ln.raw_points[:, :2] for ln in self._lane_lines],
+      lane_line_probs=self._lane_line_probs,
+      road_edges=[re.raw_points[:, :2] for re in self._road_edges],
+      path=self._path.raw_points,
+      path_max_x=float(np.clip(path_x_array[-1], MIN_DRAW_DISTANCE, MAX_DRAW_DISTANCE)),
+    )
+
+  def _get_path_half_width(self) -> float:
+    # BluePilot: keep the width the camera view's path was given, for the rendered world's path
+    self._path_half_w = super()._get_path_half_width()
+    return self._path_half_w
+
+  def _paint_scene_path(self, ribbon: np.ndarray) -> None:
+    """Draw the rendered world's path polygon the way the camera view draws its path: the same colors (stock,
+    acceleration, theme pack or rainbow) and the same status edges."""
+    saved = self._path.projected_points
+    self._path.projected_points = ribbon
+    try:
+      self._update_path_gradient()
+      self._draw_path()
+    finally:
+      self._path.projected_points = saved
+
+  def _scene_leads(self, radar_state) -> list[SceneLead]:
+    """Present leads at their smoothed positions, for the rendered world to draw as cars."""
+    if radar_state is None or not self._scene_opts.lead_vehicle:
+      return []
+    leads = []
+    for i, lead_data in enumerate((radar_state.leadOne, radar_state.leadTwo)):
+      if lead_data and lead_data.present and self._lead_was_active[i]:
+        leads.append(SceneLead(float(self._lead_d_filters[i].x), float(-self._lead_y_filters[i].x + self._camera_offset),
+                               self._lead_is_radar[i]))
+    return leads
 
   def _update_lead_radar_status(self, radar_state):
     """Track whether each lead is radar-sourced for coloring."""
@@ -226,7 +310,10 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
 
         idx = self._get_path_length_idx(path_x_array, d_rel)
         z = self._path.raw_points[idx, 2] if idx < len(self._path.raw_points) else 0.0
-        point = self._map_to_screen(d_rel, -y_rel + self._camera_offset, z + self._path_offset_z)
+        if self.rendered_world_active:
+          point = self._rendered_world.lead_anchor(self._rect, d_rel, -y_rel + self._camera_offset)
+        else:
+          point = self._map_to_screen(d_rel, -y_rel + self._camera_offset, z + self._path_offset_z)
         if point:
           self._lead_vehicles[i] = self._update_lead_vehicle(d_rel, v_rel, point, self._rect)
 

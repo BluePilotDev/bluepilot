@@ -335,6 +335,10 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"mici_hide_onroad_border", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"BPHideOnroadBorder", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"BPHideCameraView", {PERSISTENT | BACKUP, BOOL, "0"}},
+    {"BPDrivingScene", {PERSISTENT | BACKUP, INT, "0"}},  // comma 3X Minimal Driving View scene: 0=plain, 1=rendered world
+    {"BPSceneRoadMotion", {PERSISTENT | BACKUP, BOOL, "1"}},
+    {"BPSceneDashedLines", {PERSISTENT | BACKUP, BOOL, "0"}},
+    {"BPSceneLeadVehicle", {PERSISTENT | BACKUP, BOOL, "1"}},
     {"BPRadRacerTheme", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"BPThemePack", {PERSISTENT | BACKUP, STRING}},  // no default: unset reads as None, which every reader takes as "" (off); an empty default fails test_set_params_with_default_value
     {"BPThemeAutoSeasonal", {PERSISTENT | BACKUP, BOOL, "0"}},
