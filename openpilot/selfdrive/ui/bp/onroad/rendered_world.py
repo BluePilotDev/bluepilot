@@ -50,6 +50,8 @@ SHOULDER_W = 1.2          # m of gravel shoulder beyond each road edge
 LANE_BEYOND_M = 2.5       # m of road beyond a line that makes it a line between lanes (drawn dashed when asked)
 LINE_HALF_W = 0.075
 PATH_HALF_W = 0.9
+PATH_END_ROUND = 0.45     # the path's far corners are rounded with this fraction of its half-width there (on screen)
+PATH_END_STEPS = 5        # points along each rounded corner
 LANE_LINE_MIN_PROB = 0.4   # a line this sure is drawn in full and holds the road wide enough for it
 LANE_LINE_FADE_FROM = 0.1   # below this a line is not drawn; between the two it fades
 EDGE_TAU = 0.8            # s: how slowly the road's width follows the model's road edges
@@ -306,6 +308,35 @@ def repeating(phase: float, spacing: float, offset: float, x_min: float, x_max: 
   return np.arange(first, x_max, spacing, dtype=np.float32)
 
 
+def round_far_end(left: np.ndarray, right: np.ndarray, frac: float = PATH_END_ROUND,
+                  steps: int = PATH_END_STEPS) -> tuple[np.ndarray, np.ndarray]:
+  """Round the far corners of a ribbon's end (left and right edges as screen points, near to far).
+
+  Done on screen, not on the road: the path's end is far away, where a rounding in road meters would be squashed
+  flat by perspective. The corners get a radius of frac of the end's half-width, kept within the last segment, so
+  the ribbon still ends where it did and stays a strip of left/right pairs that draw_polygon fills.
+  """
+  if len(left) < 2 or len(right) < 2 or frac <= 0.0:
+    return left, right
+  end_l, end_r = left[-1].astype(np.float64), right[-1].astype(np.float64)
+  center, half = (end_l + end_r) / 2, (end_r - end_l) / 2
+  half_w = float(np.hypot(half[0], half[1]))
+  ahead = center - (left[-2] + right[-2]) / 2
+  seg = float(np.hypot(ahead[0], ahead[1]))
+  if half_w < 1.0 or seg < 1e-3:
+    return left, right
+  across = half / half_w
+  fwd = np.array([across[1], -across[0]])
+  if fwd @ ahead < 0:
+    fwd = -fwd
+  r = min(frac * half_w, 0.9 * seg)
+  phi = np.linspace(0.0, np.pi / 2, steps + 1)[:, None]
+  base = center - fwd * r
+  inset, rise = across * r * (1.0 - np.cos(phi)), fwd * r * np.sin(phi)
+  cap_l, cap_r = base - half + inset + rise, base + half - inset + rise
+  return (np.vstack([left[:-1], cap_l]).astype(np.float32), np.vstack([right[:-1], cap_r]).astype(np.float32))
+
+
 class RenderedWorld:
   """Draws the rendered world into a view rectangle. One per ModelRendererBP."""
 
@@ -447,7 +478,8 @@ class RenderedWorld:
     xs = np.concatenate([[NEAR_X], inside[:, 0], [end]]).astype(np.float32)
     ys = np.concatenate([line_y(path, np.array([NEAR_X], dtype=np.float32)), inside[:, 1],
                          line_y(path, np.array([end], dtype=np.float32))]).astype(np.float32)
-    return np.vstack([cam.project(xs, ys - half_w), cam.project(xs, ys + half_w)[::-1]]).astype(np.float32)
+    left, right = round_far_end(cam.project(xs, ys - half_w), cam.project(xs, ys + half_w))
+    return np.vstack([left, right[::-1]]).astype(np.float32)
 
   def _draw_lane_lines(self, rect, cam: ChaseCamera, model: SceneModel, xs: np.ndarray, max_x: float,
                        dashed_option: bool) -> None:

@@ -3,8 +3,8 @@ import unittest
 import numpy as np
 
 from openpilot.selfdrive.ui.bp.onroad.rendered_world import (
-  CAM_HEIGHT, FOG_MAX, NEAR_X, XS, ChaseCamera, RenderedWorld, SceneModel, SceneSmoother, dashed_lines,
-  edge_bounds, fog_t, repeating, road_bounds,
+  CAM_HEIGHT, FOG_MAX, NEAR_X, PATH_END_STEPS, XS, ChaseCamera, RenderedWorld, SceneModel, SceneSmoother, dashed_lines,
+  edge_bounds, fog_t, repeating, road_bounds, round_far_end,
 )
 
 
@@ -214,7 +214,7 @@ class TestPath(unittest.TestCase):
     self.assertAlmostEqual(float(left[0][1]), float(self.cam.project(NEAR_X, -0.9)[1]), places=3)
     self.assertAlmostEqual(float(left[-1][1]), float(self.cam.project(100.0, -0.9)[1]), places=3)
     inside = int(np.sum((self.model.path[:, 0] > NEAR_X) & (self.model.path[:, 0] < 100.0)))
-    self.assertEqual(len(left), inside + 2)
+    self.assertEqual(len(left), inside + 2 + PATH_END_STEPS)  # and the rounded end's corner points
 
   def test_the_path_stops_short_of_the_lead_car(self):
     ribbon = RenderedWorld.path_ribbon(self.cam, self.model, 150.0, 30.0, 0.9)
@@ -223,6 +223,35 @@ class TestPath(unittest.TestCase):
 
   def test_no_path_under_a_lead_at_your_bumper(self):
     self.assertIsNone(RenderedWorld.path_ribbon(self.cam, self.model, 150.0, 2.0, 0.9))
+
+
+class TestRoundedPathEnd(unittest.TestCase):
+  # a straight strip 100 px wide on screen, bottom (near) to top (far)
+  LEFT = np.array([[950.0, 1000.0], [950.0, 700.0], [950.0, 400.0]], dtype=np.float32)
+  RIGHT = np.array([[1050.0, 1000.0], [1050.0, 700.0], [1050.0, 400.0]], dtype=np.float32)
+
+  def test_the_end_stays_where_it_was_and_its_corners_come_in(self):
+    left, right = round_far_end(self.LEFT, self.RIGHT, frac=0.5, steps=4)
+    self.assertEqual(len(left), len(right))
+    self.assertAlmostEqual(float(left[-1][1]), 400.0, places=3)
+    self.assertAlmostEqual(float(right[-1][1]), 400.0, places=3)
+    self.assertAlmostEqual(float(left[-1][0]), 975.0, places=3)   # in by the radius, 0.5 of the 50 px half-width
+    self.assertAlmostEqual(float(right[-1][0]), 1025.0, places=3)
+    self.assertTrue(np.all(np.diff(left[:, 1]) < 0))  # still runs near to far: no fold
+    np.testing.assert_allclose(left[:2], self.LEFT[:2])  # the rest of the strip is untouched
+
+  def test_a_short_last_segment_keeps_the_corner_inside_it(self):
+    left = self.LEFT.copy()
+    right = self.RIGHT.copy()
+    left[-1, 1] = right[-1, 1] = 690.0  # last segment only 10 px long
+    out_l, _ = round_far_end(left, right, frac=0.5, steps=4)
+    corner_start = out_l[-5]  # the first of the corner's 5 points
+    self.assertTrue(690.0 < float(corner_start[1]) < 700.0)  # starts within the 10 px segment, not behind it
+    self.assertAlmostEqual(float(out_l[-1][0]), 959.0, places=3)  # radius held to 0.9 of the segment
+
+  def test_nothing_to_round_on_a_single_pair(self):
+    left, right = round_far_end(self.LEFT[:1], self.RIGHT[:1])
+    np.testing.assert_array_equal(left, self.LEFT[:1])
 
 
 class TestMotion(unittest.TestCase):
