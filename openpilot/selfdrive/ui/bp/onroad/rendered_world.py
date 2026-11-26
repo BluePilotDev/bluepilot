@@ -52,6 +52,7 @@ LINE_HALF_W = 0.075
 PATH_HALF_W = 0.9
 PATH_END_ROUND = 0.45     # the path's far corners are rounded with this fraction of its half-width there (on screen)
 PATH_END_STEPS = 5        # points along each rounded corner
+PATH_MAX_HEADING = np.radians(75.0)  # a sharp turn: past this heading the path is no longer drawn by distance ahead
 LANE_LINE_MIN_PROB = 0.4   # a line this sure is drawn in full and holds the road wide enough for it
 LANE_LINE_FADE_FROM = 0.1   # below this a line is not drawn; between the two it fades
 EDGE_TAU = 0.8            # s: how slowly the road's width follows the model's road edges
@@ -160,6 +161,21 @@ def line_y(line: np.ndarray, xs: np.ndarray) -> np.ndarray:
   return np.interp(xs, line[:, 0], line[:, 1]).astype(np.float32)
 
 
+def forward_path(path: np.ndarray) -> np.ndarray:
+  """The path up to where it stops heading forward.
+
+  The road and path are drawn by distance ahead (one sideways offset per distance). In a sharp turn the path swings
+  past 90 degrees and comes back toward you, and read that way it zigzags. So it ends where its heading first passes
+  PATH_MAX_HEADING or its distance ahead stops growing. Its first two points are always kept (stopped, they can
+  share one distance).
+  """
+  if path.shape[0] < 3:
+    return path
+  dx, dy = np.diff(path[:, 0]), np.diff(path[:, 1])
+  turned = np.nonzero((dx <= 0) | (np.abs(np.arctan2(dy, dx)) > PATH_MAX_HEADING))[0]
+  return path if len(turned) == 0 else path[:max(2, int(turned[0]) + 1)]
+
+
 Edges = tuple[np.ndarray, np.ndarray]
 PathPainter = Callable[[np.ndarray], None]
 
@@ -210,10 +226,20 @@ def dashed_lines(model: SceneModel, at_x: float = 20.0) -> list[bool]:
   return out
 
 
-def lane_center(lines: list, probs: np.ndarray, path: np.ndarray, xs: np.ndarray) -> np.ndarray:
-  """Your lane's center at xs: midway between your lane's lines (sampled at xs) when both are seen, your path when
-  they are not, and a blend of the two in between, so a line going unsure moves the center smoothly."""
-  fallback = line_y(path, xs) if path.shape[0] >= 2 else np.zeros_like(xs)
+def lane_center(lines: list, probs: np.ndarray, path: np.ndarray, xs: np.ndarray,
+                bounds: Edges | None = None) -> np.ndarray:
+  """Your lane's center at xs: midway between your lane's lines (sampled at xs) when both are seen; when they are
+  not, midway across the road (bounds) or, with no road edges either, your path; a blend in between, so a line
+  going unsure moves the center smoothly.
+
+  Midway across the road rather than the path: the road is drawn as distances from this center, steadied, and in a
+  turn the path changes shape faster than those distances follow, so the road would take the path's bends.
+  """
+  if bounds is not None:
+    fallback = (bounds[0] + bounds[1]) / 2
+  else:
+    path = forward_path(path)
+    fallback = line_y(path, xs) if path.shape[0] >= 2 else np.zeros_like(xs)
   if len(lines) < 3 or lines[1] is None or lines[2] is None:
     return fallback
   w = float(np.clip((min(probs[1], probs[2]) - CENTER_FROM_PROB) / (CENTER_FULL_PROB - CENTER_FROM_PROB), 0.0, 1.0))
@@ -248,9 +274,9 @@ class SceneSmoother:
     probs[:min(n, len(model.lane_line_probs))] = np.asarray(model.lane_line_probs, dtype=np.float32)[:n]
     lines = [line_y(ln, xs) if ln.shape[0] >= 2 else None for ln in model.lane_lines]
     filtered_probs = probs if self._probs is None or self._probs.shape != probs.shape else self._probs
-    center = lane_center(lines, filtered_probs, model.path, xs)
-    center_ref = float(center[REF_IDX])
     bounds = road_bounds(model, xs)  # widened by this frame's lines, then filtered with the edges
+    center = lane_center(lines, filtered_probs, model.path, xs, bounds)
+    center_ref = float(center[REF_IDX])
 
     has_path = model.path.shape[0] > 0
     path_off = model.path[:, 1] - np.interp(model.path[:, 0], xs, center) if has_path else np.empty(0, dtype=np.float32)
@@ -464,21 +490,28 @@ class RenderedWorld:
   @staticmethod
   def path_ribbon(cam: ChaseCamera, model: SceneModel, max_x: float, lead_d: float | None,
                   half_w: float) -> np.ndarray | None:
-    """The path as a screen polygon, from the bottom of the view to its end (short of the lead car). It keeps the
-    model's own path points, so a color per point (the camera view's acceleration colors) still lines up."""
+    """The path as a screen polygon, from the bottom of the view to its end (short of the lead car, and where a sharp
+    turn swings it sideways: forward_path). It keeps the model's own path points, so a color per point (the camera
+    view's acceleration colors) still lines up. Its width is kept across the path, so it does not thin in a curve."""
     path = model.path
     if path.shape[0] < 2:
       return None
     end = min(max_x, model.path_max_x)
     if lead_d is not None:
       end = min(end, lead_d - 1.0)
+    path = forward_path(path)
+    if path.shape[0] < model.path.shape[0]:  # a sharp turn: the path ends where it swings sideways
+      end = min(end, float(path[-1, 0]))
     if end <= NEAR_X + 0.5:
       return None
     inside = path[(path[:, 0] > NEAR_X) & (path[:, 0] < end)]
     xs = np.concatenate([[NEAR_X], inside[:, 0], [end]]).astype(np.float32)
     ys = np.concatenate([line_y(path, np.array([NEAR_X], dtype=np.float32)), inside[:, 1],
                          line_y(path, np.array([end], dtype=np.float32))]).astype(np.float32)
-    left, right = round_far_end(cam.project(xs, ys - half_w), cam.project(xs, ys + half_w))
+    tx, ty = np.gradient(xs), np.gradient(ys)
+    norm = np.maximum(np.hypot(tx, ty), 1e-6)
+    nx, ny = -ty / norm * half_w, tx / norm * half_w  # across the path, toward its right
+    left, right = round_far_end(cam.project(xs - nx, ys - ny), cam.project(xs + nx, ys + ny))
     return np.vstack([left, right[::-1]]).astype(np.float32)
 
   def _draw_lane_lines(self, rect, cam: ChaseCamera, model: SceneModel, xs: np.ndarray, max_x: float,

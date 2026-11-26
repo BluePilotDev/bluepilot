@@ -4,13 +4,19 @@ import numpy as np
 
 from openpilot.selfdrive.ui.bp.onroad.rendered_world import (
   CAM_HEIGHT, FOG_MAX, NEAR_X, PATH_END_STEPS, XS, ChaseCamera, RenderedWorld, SceneModel, SceneSmoother, dashed_lines,
-  edge_bounds, fog_t, repeating, road_bounds, round_far_end,
+  edge_bounds, fog_t, forward_path, lane_center, repeating, road_bounds, round_far_end,
 )
 
 
 def straight(offset: float, n: int = 33, length: float = 192.0) -> np.ndarray:
   x = np.linspace(0.0, length, n, dtype=np.float32)
   return np.stack([x, np.full(n, offset, dtype=np.float32)], axis=-1)
+
+
+def right_turn(radius: float = 10.0, n: int = 33) -> np.ndarray:
+  """A path turning right on a circle until it heads back toward you (170 degrees): x, y, z."""
+  a = np.linspace(0.0, np.radians(170.0), n, dtype=np.float32)
+  return np.stack([radius * np.sin(a), radius * (1.0 - np.cos(a)), np.zeros(n, dtype=np.float32)], axis=-1)
 
 
 def three_lane_model() -> SceneModel:
@@ -223,6 +229,65 @@ class TestPath(unittest.TestCase):
 
   def test_no_path_under_a_lead_at_your_bumper(self):
     self.assertIsNone(RenderedWorld.path_ribbon(self.cam, self.model, 150.0, 2.0, 0.9))
+
+  def test_a_sharp_turn_ends_the_path_where_it_swings_sideways(self):
+    self.model.path = right_turn()
+    ribbon = RenderedWorld.path_ribbon(self.cam, self.model, 150.0, None, 0.9)
+    assert ribbon is not None
+    last = forward_path(self.model.path)[-1]
+    self.assertLess(float(last[0]), 10.0)  # the 10 m radius turn: past about 75 degrees at under 10 m ahead
+    self.assertGreater(float(last[0]), 8.0)
+    # nothing of it is drawn farther ahead than that (its outer side reaches half its width beyond)
+    self.assertGreaterEqual(float(ribbon[:, 1].min()), float(self.cam.project(float(last[0]) + 0.9, 0.0)[1]) - 1e-3)
+
+  def test_the_path_keeps_its_width_in_a_curve(self):
+    x = np.linspace(0.0, 60.0, 33, dtype=np.float32)
+    self.model.path = np.column_stack([x, x, np.zeros(33, dtype=np.float32)])  # heading 45 degrees right
+    ribbon = RenderedWorld.path_ribbon(self.cam, self.model, 150.0, None, 0.9)
+    assert ribbon is not None
+    left = ribbon[:len(ribbon) // 2]
+    px = float(x[x > NEAR_X][0])  # the first model point past NEAR_X
+    py = px
+    across = 0.9 / np.sqrt(2.0)  # 0.9 m at right angles to the path, not 0.9 m sideways
+    np.testing.assert_allclose(left[1], self.cam.project(px + across, py - across), atol=1e-3)
+
+  def test_a_straight_path_is_unchanged_by_the_turn_rule(self):
+    np.testing.assert_array_equal(forward_path(self.model.path), self.model.path)
+
+
+class TestForwardPath(unittest.TestCase):
+  def test_the_path_ends_before_it_turns_back(self):
+    p = forward_path(right_turn())
+    self.assertTrue(np.all(np.diff(p[:, 0]) > 0))
+    heading = np.degrees(np.arctan2(np.diff(p[:, 1]), np.diff(p[:, 0])))
+    self.assertLessEqual(float(np.abs(heading).max()), 75.0)
+
+  def test_the_road_is_centered_on_the_turn_without_zigzags(self):
+    # no lane lines are seen in the turn, so your lane's center is the path
+    center = lane_center([None] * 4, np.zeros(4, dtype=np.float32), right_turn(), XS)
+    self.assertTrue(np.all(np.diff(center) >= 0))  # a right turn: it only moves right, then holds
+    # ...where the path heads past 75 degrees (7.4 m right), not at the turn's far end (19.7 m right, coming back)
+    self.assertLess(float(center[-1]), 8.0)
+
+  def test_unseen_lines_center_the_road_between_its_edges_not_on_the_path(self):
+    bounds = (np.full_like(XS, -6.0), np.full_like(XS, 6.0))
+    center = lane_center([None] * 4, np.zeros(4, dtype=np.float32), right_turn(), XS, bounds)
+    np.testing.assert_allclose(center, 0.0)
+
+  def test_a_turn_does_not_bend_the_road_edges(self):
+    # lines unseen, the road edges straight; the path swings through a sharp right turn and back, frame by frame
+    smoother, model = SceneSmoother(), three_lane_model()
+    model.lane_line_probs = np.zeros(4, dtype=np.float32)
+    worst = 0.0
+    for i in range(40):
+      model.path = right_turn(radius=20.0 + 5.0 * (i % 2))  # under a lane handover's jump at 10 m ahead
+      left, right = edges_of(step(smoother, model))
+      worst = max(worst, float(np.abs(left + 6.0).max()), float(np.abs(right - 6.0).max()))
+    self.assertLess(worst, 0.05)
+
+  def test_stopped_the_path_is_kept(self):
+    stopped = np.zeros((33, 3), dtype=np.float32)
+    self.assertEqual(forward_path(stopped).shape[0], 2)
 
 
 class TestRoundedPathEnd(unittest.TestCase):
