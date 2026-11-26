@@ -57,6 +57,8 @@ COUNTED = {
     ("openpilot.selfdrive.ui.bp.onroad.rendered_world", "RenderedWorld", "_draw_lane_lines"),
     ("openpilot.selfdrive.ui.bp.onroad.rendered_world", "RenderedWorld", "_draw_posts"),
     ("openpilot.selfdrive.ui.bp.onroad.rendered_world", "RenderedWorld", "draw_lead_vehicle"),
+    ("openpilot.selfdrive.ui.bp.onroad.rendered_world", "RenderedWorld", "_draw_grass"),
+    ("openpilot.selfdrive.ui.bp.onroad.chevron_metrics_bp", "ChevronMetricsBP", "_draw_scene_tag"),
     ("openpilot.selfdrive.ui.bp.onroad.model_renderer_bp", "ModelRendererBP", "_draw_lane_change"),
     ("openpilot.selfdrive.ui.bp.onroad.lane_change_bp", "LaneChangeOverlay", "shapes"),
     ("openpilot.selfdrive.ui.bp.widgets.section_header", "CollapsibleSectionHeader", "_render"),
@@ -89,7 +91,7 @@ DISPLAY_PARAMS = ("FordPrefShowRadarLeadOverlay", "BPThemePack", "BPThemeAutoSea
                   "ShowBlindspotOverlay", "ShowBrakeStatus", "BPRainbowLines", "BPHideCameraView", "BPHideOnroadBorder",
                   "FordPrefHybridBatteryStatus", "FordPrefHybridPowerFlow", "FordPrefGaugeStyle", "RainbowMode",
                   "NavigationEnabled", "NavDestination", "BPDrivingScene", "BPSceneRoadMotion", "BPSceneDashedLines",
-                  "BPSceneLeadVehicle", "BPLaneChangeAnimation")
+                  "BPSceneLeadVehicle", "BPSceneGround", "BPLaneChangeAnimation")
 
 
 def onroad_cases(family: str, theme_packs: list[str]) -> list[tuple[str, dict, dict, list[str]]]:
@@ -99,7 +101,7 @@ def onroad_cases(family: str, theme_packs: list[str]) -> list[tuple[str, dict, d
     hud = ["HudRendererBP._render", "SteeringWheelBP._render"]
     lead = ["ModelRendererBP._update_leads", "ChevronMetricsBP.draw_lead_status"]
     cases = [
-      ("defaults", {}, {}, model + hud + lead),
+      ("defaults", {}, {}, model + hud + lead + ["!ChevronMetricsBP._draw_scene_tag"]),
       ("lead overlay off, openpilot long", {"FordPrefShowRadarLeadOverlay": False}, {"op_long": True},
        model + hud + ["ModelRendererBP._update_leads", "ModelRendererBP._draw_lead_indicator", "ChevronMetricsBP.draw_lead_status"]),
       ("lead overlay on, openpilot long", {}, {"op_long": True}, model + hud + lead),
@@ -127,7 +129,9 @@ def onroad_cases(family: str, theme_packs: list[str]) -> list[tuple[str, dict, d
        model + hud + ["!LaneChangeOverlay.shapes"]),
     ]
     cases += [
-      ("rendered world", world, {}, scene + hud + lead + ["RenderedWorld.draw_lead_vehicle"]),
+      ("rendered world", world, {}, scene + hud + lead + ["RenderedWorld.draw_lead_vehicle", "ChevronMetricsBP._draw_scene_tag",
+                                                          "!RenderedWorld._draw_grass"]),
+      ("rendered world, grass", {**world, "BPSceneGround": True}, {}, scene + hud + ["RenderedWorld._draw_grass"]),
       ("rendered world, openpilot long, overlay off", {**world, "FordPrefShowRadarLeadOverlay": False}, {"op_long": True},
        scene + hud + lead + ["RenderedWorld.draw_lead_vehicle", "!ModelRendererBP._draw_lead_indicator"]),
       ("rendered world, lead car without the overlay", {**world, "FordPrefShowRadarLeadOverlay": False}, {},

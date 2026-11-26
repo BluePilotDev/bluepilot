@@ -56,6 +56,14 @@ class TestLeadAnchor(unittest.TestCase):
     world, rect = RenderedWorld(), type("R", (), {"x": 0.0, "y": 0.0, "width": 2160.0, "height": 1080.0})()
     self.assertGreater(world.lead_anchor(rect, 15.0, 0.0)[1], world.lead_anchor(rect, 60.0, 0.0)[1])
 
+  def test_the_car_box_holds_the_anchor_and_shrinks_with_distance(self):
+    world, rect = RenderedWorld(), type("R", (), {"x": 0.0, "y": 0.0, "width": 2160.0, "height": 1080.0})()
+    near, far = world.lead_box(rect, 20.0, 0.0), world.lead_box(rect, 80.0, 0.0)
+    ax, ay = world.lead_anchor(rect, 20.0, 0.0)
+    self.assertTrue(near.left < ax < near.right and near.top < ay <= near.bottom + 1.0)
+    self.assertGreater(near.right - near.left, far.right - far.left)
+    self.assertGreater(near.bottom - near.top, far.bottom - far.top)
+
 
 class TestRoad(unittest.TestCase):
   def test_bounds_follow_the_road_edges(self):

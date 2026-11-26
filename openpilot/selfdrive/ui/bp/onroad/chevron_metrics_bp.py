@@ -8,6 +8,7 @@ from openpilot.system.ui.lib.text_measure import measure_text_cached
 from openpilot.selfdrive.ui.bp.lib.ui_debug_logger import bp_ui_log
 # BluePilot: seasonal theme packs (LeadMarker recolors the vision-lead box border)
 from openpilot.selfdrive.ui.bp.lib import theme_pack
+from openpilot.selfdrive.ui.bp.onroad.lead_tag_bp import LeadBox, draw_lead_tag
 
 # BluePilot: Inversion thresholds for radar overlay (close-proximity mode)
 # When lead is closer than INVERT_UNDER_M, overlay moves to top with chevron flipped
@@ -36,6 +37,8 @@ class ChevronMetricsBP(ChevronMetrics):
     self.ford_overlay_enabled: bool = False
     self.lead_is_radar: list[bool] = [False, False]
     self.overlay_scale: float = 1.0
+    # Set by ModelRendererBP in the rendered world: the lead car's screen box per lead, for the lead tag
+    self.scene_boxes: list[LeadBox | None] | None = None
 
   def should_render(self) -> bool:
     # Render if chevron metrics is enabled OR if Ford overlay is enabled
@@ -226,6 +229,20 @@ class ChevronMetricsBP(ChevronMetrics):
       # Fall back to base vertical stack rendering
       self._render_text_lines(text_lines, chevron_x, chevron_y, sz, rect)
 
+  def _accent(self, is_radar: bool) -> rl.Color:
+    """The lead's radar or vision color: the camera view's glow color, or the theme pack's LeadMarker for vision."""
+    if is_radar:
+      return LEAD_RADAR_GLOW
+    pack = theme_pack.get_active_pack()
+    marker = pack.rl_colors().get("LeadMarker") if pack is not None else None
+    return marker if marker is not None else LEAD_VISION_GLOW
+
+  def _draw_scene_tag(self, lead_data, box: LeadBox, v_ego: float, rect: rl.Rectangle, lead_index: int) -> None:
+    """The rendered world's form of the overlay: one tag beside the lead car, in place of the boxes and chevron."""
+    lines = self._build_text_lines_bp(lead_data.dRel, lead_data.vRel, v_ego)
+    is_radar = self.lead_is_radar[lead_index] if lead_index < len(self.lead_is_radar) else False
+    draw_lead_tag(self._font, lines, box, rect, self._accent(is_radar), self._lead_status_alpha, self.overlay_scale)
+
   def draw_lead_status(self, sm, radar_state, rect, lead_vehicles):
     lead_one = radar_state.leadOne
     lead_two = radar_state.leadTwo
@@ -239,6 +256,13 @@ class ChevronMetricsBP(ChevronMetrics):
       return
 
     v_ego = sm['carState'].vEgo
+
+    # BluePilot: in the rendered world the closest lead gets a tag beside its car; the car itself shows where it is
+    if self.scene_boxes is not None:
+      box = self.scene_boxes[0]
+      if has_lead_one and box is not None:
+        self._draw_scene_tag(lead_one, box, v_ego, rect, 0)
+      return
 
     # BluePilot: Hysteresis for inversion - use closest lead's d_rel
     if has_lead_one or has_lead_two:

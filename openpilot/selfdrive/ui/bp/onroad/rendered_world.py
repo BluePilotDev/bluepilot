@@ -2,9 +2,10 @@
 BluePilot: the rendered world, a drawn road scene for the comma 3X Minimal Driving View.
 
 The model's road edges, lane lines and path are drawn from a camera above and just behind you, not through the
-road camera's calibration, over a dark sky and ground with distance fog. Pavement seams and roadside posts pass at
-your speed, and the lead is a car on the road. Your own vehicle is not drawn: the path starts at the bottom of the
-view, where you are.
+road camera's calibration, over a dark sky and ground with distance fog, or grass with a gravel shoulder beside the
+road. Pavement seams, roadside posts and mowing stripes pass at your speed, and the lead is a car on the road, with
+the radar overlay as a tag beside it (lead_tag_bp). Your own vehicle is not drawn: the path starts at the bottom of
+the view, where you are.
 
 BPDrivingScene picks it (0 plain, 1 rendered) while BPHideCameraView is on; the BPScene* params turn its parts on
 and off. ModelRendererBP owns the model data and the lead smoothing and calls draw() once per frame.
@@ -19,14 +20,14 @@ import numpy as np
 import pyray as rl
 
 from openpilot.selfdrive.ui.bp.onroad.lane_change_bp import LaneChangeOverlay, draw_ribbons
+from openpilot.selfdrive.ui.bp.onroad.lead_tag_bp import LeadBox
 from openpilot.system.ui.lib.shader_polygon import draw_polygon, Gradient
 
 DRIVING_SCENE_RENDERED = 1  # BPDrivingScene value that picks the rendered world (0 is the plain view)
 
 # Chase camera, in the model frame
 CAM_X = -8.0              # m behind the device
-CAM_HEIGHT = 7.0          # m above the road: puts a lead under 100 ft below the lead overlay, which then sits
-                          # at the top center of the view (ChevronMetricsBP's inverted mode)
+CAM_HEIGHT = 7.0          # m above the road
 FOCAL = 600.0 / 540.0     # focal length, as a fraction of the view height
 HORIZON = 0.28            # horizon, as a fraction of the view height from its top
 NEAR_X = 2.0              # m: just past the bottom edge of the view
@@ -43,6 +44,9 @@ FOG_START, FOG_END, FOG_MAX = 30.0, 260.0, 0.85
 SEAM_SPACING, SEAM_DEPTH, SEAM_MAX_X = 15.0, 0.2, 150.0
 POST_SPACING, POST_OFFSET, POST_MAX_X = 40.0, 0.7, 180.0
 DASH_PERIOD, DASH_LEN = 12.0, 3.0
+STRIPE_SPACING, STRIPE_LEN, STRIPE_MAX_X = 16.0, 8.0, 140.0  # mowing stripes across the grass
+GROUND_HALF_W = 120.0     # m each side of you the grass stripes reach (past the view's edges)
+SHOULDER_W = 1.2          # m of gravel shoulder beyond each road edge
 LANE_BEYOND_M = 2.5       # m of road beyond a line that makes it a line between lanes (drawn dashed when asked)
 LINE_HALF_W = 0.075
 PATH_HALF_W = 0.9
@@ -71,6 +75,9 @@ TIRE = (12, 12, 14)
 TAIL = (215, 34, 42)
 LEAD_PAD_RADAR = (0, 134, 233)
 LEAD_PAD_VISION = (218, 202, 37)
+GRASS = (30, 52, 30)      # muted, so the road, lines and path keep their contrast
+GRASS_STRIPE = (38, 64, 36)
+SHOULDER = (58, 56, 50)
 
 
 def fog_t(x) -> np.ndarray:
@@ -143,6 +150,7 @@ class SceneOptions:
   road_motion: bool = True
   dashed_lines: bool = False
   lead_vehicle: bool = True
+  ground: bool = False   # grass and a gravel shoulder beside the road, in place of the dark ground
 
 
 def line_y(line: np.ndarray, xs: np.ndarray) -> np.ndarray:
@@ -321,6 +329,13 @@ class RenderedWorld:
     p = self.camera(rect).project(d_rel, y_right, 0.0)
     return float(p[0]), float(p[1])
 
+  def lead_box(self, rect: rl.Rectangle, d_rel: float, y_right: float) -> LeadBox:
+    """The lead car's extent on screen, its pad included, as draw_lead_vehicle draws it: where its tag goes beside."""
+    d, y = float(d_rel), float(y_right)
+    p = self.camera(rect).project([d - 0.4, d - 0.4, d, d, d + 3.0, d + 3.0], [y - 1.25, y + 1.25, y - 0.95, y + 0.95, y - 0.8, y + 0.8],
+                                  [0.0, 0.0, 1.05, 1.05, 1.48, 1.48])
+    return LeadBox(float(p[:, 0].min()), float(p[:, 1].min()), float(p[:, 0].max()), float(p[:, 1].max()))
+
   def draw(self, rect: rl.Rectangle, model: SceneModel, leads: list[SceneLead], opts: SceneOptions,
            paint_path: PathPainter | None = None, path_half_w: float = PATH_HALF_W,
            lane_change: LaneChangeOverlay | None = None) -> None:
@@ -334,6 +349,8 @@ class RenderedWorld:
       xs = XS[XS <= max_x]
       model = self._smoother.smooth(model, self._dt)
       bounds = edge_bounds(model, xs)
+      if opts.ground:
+        self._draw_grass(rect, cam, xs, bounds)
       if bounds is not None:
         self._draw_road(rect, cam, xs, bounds)
         self._draw_seams(cam, model)
@@ -364,6 +381,27 @@ class RenderedWorld:
     top, horizon, bottom = int(cam.y), int(cam.horizon_y), int(cam.y + cam.height)
     rl.draw_rectangle_gradient_v(x, top, w, horizon - top + 1, rl.Color(*SKY_TOP, 255), rl.Color(*SKY_BOTTOM, 255))
     rl.draw_rectangle_gradient_v(x, horizon, w, bottom - horizon, fogged(GROUND, FOG_END), rl.Color(*GROUND, 255))
+
+  def _draw_grass(self, rect, cam: ChaseCamera, xs: np.ndarray, bounds: Edges | None) -> None:
+    """Grass from the horizon down, with mowing stripes that pass at your speed, and a gravel shoulder along each road
+    edge. Drawn over the dark ground and under the road."""
+    x, w = cam.x, cam.width
+    fog_top = cam.horizon_y + 1.0
+    far_y = float(cam.project(FOG_END, 0.0)[1])
+    rl.draw_rectangle_rec(rl.Rectangle(x, fog_top - 1.0, w, far_y - fog_top + 2.0), fogged(GRASS, FOG_END))
+    plane = np.array([[x, far_y], [x, cam.y + cam.height], [x + w, cam.y + cam.height], [x + w, far_y]], dtype=np.float32)
+    draw_polygon(rect, plane, gradient=self._fog_gradient(cam, GRASS, 1.0, 1.0))
+    for x0 in repeating(self._phase, STRIPE_SPACING, 0.0, NEAR_X - STRIPE_LEN, STRIPE_MAX_X):
+      a, b = max(NEAR_X, float(x0)), float(x0) + STRIPE_LEN
+      if b <= a:
+        continue
+      fade = 1.0 - float(fog_t(a)) / FOG_MAX
+      self._quad(cam.project([a, a, b, b], [-GROUND_HALF_W, GROUND_HALF_W, GROUND_HALF_W, -GROUND_HALF_W]),
+                 fogged(GRASS_STRIPE, a, int(255 * fade)))
+    if bounds is not None:
+      for edge, out in ((bounds[0], -SHOULDER_W), (bounds[1], SHOULDER_W)):
+        ribbon = np.vstack([cam.project(xs, np.minimum(edge, edge + out)), cam.project(xs, np.maximum(edge, edge + out))[::-1]])
+        draw_polygon(rect, ribbon, gradient=self._fog_gradient(cam, SHOULDER, 1.0, 1.0))
 
   @staticmethod
   def _fog_gradient(cam: ChaseCamera, color: tuple, alpha_near: float, alpha_far: float) -> Gradient:

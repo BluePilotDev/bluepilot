@@ -42,6 +42,7 @@ from openpilot.selfdrive.ui.bp.onroad.rad_racer_road import (
   RadRacerRoadMixin, RAD_RACER_ROAD_EDGE_WIDTH, RAD_RACER_DASH_LEN_M, RAD_RACER_GAP_LEN_M,
 )
 from openpilot.selfdrive.ui.bp.onroad.lane_change_bp import LaneChangeOverlay, draw_ribbons
+from openpilot.selfdrive.ui.bp.onroad.lead_tag_bp import LeadBox
 from openpilot.selfdrive.ui.bp.onroad.rendered_world import (
   PATH_HALF_W,
   DRIVING_SCENE_RENDERED, RenderedWorld, SceneLead, SceneModel, SceneOptions,
@@ -100,6 +101,7 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
     self._lead_v_filters = [FirstOrderFilter(0, 0.3, dt, initialized=False),
                             FirstOrderFilter(0, 0.3, dt, initialized=False)]
     self._lead_was_active = [False, False]
+    self._scene_lead_boxes: list[LeadBox | None] = [None, None]  # rendered world: each lead car on screen, for its tag
 
   def prepare_projection(self, rect: rl.Rectangle) -> None:
     """Set clip region so _map_to_screen works before render().
@@ -147,6 +149,7 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
       road_motion=flag("BPSceneRoadMotion"),
       dashed_lines=flag("BPSceneDashedLines"),
       lead_vehicle=flag("BPSceneLeadVehicle"),
+      ground=flag("BPSceneGround"),
     )
     self._lane_change_anim = flag("BPLaneChangeAnimation")
 
@@ -249,6 +252,8 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
       self.chevron_metrics.ford_overlay_enabled = self.ford_overlay_enabled
       self.chevron_metrics.lead_is_radar = self._lead_is_radar
       self.chevron_metrics.overlay_scale = self._overlay_scale
+      # BluePilot: the rendered world shows the overlay as a tag beside the lead car
+      self.chevron_metrics.scene_boxes = self._scene_lead_boxes if rendered_world else None
       self.chevron_metrics.draw_lead_status(sm, radar_state, self._rect, self._lead_vehicles)
 
   def _update_scene_model(self, path_x_array) -> None:
@@ -328,6 +333,7 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
   def _update_leads(self, radar_state, path_x_array):
     """Update lead positions with temporal smoothing to reduce radar jitter."""
     self._lead_vehicles = [LeadVehicle(), LeadVehicle()]
+    self._scene_lead_boxes = [None, None]
     leads = [radar_state.leadOne, radar_state.leadTwo]
 
     dt = 1 / gui_app.target_fps
@@ -348,6 +354,7 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
         z = self._path.raw_points[idx, 2] if idx < len(self._path.raw_points) else 0.0
         if self.rendered_world_active:
           point = self._rendered_world.lead_anchor(self._rect, d_rel, -y_rel + self._camera_offset)
+          self._scene_lead_boxes[i] = self._rendered_world.lead_box(self._rect, d_rel, -y_rel + self._camera_offset)
         else:
           point = self._map_to_screen(d_rel, -y_rel + self._camera_offset, z + self._path_offset_z)
         if point:
