@@ -78,6 +78,7 @@ class BluePilotLayout(Widget):
       ("BPSceneRoadMotion", self._scene_road_motion),
       ("BPSceneDashedLines", self._scene_dashed_lines),
       ("BPSceneLeadVehicle", self._scene_lead_vehicle),
+      ("BPSceneGround", self._scene_ground),
       ("BPRainbowLines", self._rainbow_lane_lines),
       ("ShowBlindspotOverlay", self._show_blindspot),
       ("BPLaneChangeAnimation", self._lane_change_anim),
@@ -159,9 +160,16 @@ class BluePilotLayout(Widget):
     )
     self._scene_lead_vehicle = toggle_item(
       lambda: tr("Lead Vehicle"),
-      lambda: tr("Draw the lead as a car on a blue (radar) or yellow (vision) pad. The radar overlay boxes attach to it."),
+      lambda: tr("Draw the lead as a car on a blue (radar) or yellow (vision) pad. The radar overlay shows as a tag beside it."),
       initial_state=self._safe_get_bool(self._params, "BPSceneLeadVehicle"),
       callback=lambda state: self._toggle_callback(state, "BPSceneLeadVehicle"),
+      icon="monitoring.png"
+    )
+    self._scene_ground = toggle_item(
+      lambda: tr("Grass Beside the Road"),
+      lambda: tr("Draw grass and a gravel shoulder beside the road, in place of the dark ground."),
+      initial_state=self._safe_get_bool(self._params, "BPSceneGround"),
+      callback=lambda state: self._toggle_callback(state, "BPSceneGround"),
       icon="monitoring.png"
     )
 
@@ -590,6 +598,7 @@ class BluePilotLayout(Widget):
         self._scene_road_motion,
         self._scene_dashed_lines,
         self._scene_lead_vehicle,
+        self._scene_ground,
       ]) +
       _section(tr("Visuals"), tr("Theme, gauges, overlays"), sp_icons + "icon_visuals.png", [
         self._hide_onroad_border,
@@ -801,7 +810,7 @@ class BluePilotLayout(Widget):
     scene = self._get_driving_scene(ui_state.params)
     self._driving_scene_btn.action_item.set_selected_button(scene)
     self._driving_scene_btn.action_item.set_enabled(minimal)
-    for item in (self._scene_road_motion, self._scene_dashed_lines, self._scene_lead_vehicle):
+    for item in (self._scene_road_motion, self._scene_dashed_lines, self._scene_lead_vehicle, self._scene_ground):
       item.action_item.set_enabled(minimal and scene == DRIVING_SCENE_RENDERED)
     self._lateral_support = support_row(self._safe_get(ui_state.params, SUPPORT_PARAM))
     self._jetlink_link_btn.action_item.set_selected_button(jetlink_settings.selected_index(ui_state.params))
