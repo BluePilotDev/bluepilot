@@ -26,6 +26,7 @@ from openpilot.selfdrive.ui.bp.lib.dm_icon_style import (
 from openpilot.selfdrive.ui.bp.lib.custom_sound import get_custom_sound_selection
 from openpilot.bluepilot.selfdrive.car.ford_lateral_support import SUPPORT_PARAM, support_row
 from openpilot.selfdrive.ui.bp.onroad.augmented_road_view_bp import GaugeStyle
+from openpilot.selfdrive.ui.bp.onroad.rendered_world import DRIVING_SCENE_RENDERED
 from openpilot.selfdrive.ui.bp.lib import jetlink_settings, jetlink_status
 from openpilot.selfdrive.ui.bp.widgets.live_description_item import live_text_item
 
@@ -74,6 +75,9 @@ class BluePilotLayout(Widget):
       ("send_hands_free_cluster_msg", self._show_hands_free_ui),
       ("BPDisableLaneLineStatusColor", self._disable_lane_line_status_color),
       ("BPHideCameraView", self._hide_camera_view),
+      ("BPSceneRoadMotion", self._scene_road_motion),
+      ("BPSceneDashedLines", self._scene_dashed_lines),
+      ("BPSceneLeadVehicle", self._scene_lead_vehicle),
       ("BPRainbowLines", self._rainbow_lane_lines),
       ("ShowBlindspotOverlay", self._show_blindspot),
       ("ShowBrakeStatus", self._show_brake_status),
@@ -124,6 +128,40 @@ class BluePilotLayout(Widget):
       initial_state=self._safe_get_bool(self._params, "BPHideCameraView"),
       callback=lambda state: self._toggle_callback(state, "BPHideCameraView"),
       icon="chffr_wheel.png"
+    )
+
+    # BluePilot: Minimal Driving View scene and the rendered world's parts
+    self._driving_scene_btn = multiple_button_item(
+      lambda: tr("Scene"),
+      lambda: tr("Plain draws the lane lines and path. Rendered draws a road with distance fog, seen from behind " +
+                 "your vehicle, with the lead as a car."),
+      buttons=[lambda: tr("Plain"), lambda: tr("Rendered")],
+      button_width=225,
+      callback=self._set_driving_scene,
+      selected_index=self._get_driving_scene(self._params),
+      icon="chffr_wheel.png"
+    )
+    self._scene_road_motion = toggle_item(
+      lambda: tr("Road Motion"),
+      lambda: tr("Pavement seams and roadside posts pass at your speed."),
+      initial_state=self._safe_get_bool(self._params, "BPSceneRoadMotion"),
+      callback=lambda state: self._toggle_callback(state, "BPSceneRoadMotion"),
+      icon="monitoring.png"
+    )
+    self._scene_dashed_lines = toggle_item(
+      lambda: tr("Dashed Lane Lines"),
+      lambda: tr("Draw lines with another lane beyond them as moving dashes. The model does not report paint, " +
+                 "so this is a guess from the road's width."),
+      initial_state=self._safe_get_bool(self._params, "BPSceneDashedLines"),
+      callback=lambda state: self._toggle_callback(state, "BPSceneDashedLines"),
+      icon="monitoring.png"
+    )
+    self._scene_lead_vehicle = toggle_item(
+      lambda: tr("Lead Vehicle"),
+      lambda: tr("Draw the lead as a car on a blue (radar) or yellow (vision) pad. The radar overlay boxes attach to it."),
+      initial_state=self._safe_get_bool(self._params, "BPSceneLeadVehicle"),
+      callback=lambda state: self._toggle_callback(state, "BPSceneLeadVehicle"),
+      icon="monitoring.png"
     )
 
     # Rainbow lane lines toggle
@@ -536,10 +574,16 @@ class BluePilotLayout(Widget):
         self._use_custom_sounds,
         self._custom_sound_selection_btn,
       ]) +
-      _section(tr("Visuals"), tr("Driving view, theme, gauges, overlays"), sp_icons + "icon_visuals.png", [
+      _section(tr("Driving View"), tr("Minimal view, rendered road, lead car"), "icons/chffr_wheel.png", [
+        self._hide_camera_view,
+        self._driving_scene_btn,
+        self._scene_road_motion,
+        self._scene_dashed_lines,
+        self._scene_lead_vehicle,
+      ]) +
+      _section(tr("Visuals"), tr("Theme, gauges, overlays"), sp_icons + "icon_visuals.png", [
         self._hide_onroad_border,
         self._disable_lane_line_status_color,
-        self._hide_camera_view,
         self._theme_pack_btn,
         self._theme_auto_seasonal,
         self._rainbow_lane_lines,
@@ -740,6 +784,14 @@ class BluePilotLayout(Widget):
     pause_lc = fresh.get("BlinkerPauseLaneChange") if "BlinkerPauseLaneChange" in fresh else self._safe_get_bool(ui_state.params, "BlinkerPauseLaneChange")
     # Conditional on BlinkerPauseLaneChange
     self._blinker_min_speed.action_item.set_enabled(pause_lc)
+
+    # Driving View: the scene picker needs the minimal view, and the rendered world's parts need the Rendered scene
+    minimal = fresh["BPHideCameraView"] if "BPHideCameraView" in fresh else self._safe_get_bool(ui_state.params, "BPHideCameraView")
+    scene = self._get_driving_scene(ui_state.params)
+    self._driving_scene_btn.action_item.set_selected_button(scene)
+    self._driving_scene_btn.action_item.set_enabled(minimal)
+    for item in (self._scene_road_motion, self._scene_dashed_lines, self._scene_lead_vehicle):
+      item.action_item.set_enabled(minimal and scene == DRIVING_SCENE_RENDERED)
     self._lateral_support = support_row(self._safe_get(ui_state.params, SUPPORT_PARAM))
     self._jetlink_link_btn.action_item.set_selected_button(jetlink_settings.selected_index(ui_state.params))
 
@@ -902,6 +954,19 @@ class BluePilotLayout(Widget):
       callback=handle_confirm
     )
     gui_app.push_widget(dialog)
+
+  def _get_driving_scene(self, params) -> int:
+    try:
+      return 1 if int(self._safe_get(params, "BPDrivingScene") or 0) == DRIVING_SCENE_RENDERED else 0
+    except (TypeError, ValueError):
+      return 0
+
+  def _set_driving_scene(self, button_index: int):
+    try:
+      self._params.put("BPDrivingScene", button_index)
+    except UnknownKeyName:
+      pass
+    self._update_toggles()
 
   def _set_overlay_size(self, button_index: int):
     """Handle overlay size button selection."""
