@@ -1,6 +1,5 @@
 import numpy as np
 import pyray as rl
-from openpilot.common.constants import CV
 from openpilot.common.params import Params
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.selfdrive.ui.sunnypilot.onroad.chevron_metrics import ChevronMetrics, ChevronOptions
@@ -9,6 +8,8 @@ from openpilot.selfdrive.ui.bp.lib.ui_debug_logger import bp_ui_log
 # BluePilot: seasonal theme packs (LeadMarker recolors the vision-lead box border)
 from openpilot.selfdrive.ui.bp.lib import theme_pack
 from openpilot.selfdrive.ui.bp.onroad.lead_tag_bp import LeadBox, draw_lead_tag
+from openpilot.selfdrive.ui.bp.onroad.lead_readout_bp import LeadReadout
+from openpilot.system.ui.lib.application import gui_app
 
 # BluePilot: Inversion thresholds for radar overlay (close-proximity mode)
 # When lead is closer than INVERT_UNDER_M, overlay moves to top with chevron flipped
@@ -39,6 +40,8 @@ class ChevronMetricsBP(ChevronMetrics):
     self.overlay_scale: float = 1.0
     # Set by ModelRendererBP in the rendered world: the lead car's screen box per lead, for the lead tag
     self.scene_boxes: list[LeadBox | None] | None = None
+    # Filtered, held numbers per lead, so the readout does not flicker with every radar or vision update
+    self._readouts = [LeadReadout(), LeadReadout()]
 
   def should_render(self) -> bool:
     # Render if chevron metrics is enabled OR if Ford overlay is enabled
@@ -52,47 +55,29 @@ class ChevronMetricsBP(ChevronMetrics):
       return
 
     d_rel = lead_data.dRel
-    v_rel = lead_data.vRel
 
     if not lead_vehicle.chevron or len(lead_vehicle.chevron) < 3:
       return
 
     sz = np.clip((25 * 30) / (d_rel / 3 + 30), 15.0, 30.0) * 2.35 * self.overlay_scale
 
-    text_lines = self._build_text_lines_bp(d_rel, v_rel, v_ego)
+    text_lines = self._build_text_lines_bp(lead_index, v_ego)
     if not text_lines:
       return
 
     is_radar = self.lead_is_radar[lead_index] if lead_index < len(self.lead_is_radar) else False
     self._render_text_lines_bp(text_lines, lead_vehicle, sz, rect, is_radar, self._inverted_mode)
 
-  def _build_text_lines_bp(self, d_rel: float, v_rel: float, v_ego: float) -> list[str]:
-    """Build text lines - Ford overlay forces all 3, otherwise respects setting."""
-    if self.ford_overlay_enabled:
-      # When Ford overlay is enabled, always show all 3 values
-      text_lines = []
-
-      # Distance
-      val = max(0.0, d_rel)
-      unit = "m" if ui_state.is_metric else "ft"
-      if not ui_state.is_metric:
-        val *= 3.28084
-      text_lines.append(f"{val:.0f} {unit}")
-
-      # Speed
-      multiplier = CV.MS_TO_KPH if ui_state.is_metric else CV.MS_TO_MPH
-      val = max(0.0, (v_rel + v_ego) * multiplier)
-      unit = "km/h" if ui_state.is_metric else "mph"
-      text_lines.append(f"{val:.0f} {unit}")
-
-      # Lead time
-      val = (d_rel / v_ego) if (d_rel > 0 and v_ego > 0) else 0.0
-      ttc_text = f"{val:.1f} s" if (0 < val < 200) else "---"
-      text_lines.append(ttc_text)
-
-      return text_lines
-    else:
-      return ChevronMetrics._build_text_lines(d_rel, v_rel, v_ego)
+  def _build_text_lines_bp(self, lead_index: int, v_ego: float) -> list[str]:
+    """The lead's filtered, held readout. Ford overlay forces all 3 values, otherwise the setting picks them."""
+    opt = ui_state.chevron_metrics
+    show_all = self.ford_overlay_enabled or opt == ChevronOptions.ALL
+    return self._readouts[lead_index].lines(
+      v_ego, ui_state.is_metric,
+      distance=show_all or opt == ChevronOptions.DISTANCE_ONLY,
+      speed=show_all or opt == ChevronOptions.SPEED_ONLY,
+      gap=show_all or opt == ChevronOptions.TTC_ONLY,
+    )
 
   def _render_text_lines_bp(self, text_lines: list[str], lead_vehicle,
                             sz: float, rect: rl.Rectangle, is_radar: bool, inverted: bool = False):
@@ -239,7 +224,7 @@ class ChevronMetricsBP(ChevronMetrics):
 
   def _draw_scene_tag(self, lead_data, box: LeadBox, v_ego: float, rect: rl.Rectangle, lead_index: int) -> None:
     """The rendered world's form of the overlay: one tag beside the lead car, in place of the boxes and chevron."""
-    lines = self._build_text_lines_bp(lead_data.dRel, lead_data.vRel, v_ego)
+    lines = self._build_text_lines_bp(lead_index, v_ego)
     is_radar = self.lead_is_radar[lead_index] if lead_index < len(self.lead_is_radar) else False
     draw_lead_tag(self._font, lines, box, rect, self._accent(is_radar), self._lead_status_alpha, self.overlay_scale)
 
@@ -251,6 +236,9 @@ class ChevronMetricsBP(ChevronMetrics):
     has_lead_two = lead_two.present if lead_two else False
 
     self.update_alpha(has_lead_one or has_lead_two)
+    dt = 1 / gui_app.target_fps
+    for readout, lead, present in ((self._readouts[0], lead_one, has_lead_one), (self._readouts[1], lead_two, has_lead_two)):
+      readout.update(present, lead.dRel if present else 0.0, lead.vRel if present else 0.0, dt)
 
     if not self.should_render():
       return

@@ -43,6 +43,7 @@ from openpilot.selfdrive.ui.bp.onroad.rad_racer_road import (
 )
 from openpilot.selfdrive.ui.bp.onroad.lane_change_bp import LaneChangeOverlay, draw_ribbons
 from openpilot.selfdrive.ui.bp.onroad.lead_tag_bp import LeadBox
+from openpilot.selfdrive.ui.bp.onroad.lead_readout_bp import JUMP_FRAC, JUMP_M
 from openpilot.selfdrive.ui.bp.onroad.rendered_world import (
   PATH_HALF_W,
   DRIVING_SCENE_RENDERED, RenderedWorld, SceneLead, SceneModel, SceneOptions,
@@ -339,8 +340,10 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
     dt = 1 / gui_app.target_fps
     for i, lead_data in enumerate(leads):
       if lead_data and lead_data.present:
-        # Reset filters when a lead first appears so we don't lerp from stale data
-        if not self._lead_was_active[i]:
+        # Reset filters when a lead first appears so we don't lerp from stale data, or when it jumps (a cut-in, or
+        # the lead changing to another car), so the car is drawn at the new lead at once instead of sliding there
+        d_was = self._lead_d_filters[i].x
+        if not self._lead_was_active[i] or abs(lead_data.dRel - d_was) > max(JUMP_M, JUMP_FRAC * d_was):
           self._lead_d_filters[i] = FirstOrderFilter(lead_data.dRel, 0.4, dt)
           self._lead_y_filters[i] = FirstOrderFilter(lead_data.yRel, 0.5, dt)
           self._lead_v_filters[i] = FirstOrderFilter(lead_data.vRel, 0.3, dt)
