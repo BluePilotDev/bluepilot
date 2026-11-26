@@ -80,6 +80,7 @@ class BluePilotLayout(Widget):
       ("BPSceneLeadVehicle", self._scene_lead_vehicle),
       ("BPRainbowLines", self._rainbow_lane_lines),
       ("ShowBlindspotOverlay", self._show_blindspot),
+      ("BPLaneChangeAnimation", self._lane_change_anim),
       ("ShowBrakeStatus", self._show_brake_status),
       ("BPHideOnroadBorder", self._hide_onroad_border),
       ("BPShowConfidenceBall", self._show_confidence_ball),
@@ -180,6 +181,15 @@ class BluePilotLayout(Widget):
       initial_state=self._safe_get_bool(self._params, "ShowBlindspotOverlay"),
       callback=lambda state: self._toggle_callback(state, "ShowBlindspotOverlay"),
       icon="warning.png"
+    )
+
+    # BluePilot: lane change animation, in the camera view and the rendered world
+    self._lane_change_anim = toggle_item(
+      lambda: tr("Lane Change Animation"),
+      lambda: tr("Highlight the lane you are changing into. It pulses red while the blind spot is occupied."),
+      initial_state=self._safe_get_bool(self._params, "BPLaneChangeAnimation"),
+      callback=lambda state: self._toggle_callback(state, "BPLaneChangeAnimation"),
+      icon="monitoring.png"
     )
 
     # Brake status toggle
@@ -588,6 +598,7 @@ class BluePilotLayout(Widget):
         self._theme_auto_seasonal,
         self._rainbow_lane_lines,
         self._show_blindspot,
+        self._lane_change_anim,
         self._show_brake_status,
         self._show_confidence_ball,
         self._animate_steering_wheel,
