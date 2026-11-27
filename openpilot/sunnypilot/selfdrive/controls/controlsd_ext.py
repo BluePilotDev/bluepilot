@@ -152,6 +152,11 @@ class ControlsExt(ModelStateBase):
     # imported here, not at module level: the key list lives in the opendbc submodule and only
     # Ford needs it, so a submodule on another layout must not break controlsd for other brands
     from opendbc.bluepilot_lateral.core.values_ext import BP_LATERAL_PARAMS
+    # Blendful also centers on the lane lines; while it runs (toggle on, tinygrad model, as modeld_tinygrad
+    # launches), Lanefull reaches the car code as off and lane positioning keeps only the In-Lane Offset.
+    # The saved settings are not written. Read directly: models.helpers.get_active_model_runner can write params.
+    blendful_running = bool(self.params.get("Blendful")) and \
+      self.params.get("ModelRunnerTypeCache") == custom.ModelManagerSP.Runner.tinygrad
     entries = []
     for key in BP_LATERAL_PARAMS if keys is None else keys:
       try:
@@ -164,6 +169,8 @@ class ControlsExt(ModelStateBase):
         continue
       if value is None:
         continue
+      if blendful_running and key in ("enable_lane_full_mode_curv", "enable_lane_full_mode_ang"):
+        value = False
       # same wire format Params writes: bools as "1"/"0" (checked first: bool is an int subclass)
       encoded = (b"1" if value else b"0") if isinstance(value, bool) else str(value).encode()
       entries.append({"key": key, "value": encoded})

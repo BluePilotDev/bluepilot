@@ -2314,6 +2314,31 @@
           ]
         },
         {
+          "key": "enable_lane_full_mode_ang",
+          "widget": "toggle",
+          "title": "[Lateral Tuning] Enable Lanefull Mode (Angle)",
+          "description": "Center on the lane lines when they can be trusted. Off: lane positioning applies only the In-Lane Offset to the model's path. Off while Blendful is on.",
+          "visibility": [
+            {
+              "type": "param",
+              "key": "FordPrefLateralControl",
+              "equals": 1
+            }
+          ],
+          "enablement": [
+            {
+              "type": "param",
+              "key": "enable_lane_positioning_ang",
+              "equals": true
+            },
+            {
+              "type": "param",
+              "key": "Blendful",
+              "equals": false
+            }
+          ]
+        },
+        {
           "key": "custom_path_offset_ang",
           "widget": "option",
           "title": "[Lateral Tuning] In-Lane Offset (Angle)",
@@ -2430,7 +2455,7 @@
           "key": "enable_lane_full_mode_curv",
           "widget": "toggle",
           "title": "[Lateral Tuning] Enable Lanefull Mode (Curvature)",
-          "description": "Enable lanefull mode for lane positioning.",
+          "description": "Enable lanefull mode for lane positioning. Off while Blendful is on.",
           "visibility": [
             {
               "type": "param",
@@ -2443,6 +2468,11 @@
               "type": "param",
               "key": "enable_lane_positioning_curv",
               "equals": true
+            },
+            {
+              "type": "param",
+              "key": "Blendful",
+              "equals": false
             }
           ]
         },
