@@ -143,7 +143,7 @@ def get_disk_space_info():
             }
         }
     except Exception as e:
-        logger.error(f"Error getting disk space info: {e}")
+        logger.exception(f"Error getting disk space info: {e}")
         # Return safe defaults on error
         return {
             'available_bytes': MIN_BYTES + 1,

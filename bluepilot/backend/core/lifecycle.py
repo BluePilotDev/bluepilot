@@ -64,7 +64,7 @@ def record_crash(params):
         logger.warning(f"Server error occurred ({crash_count} recent errors) - continuing operation")
 
     except Exception as e:
-        logger.error(f"Error recording crash: {e}")
+        logger.exception(f"Error recording crash: {e}")
 
 
 def check_and_handle_crashes(params):
@@ -111,7 +111,7 @@ def check_and_handle_crashes(params):
         return True  # Always allow server to start
 
     except Exception as e:
-        logger.error(f"Error checking crash status: {e}")
+        logger.exception(f"Error checking crash status: {e}")
         return True  # Default to allowing server start
 
 
@@ -173,7 +173,7 @@ def trigger_restart():
         os.execv(sys.executable, [sys.executable] + sys.argv)
     except Exception as e:
         # If execv fails, reset the triggered flag so it can be retried
-        logger.error(f"Failed to restart server: {e}")
+        logger.exception(f"Failed to restart server: {e}")
         with _restart_lock:
             _restart_triggered = False
         raise
@@ -249,7 +249,7 @@ def install_dependencies_background(on_complete_callback=None):
             if on_complete_callback:
                 on_complete_callback(False)
         except Exception as e:
-            logger.error(f"Error during background package installation: {e}")
+            logger.exception(f"Error during background package installation: {e}")
             if on_complete_callback:
                 on_complete_callback(False)
 
@@ -314,7 +314,7 @@ def ensure_dependencies():
             logger.info("Network may not be available yet. WebSocket features will remain disabled")
             return False
         except Exception as e:
-            logger.error(f"Error during package installation: {e}")
+            logger.exception(f"Error during package installation: {e}")
             return False
 
     except Exception as e:

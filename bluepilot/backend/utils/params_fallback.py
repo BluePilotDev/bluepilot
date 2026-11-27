@@ -19,7 +19,7 @@ def get_params_with_defaults(defaults: Dict[str, Any] | None = None):
     except ImportError:
         logger.debug("openpilot Params unavailable, using fallback")
     except Exception as exc:  # pragma: no cover - defensive
-        logger.error(f"Unexpected Params import error: {exc}")
+        logger.exception(f"Unexpected Params import error: {exc}")
 
     class Params:
         def __init__(self, initial: Dict[str, Any] | None = None):

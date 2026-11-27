@@ -94,7 +94,7 @@ except ImportError as e:
                     f.write(value)
                 return 0
             except Exception as e:
-                logger.error(f"Error writing param {key}: {e}")
+                logger.exception(f"Error writing param {key}: {e}")
                 return -1
 
         def put_bool(self, key, value):
@@ -236,7 +236,7 @@ def write_param_direct(key: str, value: Any) -> Tuple[bool, Optional[str]]:
         return True, None
 
     except Exception as e:
-        logger.error(f"Direct param write failed for {key}: {e}")
+        logger.exception(f"Direct param write failed for {key}: {e}")
         return False, str(e)
 
 
@@ -280,7 +280,7 @@ def get_all_params(params: Optional[Params] = None) -> Dict[str, Any]:
         try:
             param_keys = os.listdir(params_dir)
         except Exception as e:
-            logger.error(f"Error listing params directory: {e}")
+            logger.exception(f"Error listing params directory: {e}")
             param_keys = []
     else:
         # Fallback to known params
@@ -422,7 +422,7 @@ def set_param_value(key: str, value: Any, params: Optional[Params] = None) -> Di
         }
 
     except Exception as e:
-        logger.error(f"Error setting param {key}: {e}")
+        logger.exception(f"Error setting param {key}: {e}")
         return {
             "success": False,
             "error": f"Failed to update parameter: {str(e)}"

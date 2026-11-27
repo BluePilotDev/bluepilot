@@ -205,7 +205,7 @@ def broadcast_route_export_update(route_base, camera, info, export_path=None, se
             try:
                 broadcaster.broadcast(WebSocketEvent.ROUTE_EXPORT_UPDATE, payload)
             except Exception as e:
-                logger.error(f"Error broadcasting WebSocket event: {e}")
+                logger.exception(f"Error broadcasting WebSocket event: {e}")
 
 
 # ============================================================================

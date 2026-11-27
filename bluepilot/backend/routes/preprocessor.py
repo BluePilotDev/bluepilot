@@ -288,7 +288,7 @@ def main():
             logger.info("Preprocessor stopped by user")
             break
         except Exception as e:
-            logger.error(f"Error in main loop: {e}")
+            logger.exception(f"Error in main loop: {e}")
 
         # Wait before next check
         time.sleep(check_interval)
