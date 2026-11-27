@@ -128,6 +128,13 @@ class TestSetting(unittest.TestCase):
         overlay.update(sm, 0, now=t)
       self.assertFalse(overlay.visible)
 
+  def test_in_the_bluepilot_panel(self):
+    import inspect
+    from openpilot.selfdrive.ui.bp.layouts.settings import bluepilot
+    src = inspect.getsource(bluepilot.BluePilotLayout)
+    self.assertIn('("BPParkSensors", self._park_sensors)', src)  # refreshed with the other toggles
+    self.assertIn('self._toggle_callback(state, "BPParkSensors")', src)
+
 
 if __name__ == "__main__":
   unittest.main()

@@ -82,6 +82,7 @@ class BluePilotLayout(Widget):
       ("BPRainbowLines", self._rainbow_lane_lines),
       ("ShowBlindspotOverlay", self._show_blindspot),
       ("BPLaneChangeAnimation", self._lane_change_anim),
+      ("BPParkSensors", self._park_sensors),
       ("ShowBrakeStatus", self._show_brake_status),
       ("BPHideOnroadBorder", self._hide_onroad_border),
       ("BPShowConfidenceBall", self._show_confidence_ball),
@@ -197,6 +198,15 @@ class BluePilotLayout(Widget):
       lambda: tr("Highlight the lane you are changing into. It pulses red while the blind spot is occupied."),
       initial_state=self._safe_get_bool(self._params, "BPLaneChangeAnimation"),
       callback=lambda state: self._toggle_callback(state, "BPLaneChangeAnimation"),
+      icon="monitoring.png"
+    )
+
+    # BluePilot: Ford park sensor zones onroad
+    self._park_sensors = toggle_item(
+      lambda: tr("Park Sensors"),
+      lambda: tr("Show the park sensor zones in the lower right while something is near. Ford turns them on below about 11 mph."),
+      initial_state=self._safe_get_bool(self._params, "BPParkSensors"),
+      callback=lambda state: self._toggle_callback(state, "BPParkSensors"),
       icon="monitoring.png"
     )
 
@@ -608,6 +618,7 @@ class BluePilotLayout(Widget):
         self._rainbow_lane_lines,
         self._show_blindspot,
         self._lane_change_anim,
+        self._park_sensors,
         self._show_brake_status,
         self._show_confidence_ball,
         self._animate_steering_wheel,
