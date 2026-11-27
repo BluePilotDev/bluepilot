@@ -700,6 +700,7 @@ struct CarStateBP @0xb057204d7deadf3f {
   hybridDrive @0 :HybridDrive;
   hybridBattery @1 :HybridBattery;
   brakeLightStatus @2 :BrakeLightStatus;
+  parkAid @3 :ParkAid;
 
   struct HybridDrive {
     dataAvailable @0 :Bool;
@@ -725,6 +726,19 @@ struct CarStateBP @0xb057204d7deadf3f {
   struct BrakeLightStatus {
     dataAvailable @0 :Bool;
     brakeLightsOn @1 :Bool;
+  }
+
+  # Ford park aid (camera bus ParkAid_Aud_Warn_Stat/Stat2). Each zone is a step, not a distance: 15 clear,
+  # lower closer, 0 off. Zones run left to right as seen from the driver's seat: corner, center, center, corner.
+  struct ParkAid {
+    dataAvailable @0 :Bool;     # both park aid frames arrived in the last second
+    frontStatus @1 :UInt8;      # the module's: 0 disabled, 1 enabled, 3 faulted
+    rearStatus @2 :UInt8;
+    frontZones @3 :List(UInt8);
+    rearZones @4 :List(UInt8);
+    frontChime @5 :UInt8;       # the chime step the module asks for, 0 none
+    rearChime @6 :UInt8;
+    fault @7 :UInt8;            # PrkAid_D_Falt: 0 no fault
   }
 }
 

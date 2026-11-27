@@ -341,6 +341,7 @@ inline static std::unordered_map<std::string, ParamKeyAttributes> keys = {
     {"BPSceneLeadVehicle", {PERSISTENT | BACKUP, BOOL, "1"}},
     {"BPSceneGround", {PERSISTENT | BACKUP, BOOL, "0"}},  // rendered world: grass and a gravel shoulder beside the road
     {"BPLaneChangeAnimation", {PERSISTENT | BACKUP, BOOL, "0"}},  // comma 3X: highlight the lane you are changing into
+    {"BPParkSensors", {PERSISTENT | BACKUP, BOOL, "0"}},  // comma 3X: the Ford park sensor zones onroad while something is near
     {"BPRadRacerTheme", {PERSISTENT | BACKUP, BOOL, "0"}},
     {"BPThemePack", {PERSISTENT | BACKUP, STRING}},  // no default: unset reads as None, which every reader takes as "" (off); an empty default fails test_set_params_with_default_value
     {"BPThemeAutoSeasonal", {PERSISTENT | BACKUP, BOOL, "0"}},

@@ -61,6 +61,7 @@ COUNTED = {
     ("openpilot.selfdrive.ui.bp.onroad.chevron_metrics_bp", "ChevronMetricsBP", "_draw_scene_tag"),
     ("openpilot.selfdrive.ui.bp.onroad.model_renderer_bp", "ModelRendererBP", "_draw_lane_change"),
     ("openpilot.selfdrive.ui.bp.onroad.lane_change_bp", "LaneChangeOverlay", "shapes"),
+    ("openpilot.selfdrive.ui.bp.onroad.park_sensors_bp", None, "draw_park_sensors"),
     ("openpilot.selfdrive.ui.bp.widgets.section_header", "CollapsibleSectionHeader", "_render"),
     ("openpilot.selfdrive.ui.bp.widgets.float_control_item", "FloatControlAction", "_render"),
   ],
@@ -91,7 +92,7 @@ DISPLAY_PARAMS = ("FordPrefShowRadarLeadOverlay", "BPThemePack", "BPThemeAutoSea
                   "ShowBlindspotOverlay", "ShowBrakeStatus", "BPRainbowLines", "BPHideCameraView", "BPHideOnroadBorder",
                   "FordPrefHybridBatteryStatus", "FordPrefHybridPowerFlow", "FordPrefGaugeStyle", "RainbowMode",
                   "NavigationEnabled", "NavDestination", "BPDrivingScene", "BPSceneRoadMotion", "BPSceneDashedLines",
-                  "BPSceneLeadVehicle", "BPSceneGround", "BPLaneChangeAnimation")
+                  "BPSceneLeadVehicle", "BPSceneGround", "BPLaneChangeAnimation", "BPParkSensors", "DevUIInfo")
 
 
 def onroad_cases(family: str, theme_packs: list[str]) -> list[tuple[str, dict, dict, list[str]]]:
@@ -127,6 +128,15 @@ def onroad_cases(family: str, theme_packs: list[str]) -> list[tuple[str, dict, d
        scene + hud + ["LaneChangeOverlay.shapes", "!ModelRendererBP._draw_lane_change"]),
       ("lane change animation off", {}, {"lane_change": ("laneChangeStarting", "right")},
        model + hud + ["!LaneChangeOverlay.shapes"]),
+    ]
+    # The park sensor zones: shown while the sensors are on and something is near, over every view
+    park = {"BPParkSensors": True}
+    cases += [
+      ("park sensors, something near", park, {"park_aid": "near"}, model + hud + ["draw_park_sensors"]),
+      ("park sensors, rendered world", {**park, **world}, {"park_aid": "near"}, scene + hud + ["draw_park_sensors"]),
+      ("park sensors, developer UI", {**park, "DevUIInfo": 3}, {"park_aid": "near"}, model + hud + ["draw_park_sensors"]),
+      ("park sensors, all clear", park, {"park_aid": "clear"}, model + hud + ["!draw_park_sensors"]),
+      ("park sensors off", {}, {"park_aid": "near"}, model + hud + ["!draw_park_sensors"]),
     ]
     cases += [
       ("rendered world", world, {}, scene + hud + lead + ["RenderedWorld.draw_lead_vehicle", "ChevronMetricsBP._draw_scene_tag",
@@ -276,6 +286,13 @@ def build_messages(opts: dict) -> dict:
   csbp = msg("carStateBP")
   csbp.brakeLightStatus.dataAvailable = True
   csbp.brakeLightStatus.brakeLightsOn = bool(opts.get("brakes"))
+  if opts.get("park_aid"):  # "near": something at the front right and the rear left; "clear": the sensors on, nothing near
+    aid = csbp.parkAid
+    aid.dataAvailable = True
+    aid.frontStatus = aid.rearStatus = 1
+    near = opts["park_aid"] == "near"
+    aid.frontZones = [15, 15, 3, 7] if near else [15] * 4
+    aid.rearZones = [12, 15, 15, 15] if near else [15] * 4
   if opts.get("hybrid"):
     hb, hd = csbp.hybridBattery, csbp.hybridDrive
     hb.dataAvailable = True

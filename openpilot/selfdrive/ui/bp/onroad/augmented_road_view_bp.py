@@ -17,6 +17,7 @@ from openpilot.selfdrive.ui.bp.onroad.power_flow_gauge import PowerFlowGauge
 from openpilot.selfdrive.ui.bp.onroad.powerflow_gauge_arched import PowerflowGaugeArched, POWERFLOW_ANGLE_SPAN
 from openpilot.selfdrive.ui.bp.onroad.torque_bar_renderer_bp import TorqueBarRendererBP
 from openpilot.selfdrive.ui.bp.onroad.rad_racer_theme import RadRacerTheme
+from openpilot.selfdrive.ui.bp.onroad.park_sensors_bp import ParkSensorsOverlay
 from openpilot.selfdrive.ui.bp.mici.onroad.confidence_ball_bp import ConfidenceBallTiciBP
 from openpilot.selfdrive.ui.onroad.driver_state import BTN_SIZE
 from openpilot.selfdrive.ui.sunnypilot.onroad.developer_ui import DeveloperUiState, get_bottom_dev_ui_offset
@@ -84,6 +85,9 @@ class AugmentedRoadViewBP(CameraViewBP, AugmentedRoadView, BlindspotRendererMixi
       self._cached_gauge_size = int(self._bp_params.get("FordPrefHybridDriveGaugeSize", return_default=True))
     except (TypeError, ValueError):
       self._cached_gauge_size = 2
+
+    # BluePilot: Ford park sensor zones, lower right (BPParkSensors)
+    self._park_sensors = ParkSensorsOverlay(self._bp_params)
 
     # BluePilot: Rad Racer 8-bit theme (drawing host; selection lives in theme_scene)
     self._rad_racer_theme = RadRacerTheme()
@@ -213,6 +217,11 @@ class AugmentedRoadViewBP(CameraViewBP, AugmentedRoadView, BlindspotRendererMixi
       if ui_state.developer_ui in (DeveloperUiState.BOTTOM, DeveloperUiState.BOTH):
         torque_rect = rl.Rectangle(ui_rect.x, ui_rect.y, ui_rect.width, ui_rect.height - get_bottom_dev_ui_offset())
       self._torque_bar.render(torque_rect, gauge_height_offset=gauge_height_offset)
+
+    # BluePilot: park sensor zones while the sensors are on and something is near, under alerts
+    self._park_sensors.update(ui_state.sm, ui_state.started_frame)
+    self._park_sensors.render(ui_rect, dev_ui_right=ui_state.developer_ui in (DeveloperUiState.RIGHT, DeveloperUiState.BOTH),
+                              dev_ui_bottom=get_bottom_dev_ui_offset())
 
     # BluePilot: theme scene foreground — decor + near particles over the HUD, under alerts.
     if _scene is not None and not _scene.replaces_hud():
