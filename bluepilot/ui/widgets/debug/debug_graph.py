@@ -5,9 +5,8 @@ Draws configurable line graphs with grid, scale, time markers, and legend.
 
 import collections
 import pyray as rl
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from openpilot.system.ui.lib.application import gui_app, FontWeight
-from openpilot.system.ui.lib.text_measure import measure_text_cached
 from openpilot.system.ui.widgets import Widget
 from bluepilot.ui.widgets.debug.debug_colors import DebugColors
 

@@ -8,7 +8,6 @@ Requires: websockets (for real-time updates, graceful fallback if not available)
 
 import os
 import sys
-import subprocess
 import importlib.util
 
 def check_file(path, description):

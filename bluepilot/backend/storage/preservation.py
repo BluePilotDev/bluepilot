@@ -7,8 +7,6 @@ Route preservation, deletion risk calculation, and disk space management
 import os
 import time
 import logging
-from functools import lru_cache
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +31,6 @@ except ImportError:
 
 # Import disk space utilities
 try:
-    from openpilot.system.loggerd.config import get_available_bytes, get_available_percent
     from openpilot.system.loggerd.deleter import MIN_BYTES, MIN_PERCENT
     from openpilot.system.loggerd.uploader import listdir_by_creation
     DISK_SPACE_UTILS_AVAILABLE = True

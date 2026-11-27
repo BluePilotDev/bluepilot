@@ -9,7 +9,7 @@ import time
 import logging
 import threading
 from pathlib import Path
-from typing import Dict, Any, Optional, Callable
+from typing import Any, Optional, Callable
 
 logger = logging.getLogger(__name__)
 

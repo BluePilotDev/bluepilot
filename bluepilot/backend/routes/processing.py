@@ -711,7 +711,6 @@ def extract_drive_stats_from_segments(segments):
     if not use_logreader:
         try:
             import openpilot.cereal.messaging as messaging
-            from openpilot.cereal import log as log_capnp
             import bz2
             import subprocess
 
