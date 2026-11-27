@@ -283,10 +283,8 @@ def get_all_params(params: Optional[Params] = None) -> Dict[str, Any]:
             logger.exception(f"Error listing params directory: {e}")
             param_keys = []
     else:
-        # Fallback to known params
+        # no params directory (not on a device): nothing to list
         param_keys = []
-        for category_info in PARAM_CATEGORIES.values():
-            param_keys.extend(category_info["params"])
 
     for key in param_keys:
         result[key] = _build_param_entry(key, params, params_dir)
@@ -697,37 +695,6 @@ def _get_param_mtime(params_dir: Optional[str], key: str) -> Optional[float]:
     except Exception as e:
         logger.debug(f"Error getting mtime for param {key}: {e}")
     return None
-
-
-def get_params_by_category(params: Optional[Params] = None) -> Dict[str, Any]:
-    """Get all parameters organized by category
-
-    Args:
-        params: Params instance (creates new one if None)
-
-    Returns:
-        Dictionary with params organized by category
-    """
-    all_params = get_all_params(params)
-
-    result = {}
-    for category, info in PARAM_CATEGORIES.items():
-        result[category] = {
-            "name": info["name"],
-            "description": info["description"],
-            "params": []
-        }
-
-    # Organize params into categories
-    for param_data in all_params.values():
-        category = param_data["category"]
-        result[category]["params"].append(param_data)
-
-    # Sort params within each category
-    for category_data in result.values():
-        category_data["params"].sort(key=lambda p: p["key"])
-
-    return result
 
 
 def search_params(query: str, params: Optional[Params] = None) -> List[Dict[str, Any]]:
