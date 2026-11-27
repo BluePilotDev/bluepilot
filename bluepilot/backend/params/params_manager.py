@@ -473,6 +473,77 @@ def set_param_value(key: str, value: Any, params: Optional[Params] = None) -> Di
         }
 
 
+def backup_param_keys() -> list[str]:
+    """The params params_keys.h flags BACKUP."""
+    return sorted(key for key, flags in _load_param_attributes_cache().items() if 'BACKUP' in flags)
+
+
+def export_backup_params(params: Params) -> dict[str, Any]:
+    """Every set BACKUP param as a JSON-safe value; restore_backup_params() is the inverse."""
+    backup: dict[str, Any] = {}
+    for key in backup_param_keys():
+        try:
+            value = params.get(key)
+        except UnknownKeyName:
+            continue
+        if value is None:
+            continue
+        param_type = _get_param_type_name(params, key)
+        if param_type == 'bytes':
+            value = {'_binary': True, 'data': base64.b64encode(value).decode('ascii')}
+        elif param_type == 'json':
+            value = json.dumps(value)
+        elif param_type == 'time':
+            value = value.isoformat()
+        backup[key] = value
+    return backup
+
+
+def _restore_value(param_type: str | None, value: Any) -> Any:
+    """Turn an exported value back into what Params.put() takes for the declared type."""
+    if param_type == 'bool' and isinstance(value, bool):
+        return value
+    if param_type == 'int' and isinstance(value, int) and not isinstance(value, bool):
+        return value
+    # a browser writes 1.0 as 1
+    if param_type == 'float' and isinstance(value, (int, float)) and not isinstance(value, bool):
+        return float(value)
+    if param_type == 'string' and isinstance(value, str):
+        return value
+    if param_type == 'json':
+        return json.loads(value) if isinstance(value, str) else value
+    if param_type == 'time' and isinstance(value, str):
+        return datetime.fromisoformat(value)
+    if param_type == 'bytes' and isinstance(value, dict) and value.get('_binary'):
+        return base64.b64decode(value['data'])
+    raise TypeError(f"a {type(value).__name__} value does not fit a {param_type} param")
+
+
+def restore_backup_params(backup: dict[str, Any], params: Params, onroad: bool) -> dict[str, Any]:
+    """Write back the BACKUP params of an export; refused while onroad."""
+    if onroad:
+        return {'success': False, 'error': 'Restore is not allowed while driving. Park and try again.',
+                'restored': [], 'failed': [], 'skipped': [], 'count': 0}
+
+    backup_keys = set(backup_param_keys())
+    restored: list[str] = []
+    failed: list[dict[str, str]] = []
+    skipped: list[str] = []
+    for key, value in backup.items():
+        if key not in backup_keys:
+            logger.warning(f"Skipping {key}: not a BACKUP param")
+            skipped.append(key)
+            continue
+        try:
+            params.put(key, _restore_value(_get_param_type_name(params, key), value), block=True)
+            restored.append(key)
+        except Exception as e:
+            logger.warning(f"Failed to restore param {key}: {e}")
+            failed.append({'param': key, 'error': str(e)})
+
+    return {'success': not failed, 'restored': restored, 'failed': failed, 'skipped': skipped, 'count': len(restored)}
+
+
 def _build_param_entry(key: str, params: Optional[Params], params_dir: Optional[str] = None) -> Dict[str, Any]:
     if params is None:
         params = Params()
