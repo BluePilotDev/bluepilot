@@ -41,7 +41,8 @@ class MiciHudRendererBP(HudRendererSP):
     self._wheel_icon_style = ensure_steering_wheel_icon_style_initialized(self._bp_params, SteeringWheelIconStyle.COMMA_4)
     self._theme_pack = theme_pack.get_active_pack(force=True)
     self._animate_wheel_param_counter = 0
-    self.show_lateral_control = False
+    self._show_brake_status = self._bp_params.get_bool("ShowBrakeStatus")
+    self.show_lateral_control = self._bp_params.get_bool("BpShowLateralControl")
     # BluePilot: actual mode from controllerStateBP (None = not published, e.g. non-Ford)
     self.lateral_mode = None
     # BluePilot: Track overlay hit-area for click-to-toggle
@@ -59,8 +60,10 @@ class MiciHudRendererBP(HudRendererSP):
       self._animate_steering_wheel = self._bp_params.get_bool("BPAnimateSteeringWheel")
       self._wheel_icon_style = get_steering_wheel_icon_style(self._bp_params, SteeringWheelIconStyle.COMMA_4)
       self._theme_pack = theme_pack.get_active_pack()
+      self._show_brake_status = self._bp_params.get_bool("ShowBrakeStatus")
+      self.show_lateral_control = self._bp_params.get_bool("BpShowLateralControl")
 
-    if self._bp_params.get_bool("ShowBrakeStatus"):
+    if self._show_brake_status:
       sm = ui_state.sm
       try:
         car_state_bp = sm['carStateBP']
@@ -71,7 +74,6 @@ class MiciHudRendererBP(HudRendererSP):
     else:
       self._brakes_on = False
 
-    self.show_lateral_control = self._bp_params.get_bool("BpShowLateralControl")
     if self.show_lateral_control:
       sm = ui_state.sm
       self.lateral_mode = sm['controllerStateBP'].activeLateralMode if sm.alive['controllerStateBP'] else None
