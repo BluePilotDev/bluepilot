@@ -142,7 +142,8 @@ from bluepilot.backend.system import get_system_metrics
 # Params management
 from bluepilot.backend.params.params_manager import (
     get_all_params, get_params_by_category, get_param_value,
-    set_param_value, search_params, READONLY_PARAMS, CRITICAL_PARAMS
+    set_param_value, search_params, READONLY_PARAMS, CRITICAL_PARAMS,
+    backup_param_keys, export_backup_params, restore_backup_params
 )
 from bluepilot.backend.params.params_watcher import ParamsWatcher
 
@@ -2203,35 +2204,13 @@ class WebRoutesHandler(BaseHTTPRequestHandler):
             elif path == '/api/params/backup':
                 # Get only params with BACKUP flag for backup/restore
                 try:
-                    # Get all params with their metadata (including attributes)
-                    all_params = get_all_params(params)
-
-                    # Filter to only params with BACKUP attribute and extract their values
-                    backup_data = {}
-                    backup_keys = []
-
-                    for key, param_entry in all_params.items():
-                        attributes = param_entry.get('attributes', [])
-                        if 'BACKUP' in attributes:
-                            backup_keys.append(key)
-                            value = param_entry.get('value')
-
-                            # Store value for backup
-                            if value is not None:
-                                # Check if it's already a dict with _binary flag
-                                if isinstance(value, dict) and value.get('_binary'):
-                                    backup_data[key] = value
-                                elif isinstance(value, (str, int, float, bool)):
-                                    backup_data[key] = value
-                                else:
-                                    # For other types, store as JSON string
-                                    backup_data[key] = json.dumps(value)
+                    backup_data = export_backup_params(params)
 
                     self.send_json_response({
                         'success': True,
                         'params': backup_data,
                         'count': len(backup_data),
-                        'backup_params_list': sorted(backup_keys)
+                        'backup_params_list': backup_param_keys()
                     })
 
                 except Exception as e:
@@ -3073,52 +3052,14 @@ class WebRoutesHandler(BaseHTTPRequestHandler):
                         }, 400)
                         return
 
-                    # Use centralized attributes cache to get list of valid BACKUP params
-                    from bluepilot.backend.params.params_manager import _load_param_attributes_cache
+                    result = restore_backup_params(params_data, params, onroad=is_onroad())
+                    for param_key in result['restored']:
+                        broadcast_websocket_event(WebSocketEvent.PARAM_UPDATED, {
+                            'key': param_key,
+                            'value': params_data[param_key]
+                        })
 
-                    attributes_cache = _load_param_attributes_cache()
-                    backup_params = {key for key, attrs in attributes_cache.items() if 'BACKUP' in attrs}
-
-                    restored = []
-                    failed = []
-                    skipped = []
-
-                    for param_key, param_value in params_data.items():
-                        # Only restore params that have BACKUP flag
-                        if param_key not in backup_params:
-                            skipped.append(param_key)
-                            logger.warning(f"Skipping {param_key}: not a BACKUP param")
-                            continue
-
-                        try:
-                            # Handle binary data
-                            if isinstance(param_value, dict) and param_value.get('_binary'):
-                                import base64
-                                value = base64.b64decode(param_value['data'])
-                                params.put(param_key, value)
-                            else:
-                                # String value
-                                params.put(param_key, str(param_value))
-
-                            restored.append(param_key)
-
-                            # Broadcast param change
-                            broadcast_websocket_event(WebSocketEvent.PARAM_UPDATED, {
-                                'key': param_key,
-                                'value': param_value
-                            })
-
-                        except Exception as e:
-                            logger.error(f"Failed to restore param {param_key}: {e}")
-                            failed.append({'param': param_key, 'error': str(e)})
-
-                    self.send_json_response({
-                        'success': len(failed) == 0,
-                        'restored': restored,
-                        'failed': failed,
-                        'skipped': skipped,
-                        'count': len(restored)
-                    })
+                    self.send_json_response(result, 503 if 'error' in result else 200)
 
                 except json.JSONDecodeError:
                     self.send_json_response({

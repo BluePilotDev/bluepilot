@@ -20,6 +20,7 @@ PARAMS_DIR = "/data/params/d"
 USE_DIRECT_FILE_READING = False
 _PARAM_TYPE_CACHE: Optional[Dict[str, str]] = None
 _PARAM_ATTRIBUTES_CACHE: Optional[Dict[str, List[str]]] = None
+PARAMS_KEYS_H = Path(__file__).resolve().parents[3] / "openpilot" / "common" / "params_keys.h"
 
 CAR_PARAM_KEYS = {
     "CarParams", "CarParamsCache", "CarParamsPersistent", "CarParamsPrevRoute",
@@ -132,87 +133,40 @@ CRITICAL_PARAMS = {
     "LongitudinalPersonality",
 }
 
-# Cache for BluePilot panel params (loaded from JSON files)
+# BluePilot's params are the ones declared from this comment in params_keys.h to the end of the list
+BLUEPILOT_PARAMS_START = "// BluePilot Ford lateral control:"
 _BLUEPILOT_PARAMS_CACHE: Optional[set] = None
 
 
 def _load_bluepilot_params() -> set:
-    """Load all param names from BluePilot panel JSON files.
-
-    Params defined in panel JSONs are considered 'BluePilot' params.
-    All other params are considered 'System' params.
-    """
+    """Params declared in params_keys.h's BluePilot blocks are 'BluePilot'; all others are 'System'."""
     global _BLUEPILOT_PARAMS_CACHE
     if _BLUEPILOT_PARAMS_CACHE is not None:
         return _BLUEPILOT_PARAMS_CACHE
 
     bp_params: set = set()
+    try:
+        contents = PARAMS_KEYS_H.read_text()
+        start = contents.index(BLUEPILOT_PARAMS_START)
+        bp_params = set(re.findall(r'\{"([^"]+)",', contents[start:contents.index("};", start)]))
+    except (OSError, ValueError) as e:
+        logger.warning(f"Failed to find the BluePilot params in params_keys.h: {e}")
 
-    # Find panel JSON files
-    repo_root = Path(__file__).resolve().parents[3]  # Go up to openpilot root
-    panel_dirs = [
-        repo_root / "selfdrive" / "ui" / "bluepilot" / "menus",
-    ]
-
-    for panel_dir in panel_dirs:
-        if not panel_dir.exists():
-            continue
-
-        for json_file in panel_dir.glob("*.json"):
-            try:
-                with open(json_file, 'r') as f:
-                    panel_data = json.load(f)
-
-                # Extract params from all controls in all groups
-                groups = panel_data.get("groups", [])
-                for group in groups:
-                    controls = group.get("controls", [])
-                    for control in controls:
-                        # Get param from control
-                        param = control.get("param")
-                        if param:
-                            bp_params.add(param)
-
-                        # Also check params array (some controls have multiple params)
-                        params_list = control.get("params", [])
-                        bp_params.update(params_list)
-
-                        # Check options for selection controls
-                        options = control.get("options", [])
-                        for opt in options:
-                            if isinstance(opt, dict):
-                                opt_param = opt.get("param")
-                                if opt_param:
-                                    bp_params.add(opt_param)
-
-                # Also include persistent params and other param arrays
-                for key in ["persistentParams", "clearOnManagerStartParams",
-                           "clearOnOnroadTransitionParams", "clearOnOffroadTransitionParams"]:
-                    bp_params.update(panel_data.get(key, []))
-
-            except (json.JSONDecodeError, IOError) as e:
-                logger.debug(f"Error reading panel file {json_file}: {e}")
-                continue
-
-    logger.info(f"Loaded {len(bp_params)} BluePilot params from panel JSON files")
     _BLUEPILOT_PARAMS_CACHE = bp_params
     return bp_params
 
 
 def _load_param_type_cache() -> Dict[str, str]:
-    """Parse common/params_keys.h and bluepilot/params/params.json to know declared types."""
+    """Parse openpilot/common/params_keys.h to know declared types."""
     global _PARAM_TYPE_CACHE
     if _PARAM_TYPE_CACHE is not None:
         return _PARAM_TYPE_CACHE
 
     cache: Dict[str, str] = {}
 
-    # First, load from common/params_keys.h (openpilot core params)
     try:
-        repo_root = Path(__file__).resolve().parents[3]  # Go up to openpilot root
-        header_path = repo_root / "common" / "params_keys.h"
-        if header_path.exists():
-            contents = header_path.read_text()
+        if PARAMS_KEYS_H.exists():
+            contents = PARAMS_KEYS_H.read_text()
             pattern = re.compile(r'\{"([^"]+)",\s*\{[^,]+,\s*(STRING|BOOL|INT|FLOAT|TIME|JSON|BYTES)')
             for match in pattern.finditer(contents):
                 key, type_name = match.groups()
@@ -220,28 +174,12 @@ def _load_param_type_cache() -> Dict[str, str]:
     except Exception as e:
         logger.debug(f"Failed to parse params_keys.h for param types: {e}")
 
-    # Second, load from bluepilot/params/params.json (BluePilot-specific params)
-    try:
-        repo_root = Path(__file__).resolve().parents[3]  # Go up to openpilot root
-        params_json_path = repo_root / "bluepilot" / "params" / "params.json"
-        if params_json_path.exists():
-            with open(params_json_path, 'r') as f:
-                bp_params_data = json.load(f)
-            # params.json has structure: {"params": [...]}
-            params_list = bp_params_data.get("params", []) if isinstance(bp_params_data, dict) else bp_params_data
-            for param in params_list:
-                if isinstance(param, dict) and 'name' in param and 'type' in param:
-                    cache[param['name']] = param['type'].lower()
-            logger.info(f"Loaded {len([p for p in params_list if isinstance(p, dict) and 'name' in p])} param types from bluepilot params.json")
-    except Exception as e:
-        logger.debug(f"Failed to parse bluepilot params.json for param types: {e}")
-
     _PARAM_TYPE_CACHE = cache
     return cache
 
 
 def _load_param_attributes_cache() -> Dict[str, List[str]]:
-    """Parse common/params_keys.h to extract ParamKeyAttributes flags.
+    """Parse openpilot/common/params_keys.h to extract ParamKeyAttributes flags.
 
     Returns a dict mapping param key to list of attribute flags like:
     ['PERSISTENT', 'BACKUP'], ['CLEAR_ON_MANAGER_START'], etc.
@@ -252,10 +190,8 @@ def _load_param_attributes_cache() -> Dict[str, List[str]]:
 
     cache: Dict[str, List[str]] = {}
     try:
-        repo_root = Path(__file__).resolve().parents[3]  # Go up to openpilot root
-        header_path = repo_root / "common" / "params_keys.h"
-        if header_path.exists():
-            contents = header_path.read_text()
+        if PARAMS_KEYS_H.exists():
+            contents = PARAMS_KEYS_H.read_text()
             # Match pattern: {"ParamName", {FLAGS, TYPE, ...}}
             # FLAGS can be: PERSISTENT | BACKUP | CLEAR_ON_MANAGER_START | DONT_LOG | DEVELOPMENT_ONLY | etc.
             pattern = re.compile(r'\{"([^"]+)",\s*\{([^}]+)\}\}')
@@ -307,7 +243,7 @@ def write_param_direct(key: str, value: Any) -> Tuple[bool, Optional[str]]:
 def categorize_param(key: str) -> str:
     """Determine which category a param belongs to.
 
-    Params defined in BluePilot panel JSON files are 'BluePilot'.
+    Params declared in params_keys.h's BluePilot blocks are 'BluePilot'.
     All other params are 'System'.
 
     Args:
@@ -491,6 +427,77 @@ def set_param_value(key: str, value: Any, params: Optional[Params] = None) -> Di
             "success": False,
             "error": f"Failed to update parameter: {str(e)}"
         }
+
+
+def backup_param_keys() -> list[str]:
+    """The params params_keys.h flags BACKUP."""
+    return sorted(key for key, flags in _load_param_attributes_cache().items() if 'BACKUP' in flags)
+
+
+def export_backup_params(params: Params) -> dict[str, Any]:
+    """Every set BACKUP param as a JSON-safe value; restore_backup_params() is the inverse."""
+    backup: dict[str, Any] = {}
+    for key in backup_param_keys():
+        try:
+            value = params.get(key)
+        except UnknownKeyName:
+            continue
+        if value is None:
+            continue
+        param_type = _get_param_type_name(params, key)
+        if param_type == 'bytes':
+            value = {'_binary': True, 'data': base64.b64encode(value).decode('ascii')}
+        elif param_type == 'json':
+            value = json.dumps(value)
+        elif param_type == 'time':
+            value = value.isoformat()
+        backup[key] = value
+    return backup
+
+
+def _restore_value(param_type: str | None, value: Any) -> Any:
+    """Turn an exported value back into what Params.put() takes for the declared type."""
+    if param_type == 'bool' and isinstance(value, bool):
+        return value
+    if param_type == 'int' and isinstance(value, int) and not isinstance(value, bool):
+        return value
+    # a browser writes 1.0 as 1
+    if param_type == 'float' and isinstance(value, (int, float)) and not isinstance(value, bool):
+        return float(value)
+    if param_type == 'string' and isinstance(value, str):
+        return value
+    if param_type == 'json':
+        return json.loads(value) if isinstance(value, str) else value
+    if param_type == 'time' and isinstance(value, str):
+        return datetime.fromisoformat(value)
+    if param_type == 'bytes' and isinstance(value, dict) and value.get('_binary'):
+        return base64.b64decode(value['data'])
+    raise TypeError(f"a {type(value).__name__} value does not fit a {param_type} param")
+
+
+def restore_backup_params(backup: dict[str, Any], params: Params, onroad: bool) -> dict[str, Any]:
+    """Write back the BACKUP params of an export; refused while onroad."""
+    if onroad:
+        return {'success': False, 'error': 'Restore is not allowed while driving. Park and try again.',
+                'restored': [], 'failed': [], 'skipped': [], 'count': 0}
+
+    backup_keys = set(backup_param_keys())
+    restored: list[str] = []
+    failed: list[dict[str, str]] = []
+    skipped: list[str] = []
+    for key, value in backup.items():
+        if key not in backup_keys:
+            logger.warning(f"Skipping {key}: not a BACKUP param")
+            skipped.append(key)
+            continue
+        try:
+            params.put(key, _restore_value(_get_param_type_name(params, key), value), block=True)
+            restored.append(key)
+        except Exception as e:
+            logger.warning(f"Failed to restore param {key}: {e}")
+            failed.append({'param': key, 'error': str(e)})
+
+    return {'success': not failed, 'restored': restored, 'failed': failed, 'skipped': skipped, 'count': len(restored)}
 
 
 def _build_param_entry(key: str, params: Optional[Params], params_dir: Optional[str] = None) -> Dict[str, Any]:
