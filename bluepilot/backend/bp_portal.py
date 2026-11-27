@@ -38,6 +38,11 @@ try:
 except ImportError:
     psutil = None
 
+# Add parent directory to path for imports
+sys.path.append(os.path.join(os.path.dirname(__file__), "../.."))
+
+from bluepilot.backend.portal_log import portal_file_handler
+
 # Configure logging
 log_file = "/tmp/bp_portal.log"
 try:
@@ -47,9 +52,7 @@ try:
         root_logger.removeHandler(handler)
     
     # Create file handler
-    file_handler = logging.FileHandler(log_file, mode='a')
-    file_handler.setLevel(logging.INFO)
-    file_handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s [%(name)s]: %(message)s'))
+    file_handler = portal_file_handler(log_file)
     
     # Create console handler
     console_handler = logging.StreamHandler()
@@ -71,10 +74,7 @@ except Exception as e:
         force=True
     )
     logger = logging.getLogger(__name__)
-    logger.error(f"Failed to configure file logging: {e}")
-
-# Add parent directory to path for imports
-sys.path.append(os.path.join(os.path.dirname(__file__), "../.."))
+    logger.exception(f"Failed to configure file logging: {e}")
 
 # ============================================================================
 # Import All Modular Components
@@ -230,7 +230,7 @@ def restart_ui_process():
     except FileNotFoundError:
         logger.warning('pkill not available for UI restart fallback')
     except Exception as exc:
-        logger.error(f"Failed to invoke pkill for UI restart: {exc}")
+        logger.exception(f"Failed to invoke pkill for UI restart: {exc}")
 
     return False, 'Unable to signal UI process'
 
@@ -259,7 +259,7 @@ def broadcast_websocket_event(event_type, data=None):
         try:
             broadcaster.broadcast(event_type, data)
         except Exception as e:
-            logger.error(f"Error broadcasting WebSocket event {event_type}: {e}")
+            logger.exception(f"Error broadcasting WebSocket event {event_type}: {e}")
 
 
 async def websocket_handler(websocket):
@@ -617,7 +617,7 @@ class WebRoutesHandler(BaseHTTPRequestHandler):
             # Connection might be broken, don't try to send error response
             return
         except Exception as e:
-            logger.error(f"Unexpected error sending file {filepath}: {e}")
+            logger.exception(f"Unexpected error sending file {filepath}: {e}")
             return
 
     def send_remuxed_hevc(self, hevc_path, route_base, segment_num, camera, debug_mode=False):
@@ -831,7 +831,7 @@ class WebRoutesHandler(BaseHTTPRequestHandler):
                 self.send_file_response(hevc_path, 'video/mp4; codecs="hev1"')
                 return
             except Exception as fallback_error:
-                logger.error(f"Fallback to raw HEVC also failed: {fallback_error}")
+                logger.exception(f"Fallback to raw HEVC also failed: {fallback_error}")
                 self.send_json_response({
                     'error': 'Video conversion failed',
                     'details': str(e),
@@ -2360,7 +2360,7 @@ class WebRoutesHandler(BaseHTTPRequestHandler):
                                             params.put("ApiCache_DriveStats", json.dumps(api_data))
                                             logger.info(f"Successfully cached drive stats (as JSON string): {api_data.get('all', {}).get('routes', 0)} routes")
                                         except Exception as cache_error2:
-                                            logger.error(f"Failed to cache drive stats: {cache_error2}")
+                                            logger.exception(f"Failed to cache drive stats: {cache_error2}")
                                     logger.info(f"Successfully fetched drive stats from Comma API: {api_data.get('all', {}).get('routes', 0)} routes")
                                     
                                     # Parse and return the data
@@ -2895,7 +2895,7 @@ class WebRoutesHandler(BaseHTTPRequestHandler):
                         os.remove(export_path)
                         logger.info(f"Cleaned up cancelled export: {export_path}")
                     except Exception as e:
-                        logger.error(f"Failed to clean up export file: {e}")
+                        logger.exception(f"Failed to clean up export file: {e}")
 
                 self.send_json_response({'status': 'cancelled', 'message': 'Export cancelled'})
                 return
@@ -3714,7 +3714,7 @@ def main():
             })
             logger.debug(f"Broadcasted external param change: {key} = {value}")
         except Exception as e:
-            logger.error(f"Error broadcasting param change: {e}")
+            logger.exception(f"Error broadcasting param change: {e}")
 
     params_watcher = ParamsWatcher(params, broadcast_callback=on_param_change)
     params_watcher.start()
@@ -3795,7 +3795,7 @@ def main():
                         logger.info(f"Successfully bound to {bind_address}:{port} after force cleanup")
                         break
                     except Exception as final_error:
-                        logger.error(f"Failed to start server even after force cleanup: {final_error}")
+                        logger.exception(f"Failed to start server even after force cleanup: {final_error}")
                         logger.error("Manual intervention required. Try: sudo reboot")
                         return
             else:
@@ -3822,7 +3822,7 @@ def main():
 
             last_onroad_status[0] = current_onroad
         except Exception as e:
-            logger.error(f"Error in status monitor: {e}")
+            logger.exception(f"Error in status monitor: {e}")
 
     # Start background dependency installation if needed (after server is ready to start)
     # This ensures the server is responsive immediately while packages install in background
@@ -3858,7 +3858,7 @@ def main():
                 try:
                     lifecycle.trigger_restart()
                 except Exception as e:
-                    logger.error(f"Failed to trigger restart: {e}")
+                    logger.exception(f"Failed to trigger restart: {e}")
                     # Server will continue running, retry on next timeout
                 return  # Don't call original handler if restarting
 
@@ -3872,7 +3872,7 @@ def main():
         logger.info("Server stopped by user")
         server.shutdown()
     except Exception as e:
-        logger.error(f"Server error: {e}")
+        logger.exception(f"Server error: {e}")
         # Record this error for monitoring but don't stop the server
         # lifecycle.record_crash()
         logger.info("Server continuing despite error...")

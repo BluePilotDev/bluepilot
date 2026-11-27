@@ -43,7 +43,7 @@ class LogStreamer:
 
                 self._sock = messaging.sub_sock('logMessage', timeout=1000, conflate=True)
             except Exception as exc:
-                logger.error("Unable to access logMessage stream: %s", exc)
+                logger.exception("Unable to access logMessage stream: %s", exc)
                 self._broadcast_status('error', 'log stream unavailable')
                 return False
 
@@ -92,7 +92,7 @@ class LogStreamer:
         try:
             import openpilot.cereal.messaging as messaging
         except Exception as exc:
-            logger.error("Unable to import messaging for log stream: %s", exc)
+            logger.exception("Unable to import messaging for log stream: %s", exc)
             self._broadcast_status('error', 'messaging unavailable')
             self.running = False
             return
@@ -118,7 +118,7 @@ class LogStreamer:
                     })
 
         except Exception as exc:
-            logger.error("Error reading log stream: %s", exc)
+            logger.exception("Error reading log stream: %s", exc)
             self._broadcast_status('error', 'Log stream error')
         finally:
             self.running = False

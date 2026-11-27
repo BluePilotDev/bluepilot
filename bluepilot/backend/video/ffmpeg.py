@@ -112,7 +112,7 @@ class FFmpegProcess:
                         self.process.kill()
                         self.process.wait()
             except Exception as e:
-                logger.error(f"Error cleaning up FFmpeg process {self.pid}: {e}")
+                logger.exception(f"Error cleaning up FFmpeg process {self.pid}: {e}")
             finally:
                 # Wait for log streaming thread to finish
                 if self.log_thread and self.log_thread.is_alive():
@@ -182,5 +182,5 @@ class FFmpegProcess:
             return self.process
 
         except Exception as e:
-            logger.error(f"Failed to start FFmpeg: {e}")
+            logger.exception(f"Failed to start FFmpeg: {e}")
             raise
