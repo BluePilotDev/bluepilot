@@ -1140,10 +1140,6 @@ class WebRoutesHandler(BaseHTTPRequestHandler):
                     connection_type = get_connection_type()
                     wifi_ip = get_wifi_ip()
                     all_wifi_ips = get_all_wifi_ips()
-                    try:
-                        tethering_enabled = params.get_bool("EnableTethering")
-                    except Exception:
-                        tethering_enabled = False
 
                     # Server uptime
                     try:
@@ -1177,7 +1173,6 @@ class WebRoutesHandler(BaseHTTPRequestHandler):
                         'wifi_ip': wifi_ip,
                         'wifi_available': wifi_ip is not None,
                         'all_wifi_ips': [{'interface': iface, 'ip': ip} for iface, ip in all_wifi_ips],
-                        'tethering_enabled': tethering_enabled,
                         'port': int(params.get("BPPortalPort") or "8088")
                     },
                     'clients': {
@@ -3281,29 +3276,6 @@ class WebRoutesHandler(BaseHTTPRequestHandler):
                                 'username': current_username if has_keys else None
                             })
 
-                    elif action == 'set_copyparty_password':
-                        # Set Copyparty password
-                        password = data.get('password', '')
-
-                        if password is None:
-                            self.send_json_response({
-                                'success': False,
-                                'error': 'Missing password field'
-                            }, 400)
-                            return
-
-                        # Empty string means remove password
-                        if password == '':
-                            params.remove('CopypartyPassword')
-                        else:
-                            params.put('CopypartyPassword', password)
-
-                        self.send_json_response({
-                            'success': True,
-                            'message': 'Password saved. Reboot required to apply changes.',
-                            'requires_reboot': True
-                        })
-
                     elif action == 'view_error_log':
                         # View error log
                         error_log_path = '/data/community/crashes/error.log'
@@ -3651,11 +3623,6 @@ def main():
     # Enable all CPU cores for better FFmpeg performance
     enable_performance_mode()
 
-    # Check if server should be disabled due to crashes
-    # if not lifecycle.check_and_handle_crashes():
-    #     logger.error("Server startup aborted due to excessive crashes")
-    #     return
-
     # Start WebSocket server in separate thread if websockets is available
     try:
         if importlib.util.find_spec("websockets") is None:
@@ -3725,11 +3692,6 @@ def main():
     # Only wlan IPs are advertised to users (cellular IPs are filtered out)
     wifi_ip = get_wifi_ip()
     all_wifi_ips = get_all_wifi_ips()
-    try:
-        tethering_enabled = params.get_bool("EnableTethering")
-    except Exception:
-        # EnableTethering may not be registered in params schema
-        tethering_enabled = False
 
     # Always bind to all interfaces to support both WiFi and hotspot seamlessly
     bind_address = '0.0.0.0'
@@ -3743,11 +3705,6 @@ def main():
         logger.info(f"Primary WiFi IP: {wifi_ip or 'N/A'}")
     else:
         logger.warning("No WiFi interfaces detected!")
-
-    if tethering_enabled:
-        logger.info("Tethering/hotspot: ENABLED")
-    else:
-        logger.info("Tethering/hotspot: Disabled")
 
     logger.info("Note: Only WiFi/hotspot IPs are shown to users (cellular filtered)")
     logger.info("=" * 60)
@@ -3867,8 +3824,6 @@ def main():
         server.shutdown()
     except Exception as e:
         logger.exception(f"Server error: {e}")
-        # Record this error for monitoring but don't stop the server
-        # lifecycle.record_crash()
         logger.info("Server continuing despite error...")
         # Don't shutdown or re-raise - keep server running
 
