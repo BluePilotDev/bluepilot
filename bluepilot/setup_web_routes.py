@@ -91,7 +91,7 @@ def main():
                 print(f"✓ BPPortalPort = {port}")
             else:
                 print("  BPPortalPort not set (will default to 8088)")
-        except:
+        except Exception:
             print("  BPPortalPort not set (will default to 8088)")
 
     except ImportError:

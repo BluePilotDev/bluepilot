@@ -26,10 +26,7 @@ def get_segment_number(route_name):
     """
     match = re.search(r'--(\d+)$', route_name)
     if match:
-        try:
-            return int(match.group(1))
-        except:
-            return 0
+        return int(match.group(1))
     return 0
 
 

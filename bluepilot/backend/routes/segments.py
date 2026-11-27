@@ -69,7 +69,7 @@ def get_file_size(path):
                 filepath = os.path.join(dirpath, filename)
                 if os.path.exists(filepath):
                     total += os.path.getsize(filepath)
-    except:
+    except OSError:
         pass
     return total
 

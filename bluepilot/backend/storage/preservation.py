@@ -84,7 +84,7 @@ def has_preserve_xattr_segment(segment_path: str) -> bool:
         return False
     try:
         return getxattr(segment_path, PRESERVE_ATTR_NAME) == PRESERVE_ATTR_VALUE
-    except:
+    except OSError:
         return False
 
 
@@ -145,7 +145,7 @@ def has_lock_file(segment_path: str) -> bool:
     try:
         full_path = os.path.join(ROUTES_DIR, segment_path)
         return any(name.endswith(".lock") for name in os.listdir(full_path))
-    except:
+    except OSError:
         return False
 
 
