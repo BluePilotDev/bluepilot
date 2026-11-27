@@ -33,6 +33,9 @@ class LateralLayoutMici(NavScroller):
     self.enable_lane_positioning_ang = BigParamControlBP(
       "Enable Lane Positioning", "enable_lane_positioning_ang",
     )
+    self.enable_lane_full_mode_ang = BigParamControlBP(
+      "Enable Lanefull Mode", "enable_lane_full_mode_ang",
+    )
     self.custom_path_offset_ang = BigParamFloatControl(
       "In-Lane Offset", "custom_path_offset_ang", min=-0.5, max=0.5, step=0.01,
     )
@@ -86,6 +89,7 @@ class LateralLayoutMici(NavScroller):
       self.high_speed_dampening,
       self.lane_change_factor_high_ang,
       self.enable_lane_positioning_ang,
+      self.enable_lane_full_mode_ang,
       self.custom_path_offset_ang,
       self.lane_centering_strength_ang,
       self.disable_lane_change_under_speed,
@@ -111,6 +115,7 @@ class LateralLayoutMici(NavScroller):
       ("enable_lane_full_mode_curv", self.enable_lane_full_mode),
       ("custom_profile_curv", self.custom_profile),
       ("enable_lane_positioning_ang", self.enable_lane_positioning_ang),
+      ("enable_lane_full_mode_ang", self.enable_lane_full_mode_ang),
       ("BpShowLateralControl", self.show_lateral_control),
     )
 
@@ -133,6 +138,8 @@ class LateralLayoutMici(NavScroller):
     self.lane_change_factor_high_ang.set_visible(is_angle)
     self.enable_lane_positioning_ang.set_visible(is_angle)
     lane_pos_ang = ui_state.params.get_bool("enable_lane_positioning_ang")
+    self.enable_lane_full_mode_ang.set_visible(is_angle)
+    self.enable_lane_full_mode_ang.set_enabled(lane_pos_ang)
     self.custom_path_offset_ang.set_visible(is_angle)
     self.custom_path_offset_ang.set_enabled(lane_pos_ang)
     self.lane_centering_strength_ang.set_visible(is_angle)
