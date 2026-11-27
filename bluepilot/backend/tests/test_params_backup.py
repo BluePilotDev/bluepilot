@@ -36,6 +36,15 @@ def non_default_value(params, key):
   raise AssertionError(f"{key}: unhandled type {t!r}")
 
 
+def changed(value):
+  """Another value of the same type."""
+  if isinstance(value, bool):
+    return not value
+  if isinstance(value, dict):
+    return {"changed": True}
+  return value + type(value)(1) if isinstance(value, (int, float)) else value + value[:1]
+
+
 class ParamsTestCase(unittest.TestCase):
   def setUp(self):
     tmp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)  # Params may still be writing in the background
@@ -66,9 +75,13 @@ class TestBackupRoundTrip(ParamsTestCase):
     exported = json.loads(json.dumps(params_manager.export_backup_params(self.params)))
     self.assertEqual(sorted(exported), keys)
 
-    for key in keys:
-      self.params.remove(key)
-      self.assertIsNone(self.params.get(key), key)
+    # change every setting after the export: half get another value, half are removed
+    for i, (key, value) in enumerate(expected.items()):
+      if i % 2:
+        self.params.remove(key)
+      else:
+        self.params.put(key, changed(value), block=True)
+      self.assertNotEqual(self.params.get(key), value, key)
 
     result = params_manager.restore_backup_params(exported, self.params, onroad=False)
     self.assertEqual(result["failed"], [])

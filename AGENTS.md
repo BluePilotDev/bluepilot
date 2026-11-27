@@ -56,7 +56,7 @@ All of these are protected. Work on your own branch or fork and open a PR.
 
 BluePilot's own code lives in two places:
 
-- `bluepilot/`: the portal (`backend/`, `web/`), settings (`params/`), processes and openpilot-side logic
+- `bluepilot/`: the portal (`backend/`, `web/`), processes and openpilot-side logic
   (`selfdrive/`, `system/`), vendored third-party Python (`vendor/`), images (`assets/`).
 - `openpilot/selfdrive/ui/bp/`: the UI. `onroad/`, `layouts/` and `widgets/` are the comma 3X (upstream calls it
   tici); `mici/` is the comma four.
