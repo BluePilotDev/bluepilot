@@ -3,7 +3,7 @@ import os
 import tempfile
 import unittest
 
-from bluepilot.backend.core.logging_handler import portal_file_handler
+from bluepilot.backend.portal_log import portal_file_handler
 from bluepilot.backend.utils import file_ops
 
 

@@ -33,12 +33,15 @@ import asyncio
 import threading
 import requests
 
-from bluepilot.backend.core.logging_handler import portal_file_handler
-
 try:
     import psutil
 except ImportError:
     psutil = None
+
+# Add parent directory to path for imports
+sys.path.append(os.path.join(os.path.dirname(__file__), "../.."))
+
+from bluepilot.backend.portal_log import portal_file_handler
 
 # Configure logging
 log_file = "/tmp/bp_portal.log"
@@ -72,9 +75,6 @@ except Exception as e:
     )
     logger = logging.getLogger(__name__)
     logger.exception(f"Failed to configure file logging: {e}")
-
-# Add parent directory to path for imports
-sys.path.append(os.path.join(os.path.dirname(__file__), "../.."))
 
 # ============================================================================
 # Import All Modular Components
