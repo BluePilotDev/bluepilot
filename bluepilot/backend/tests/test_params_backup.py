@@ -115,5 +115,23 @@ class TestRestoreRules(ParamsTestCase):
     self.assertIs(type(restored), float)
 
 
+class TestCategory(unittest.TestCase):
+  def test_bluepilot_block_markers_are_in_the_header(self):
+    # a renamed marker would silently put every BluePilot param under "System"
+    header = params_manager.PARAMS_KEYS_H.read_text()
+    for marker in ("// BluePilot Ford lateral control:", "// BluePilot (BPx): BluePilot's own settings"):
+      self.assertIn(marker, header)
+
+  def test_bluepilot_params_are_bluepilot(self):
+    # first of the lateral block, first of the BPx block, last in the list
+    for key in ("FordPrefLateralControl", "ShowBlindspotOverlay", "BPHideOnroadBorder", "WifiFavoriteSSID"):
+      self.assertEqual(params_manager.categorize_param(key), "BluePilot", key)
+
+  def test_upstream_params_are_system(self):
+    # IsMetric is upstream; TorqueParamsOverrideLatAccelFactor is the line just above the BluePilot blocks
+    for key in ("IsMetric", "TorqueParamsOverrideLatAccelFactor"):
+      self.assertEqual(params_manager.categorize_param(key), "System", key)
+
+
 if __name__ == "__main__":
   unittest.main()

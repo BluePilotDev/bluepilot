@@ -133,69 +133,25 @@ CRITICAL_PARAMS = {
     "LongitudinalPersonality",
 }
 
-# Cache for BluePilot panel params (loaded from JSON files)
+# BluePilot's params are the ones declared from this comment in params_keys.h to the end of the list
+BLUEPILOT_PARAMS_START = "// BluePilot Ford lateral control:"
 _BLUEPILOT_PARAMS_CACHE: Optional[set] = None
 
 
 def _load_bluepilot_params() -> set:
-    """Load all param names from BluePilot panel JSON files.
-
-    Params defined in panel JSONs are considered 'BluePilot' params.
-    All other params are considered 'System' params.
-    """
+    """Params declared in params_keys.h's BluePilot blocks are 'BluePilot'; all others are 'System'."""
     global _BLUEPILOT_PARAMS_CACHE
     if _BLUEPILOT_PARAMS_CACHE is not None:
         return _BLUEPILOT_PARAMS_CACHE
 
     bp_params: set = set()
+    try:
+        contents = PARAMS_KEYS_H.read_text()
+        start = contents.index(BLUEPILOT_PARAMS_START)
+        bp_params = set(re.findall(r'\{"([^"]+)",', contents[start:contents.index("};", start)]))
+    except (OSError, ValueError) as e:
+        logger.warning(f"Failed to find the BluePilot params in params_keys.h: {e}")
 
-    # Find panel JSON files
-    repo_root = Path(__file__).resolve().parents[3]  # Go up to openpilot root
-    panel_dirs = [
-        repo_root / "selfdrive" / "ui" / "bluepilot" / "menus",
-    ]
-
-    for panel_dir in panel_dirs:
-        if not panel_dir.exists():
-            continue
-
-        for json_file in panel_dir.glob("*.json"):
-            try:
-                with open(json_file, 'r') as f:
-                    panel_data = json.load(f)
-
-                # Extract params from all controls in all groups
-                groups = panel_data.get("groups", [])
-                for group in groups:
-                    controls = group.get("controls", [])
-                    for control in controls:
-                        # Get param from control
-                        param = control.get("param")
-                        if param:
-                            bp_params.add(param)
-
-                        # Also check params array (some controls have multiple params)
-                        params_list = control.get("params", [])
-                        bp_params.update(params_list)
-
-                        # Check options for selection controls
-                        options = control.get("options", [])
-                        for opt in options:
-                            if isinstance(opt, dict):
-                                opt_param = opt.get("param")
-                                if opt_param:
-                                    bp_params.add(opt_param)
-
-                # Also include persistent params and other param arrays
-                for key in ["persistentParams", "clearOnManagerStartParams",
-                           "clearOnOnroadTransitionParams", "clearOnOffroadTransitionParams"]:
-                    bp_params.update(panel_data.get(key, []))
-
-            except (json.JSONDecodeError, IOError) as e:
-                logger.debug(f"Error reading panel file {json_file}: {e}")
-                continue
-
-    logger.info(f"Loaded {len(bp_params)} BluePilot params from panel JSON files")
     _BLUEPILOT_PARAMS_CACHE = bp_params
     return bp_params
 
@@ -287,7 +243,7 @@ def write_param_direct(key: str, value: Any) -> Tuple[bool, Optional[str]]:
 def categorize_param(key: str) -> str:
     """Determine which category a param belongs to.
 
-    Params defined in BluePilot panel JSON files are 'BluePilot'.
+    Params declared in params_keys.h's BluePilot blocks are 'BluePilot'.
     All other params are 'System'.
 
     Args:
