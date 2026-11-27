@@ -141,7 +141,7 @@ from bluepilot.backend.system import get_system_metrics
 
 # Params management
 from bluepilot.backend.params.params_manager import (
-    get_all_params, get_params_by_category, get_param_value,
+    get_all_params, get_param_value,
     set_param_value, search_params, READONLY_PARAMS, CRITICAL_PARAMS,
     backup_param_keys, export_backup_params, restore_backup_params
 )
@@ -187,52 +187,6 @@ from bluepilot.backend.handlers.log_downloads import (
 from bluepilot.backend.params.params_manager import Params
 params = Params()
 
-
-def restart_ui_process():
-    """Attempt to restart the UI process by signaling the running binary."""
-    process_names = {'ui', 'bluepilot-ui', 'bp-ui'}
-
-    if psutil:
-        try:
-            targets = []
-            for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
-                name = (proc.info.get('name') or '').lower()
-                cmdline = ' '.join(proc.info.get('cmdline') or [])
-                if name in process_names or 'selfdrive/ui' in cmdline or 'bluepilot-ui' in cmdline:
-                    targets.append(proc)
-
-            if targets:
-                for proc in targets:
-                    try:
-                        logger.info(f"Sending SIGINT to UI process {proc.pid} ({proc.info.get('name')})")
-                        proc.send_signal(signal.SIGINT)
-                    except (psutil.NoSuchProcess, psutil.AccessDenied) as exc:
-                        logger.warning(f"Failed to signal UI process {proc.pid}: {exc}")
-                return True, 'Restart signal sent to UI process'
-        except Exception as exc:
-            logger.warning(f"psutil UI restart attempt failed: {exc}")
-
-    # Fallback to pkill if psutil is unavailable or no process matched
-    try:
-        result = subprocess.run(
-            ['pkill', '-2', '-f', 'selfdrive/ui'],
-            capture_output=True,
-            text=True,
-            timeout=3
-        )
-        if result.returncode == 0:
-            logger.info('pkill successfully signaled UI process')
-            return True, 'Restart signal sent via pkill'
-        if result.returncode == 1:
-            logger.warning('pkill could not find a UI process to signal')
-            return False, 'UI process not found'
-        logger.warning(f"pkill returned unexpected code {result.returncode}: {result.stderr.strip()}")
-    except FileNotFoundError:
-        logger.warning('pkill not available for UI restart fallback')
-    except Exception as exc:
-        logger.exception(f"Failed to invoke pkill for UI restart: {exc}")
-
-    return False, 'Unable to signal UI process'
 
 # Disk space deletion thresholds
 try:
@@ -1345,21 +1299,6 @@ class WebRoutesHandler(BaseHTTPRequestHandler):
                     })
                 except Exception as e:
                     logger.exception("Error getting params")
-                    self.send_json_response({
-                        'success': False,
-                        'error': str(e)
-                    }, 500)
-
-            elif path == '/api/params/categories':
-                # Get parameters organized by category
-                try:
-                    categorized = get_params_by_category(params)
-                    self.send_json_response({
-                        'success': True,
-                        'categories': categorized
-                    })
-                except Exception as e:
-                    logger.exception("Error getting params by category")
                     self.send_json_response({
                         'success': False,
                         'error': str(e)
@@ -3200,22 +3139,6 @@ class WebRoutesHandler(BaseHTTPRequestHandler):
                             'error': 'Reset settings not yet implemented in web UI',
                             'hint': 'Use the device settings panel for this operation'
                         }, 501)
-
-                    elif action == 'restart_ui':
-                        success, message = restart_ui_process()
-                        if success:
-                            self.send_json_response({
-                                'success': True,
-                                'message': message
-                            })
-                            broadcast_websocket_event(WebSocketEvent.STATUS_CHANGED, {
-                                'status': 'ui_restart_requested'
-                            })
-                        else:
-                            self.send_json_response({
-                                'success': False,
-                                'error': message
-                            }, 500)
 
                     elif action == 'manage_ssh_keys':
                         # Manage SSH keys (add/remove GitHub SSH keys)
