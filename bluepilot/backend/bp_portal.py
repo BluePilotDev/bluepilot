@@ -28,6 +28,7 @@ from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs
 import logging
+import re
 import asyncio
 import threading
 import requests
@@ -1086,7 +1087,6 @@ class WebRoutesHandler(BaseHTTPRequestHandler):
                             with open(op_version_path, 'r') as f:
                                 content = f.read()
                                 # Extract version from #define COMMA_VERSION "0.10.1"
-                                import re
                                 match = re.search(r'#define\s+COMMA_VERSION\s+"([^"]+)"', content)
                                 if match:
                                     device_info['op_version'] = match.group(1)
@@ -1105,7 +1105,6 @@ class WebRoutesHandler(BaseHTTPRequestHandler):
                             with open(sp_version_path, 'r') as f:
                                 content = f.read()
                                 # Extract version from #define SUNNYPILOT_VERSION "2025.003.000"
-                                import re
                                 match = re.search(r'#define\s+SUNNYPILOT_VERSION\s+"([^"]+)"', content)
                                 if match:
                                     device_info['sp_version'] = match.group(1)
