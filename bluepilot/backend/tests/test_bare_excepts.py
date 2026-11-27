@@ -63,7 +63,7 @@ def run_has_lock_file(side_effect):
 
 
 def short_inet_line(*args, **kwargs):
-  return subprocess.CompletedProcess(args[0], 0, stdout="    inet\n", stderr="")
+  return subprocess.CompletedProcess(args[0], 0, stdout="    inet \n", stderr="")
 
 
 TIMEOUT = subprocess.TimeoutExpired(["ip"], 2)
