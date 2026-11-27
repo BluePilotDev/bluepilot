@@ -20,6 +20,7 @@ PARAMS_DIR = "/data/params/d"
 USE_DIRECT_FILE_READING = False
 _PARAM_TYPE_CACHE: Optional[Dict[str, str]] = None
 _PARAM_ATTRIBUTES_CACHE: Optional[Dict[str, List[str]]] = None
+PARAMS_KEYS_H = Path(__file__).resolve().parents[3] / "openpilot" / "common" / "params_keys.h"
 
 CAR_PARAM_KEYS = {
     "CarParams", "CarParamsCache", "CarParamsPersistent", "CarParamsPrevRoute",
@@ -200,19 +201,16 @@ def _load_bluepilot_params() -> set:
 
 
 def _load_param_type_cache() -> Dict[str, str]:
-    """Parse common/params_keys.h and bluepilot/params/params.json to know declared types."""
+    """Parse openpilot/common/params_keys.h to know declared types."""
     global _PARAM_TYPE_CACHE
     if _PARAM_TYPE_CACHE is not None:
         return _PARAM_TYPE_CACHE
 
     cache: Dict[str, str] = {}
 
-    # First, load from common/params_keys.h (openpilot core params)
     try:
-        repo_root = Path(__file__).resolve().parents[3]  # Go up to openpilot root
-        header_path = repo_root / "common" / "params_keys.h"
-        if header_path.exists():
-            contents = header_path.read_text()
+        if PARAMS_KEYS_H.exists():
+            contents = PARAMS_KEYS_H.read_text()
             pattern = re.compile(r'\{"([^"]+)",\s*\{[^,]+,\s*(STRING|BOOL|INT|FLOAT|TIME|JSON|BYTES)')
             for match in pattern.finditer(contents):
                 key, type_name = match.groups()
@@ -220,28 +218,12 @@ def _load_param_type_cache() -> Dict[str, str]:
     except Exception as e:
         logger.debug(f"Failed to parse params_keys.h for param types: {e}")
 
-    # Second, load from bluepilot/params/params.json (BluePilot-specific params)
-    try:
-        repo_root = Path(__file__).resolve().parents[3]  # Go up to openpilot root
-        params_json_path = repo_root / "bluepilot" / "params" / "params.json"
-        if params_json_path.exists():
-            with open(params_json_path, 'r') as f:
-                bp_params_data = json.load(f)
-            # params.json has structure: {"params": [...]}
-            params_list = bp_params_data.get("params", []) if isinstance(bp_params_data, dict) else bp_params_data
-            for param in params_list:
-                if isinstance(param, dict) and 'name' in param and 'type' in param:
-                    cache[param['name']] = param['type'].lower()
-            logger.info(f"Loaded {len([p for p in params_list if isinstance(p, dict) and 'name' in p])} param types from bluepilot params.json")
-    except Exception as e:
-        logger.debug(f"Failed to parse bluepilot params.json for param types: {e}")
-
     _PARAM_TYPE_CACHE = cache
     return cache
 
 
 def _load_param_attributes_cache() -> Dict[str, List[str]]:
-    """Parse common/params_keys.h to extract ParamKeyAttributes flags.
+    """Parse openpilot/common/params_keys.h to extract ParamKeyAttributes flags.
 
     Returns a dict mapping param key to list of attribute flags like:
     ['PERSISTENT', 'BACKUP'], ['CLEAR_ON_MANAGER_START'], etc.
@@ -252,10 +234,8 @@ def _load_param_attributes_cache() -> Dict[str, List[str]]:
 
     cache: Dict[str, List[str]] = {}
     try:
-        repo_root = Path(__file__).resolve().parents[3]  # Go up to openpilot root
-        header_path = repo_root / "common" / "params_keys.h"
-        if header_path.exists():
-            contents = header_path.read_text()
+        if PARAMS_KEYS_H.exists():
+            contents = PARAMS_KEYS_H.read_text()
             # Match pattern: {"ParamName", {FLAGS, TYPE, ...}}
             # FLAGS can be: PERSISTENT | BACKUP | CLEAR_ON_MANAGER_START | DONT_LOG | DEVELOPMENT_ONLY | etc.
             pattern = re.compile(r'\{"([^"]+)",\s*\{([^}]+)\}\}')
