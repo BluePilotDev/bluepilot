@@ -614,7 +614,7 @@ def wait_for_ffmpeg_capacity(timeout=30.0, reserve=FFMPEG_RESERVED_FOR_PLAYBACK,
     if not server_state:
         return True  # Can't check, assume OK
 
-    deadline = None if timeout is None else time.time() + timeout
+    deadline = None if timeout is None else time.monotonic() + timeout
     min_capacity = max(1, MAX_CONCURRENT_FFMPEG - reserve)
 
     while True:
@@ -622,7 +622,7 @@ def wait_for_ffmpeg_capacity(timeout=30.0, reserve=FFMPEG_RESERVED_FOR_PLAYBACK,
         if current < min_capacity:
             return True
 
-        if deadline and time.time() >= deadline:
+        if deadline and time.monotonic() >= deadline:
             return False
 
         time.sleep(0.5)

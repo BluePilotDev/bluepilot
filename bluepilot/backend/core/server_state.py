@@ -34,7 +34,7 @@ class ServerState:
         self._active_ffmpeg_count = 0
         self._error_log = []  # Circular buffer of recent errors
         self._max_errors = 50  # Keep last 50 errors
-        self._server_start_time = time.time()
+        self._server_start_time = time.monotonic()
         self._route_exports = {}
         self._export_threads = {}
 
@@ -152,7 +152,7 @@ class ServerState:
 
     def get_server_uptime(self):
         """Get server uptime in seconds"""
-        return time.time() - self._server_start_time
+        return time.monotonic() - self._server_start_time
 
     def clear_error_log(self):
         """Clear the error log"""
