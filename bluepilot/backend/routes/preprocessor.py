@@ -250,7 +250,7 @@ def main():
     # Get web server port from params
     try:
         web_port = int(params.get("BPPortalPort") or "8088")
-    except:
+    except Exception:
         web_port = 8088
 
     broadcaster = WebSocketBroadcaster(http_fallback_port=web_port)

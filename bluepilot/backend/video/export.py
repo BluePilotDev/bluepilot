@@ -27,6 +27,7 @@ from bluepilot.backend.config import (
 from bluepilot.backend.video.ffmpeg import FFmpegProcess
 from bluepilot.backend.realtime import WebSocketEvent
 from bluepilot.backend.utils.power import enable_performance_mode
+from bluepilot.backend.routes.parsing import get_segment_number
 from bluepilot.backend.utils.file_ops import (
     get_free_disk_space,
     has_sufficient_disk_space,
@@ -559,19 +560,6 @@ def parse_route_datetime(route_base):
         # Silently return None for non-standard route names
         pass
     return None
-
-
-def get_segment_number(route_name):
-    """Extract segment number from route name
-    Example: 2024-09-18--14-30-00--5 -> 5
-    """
-    match = re.search(r'--(\d+)$', route_name)
-    if match:
-        try:
-            return int(match.group(1))
-        except:
-            return 0
-    return 0
 
 
 @lru_cache(maxsize=100)
