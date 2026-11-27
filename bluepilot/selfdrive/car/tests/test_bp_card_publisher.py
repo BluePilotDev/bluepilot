@@ -2,6 +2,7 @@ from types import SimpleNamespace
 
 import openpilot.cereal.messaging as messaging
 from openpilot.cereal import custom
+from openpilot.common.params import Params
 from openpilot.common.test import OpenpilotTestCase
 from opendbc.bluepilot_lateral.host_types import LateralStatus
 from opendbc.car import structs
@@ -70,14 +71,24 @@ class TestControllerStateBP(OpenpilotTestCase):
     self.assertFalse(_controller_state_bp(_ford(fingerprint_source="fw")).controllerStateBP.bmsFingerprintForced)
 
   def test_settings_snapshot(self):
-    # the 48 bms* fields of ControllerStateBP: 46 settings plus the two fingerprint fields
+    # the 49 bms* fields of ControllerStateBP: 47 settings plus the two fingerprint fields
     snapshot = bp_card_publisher._refresh_settings_cache()
     bms_fields = {f for f in custom.ControllerStateBP.schema.fields if f.startswith("bms")}
-    self.assertEqual(len(bms_fields), 48)
+    self.assertEqual(len(bms_fields), 49)
     self.assertEqual(set(snapshot) | {"bmsFingerprintForced", "bmsFingerprint"}, bms_fields)
     cs = _controller_state_bp(_ford()).controllerStateBP
     self.assertAlmostEqual(cs.bmsTwelveVBatteryLimit, snapshot["bmsTwelveVBatteryLimit"], places=5)
     self.assertEqual(cs.bmsShowBlindspotOverlay, snapshot["bmsShowBlindspotOverlay"])
+
+  def test_angle_lanefull_records_the_saved_setting(self):
+    # #285: the saved setting, also while Blendful runs (the override is read from the Blendful fields)
+    params = Params()
+    params.put_bool("Blendful", True, block=True)
+    params.put("ModelRunnerTypeCache", int(custom.ModelManagerSP.Runner.tinygrad), block=True)
+    for saved in (False, True):
+      params.put_bool("enable_lane_full_mode_ang", saved, block=True)
+      with self.subTest(saved=saved):
+        self.assertEqual(bp_card_publisher._refresh_settings_cache()["bmsEnableLanefullModeAngle"], saved)
 
 
 class TestCarStateBP(OpenpilotTestCase):

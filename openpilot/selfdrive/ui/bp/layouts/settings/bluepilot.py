@@ -26,6 +26,7 @@ from openpilot.selfdrive.ui.bp.lib.dm_icon_style import (
   get_dm_icon_style,
 )
 from openpilot.selfdrive.ui.bp.lib.custom_sound import get_custom_sound_selection
+from openpilot.selfdrive.ui.bp.lib.blendful import blendful_running
 from opendbc.bluepilot_lateral.core.lateral_curv_ext import PrimaryLateralControl
 from openpilot.selfdrive.ui.bp.onroad.augmented_road_view_bp import GaugeStyle
 
@@ -71,6 +72,8 @@ class BluePilotLayout(Widget):
     # Register callback to update saved networks list
     self._wifi_manager.add_callbacks(networks_updated=self._on_network_updated)
 
+    self._blendful_locked = False  # Lanefull toggles shown off and locked while Blendful runs (#285)
+
     # Initialize items
     items = self._initialize_items()
     self._scroller = Scroller(items, line_separator=True, spacing=0)
@@ -97,6 +100,7 @@ class BluePilotLayout(Widget):
       ("enable_lane_full_mode_curv", self._enable_lane_full_mode),
       ("custom_profile_curv", self._custom_profile),
       ("enable_lane_positioning_ang", self._enable_lane_positioning_ang),
+      ("enable_lane_full_mode_ang", self._enable_lane_full_mode_ang),
       ("disable_BP_lat_UI", self._disable_BP_lat),
       ("disable_BP_long_UI", self._disable_BP_long),
       ("disable_downhill_comp_UI", self._disable_dowhill_comp),
@@ -425,7 +429,7 @@ class BluePilotLayout(Widget):
     # Enable lanefull mode toggle (conditional on lane positioning)
     self._enable_lane_full_mode = toggle_item(
       lambda: tr("Enable Lanefull Mode"),
-      lambda: tr("Enable lanefull mode for lane positioning."),
+      lambda: self._lanefull_description(tr("Enable lanefull mode for lane positioning.")),
       initial_state=self._safe_get_bool(self._params, "enable_lane_full_mode_curv"),
       callback=lambda state: self._toggle_callback(state, "enable_lane_full_mode_curv"),
       enabled=lambda: self._safe_get_bool(self._params, "enable_lane_positioning_curv"),
@@ -572,6 +576,15 @@ class BluePilotLayout(Widget):
       callback=lambda state: self._toggle_callback(state, "enable_lane_positioning_ang"),
       icon="chffr_wheel.png"
     )
+    self._enable_lane_full_mode_ang = toggle_item(
+      lambda: tr("Enable Lanefull Mode"),
+      lambda: self._lanefull_description(
+        tr("Center on the lane lines when they can be trusted. Off: lane positioning applies only the In-Lane Offset to the model's path.")),
+      initial_state=self._safe_get_bool(self._params, "enable_lane_full_mode_ang"),
+      callback=lambda state: self._toggle_callback(state, "enable_lane_full_mode_ang"),
+      enabled=lambda: self._safe_get_bool(self._params, "enable_lane_positioning_ang"),
+      icon="chffr_wheel.png"
+    )
     self._custom_path_offset_ang = float_control_item(
       lambda: tr("In-Lane Offset"),
       lambda: tr("Adjust the in-lane offset (-0.5 to 0.5)."),
@@ -678,6 +691,7 @@ class BluePilotLayout(Widget):
       self._high_speed_dampening,
       self._lane_change_factor_high_ang,
       self._enable_lane_positioning_ang,
+      self._enable_lane_full_mode_ang,
       self._custom_path_offset_ang,
       self._lane_centering_strength_ang,
     ]
@@ -770,6 +784,9 @@ class BluePilotLayout(Widget):
       return float(self._params.get(param, return_default=True))
     except (TypeError, ValueError):
       return default
+
+  def _lanefull_description(self, text: str) -> str:
+    return f"<b>{tr('Off while Blendful is on.')}</b><br><br>{text}" if self._blendful_locked else text
 
   def _toggle_callback(self, state: bool, param: str):
     """Handle toggle state changes."""
@@ -879,6 +896,11 @@ class BluePilotLayout(Widget):
     for key, item in self._refresh_toggles:
       state = fresh[key] if key in fresh else self._safe_get_bool(ui_state.params, key)
       item.action_item.set_state(state)
+    # While Blendful runs, both Lanefull toggles show off and are locked (enabled states below); nothing is written
+    self._blendful_locked = blendful_running()
+    if self._blendful_locked:
+      self._enable_lane_full_mode.action_item.set_state(False)
+      self._enable_lane_full_mode_ang.action_item.set_state(False)
 
     wheel_style_idx = int(get_steering_wheel_icon_style(ui_state.params, SteeringWheelIconStyle.COMMA_3X))
     self._wheel_icon_style_btn.action_item.set_selected_button(wheel_style_idx)
@@ -933,6 +955,7 @@ class BluePilotLayout(Widget):
     self._high_speed_dampening.action_item.set_enabled(is_angle)
     self._lane_change_factor_high_ang.action_item.set_enabled(is_angle)
     self._enable_lane_positioning_ang.action_item.set_enabled(is_angle)
+    self._enable_lane_full_mode_ang.action_item.set_enabled(is_angle and lane_pos_ang and not self._blendful_locked)
     self._custom_path_offset_ang.action_item.set_enabled(is_angle and lane_pos_ang)
     self._lane_centering_strength_ang.action_item.set_enabled(is_angle and lane_pos_ang)
     # Curvature-mode items: always visible (Curvature Tuning section), grayed out when angle mode is active
@@ -940,7 +963,7 @@ class BluePilotLayout(Widget):
     self._enable_human_turn_detection.action_item.set_enabled(is_curv)
     self._enable_lane_positioning.action_item.set_enabled(is_curv)
     self._custom_path_offset.action_item.set_enabled(is_curv and lane_pos)
-    self._enable_lane_full_mode.action_item.set_enabled(is_curv and lane_pos)
+    self._enable_lane_full_mode.action_item.set_enabled(is_curv and lane_pos and not self._blendful_locked)
     self._custom_profile.action_item.set_enabled(is_curv)
     self._pc_blend_ratio_high_C.action_item.set_enabled(is_curv and custom_prof)
     self._pc_blend_ratio_low_C.action_item.set_enabled(is_curv and custom_prof)

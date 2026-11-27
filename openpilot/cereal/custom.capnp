@@ -593,6 +593,7 @@ struct ControllerStateBP @0xcd96dafb67a082d0 {
   bmsLowSpeedAdjustmentFactor @40 :Float32;  # FordLowSpeedFactor_ang
   bmsHighSpeedAdjustmentFactor @41 :Float32;  # FordHighSpeedFactor_ang
   bmsLaneChangeFactorHighAngle @42 :Float32;  # lane_change_factor_high_ang
+  bmsEnableLanefullModeAngle @55 :Bool;  # enable_lane_full_mode_ang (the saved setting; Blendful forces it off at runtime)
 
   # --- Curvature Tuning (curvature-mode-only menu items) ---
   bmsEnableHumanTurnDetection @43 :Bool;  # enable_human_turn_detection_curv

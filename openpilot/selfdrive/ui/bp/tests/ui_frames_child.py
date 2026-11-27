@@ -483,6 +483,43 @@ def main() -> None:
     else:
       draw_mici_settings(layout, draw, attempt)
 
+    # #285: the lateral settings with Blendful running (both Lanefull toggles locked off, with the reason), both modes
+    def lanefull_locked():
+      from openpilot.cereal import custom
+      put("Blendful", True)
+      put("ModelRunnerTypeCache", int(custom.ModelManagerSP.Runner.tinygrad))
+      try:
+        for mode in (0, 1):
+          put("FordPrefLateralControl", mode)
+          if FAMILY == "tici":
+            from openpilot.selfdrive.ui.bp.layouts.settings.bluepilot import BluePilotLayout
+            from openpilot.selfdrive.ui.bp.widgets.section_header import CollapsibleSectionHeader
+            page = BluePilotLayout()
+            page.show_event()
+            for item in page._scroller._items:
+              if isinstance(item, CollapsibleSectionHeader) and not item._expanded:
+                item._toggle()
+            toggles = (page._enable_lane_full_mode, page._enable_lane_full_mode_ang)
+            for item in toggles:
+              item._set_description_visible(True)  # the reason is in the description
+            locked = all(not t.action_item.get_state() and not t.action_item.enabled for t in toggles)
+          else:
+            from openpilot.selfdrive.ui.bp.mici.layouts.settings.lateral_mici import LateralLayoutMici
+            page = LateralLayoutMici()
+            page.show_event()
+            toggles = (page.enable_lane_full_mode, page.enable_lane_full_mode_ang)
+            locked = all(not t._checked and not t.enabled and t.value for t in toggles)
+          if not locked:
+            raise AssertionError("the Lanefull toggles are not locked off while Blendful runs")
+          draw(page, 3)
+          panel = page._scroller.scroll_panel
+          for offset in range(0, 12000, 400):
+            draw(page, 1, lambda offset=offset, panel=panel: panel.set_offset(-offset))
+          calls["lanefull locked pages drawn"] += 1
+      finally:
+        put("Blendful", False)
+    attempt("settings/lanefull locked", lanefull_locked)
+
   # flush: a line longer than the pipe buffer is written straight through while its newline stays buffered,
   # and raylib's close_window log (flushed C stdout) would land on the same line
   print("RESULTS " + json.dumps(results), flush=True)

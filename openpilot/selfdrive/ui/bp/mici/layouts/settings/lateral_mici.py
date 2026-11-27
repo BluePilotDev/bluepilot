@@ -2,6 +2,7 @@
 
 from collections.abc import Callable
 
+from openpilot.selfdrive.ui.bp.lib.blendful import blendful_running
 from openpilot.selfdrive.ui.bp.mici.widgets.button_bp import BigParamControlBP
 from openpilot.selfdrive.ui.bp.mici.widgets.floatbutton import BigParamFloatControl, BigParamIntControl
 from openpilot.selfdrive.ui.ui_state import ui_state
@@ -32,6 +33,9 @@ class LateralLayoutMici(NavScroller):
     # see opendbc/sunnypilot/car/ford/lane_center_trim.py).
     self.enable_lane_positioning_ang = BigParamControlBP(
       "Enable Lane Positioning", "enable_lane_positioning_ang",
+    )
+    self.enable_lane_full_mode_ang = BigParamControlBP(
+      "Enable Lanefull Mode", "enable_lane_full_mode_ang",
     )
     self.custom_path_offset_ang = BigParamFloatControl(
       "In-Lane Offset", "custom_path_offset_ang", min=-0.5, max=0.5, step=0.01,
@@ -86,6 +90,7 @@ class LateralLayoutMici(NavScroller):
       self.high_speed_dampening,
       self.lane_change_factor_high_ang,
       self.enable_lane_positioning_ang,
+      self.enable_lane_full_mode_ang,
       self.custom_path_offset_ang,
       self.lane_centering_strength_ang,
       self.disable_lane_change_under_speed,
@@ -111,6 +116,7 @@ class LateralLayoutMici(NavScroller):
       ("enable_lane_full_mode_curv", self.enable_lane_full_mode),
       ("custom_profile_curv", self.custom_profile),
       ("enable_lane_positioning_ang", self.enable_lane_positioning_ang),
+      ("enable_lane_full_mode_ang", self.enable_lane_full_mode_ang),
       ("BpShowLateralControl", self.show_lateral_control),
     )
 
@@ -124,6 +130,13 @@ class LateralLayoutMici(NavScroller):
     ui_state.update_params()
     for key, item in self._refresh_toggles:
       item.set_checked(ui_state.params.get_bool(key))
+    # While Blendful runs, both Lanefull toggles show off and are locked, with the reason as the value; nothing is written
+    blendful_locked = blendful_running()
+    for item in (self.enable_lane_full_mode, self.enable_lane_full_mode_ang):
+      if blendful_locked:
+        item.set_checked(False)
+      item.set_value("Off while Blendful is on" if blendful_locked else "")
+    self.enable_lane_full_mode.set_enabled(not blendful_locked)
     plat_idx = PrimaryLateralControl(ui_state.params.get("FordPrefLateralControl", return_default=True) or 0)
     is_angle = (plat_idx == PrimaryLateralControl.angle)
     is_curv = not is_angle
@@ -133,6 +146,8 @@ class LateralLayoutMici(NavScroller):
     self.lane_change_factor_high_ang.set_visible(is_angle)
     self.enable_lane_positioning_ang.set_visible(is_angle)
     lane_pos_ang = ui_state.params.get_bool("enable_lane_positioning_ang")
+    self.enable_lane_full_mode_ang.set_visible(is_angle)
+    self.enable_lane_full_mode_ang.set_enabled(lane_pos_ang and not blendful_locked)
     self.custom_path_offset_ang.set_visible(is_angle)
     self.custom_path_offset_ang.set_enabled(lane_pos_ang)
     self.lane_centering_strength_ang.set_visible(is_angle)

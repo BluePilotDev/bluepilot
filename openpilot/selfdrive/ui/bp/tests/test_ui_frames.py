@@ -73,6 +73,14 @@ class TestUiFrames(unittest.TestCase):
       with self.subTest(drawn=drawn):
         self.assertGreater(calls.get(drawn, 0), 0)
 
+  def test_lanefull_locked_drawn(self):
+    # #285: the lateral settings drawn with Blendful running, in both lateral modes
+    for family in ("tici", "mici"):
+      with self.subTest(family=family):
+        result = self._results(family)["settings/lanefull locked"]
+        self.assertIsNone(result["error"], result["error"])
+        self.assertEqual(result["calls"].get("lanefull locked pages drawn"), 2)
+
   def test_tici_controls_debug_panel_drawn(self):
     self.assertGreater(self._results("tici")["onroad/controls debug panel"]["calls"].get("DebugDataCard._render", 0), 0)
 

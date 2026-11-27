@@ -106,6 +106,7 @@ def _refresh_settings_cache() -> dict:
     "bmsLowSpeedAdjustmentFactor":     _get_float(p, "FordLowSpeedFactor_ang", 1.0),
     "bmsHighSpeedAdjustmentFactor":    _get_float(p, "FordHighSpeedFactor_ang", 1.0),
     "bmsLaneChangeFactorHighAngle":    _get_float(p, "lane_change_factor_high_ang", 1.0),
+    "bmsEnableLanefullModeAngle":      _get_bool(p, "enable_lane_full_mode_ang", True),
     # --- Curvature Tuning ---
     "bmsEnableHumanTurnDetection":     _get_bool(p, "enable_human_turn_detection_curv", True),
     "bmsLaneChangeFactorHighCurvature": _get_float(p, "lane_change_factor_high_curv", 0.85),
