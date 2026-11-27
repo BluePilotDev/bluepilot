@@ -16,10 +16,10 @@ All utility functions have been modularized into dedicated modules.
 
 import os
 import json
+import importlib.util
 import mimetypes
 import subprocess
 import sys
-import shutil
 import time
 import signal
 import atexit
@@ -28,7 +28,6 @@ from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs
 import logging
-import re
 import asyncio
 import threading
 import requests
@@ -264,9 +263,7 @@ def broadcast_websocket_event(event_type, data=None):
 
 async def websocket_handler(websocket):
     """Handle WebSocket connections (thread-safe)"""
-    try:
-        import websockets
-    except ImportError:
+    if importlib.util.find_spec("websockets") is None:
         logger.error("websockets not available in handler")
         return
 
@@ -396,9 +393,7 @@ async def start_websocket_server():
 
 def start_websocket_server_thread():
     """Start WebSocket server in a separate thread (thread-safe)"""
-    try:
-        import websockets
-    except ImportError:
+    if importlib.util.find_spec("websockets") is None:
         logger.warning("WebSocket server thread not started - websockets library not available")
         return
 
@@ -3376,7 +3371,6 @@ class WebRoutesHandler(BaseHTTPRequestHandler):
 
             elif path == '/api/clear-cache':
                 # Clear all cached data (remuxed videos, thumbnails, GPS metrics, drive stats, fingerprints)
-                import shutil
 
                 cleared = {
                     'remux_cache': 0,
@@ -3665,7 +3659,8 @@ def main():
 
     # Start WebSocket server in separate thread if websockets is available
     try:
-        import websockets
+        if importlib.util.find_spec("websockets") is None:
+            raise ImportError("websockets not available")
         websocket_thread = threading.Thread(
             target=start_websocket_server_thread,
             daemon=True,

@@ -28,8 +28,6 @@ except ImportError:
 from bluepilot.backend.routes.processing import (
     ROUTES_DIR,
     METRICS_CACHE,
-    THUMBNAIL_CACHE,
-    check_processing_status,
     process_route,
 )
 

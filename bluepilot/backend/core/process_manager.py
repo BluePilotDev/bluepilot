@@ -4,7 +4,6 @@ BluePilot Backend Process Manager
 Process management and capacity control for FFmpeg and other background tasks
 """
 
-import os
 import time
 import logging
 import subprocess

@@ -11,6 +11,7 @@ import logging
 import subprocess
 import shutil
 import threading
+import importlib.util
 
 logger = logging.getLogger(__name__)
 
@@ -194,14 +195,11 @@ def install_dependencies_background(on_complete_callback=None):
         global _restart_pending
         try:
             # Check if websockets is available
-            try:
-                import websockets
+            if importlib.util.find_spec("websockets") is not None:
                 logger.info("websockets library is already available")
                 if on_complete_callback:
                     on_complete_callback(False)
                 return
-            except ImportError:
-                pass
 
             logger.info("=" * 60)
             logger.info("BACKGROUND DEPENDENCY INSTALLATION")
@@ -274,12 +272,9 @@ def ensure_dependencies():
     """
     try:
         # Check if websockets is available (direct import)
-        try:
-            import websockets
+        if importlib.util.find_spec("websockets") is not None:
             logger.info("websockets library is available")
             return False  # No restart needed
-        except ImportError:
-            pass
 
         logger.warning("websockets library not available - attempting installation")
         logger.info("HTTP API will still work during installation")
