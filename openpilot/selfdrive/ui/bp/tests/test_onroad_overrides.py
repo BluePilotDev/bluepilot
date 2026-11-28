@@ -24,6 +24,12 @@ class _SM(dict):
   valid = {"radarState": True}
 
 
+class _HudSM(dict):
+  recv_frame = {"carState": 1}
+  valid = {"carStateBP": True}
+  alive = {"controllerStateBP": False}
+
+
 def _lead_frame(present=True, available=True, d_rel=40.0):
   lead = SimpleNamespace(present=present, dRel=d_rel, yRel=0.0, vRel=0.0)
   no_lead = SimpleNamespace(present=False, dRel=0.0, yRel=0.0, vRel=0.0)
@@ -129,6 +135,45 @@ class TestOnroadOverrides(OpenpilotTestCase):
     # BP7's sizes: border 30, button 192
     (button_rect,), _ = hud._steering_wheel.render.call_args
     self.assertEqual((button_rect.x, button_rect.y, button_rect.width, button_rect.height), (2160 - 30 - 192, 30, 192, 192))
+
+  def _tici_hud_speed_drawn(self, true_v_ego_ui=False, brakes_on=False, params=None):
+    """One frame of the 3X HUD's current speed; returns (text, color) of the speed number, or None if not drawn."""
+    from openpilot.common.params import Params
+    from openpilot.selfdrive.ui.bp.onroad.hud_renderer_bp import HudRendererBP
+    for key, value in (params or {}).items():
+      Params().put_bool(key, value)
+    with mock.patch("openpilot.selfdrive.ui.bp.onroad.hud_renderer_bp.SteeringWheelBP"):
+      hud = HudRendererBP()
+    for name in ("road_name_renderer", "speed_limit_renderer", "smart_cruise_control_renderer",
+                 "turn_signal_controller", "circular_alerts_renderer"):
+      setattr(hud, name, mock.Mock())
+    car_state = SimpleNamespace(vEgo=26.8224, vEgoCluster=27.7166, vCruiseCluster=0.0,  # 60 mph true, 62 mph on the cluster
+                                cruiseState=SimpleNamespace(speedCluster=0.0))
+    light = SimpleNamespace(dataAvailable=True, brakeLightsOn=brakes_on)
+    sm = _HudSM(carState=car_state, controlsState=SimpleNamespace(deprecated=SimpleNamespace(vCruise=0.0)),
+                carStateBP=SimpleNamespace(brakeLightStatus=light))
+    with (mock.patch.object(self.ui_state, "sm", sm), mock.patch.object(self.ui_state, "started_frame", 0),
+          mock.patch.object(self.ui_state, "is_metric", False), mock.patch.object(self.ui_state, "CP_SP", None),
+          mock.patch.object(self.ui_state, "true_v_ego_ui", true_v_ego_ui, create=True), mock.patch.object(rl, "draw_text_ex") as draw):
+      hud._update_state()
+      hud._draw_current_speed(RECT)
+    if not draw.call_args_list:
+      return None
+    (_, text, _, _, _, color), _ = draw.call_args_list[0]
+    return text, tuple(color)[:3] if isinstance(color, tuple) else (color.r, color.g, color.b)  # rl.WHITE is a tuple
+
+  def test_tici_hud_speed_follows_true_v_ego_ui(self):
+    self.assertEqual(self._tici_hud_speed_drawn(true_v_ego_ui=True)[0], "60")  # vEgo
+
+  def test_tici_hud_speed_is_cluster_speed_without_true_v_ego_ui(self):
+    self.assertEqual(self._tici_hud_speed_drawn(true_v_ego_ui=False)[0], "62")  # vEgoCluster
+
+  def test_tici_hud_speed_red_while_braking(self):
+    self.assertEqual(self._tici_hud_speed_drawn(true_v_ego_ui=True, brakes_on=True, params={"ShowBrakeStatus": True}),
+                     ("60", (255, 60, 60)))
+
+  def test_tici_hud_speed_hidden(self):
+    self.assertIsNone(self._tici_hud_speed_drawn(true_v_ego_ui=True, params={"HideVEgoUI": True}))
 
   def _mici_rad_racer(self):
     """comma four renderer on a straight flat road, and the Rad Racer theme with stub textures."""
