@@ -281,6 +281,19 @@ cleanup_tinygrad_repo() {
     rm -f tinygrad_repo/{.flake8,.pylintrc,.tokeignore,*.sh,*.ini,*.toml,*.py} 2>/dev/null || :
 }
 
+# BluePilot: JetLink ships only what the comma runs and its license: jetlink/, LICENSE, pyproject.toml, README.md
+# (JetLink's docs/porting.md). The host apps (android, ios, macos, JetlinkKit), docs, scripts and tests stay out
+cleanup_jetlink_repo() {
+    print_info "[-] Cleaning up jetlink_repo..."
+
+    cd "$BUILD_DIR" || exit 1
+
+    [ -d jetlink_repo ] || return 0
+    find jetlink_repo -mindepth 1 -maxdepth 1 ! -name jetlink ! -name LICENSE ! -name pyproject.toml ! -name README.md \
+        ! -name '.git' -exec rm -rf {} + 2>/dev/null || :
+}
+# End BluePilot
+
 cleanup_files() {
     local CURRENT_DIR
     CURRENT_DIR=$(pwd)
@@ -317,6 +330,7 @@ cleanup_files() {
     cleanup_directory "$BUILD_DIR/third_party" "*Darwin*" "LICENSE" "README.md"
 
     cleanup_tinygrad_repo
+    cleanup_jetlink_repo  # BluePilot
 
     cd "$CURRENT_DIR" || return 1
 
@@ -328,7 +342,8 @@ process_submodules() {
 
     cd "$BUILD_DIR" || exit 1
 
-    local submodules=("msgq_repo" "opendbc_repo" "rednose_repo" "panda" "tinygrad_repo" "teleoprtc_repo")
+    # BluePilot: jetlink_repo (JetLink)
+    local submodules=("msgq_repo" "opendbc_repo" "rednose_repo" "panda" "tinygrad_repo" "teleoprtc_repo" "jetlink_repo")
 
     for sub in "${submodules[@]}"; do
         if [ -d "$sub" ]; then

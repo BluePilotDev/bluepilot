@@ -22,6 +22,7 @@ from openpilot.selfdrive.ui.bp.mici.layouts.settings.audio_mici import AudioLayo
 from openpilot.selfdrive.ui.bp.mici.layouts.settings.visuals_mici import VisualsLayoutMici
 from openpilot.selfdrive.ui.bp.mici.layouts.settings.longitudinal_mici import LongitudinalLayoutMici
 from openpilot.selfdrive.ui.bp.mici.layouts.settings.lateral_mici import LateralLayoutMici
+from openpilot.selfdrive.ui.bp.mici.layouts.settings.jetlink_mici import JetlinkLayoutMici
 
 
 class BluePilotBigButton(BigButtonBP):
@@ -106,6 +107,12 @@ class BluePilotLayoutMici(NavScroller):
     )
     lat_btn.set_click_callback(lambda: gui_app.push_widget(lat_panel))
 
+    jetlink_panel = JetlinkLayoutMici()
+    jetlink_btn = BluePilotBigButton(
+      tr("jetlink"), "", "icons_mici/settings/developer_icon.png", icon_size=80,
+    )
+    jetlink_btn.set_click_callback(lambda: gui_app.push_widget(jetlink_panel))
+
     self._scroller.add_widgets([
       self.enable_web_routes,
       self.show_web_routes_qr,
@@ -116,6 +123,7 @@ class BluePilotLayoutMici(NavScroller):
       self.primary_lateral_control,
       lat_btn,
       long_btn,
+      jetlink_btn,
       self.ui_debug_log,
       self.clear_model_cache,
       self.connect_backend_btn,

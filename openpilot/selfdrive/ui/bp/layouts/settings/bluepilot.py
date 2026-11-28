@@ -5,14 +5,13 @@ from openpilot.common.swaglog import cloudlog
 from openpilot.system.ui.widgets import Widget, DialogResult
 from openpilot.system.ui.widgets.confirm_dialog import ConfirmDialog
 from openpilot.system.ui.widgets.list_view import toggle_item, multiple_button_item, button_item, ButtonAction, ListItem
-from openpilot.system.ui.widgets.scroller_tici import Scroller
 from openpilot.system.ui.widgets.option_dialog import MultiOptionDialog
 from openpilot.system.ui.lib.application import gui_app
 from openpilot.system.ui.lib.multilang import tr
 from openpilot.system.ui.lib.wifi_manager import WifiManager, Network
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.selfdrive.ui.bp.widgets.float_control_item import float_control_item, int_control_item
-from openpilot.selfdrive.ui.bp.widgets.section_header import CollapsibleSectionHeader
+from openpilot.selfdrive.ui.bp.widgets.section_header import CollapsibleSectionHeader, SectionScroller
 from openpilot.selfdrive.ui.bp.lib.steering_wheel_style import (
   ensure_steering_wheel_icon_style_initialized,
   get_steering_wheel_icon_style,
@@ -28,6 +27,8 @@ from openpilot.selfdrive.ui.bp.lib.dm_icon_style import (
 from openpilot.selfdrive.ui.bp.lib.custom_sound import get_custom_sound_selection
 from opendbc.bluepilot_lateral.core.lateral_curv_ext import PrimaryLateralControl
 from openpilot.selfdrive.ui.bp.onroad.augmented_road_view_bp import GaugeStyle
+from openpilot.selfdrive.ui.bp.lib import jetlink_settings, jetlink_status
+from openpilot.selfdrive.ui.bp.widgets.live_description_item import live_text_item
 
 
 class BluePilotLayout(Widget):
@@ -72,8 +73,10 @@ class BluePilotLayout(Widget):
     self._wifi_manager.add_callbacks(networks_updated=self._on_network_updated)
 
     # Initialize items
+    self._section_headers: list[CollapsibleSectionHeader] = []
     items = self._initialize_items()
-    self._scroller = Scroller(items, line_separator=True, spacing=0)
+    # Section cards: an open section's items grouped in one card, the whole header row tappable
+    self._scroller = SectionScroller(items, line_separator=True)
 
     # Toggle refresh list
     self._refresh_toggles = (
@@ -103,6 +106,7 @@ class BluePilotLayout(Widget):
       ("disable_ford_radar_UI", self._disable_ford_radar),
       ("BpShowLateralControl", self._show_lateral_control),
       ("BPUIDebugLog", self._ui_debug_log),
+      (jetlink_settings.CHARGE_PHONE_PARAM, self._jetlink_charge_phone),
     )
 
     ui_state.add_offroad_transition_callback(self._update_toggles)
@@ -656,6 +660,33 @@ class BluePilotLayout(Widget):
       callback=self._clear_model_cache
     )
 
+    # JetLink: the big model on a computer on the USB-C port. Offroad only
+    self._jetlink_link_btn = multiple_button_item(
+      lambda: tr(jetlink_settings.TITLE),
+      lambda: tr(jetlink_settings.DESCRIPTION),
+      buttons=[(lambda label=label: tr(label)) for label in jetlink_settings.LINK_LABELS.values()],
+      button_width=225,
+      callback=self._set_jetlink_link,
+      selected_index=jetlink_settings.selected_index(self._params),
+      icon="chffr_wheel.png"
+    )
+    self._jetlink_link_btn.action_item.set_enabled(lambda: ui_state.is_offroad())
+    self._jetlink_charge_phone = toggle_item(
+      lambda: tr(jetlink_settings.CHARGE_PHONE_TITLE),
+      lambda: tr(jetlink_settings.CHARGE_PHONE_DESCRIPTION),
+      initial_state=self._safe_get_bool(self._params, jetlink_settings.CHARGE_PHONE_PARAM),
+      callback=lambda state: self._toggle_callback(state, jetlink_settings.CHARGE_PHONE_PARAM),
+      icon="chffr_wheel.png"
+    )
+    self._jetlink_charge_phone.action_item.set_enabled(lambda: ui_state.is_offroad())
+    # the link's state: the chip, and under it why it cannot run, progress, the port, the model and the ADB note
+    self._jetlink_status_reader = jetlink_status.StatusReader()
+    self._jetlink_status = live_text_item(
+      lambda: tr("JetLink Status"),
+      lambda: tr(jetlink_status.chip(self._jetlink_status_reader.get())),
+      description=lambda: "<br>".join(tr(line) for line in jetlink_status.detail_lines(self._jetlink_status_reader.get())),
+    )
+
     # BluePilot: reset menu layout — collapses all sections, fixing overlap glitch without reboot.
     self._reset_menu_btn = button_item(
       lambda: tr("Reset Menu Layout"),
@@ -665,10 +696,15 @@ class BluePilotLayout(Widget):
     )
     # End BluePilot
 
-    # BluePilot: collapsible section groups — all start collapsed when the menu opens.
-    def _section(title: str, items: list) -> list:
-      header = CollapsibleSectionHeader(title)
+    # BluePilot: collapsible section groups — all start collapsed when the menu opens, and one is open
+    # at a time (opening one closes the others and scrolls it to the top).
+    sp_icons = "../../sunnypilot/selfdrive/assets/offroad/"
+
+    def _section(title: str, subtitle: str, icon: str, items: list) -> list:
+      header = CollapsibleSectionHeader(title, subtitle=subtitle, icon=icon)
       header.set_items(items)
+      header.set_toggle_callback(self._on_section_toggled)
+      self._section_headers.append(header)
       return [header] + items
 
     # Angle Tuning: nested collapsible sub-section, angle-mode-only tuning items
@@ -710,15 +746,18 @@ class BluePilotLayout(Widget):
       self._blinker_min_speed,
       self._show_lateral_control,
     ]
-    lateral_header = CollapsibleSectionHeader(tr("Lateral Tuning"))
+    lateral_header = CollapsibleSectionHeader(tr("Lateral Tuning"), subtitle=tr("Steering mode, angle and curvature tuning"),
+                                              icon=sp_icons + "icon_lateral.png")
     lateral_header.set_items(lateral_items + [angle_header, curv_header])
     lateral_header.set_nested_headers([angle_header, curv_header])
+    lateral_header.set_toggle_callback(self._on_section_toggled)
+    self._section_headers.append(lateral_header)
     self._lateral_header = lateral_header
 
     lateral_section = [lateral_header] + lateral_items + [angle_header] + angle_items + [curv_header] + curv_items
 
     return (
-      _section(tr("System"), [
+      _section(tr("System"), tr("Wi-Fi, connect backend, model cache"), "icons/settings.png", [
         self._preferred_network_btn,
         self._clear_model_cache_btn,
         self._ui_debug_log,
@@ -726,16 +765,16 @@ class BluePilotLayout(Widget):
         self._restore_dongle_btn,
         self._reset_menu_btn,
       ]) +
-      _section(tr("Vehicle"), [
+      _section(tr("Vehicle"), tr("Cluster display, 12V battery"), sp_icons + "icon_vehicle.png", [
         self._show_hands_free_ui,
         self._steer_angle_curvature,
         self._vbatt_pause_charging,
       ]) +
-      _section(tr("Audio"), [
+      _section(tr("Audio"), tr("Engage and disengage sounds"), "icons/microphone.png", [
         self._use_custom_sounds,
         self._custom_sound_selection_btn,
       ]) +
-      _section(tr("Visuals"), [
+      _section(tr("Visuals"), tr("Driving view, theme, gauges, overlays"), sp_icons + "icon_visuals.png", [
         self._hide_onroad_border,
         self._disable_lane_line_status_color,
         self._hide_camera_view,
@@ -755,14 +794,28 @@ class BluePilotLayout(Widget):
         self._hybrid_gauge_size_btn,
         self._hybrid_gauge_style_btn,
       ]) +
-      _section(tr("Longitudinal Tuning"), [
+      _section(tr("Longitudinal Tuning"), tr("BP long control, downhill, radar"), "icons/speed_limit.png", [
         self._disable_BP_long,
         self._disable_dowhill_comp,
         self._disable_ford_radar,
       ]) +
-      lateral_section
+      lateral_section +
+      _section(tr("JetLink"), tr("Big model on a USB-C computer"), "icons/link.png", [
+        self._jetlink_link_btn,
+        self._jetlink_status,
+        self._jetlink_charge_phone,
+      ])
     )
     # End BluePilot
+
+  def _on_section_toggled(self, header: CollapsibleSectionHeader) -> None:
+    """One section open at a time; bring the one just opened to the top of the list."""
+    if not header.expanded:
+      return
+    for other in self._section_headers:
+      if other is not header and other.expanded:
+        other.collapse()
+    self._scroller.scroll_to(header)
 
   def _get_float_param(self, param: str, default: float) -> float:
     """Get float parameter value."""
@@ -945,6 +998,7 @@ class BluePilotLayout(Widget):
     self._pc_blend_ratio_high_C.action_item.set_enabled(is_curv and custom_prof)
     self._pc_blend_ratio_low_C.action_item.set_enabled(is_curv and custom_prof)
     self._lc_pid_gain.action_item.set_enabled(is_curv and lane_pos and custom_prof)
+    self._jetlink_link_btn.action_item.set_selected_button(jetlink_settings.selected_index(ui_state.params))
 
   def show_event(self):
     super().show_event()
@@ -1133,6 +1187,11 @@ class BluePilotLayout(Widget):
   def _handle_sound_reboot(self, result):
     if result == DialogResult.CONFIRM:
       self._params.put_bool("DoReboot", True)
+
+  def _set_jetlink_link(self, button_index: int):
+    """JetLink's link selector: Off or USB, offroad only (the buttons are disabled onroad too)."""
+    if not jetlink_settings.write_link(self._params, button_index, ui_state.is_offroad()):
+      self._jetlink_link_btn.action_item.set_selected_button(jetlink_settings.selected_index(self._params))
 
   def _set_hybrid_gauge_size(self, button_index: int):
     """Handle hybrid gauge size button selection. Buttons are 0/1/2, param stores 1/2/3."""

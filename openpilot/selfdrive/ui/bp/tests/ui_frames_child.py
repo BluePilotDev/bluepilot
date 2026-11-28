@@ -498,15 +498,24 @@ def draw_tici_settings(layout, draw, attempt, calls) -> None:
       draw(layout, 3)
       inst = info.instance
       scroller = getattr(inst, "_scroller", None)
-      for item in (getattr(scroller, "_items", None) or getattr(scroller, "items", None) or []):
-        if getattr(item, "_expanded", True) is False and hasattr(item, "_toggle"):  # open every collapsible section
+      panel = getattr(scroller, "scroll_panel", None)
+
+      def scroll_through():
+        draw(layout, 2)
+        if panel is not None:
+          for y in range(0, 12000, 600):
+            draw(layout, 1, lambda y=y: panel.set_offset(-y))
+
+      # open each collapsible section in turn (BluePilot's sections are one-open-at-a-time) and draw it
+      sections = [item for item in (getattr(scroller, "_items", None) or getattr(scroller, "items", None) or [])
+                  if getattr(item, "_expanded", True) is False and hasattr(item, "_toggle")]
+      for item in sections:
+        if not item._expanded:
           item._toggle()
           calls["sections expanded"] += 1
-      draw(layout, 2)
-      panel = getattr(scroller, "scroll_panel", None)
-      if panel is not None:
-        for y in range(0, 12000, 600):
-          draw(layout, 1, lambda y=y: panel.set_offset(-y))
+        scroll_through()
+      if not sections:
+        scroll_through()
     attempt(f"settings/{getattr(panel_type, 'name', panel_type)}", run)
 
 

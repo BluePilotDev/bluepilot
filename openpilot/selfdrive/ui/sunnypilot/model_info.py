@@ -13,6 +13,9 @@ from openpilot.selfdrive.ui.ui_state import ui_state, ChestnutState
 from openpilot.sunnypilot.models.fetcher import get_cached_bundles
 from openpilot.sunnypilot.models.helpers import get_active_source, get_selected_bundle, resolve_bundle_by_ref
 from openpilot.sunnypilot.models.model_name import DEFAULT_BIG_MODEL, DEFAULT_MODEL
+# BluePilot: JetLink's default big model for the pickers
+from openpilot.selfdrive.ui.bp.lib.jetlink_status import picker_default_big_model
+# End BluePilot
 
 
 def model_cache_size_mb() -> float:
@@ -39,6 +42,10 @@ def bundles_for_source(source: str):
 
 
 def default_model(source: str) -> str:
+  # BluePilot: JetLink's default big model while the big-model list is JetLink's (no chestnut fitted)
+  if source == 'chestnut' and (jetlink_default := picker_default_big_model(ui_state.params)):
+    return jetlink_default
+  # End BluePilot
   return DEFAULT_BIG_MODEL if source == 'chestnut' else DEFAULT_MODEL
 
 

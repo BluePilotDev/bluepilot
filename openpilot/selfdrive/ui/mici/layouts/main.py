@@ -49,12 +49,25 @@ class MiciMainLayout(Scroller):
       # TODO: set parent rect and use it if never passed rect from render (like in Scroller)
       widget.set_rect(rl.Rectangle(0, 0, gui_app.width, gui_app.height))
 
-    self._scroller.add_widgets([
+    pages = [
       self._alerts_layout,
       self._home_layout,
       self._car_onroad_layout,
       self._body_onroad_layout,
-    ])
+    ]
+    # BluePilot: the Driving Models page (TICI's home card), right of home and offroad only; tapping it opens the
+    # Models settings panel. Home stays the second page, where _render's first scroll expects it.
+    if is_bluepilot():
+      from openpilot.selfdrive.ui.bp.mici.layouts.driving_models_page import DrivingModelsPageMici
+      self._models_page = DrivingModelsPageMici()
+      self._models_page.set_rect(rl.Rectangle(0, 0, gui_app.width, gui_app.height))
+      self._models_page.set_visible(lambda: not ui_state.started)
+      models_panel = getattr(self._settings_layout, 'models_panel', None)
+      if models_panel is not None:
+        self._models_page.set_click_callback(lambda: gui_app.push_widget(models_panel))
+      pages.insert(pages.index(self._home_layout) + 1, self._models_page)
+    # End BluePilot
+    self._scroller.add_widgets(pages)
     self._scroller.set_reset_scroll_at_show(False)
 
     # Disable scrolling when onroad is interacting with bookmark
