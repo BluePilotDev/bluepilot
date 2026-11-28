@@ -79,6 +79,11 @@
     "severity": 1,
     "_comment": "Set extra field to the current branch name."
   },
+  "Offroad_JetlinkUnavailable": {
+    "text": "JetLink unavailable: %1",
+    "severity": 0,
+    "_comment": "BluePilot: JetLink's reason as the extra field (bluepilot/jetlink_adapter, hardwared)."
+  },
   "Offroad_Pairing": {
     "text": "Finish setup. Pair your device with comma connect to view recent drives and bookmarked routes.",
     "severity": -2,

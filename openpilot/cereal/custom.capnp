@@ -519,11 +519,51 @@ struct GpsLocationSP @0xcb9fd56c7057593a {
   fused @8 :Bool;  # false while passing the raw fix through
 }
 
-struct CustomReserved11 @0xc2243c65e0340384 {
-}
+# BluePilot: JetLink's big model as modeld saw it, every model frame, for logs and route review (D2 b; claims the
+# CustomReserved11 slot). Which model drove a frame is modelV2.big. bluepilot/jetlink_adapter/telemetry.py fills it
+struct ModelDataV2BP @0xc2243c65e0340384 {
+  acceleratorState @0 :AcceleratorState;  # jetlink.openpilot STATES; none with the link off or no usable JetLink
+  handovers @1 :UInt32;  # swaps and hand-backs since this modeld started: each step is a change of driving model
 
-struct CustomReserved12 @0x9ccdc8676701b412 {
+  # zoompilot's ModelDataV2ZP.AcceleratorState ordinals, so one reader serves both forks' logs
+  enum AcceleratorState {
+    none @0;
+    joining @1;      # the big model is being prepared or connected
+    running @2;      # the big model drives
+    retrying @3;     # the link dropped; the small model drives while it reconnects
+    unavailable @4;  # the big model cannot run on this device or link
+    ready @5;        # link up and the big model loaded, waiting for a window to switch (re-engage)
+  }
 }
+# End BluePilot
+
+# BluePilot: BluePilot's own onroad events, which selfdrived turns into alerts beside sunnypilot's (claims the
+# CustomReserved12 slot). JetLink's two first (bluepilot/selfdrive/selfdrived/events_bp.py)
+struct OnroadEventBP @0x9ccdc8676701b412 {
+  events @0 :List(Event);
+
+  struct Event {
+    name @0 :EventName;
+
+    # event types, as OnroadEventSP.Event
+    enable @1 :Bool;
+    noEntry @2 :Bool;
+    warning @3 :Bool;
+    userDisable @4 :Bool;
+    softDisable @5 :Bool;
+    immediateDisable @6 :Bool;
+    preEnable @7 :Bool;
+    permanent @8 :Bool;
+    overrideLateral @10 :Bool;
+    overrideLongitudinal @9 :Bool;
+  }
+
+  enum EventName {
+    bigModelAvailable @0;  # JetLink: the big model is ready while engaged; re-engage to switch to it
+    bigModelLinkLost @1;   # JetLink: the big model's link fell while engaged; the small model drives on
+  }
+}
+# End BluePilot
 
 struct ControllerStateBP @0xcd96dafb67a082d0 {
   lateralUncertainty @0 :Float32;  # BluePilot: lateral uncertainty for angleState (e.g. torque bar)

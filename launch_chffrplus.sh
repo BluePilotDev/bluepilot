@@ -85,6 +85,16 @@ function launch {
   ln -sfn teleoprtc_repo/teleoprtc teleoprtc
   ln -sfn tinygrad_repo/tinygrad tinygrad
 
+  # BluePilot: JetLink (jetlink_repo), and with the link on, cut the comma's draw from the USB-C port from boot
+  # (its owner, jetlinkd, starts ~20 s later): the comma runs from the car harness, never the host's port.
+  # "off" is a missing, empty or 0 JetlinkLink, and then the root script is never run
+  ln -sfn jetlink_repo/jetlink jetlink
+  if [ -f /AGNOS ] && [ -f jetlink/comma/jetlink-root.sh ] && [ -s /data/params/d/JetlinkLink ] && \
+     [ "$(cat /data/params/d/JetlinkLink)" != "0" ]; then
+    sudo -n bash jetlink/comma/jetlink-root.sh boot /data/params/d/JetlinkLink &
+  fi
+  # End BluePilot
+
   # BluePilot: fill the nested bluepilot_lateral submodule if the installer's
   # non-recursive clone left it empty (see openpilot/sunnypilot/bluepilot_ensure_submodules.sh)
   bash openpilot/sunnypilot/bluepilot_ensure_submodules.sh || true

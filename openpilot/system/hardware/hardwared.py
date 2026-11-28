@@ -30,6 +30,9 @@ from openpilot.system.hardware.fan_controller import FanController
 from openpilot.system.hardware.chestnut.monitoring import chestnut_state_thread
 from openpilot.system.hardware.chestnut.status import ChestnutStatus
 from openpilot.common.version import terms_version, training_version, get_build_metadata, terms_version_sp
+# BluePilot: JetLink's host powers off with the comma, and its offroad alert
+from openpilot.bluepilot.system.hardware.jetlink_shutdown import JetlinkShutdown
+# End BluePilot
 
 ThermalStatus = log.DeviceState.ThermalStatus
 NetworkType = log.DeviceState.NetworkType
@@ -216,6 +219,7 @@ def hardware_thread(end_event, hw_queue) -> None:
 
   off_ts: float | None = None
   started_ts: float | None = None
+  jetlink_shutdown = JetlinkShutdown()  # BluePilot
   started_seen = False
   startup_blocked_ts: float | None = None
   thermal_status = ThermalStatus.ok
@@ -373,6 +377,11 @@ def hardware_thread(end_event, hw_queue) -> None:
 
     startup_conditions["not_flashing_chestnut"] = not chestnut.flashing
 
+    # BluePilot: no drive starts while a power-off waits for JetLink's host to go down
+    startup_conditions["not_powering_off"] = not jetlink_shutdown.waiting
+    jetlink_shutdown.update_alert(set_offroad_alert_if_changed)
+    # End BluePilot
+
     # ensure device is fully booted
     startup_conditions["device_booted"] = startup_conditions.get("device_booted", False) or HARDWARE.booted()
 
@@ -451,7 +460,11 @@ def hardware_thread(end_event, hw_queue) -> None:
     msg.deviceState.somPowerDrawW = som_power_draw
 
     # Check if we need to shut down
-    if power_monitor.should_shutdown(onroad_conditions["ignition"], in_car, off_ts, started_seen):
+    # BluePilot: JetLink's host is asked to power off first, at most JETLINK_SHUTDOWN_CAP_S (DoShutdown only)
+    should_shutdown = power_monitor.should_shutdown(onroad_conditions["ignition"], in_car, off_ts, started_seen)
+    may_power_off = jetlink_shutdown.step(should_shutdown, f"offroad since {off_ts}")
+    # End BluePilot
+    if may_power_off:  # BluePilot: was power_monitor.should_shutdown(...) directly
       cloudlog.warning(f"shutting device down, offroad since {off_ts}")
       params.put_bool("DoShutdown", True, block=True)
 

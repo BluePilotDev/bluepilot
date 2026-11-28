@@ -1,0 +1,70 @@
+# BluePilot: JetLink's fork kit (jetlink.openpilot.testing) and BluePilot's JetLink pieces, run twice: with the
+# jetlink_repo submodule checked out (the kit's adapter, seam and fallback checks) and without it (every hook answers
+# as the link off; the kit's own tests skip). bluepilot/jetlink_adapter/tests/test_jetlink.py.
+name: bp jetlink
+
+on:
+  push:
+    branches:
+      - bp-dev
+      - 'bp-*'
+      - 'feat/jetlink*'
+    paths: &paths
+      - 'jetlink_repo'
+      - '.gitmodules'
+      - 'bluepilot/jetlink_adapter/**'
+      - 'bluepilot/system/**'
+      - 'bluepilot/selfdrive/selfdrived/**'
+      - 'openpilot/selfdrive/modeld/modeld.py'
+      - 'openpilot/sunnypilot/modeld_v2/modeld.py'
+      - 'openpilot/selfdrive/selfdrived/selfdrived.py'
+      - 'openpilot/sunnypilot/mads/state.py'
+      - 'openpilot/system/hardware/hardwared.py'
+      - 'openpilot/system/manager/process_config.py'
+      - 'openpilot/sunnypilot/models/manager.py'
+      - 'openpilot/selfdrive/ui/sunnypilot/model_info.py'
+      - 'openpilot/common/params_keys.h'
+      - 'openpilot/cereal/**'
+      - 'openpilot/selfdrive/ui/bp/**'
+      - '.github/workflows/bp-jetlink.yml'
+  pull_request:
+    paths: *paths
+  workflow_dispatch:
+
+concurrency:
+  group: bp-jetlink-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: 1
+  PYTHONPATH: ${{ github.workspace }}
+
+jobs:
+  jetlink:
+    name: jetlink (${{ matrix.jetlink }})
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        jetlink: [present, absent]
+    steps:
+    - uses: actions/checkout@v7
+      with:
+        submodules: recursive
+    - name: Remove the jetlink_repo checkout
+      if: matrix.jetlink == 'absent'
+      run: |
+        git submodule deinit -f jetlink_repo
+        test ! -e jetlink_repo/jetlink/__init__.py
+    - run: ./tools/op.sh setup
+    - name: Restore scons cache
+      uses: actions/cache@v6
+      with:
+        path: /tmp/scons_cache
+        key: scons-${{ runner.os }}-${{ github.job }}-${{ github.sha }}
+        restore-keys: scons-${{ runner.os }}-${{ github.job }}-
+    - name: Build openpilot
+      run: scons
+    - name: JetLink tests
+      timeout-minutes: 5
+      run: tools/op.sh test bluepilot/jetlink_adapter/tests

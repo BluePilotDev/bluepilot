@@ -9,6 +9,9 @@ BUILD_DIR=/data/openpilot
 SOURCE_DIR="$(git rev-parse --show-toplevel)"
 
 export PYTHONPATH="$BUILD_DIR:$BUILD_DIR/msgq_repo:$BUILD_DIR/opendbc_repo:$BUILD_DIR/rednose_repo:$BUILD_DIR/teleoprtc_repo:$BUILD_DIR/tinygrad_repo"
+# BluePilot: JetLink (jetlink_repo); on the device launch_chffrplus.sh links jetlink/ in
+export PYTHONPATH="$PYTHONPATH:$BUILD_DIR/jetlink_repo"
+# End BluePilot
 
 if [ -z "$RELEASE_BRANCH" ]; then
   echo "RELEASE_BRANCH is not set"

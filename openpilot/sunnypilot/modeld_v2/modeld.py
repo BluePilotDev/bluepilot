@@ -54,6 +54,10 @@ from openpilot.sunnypilot.modeld_v2.frame_fusion import fused_with_warp
 from openpilot.sunnypilot.modeld_v2.model_adapters import get_model_adapter
 from openpilot.sunnypilot.models.helpers import get_active_bundle
 from openpilot.sunnypilot.selfdrive.controls.lib.relc import RoadEdgeLaneChangeController
+# BluePilot: JetLink, the big driving model on a computer on the USB-C port
+from openpilot.bluepilot import jetlink_adapter
+from openpilot.bluepilot.jetlink_adapter import telemetry as jetlink_telemetry
+# End BluePilot
 
 PROCESS_NAME = "openpilot.selfdrive.modeld.modeld_tinygrad"
 BIG_MODEL_TIMEOUT = 60
@@ -268,7 +272,10 @@ def main(demo=False):
   cloudlog.bind(daemon=PROCESS_NAME)
   setproctitle(PROCESS_NAME)
 
-  CHESTNUT = _find_driving_pkl(get_active_bundle(chestnut=True)) is not None and (chestnut_present() or cable_connected())
+  # BluePilot: a JetLink host on the port is a cable too; it counts as a chestnut only while the link is off
+  CHESTNUT = _find_driving_pkl(get_active_bundle(chestnut=True)) is not None and \
+    (chestnut_present() or jetlink_adapter.chestnut_cable(cable_connected()))
+  # End BluePilot
   if CHESTNUT:
     from tinygrad.runtime.ops_amd import AMDDevice
     AMDDevice.wait_timeout_ms = 3000
@@ -336,10 +343,20 @@ def main(demo=False):
   assert model is not None
   cloudlog.warning(f"models loaded in {time.monotonic() - st:.1f}s, modeld starting")
 
+  # BluePilot: JetLink. Before going realtime: the GPU thread it starts would inherit SCHED_FIFO 54 on core 7. The
+  # joined model drives as small_model until JetLink's big model is ready, and hands back to it if the link drops
+  HOOKS = jetlink_adapter.hooks()
+  if HOOKS.prepare(CHESTNUT):
+    model = HOOKS.attach(model, small_model, vipc_client_main.width, vipc_client_main.height)
+  # End BluePilot
+
   config_realtime_process(7, 54)
 
   # messaging
   pub_socks = ["modelV2", "drivingModelData", "cameraOdometry", "modelDataV2SP"] + (["chestnutGpuState"] if CHESTNUT else [])
+  # BluePilot: JetLink's big model as modeld saw it, for logs (D2 b)
+  pub_socks += [jetlink_telemetry.SERVICE]
+  # End BluePilot
   pm = PubMaster(pub_socks)
   sm = SubMaster(["deviceState", "carState", "narrowRoadCameraState", "extrinsicsCalibration", "driverMonitoringState",
                   "carControl", "controlsState", "lateralDelay"])
@@ -467,6 +484,9 @@ def main(demo=False):
     if 'action_t' in model.numpy_inputs:
       inputs['action_t'] = np.array([lat_action_t, long_action_t], dtype=np.float32)
 
+    # BluePilot: JetLink hands a lagging big model back on the share of dropped camera frames
+    model.frame_drop_ratio = frame_drop_ratio  # ty: ignore[invalid-assignment]  # read by JetLink's joined model
+    # End BluePilot
     mt1 = time.perf_counter()
     try:
       send_chestnut = (chestnut_state is not None and
@@ -485,6 +505,11 @@ def main(demo=False):
       model_output = None
     mt2 = time.perf_counter()
     model_execution_time = mt2 - mt1
+
+    # BluePilot: JetLink. A swap or a hand-back stalls a frame or two; its drops restart the filter's warmup
+    if HOOKS.handed_over(model):
+      run_count, frame_drop_ratio = 0, 0.
+    # End BluePilot
 
     if model_output is not None:
       modelv2_send = messaging.new_message('modelV2')
@@ -528,6 +553,9 @@ def main(demo=False):
       pm.send('drivingModelData', drivingdata_send)
       pm.send('cameraOdometry', posenet_send)
       pm.send('modelDataV2SP', mdv2sp_send)
+      # BluePilot: JetLink's big model as modeld saw it, for logs (D2 b)
+      pm.send(jetlink_telemetry.SERVICE, jetlink_telemetry.message(HOOKS, model, modelv2_send.valid))
+      # End BluePilot
     last_vipc_frame_id = meta_main.frame_id
 
 if __name__ == "__main__":
