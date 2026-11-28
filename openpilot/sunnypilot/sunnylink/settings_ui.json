@@ -2656,6 +2656,50 @@
           "description": "Disable camera feed & only show lane lines and model path."
         },
         {
+          "key": "CustomModelPathColor",
+          "widget": "option",
+          "title": "[Visuals] Model Path Color",
+          "description": "Choose a named model path color for comma 3X or comma 4. Custom HEX colors remain available from the on-device BluePilot Visuals menu.",
+          "options": [
+            {
+              "value": "Stock",
+              "label": "Stock"
+            },
+            {
+              "value": "BP Blue",
+              "label": "BP Blue"
+            },
+            {
+              "value": "Blue",
+              "label": "Blue"
+            },
+            {
+              "value": "Green",
+              "label": "Green"
+            },
+            {
+              "value": "Purple",
+              "label": "Purple"
+            },
+            {
+              "value": "Orange",
+              "label": "Orange"
+            },
+            {
+              "value": "Red",
+              "label": "Red"
+            },
+            {
+              "value": "Cyan",
+              "label": "Cyan"
+            },
+            {
+              "value": "Yellow",
+              "label": "Yellow"
+            }
+          ]
+        },
+        {
           "key": "BPRadRacerTheme",
           "widget": "toggle",
           "title": "[Visuals] 8-Bit Racer Theme (C3X)",
