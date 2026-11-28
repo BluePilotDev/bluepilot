@@ -7,7 +7,6 @@ Route video export and streaming functionality
 import os
 import re
 import json
-import subprocess
 import tempfile
 import logging
 from datetime import datetime, timezone
@@ -27,6 +26,7 @@ from bluepilot.backend.config import (
 from bluepilot.backend.video.ffmpeg import FFmpegProcess
 from bluepilot.backend.realtime import WebSocketEvent
 from bluepilot.backend.utils.power import enable_performance_mode
+from bluepilot.backend.routes.parsing import get_segment_number
 from bluepilot.backend.utils.file_ops import (
     get_free_disk_space,
     has_sufficient_disk_space,
@@ -205,7 +205,7 @@ def broadcast_route_export_update(route_base, camera, info, export_path=None, se
             try:
                 broadcaster.broadcast(WebSocketEvent.ROUTE_EXPORT_UPDATE, payload)
             except Exception as e:
-                logger.error(f"Error broadcasting WebSocket event: {e}")
+                logger.exception(f"Error broadcasting WebSocket event: {e}")
 
 
 # ============================================================================
@@ -561,19 +561,6 @@ def parse_route_datetime(route_base):
     return None
 
 
-def get_segment_number(route_name):
-    """Extract segment number from route name
-    Example: 2024-09-18--14-30-00--5 -> 5
-    """
-    match = re.search(r'--(\d+)$', route_name)
-    if match:
-        try:
-            return int(match.group(1))
-        except:
-            return 0
-    return 0
-
-
 @lru_cache(maxsize=100)
 def get_route_segments(route_base):
     """Get all segments for a route"""
@@ -614,7 +601,7 @@ def wait_for_ffmpeg_capacity(timeout=30.0, reserve=FFMPEG_RESERVED_FOR_PLAYBACK,
     if not server_state:
         return True  # Can't check, assume OK
 
-    deadline = None if timeout is None else time.time() + timeout
+    deadline = None if timeout is None else time.monotonic() + timeout
     min_capacity = max(1, MAX_CONCURRENT_FFMPEG - reserve)
 
     while True:
@@ -622,7 +609,7 @@ def wait_for_ffmpeg_capacity(timeout=30.0, reserve=FFMPEG_RESERVED_FOR_PLAYBACK,
         if current < min_capacity:
             return True
 
-        if deadline and time.time() >= deadline:
+        if deadline and time.monotonic() >= deadline:
             return False
 
         time.sleep(0.5)

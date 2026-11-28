@@ -31,7 +31,8 @@ def should_server_run():
     """Check if server should be running (always runs when enabled, rate-limited onroad)"""
     try:
         return params.get_bool("EnableWebRoutesServer")
-    except:
+    except Exception:
+        logger.warning("Could not read EnableWebRoutesServer, assuming the server should run", exc_info=True)
         return True  # Default to running if we can't check
 
 
@@ -57,7 +58,7 @@ def get_wifi_ip():
                 if 'inet ' in line:
                     ip = line.strip().split()[1].split('/')[0]
                     return ip
-        except:
+        except (OSError, subprocess.SubprocessError, IndexError):
             pass
     return None
 
@@ -101,5 +102,5 @@ def get_connection_type():
             return 'ethernet'
         else:
             return 'unknown'
-    except:
+    except (OSError, subprocess.SubprocessError):
         return 'unknown'

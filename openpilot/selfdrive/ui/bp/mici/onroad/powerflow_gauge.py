@@ -1,6 +1,7 @@
 import numpy as np
 import pyray as rl
 import math
+from openpilot.common.params import Params
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.system.ui.lib.application import gui_app
 from openpilot.system.ui.widgets import Widget
@@ -32,12 +33,25 @@ class MiciPowerflowGauge(Widget):
     self._power_flow_mode_value = 0
     self._engine_on_reason_value = 0
     self._top_angle = -90
+    self._bp_params = Params()
+    self._param_counter = 0
+    self._read_params()
     if DEMO:
       self._demo_value = 0.0
       self._demo_inc = 0.01
 
+  def _read_params(self):
+    self._power_flow_enabled = self._bp_params.get_bool("FordPrefHybridPowerFlow")
+    self._power_flow_use_alternate = self._bp_params.get_bool("FordPrefHybridPowerFlowAlternate")
+
   def _update_state(self):
     """Update power flow state and animate changes"""
+    # Refresh settings periodically (~1s at 60fps); _should_render runs twice a frame, so the count lives here
+    self._param_counter += 1
+    if self._param_counter >= 60:
+      self._param_counter = 0
+      self._read_params()
+
     if not self._should_render():
       return
 
@@ -59,11 +73,7 @@ class MiciPowerflowGauge(Widget):
   def _should_render(self) -> bool:
     """Check if powerflow gauge should be rendered"""
     # Only render if hybrid power flow is enabled
-    from openpilot.common.params import Params
-    params = Params()
-    power_flow_enabled = params.get_bool("FordPrefHybridPowerFlow")
-    self._power_flow_use_alternate = params.get_bool("FordPrefHybridPowerFlowAlternate")
-    if not power_flow_enabled:
+    if not self._power_flow_enabled:
       bp_ui_log.visibility("MiciPowerflow", False, reason="param_disabled")
       return False
 

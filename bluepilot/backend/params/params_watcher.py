@@ -9,7 +9,7 @@ import time
 import logging
 import threading
 from pathlib import Path
-from typing import Dict, Any, Optional, Callable
+from typing import Any, Optional, Callable
 
 logger = logging.getLogger(__name__)
 
@@ -76,7 +76,7 @@ class ParamsWatcher:
             try:
                 self._check_for_changes()
             except Exception as e:
-                logger.error(f"Error in params watcher loop: {e}")
+                logger.exception(f"Error in params watcher loop: {e}")
 
             # Sleep in small increments to allow quick shutdown
             for _ in range(int(self.check_interval * 10)):
@@ -108,7 +108,7 @@ class ParamsWatcher:
                         logger.debug(f"Could not read param {param_key}: {e}")
 
         except Exception as e:
-            logger.error(f"Error updating params cache: {e}")
+            logger.exception(f"Error updating params cache: {e}")
 
     def _read_param_value(self, key: str) -> Any:
         """Read a param value using the Params instance"""
@@ -190,7 +190,7 @@ class ParamsWatcher:
                 logger.debug(f"Param deleted: {key}")
 
         except Exception as e:
-            logger.error(f"Error checking for param changes: {e}")
+            logger.exception(f"Error checking for param changes: {e}")
 
     def _broadcast_change(self, key: str, value: Any):
         """Broadcast a param change via the callback"""
@@ -198,4 +198,4 @@ class ParamsWatcher:
             try:
                 self.broadcast_callback(key, value)
             except Exception as e:
-                logger.error(f"Error broadcasting param change for {key}: {e}")
+                logger.exception(f"Error broadcasting param change for {key}: {e}")

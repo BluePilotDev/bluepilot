@@ -80,7 +80,7 @@ COUNTED = {
 DISPLAY_PARAMS = ("FordPrefShowRadarLeadOverlay", "BPThemePack", "BPThemeAutoSeasonal", "mici_complication",
                   "BPSteeringWheelIconStyle", "BPAnimateSteeringWheel", "BpShowLateralControl", "BlindSpot",
                   "ShowBlindspotOverlay", "ShowBrakeStatus", "BPRainbowLines", "BPHideCameraView", "BPHideOnroadBorder",
-                  "FordPrefHybridBatteryStatus", "FordPrefHybridPowerFlow", "FordPrefGaugeStyle", "RainbowMode",
+                  "mici_hide_onroad_fade", "FordPrefHybridBatteryStatus", "FordPrefHybridPowerFlow", "FordPrefGaugeStyle", "RainbowMode",
                   "NavigationEnabled", "NavDestination", "CustomModelPathColor")
 
 
@@ -113,6 +113,7 @@ def onroad_cases(family: str, theme_packs: list[str]) -> list[tuple[str, dict, d
        {"right_blind_spot": True, "red_right_edge": True}, model + hud + ["NavigationPanel._render"]),
       ("not started", {}, {"started": False}, ["!ModelRendererBP._draw_lane_lines", "!MiciHudRendererBP._draw_steering_wheel"]),
       ("model source icon", {}, {"chestnut": True}, model + hud + ["model source icon drawn"]),
+      ("no fade, no border", {"mici_hide_onroad_fade": True, "BPHideOnroadBorder": True}, {}, model + hud),
     ]
     renders = {1: "_render_lead_speed", 2: "_render_current_speed", 3: "_render_lead_dist", 4: "_render_lead_time"}
     for value, method in renders.items():

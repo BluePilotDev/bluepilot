@@ -13,7 +13,7 @@ class TestRestorePowerSave(unittest.TestCase):
     self.addCleanup(patcher.stop)
 
   def idle_for(self, seconds):
-    patcher = mock.patch.object(power, "last_activity_time", power.time.time() - seconds)
+    patcher = mock.patch.object(power, "last_activity_time", power.time.monotonic() - seconds)
     patcher.start()
     self.addCleanup(patcher.stop)
 

@@ -6,6 +6,7 @@
 .gitattributes                                                                         # BluePilot's own binaries are plain git files, not LFS
 .gitignore                                                                             # local agent docs and tools
 README.md                                                                              # BluePilot's README
+docs/CONTRIBUTING.md                                                                   # BluePilot's contributing guide
 launch_chffrplus.sh                                                                    # boot logo
 launch_env.sh                                                                          # connect backend (comma / Konik / offline)
 opendbc_repo                                                                           # points at ford-op/opendbc bp-full (BluePilot's Ford car code), not bp-opendbc
@@ -33,6 +34,7 @@ openpilot/sunnypilot/modeld_v2/modeld.py                                        
 openpilot/sunnypilot/selfdrive/car/intelligent_cruise_button_management/controller.py  # ICBM target cap at the cluster set speed
 openpilot/sunnypilot/selfdrive/controls/controlsd_ext.py                               # publishes the BPx settings to the car code
 openpilot/sunnypilot/selfdrive/controls/lib/blinker_pause_lateral.py                   # enable param can be chosen
+openpilot/sunnypilot/selfdrive/selfdrived/events.py                                    # Speed Limit Assist prompt direction on the comma four: sunnypilot#1961 ahead of upstream (#272)
 openpilot/sunnypilot/sunnylink/capabilities.py                                         # platform capability for the settings schema
 openpilot/sunnypilot/sunnylink/docs/README.md                                          # platform capability
 openpilot/sunnypilot/sunnylink/settings_ui.json                                        # compiled from the settings_ui_src changes below

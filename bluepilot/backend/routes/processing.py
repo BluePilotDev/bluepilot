@@ -54,7 +54,7 @@ def atomic_json_write(filepath, data):
             raise e
 
     except Exception as e:
-        logger.error(f"Atomic JSON write failed for {filepath}: {e}")
+        logger.exception(f"Atomic JSON write failed for {filepath}: {e}")
         return False
 
 # Configuration paths
@@ -445,7 +445,7 @@ def generate_thumbnail(route_base):
         logger.warning(f"FFmpeg timeout while generating thumbnail for {route_base}")
         return None
     except Exception as e:
-        logger.error(f"Error generating thumbnail for {route_base}: {e}")
+        logger.exception(f"Error generating thumbnail for {route_base}: {e}")
         return None
 
 
@@ -711,7 +711,6 @@ def extract_drive_stats_from_segments(segments):
     if not use_logreader:
         try:
             import openpilot.cereal.messaging as messaging
-            from openpilot.cereal import log as log_capnp
             import bz2
             import subprocess
 

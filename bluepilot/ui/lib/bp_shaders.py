@@ -7,12 +7,12 @@ Preserved here as BP-only features (rainbow driving path, confidence ball).
 
 import pyray as rl
 import numpy as np
-from typing import Any, Optional
+from typing import Any
 
 from openpilot.system.ui.lib.application import gui_app, GL_VERSION
 from openpilot.system.ui.lib.shader_polygon import (
-  VERTEX_SHADER, ShaderState, Gradient, triangulate,
-  UNIFORM_INT, UNIFORM_FLOAT, UNIFORM_VEC2, UNIFORM_VEC4,
+  VERTEX_SHADER, triangulate,
+  UNIFORM_FLOAT, UNIFORM_VEC2, UNIFORM_VEC4,
 )
 
 # ── Rainbow animated HSV shader ──────────────────────────────────────────────
