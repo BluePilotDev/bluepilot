@@ -175,6 +175,40 @@ class TestOnroadOverrides(OpenpilotTestCase):
   def test_tici_hud_speed_hidden(self):
     self.assertIsNone(self._tici_hud_speed_drawn(true_v_ego_ui=True, params={"HideVEgoUI": True}))
 
+  def _tici_alert_frame(self, alert, developer_ui=0):
+    """One 3X alert frame; returns (alert box rect, brightness hook calls)."""
+    from openpilot.selfdrive.ui.bp.onroad.alert_renderer_bp import AlertRendererBP
+    renderer = AlertRendererBP()
+    renderer.get_alert = mock.Mock(return_value=alert)
+    with (mock.patch.object(self.ui_state, "developer_ui", developer_ui),
+          mock.patch.object(self.ui_state, "onroad_brightness_handle_alerts") as hook,
+          mock.patch.object(gui_app, "sunnypilot_ui", return_value=True),
+          mock.patch.object(rl, "draw_rectangle_rounded") as box, mock.patch.object(rl, "draw_text_ex")):
+      renderer._render(RECT)
+    return (box.call_args.args[0] if box.call_args else None), hook.call_args_list
+
+  def test_tici_alert_laid_out_by_sunnypilot(self):
+    from openpilot.selfdrive.ui.onroad.alert_renderer import Alert, AlertSize, AlertStatus
+    alert = Alert(text1="Steering Temporarily Unavailable Due To A Long Reason", text2="Take Control And Keep Steering",
+                  size=AlertSize.mid, status=AlertStatus.userPrompt)
+    box, _ = self._tici_alert_frame(alert, developer_ui=3)  # developer UI right and bottom
+    # sunnypilot: 40 px margin, 230 px less for the right-side dev UI, 40 px up for the bottom one
+    self.assertEqual((box.x, box.width, box.y + box.height), (40, 2160 - 80 - 230, 1080 - 40 - 40))
+
+  def test_tici_pill_alert_unchanged(self):
+    from openpilot.selfdrive.ui.onroad.alert_renderer import Alert, AlertSize, AlertStatus
+    box, _ = self._tici_alert_frame(Alert(text1="Hi", size=AlertSize.small, status=AlertStatus.normal), developer_ui=3)
+    # stub fonts measure 0 px: the pill is its padding wide, one line high, 40 px above the bottom, centered
+    self.assertEqual((box.x, box.y, box.width, box.height), (1040, 930, 80, 110))
+
+  def test_tici_alert_brightness_hook_once_per_frame(self):
+    from openpilot.selfdrive.ui.onroad.alert_renderer import Alert, AlertSize, AlertStatus
+    for alert in (None, Alert(text1="Hi", size=AlertSize.small, status=AlertStatus.normal),
+                  Alert(text1="Take Control", text2="Now", size=AlertSize.mid, status=AlertStatus.critical)):
+      with self.subTest(alert=alert):
+        _, calls = self._tici_alert_frame(alert)
+        self.assertEqual(calls, [mock.call(self.ui_state, alert)])
+
   def _mici_rad_racer(self):
     """comma four renderer on a straight flat road, and the Rad Racer theme with stub textures."""
     from openpilot.selfdrive.ui.bp.mici.onroad.model_renderer_bp import ModelRendererBP
