@@ -503,8 +503,51 @@ def main() -> None:
 
 
 def draw_tici_settings(layout, draw, attempt, calls) -> None:
-  from openpilot.selfdrive.ui.layouts.main import MainState
+  from openpilot.common.params import Params
+  from openpilot.selfdrive.ui.layouts.main import MainState, PanelType
+  from openpilot.system.ui.lib.application import gui_app, MouseEvent, MousePos
+
   settings = layout._layouts[MainState.SETTINGS]
+
+  def radar_overlay_size_persists():
+    params = Params()
+    size_key, enabled_key = "FordPrefRadarOverlaySize", "FordPrefShowRadarLeadOverlay"
+    previous_size, previous_enabled = params.get(size_key), params.get(enabled_key)
+    try:
+      params.put(size_key, 1, block=True)
+      params.put_bool(enabled_key, True, block=True)
+      layout.open_settings(PanelType.BLUEPILOT)
+      page = settings._panels[PanelType.BLUEPILOT].instance
+      selector = page._radar_overlay_size_btn.action_item
+      draw(selector, 1)
+      pos = MousePos(selector.rect.x + selector.button_width / 2, selector.rect.y + selector.rect.height / 2)
+      now = time.monotonic()
+      gui_app.mouse_events.extend([
+        MouseEvent(pos, 0, True, False, True, now),
+        MouseEvent(pos, 0, False, True, False, now),
+      ])
+      try:
+        draw(selector, 1)
+      finally:
+        gui_app.mouse_events.clear()
+      assert selector.get_selected_button() == 0, "tapping Small did not select it"
+      deadline = time.monotonic() + 1
+      while params.get(size_key) != 0:
+        assert time.monotonic() < deadline, "Small was not saved"
+        time.sleep(0.01)
+      layout.open_settings(PanelType.DEVICE)
+      layout.open_settings(PanelType.BLUEPILOT)
+      assert selector.get_selected_button() == 0, f"reopening showed size index {selector.get_selected_button()}, expected Small (0)"
+    finally:
+      for key, previous in ((size_key, previous_size), (enabled_key, previous_enabled)):
+        if previous is None:
+          params.remove(key)
+        else:
+          params.put(key, previous, block=True)
+      layout.open_settings(PanelType.DEVICE)
+
+  attempt("settings/BLUEPILOT/Small radar overlay size survives reopening", radar_overlay_size_persists)
+
   for panel_type, info in list(settings._panels.items()):
     def run(panel_type=panel_type, info=info):
       layout.open_settings(panel_type)

@@ -296,7 +296,7 @@ class BluePilotLayout(Widget):
 
     # Ford radar overlay size selector (inline buttons like Driving Personality)
     try:
-      overlay_size_idx = int(self._safe_get(self._params, "FordPrefRadarOverlaySize") or 1)
+      overlay_size_idx = int(self._safe_get(self._params, "FordPrefRadarOverlaySize", 1))
     except (TypeError, ValueError):
       overlay_size_idx = 1
     # Ensure default is persisted so consumers read the correct value on first load
@@ -912,7 +912,7 @@ class BluePilotLayout(Widget):
     # Update button enabled states
     self._radar_overlay_size_btn.action_item.set_enabled(self._safe_get_bool(ui_state.params, "FordPrefShowRadarLeadOverlay"))
     try:
-      overlay_idx = int(self._safe_get(ui_state.params, "FordPrefRadarOverlaySize") or 1)
+      overlay_idx = int(self._safe_get(ui_state.params, "FordPrefRadarOverlaySize", 1))
     except (TypeError, ValueError):
       overlay_idx = 1
     self._radar_overlay_size_btn.action_item.set_selected_button(overlay_idx)
