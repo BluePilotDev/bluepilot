@@ -8,7 +8,6 @@ import os
 import re
 import json
 import logging
-import subprocess
 import tempfile
 
 logger = logging.getLogger(__name__)

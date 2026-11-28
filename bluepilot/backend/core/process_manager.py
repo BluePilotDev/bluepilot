@@ -4,7 +4,6 @@ BluePilot Backend Process Manager
 Process management and capacity control for FFmpeg and other background tasks
 """
 
-import os
 import time
 import logging
 import subprocess
@@ -32,33 +31,6 @@ def get_ffmpeg_background_capacity(max_concurrent, reserved_for_playback):
         int: Number of background FFmpeg slots available
     """
     return max(1, max_concurrent - reserved_for_playback)
-
-
-def wait_for_ffmpeg_capacity(server_state, timeout=30.0, max_concurrent=3, reserved_for_playback=1):
-    """
-    Wait until enough FFmpeg capacity is available for a background task.
-
-    Args:
-        server_state: ServerState instance for tracking FFmpeg processes
-        timeout: Maximum seconds to wait before giving up (None to wait indefinitely)
-        max_concurrent: Maximum concurrent FFmpeg processes allowed
-        reserved_for_playback: Slots to keep free for interactive playback
-
-    Returns:
-        bool: True if capacity became available, False if timed out
-    """
-    deadline = None if timeout is None else time.time() + timeout
-    min_capacity = max(1, max_concurrent - reserved_for_playback)
-
-    while True:
-        current = server_state.get_ffmpeg_count()
-        if current < min_capacity:
-            return True
-
-        if deadline and time.time() >= deadline:
-            return False
-
-        time.sleep(0.5)
 
 
 # Rate limiting state

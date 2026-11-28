@@ -231,6 +231,21 @@ class TestBluePilotVehicleVisuals(OpenpilotTestCase):
     assert item["title"] == "[Visuals] Rainbow Lane Lines"
     assert item["description"] == "Inner lane lines become rainbow colored when longitudinal control is active."
 
+  def test_model_path_color_is_available_for_both_device_families(self, schema):
+    # BluePilot: keep the feature-specific dependency inside the tagged test.
+    from openpilot.selfdrive.ui.bp.lib.model_path_color_bp import PRESET_COLORS
+    items = schema["vehicle_settings"]["ford"]["items"]
+    keys = [item["key"] for item in items]
+    assert keys.index("BPHideCameraView") < keys.index("CustomModelPathColor") < keys.index("BPRadRacerTheme")
+
+    item = _find_item(schema, "CustomModelPathColor")
+    assert item is not None
+    assert item["widget"] == "option"
+    assert item["title"] == "[Visuals] Model Path Color"
+    assert [option["value"] for option in item["options"]] == list(PRESET_COLORS)
+    assert "visibility" not in item, "model path colors must remain visible on both comma 3X and comma 4"
+    # End BluePilot
+
 
 class TestBluePilotLateralToggle(OpenpilotTestCase):
   def test_disable_toggle_leads_the_lateral_settings(self, schema):

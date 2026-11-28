@@ -19,7 +19,7 @@ def enable_performance_mode():
     """Enable all CPU cores for FFmpeg remuxing"""
     global last_activity_time
 
-    last_activity_time = time.time()  # Update activity time
+    last_activity_time = time.monotonic()  # Update activity time
 
     try:
         # Enable CPU cores 4-7 (big cores on Snapdragon 845)
@@ -72,7 +72,7 @@ def check_and_restore_power_save(is_onroad_func):
         last_activity_time = None  # Reset so we don't keep trying
         return
 
-    idle_time = time.time() - last_activity_time
+    idle_time = time.monotonic() - last_activity_time
     if idle_time > IDLE_TIMEOUT_SECONDS:
         restore_power_save()
         last_activity_time = None  # Reset so we don't keep trying

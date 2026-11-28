@@ -16,10 +16,10 @@ All utility functions have been modularized into dedicated modules.
 
 import os
 import json
+import importlib.util
 import mimetypes
 import subprocess
 import sys
-import shutil
 import time
 import signal
 import atexit
@@ -38,6 +38,11 @@ try:
 except ImportError:
     psutil = None
 
+# Add parent directory to path for imports
+sys.path.append(os.path.join(os.path.dirname(__file__), "../.."))
+
+from bluepilot.backend.portal_log import portal_file_handler
+
 # Configure logging
 log_file = "/tmp/bp_portal.log"
 try:
@@ -47,9 +52,7 @@ try:
         root_logger.removeHandler(handler)
     
     # Create file handler
-    file_handler = logging.FileHandler(log_file, mode='a')
-    file_handler.setLevel(logging.INFO)
-    file_handler.setFormatter(logging.Formatter('%(asctime)s %(levelname)s [%(name)s]: %(message)s'))
+    file_handler = portal_file_handler(log_file)
     
     # Create console handler
     console_handler = logging.StreamHandler()
@@ -71,10 +74,7 @@ except Exception as e:
         force=True
     )
     logger = logging.getLogger(__name__)
-    logger.error(f"Failed to configure file logging: {e}")
-
-# Add parent directory to path for imports
-sys.path.append(os.path.join(os.path.dirname(__file__), "../.."))
+    logger.exception(f"Failed to configure file logging: {e}")
 
 # ============================================================================
 # Import All Modular Components
@@ -141,8 +141,9 @@ from bluepilot.backend.system import get_system_metrics
 
 # Params management
 from bluepilot.backend.params.params_manager import (
-    get_all_params, get_params_by_category, get_param_value,
-    set_param_value, search_params, READONLY_PARAMS, CRITICAL_PARAMS
+    get_all_params, get_param_value,
+    set_param_value, search_params, READONLY_PARAMS, CRITICAL_PARAMS,
+    backup_param_keys, export_backup_params, restore_backup_params
 )
 from bluepilot.backend.params.params_watcher import ParamsWatcher
 
@@ -187,52 +188,6 @@ from bluepilot.backend.params.params_manager import Params
 params = Params()
 
 
-def restart_ui_process():
-    """Attempt to restart the UI process by signaling the running binary."""
-    process_names = {'ui', 'bluepilot-ui', 'bp-ui'}
-
-    if psutil:
-        try:
-            targets = []
-            for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
-                name = (proc.info.get('name') or '').lower()
-                cmdline = ' '.join(proc.info.get('cmdline') or [])
-                if name in process_names or 'selfdrive/ui' in cmdline or 'bluepilot-ui' in cmdline:
-                    targets.append(proc)
-
-            if targets:
-                for proc in targets:
-                    try:
-                        logger.info(f"Sending SIGINT to UI process {proc.pid} ({proc.info.get('name')})")
-                        proc.send_signal(signal.SIGINT)
-                    except (psutil.NoSuchProcess, psutil.AccessDenied) as exc:
-                        logger.warning(f"Failed to signal UI process {proc.pid}: {exc}")
-                return True, 'Restart signal sent to UI process'
-        except Exception as exc:
-            logger.warning(f"psutil UI restart attempt failed: {exc}")
-
-    # Fallback to pkill if psutil is unavailable or no process matched
-    try:
-        result = subprocess.run(
-            ['pkill', '-2', '-f', 'selfdrive/ui'],
-            capture_output=True,
-            text=True,
-            timeout=3
-        )
-        if result.returncode == 0:
-            logger.info('pkill successfully signaled UI process')
-            return True, 'Restart signal sent via pkill'
-        if result.returncode == 1:
-            logger.warning('pkill could not find a UI process to signal')
-            return False, 'UI process not found'
-        logger.warning(f"pkill returned unexpected code {result.returncode}: {result.stderr.strip()}")
-    except FileNotFoundError:
-        logger.warning('pkill not available for UI restart fallback')
-    except Exception as exc:
-        logger.error(f"Failed to invoke pkill for UI restart: {exc}")
-
-    return False, 'Unable to signal UI process'
-
 # Disk space deletion thresholds
 try:
     from openpilot.system.loggerd.deleter import MIN_BYTES, MIN_PERCENT
@@ -258,14 +213,12 @@ def broadcast_websocket_event(event_type, data=None):
         try:
             broadcaster.broadcast(event_type, data)
         except Exception as e:
-            logger.error(f"Error broadcasting WebSocket event {event_type}: {e}")
+            logger.exception(f"Error broadcasting WebSocket event {event_type}: {e}")
 
 
 async def websocket_handler(websocket):
     """Handle WebSocket connections (thread-safe)"""
-    try:
-        import websockets
-    except ImportError:
+    if importlib.util.find_spec("websockets") is None:
         logger.error("websockets not available in handler")
         return
 
@@ -395,9 +348,7 @@ async def start_websocket_server():
 
 def start_websocket_server_thread():
     """Start WebSocket server in a separate thread (thread-safe)"""
-    try:
-        import websockets
-    except ImportError:
+    if importlib.util.find_spec("websockets") is None:
         logger.warning("WebSocket server thread not started - websockets library not available")
         return
 
@@ -616,7 +567,7 @@ class WebRoutesHandler(BaseHTTPRequestHandler):
             # Connection might be broken, don't try to send error response
             return
         except Exception as e:
-            logger.error(f"Unexpected error sending file {filepath}: {e}")
+            logger.exception(f"Unexpected error sending file {filepath}: {e}")
             return
 
     def send_remuxed_hevc(self, hevc_path, route_base, segment_num, camera, debug_mode=False):
@@ -830,7 +781,7 @@ class WebRoutesHandler(BaseHTTPRequestHandler):
                 self.send_file_response(hevc_path, 'video/mp4; codecs="hev1"')
                 return
             except Exception as fallback_error:
-                logger.error(f"Fallback to raw HEVC also failed: {fallback_error}")
+                logger.exception(f"Fallback to raw HEVC also failed: {fallback_error}")
                 self.send_json_response({
                     'error': 'Video conversion failed',
                     'details': str(e),
@@ -1090,7 +1041,6 @@ class WebRoutesHandler(BaseHTTPRequestHandler):
                             with open(op_version_path, 'r') as f:
                                 content = f.read()
                                 # Extract version from #define COMMA_VERSION "0.10.1"
-                                import re
                                 match = re.search(r'#define\s+COMMA_VERSION\s+"([^"]+)"', content)
                                 if match:
                                     device_info['op_version'] = match.group(1)
@@ -1109,7 +1059,6 @@ class WebRoutesHandler(BaseHTTPRequestHandler):
                             with open(sp_version_path, 'r') as f:
                                 content = f.read()
                                 # Extract version from #define SUNNYPILOT_VERSION "2025.003.000"
-                                import re
                                 match = re.search(r'#define\s+SUNNYPILOT_VERSION\s+"([^"]+)"', content)
                                 if match:
                                     device_info['sp_version'] = match.group(1)
@@ -1145,10 +1094,6 @@ class WebRoutesHandler(BaseHTTPRequestHandler):
                     connection_type = get_connection_type()
                     wifi_ip = get_wifi_ip()
                     all_wifi_ips = get_all_wifi_ips()
-                    try:
-                        tethering_enabled = params.get_bool("EnableTethering")
-                    except Exception:
-                        tethering_enabled = False
 
                     # Server uptime
                     try:
@@ -1182,7 +1127,6 @@ class WebRoutesHandler(BaseHTTPRequestHandler):
                         'wifi_ip': wifi_ip,
                         'wifi_available': wifi_ip is not None,
                         'all_wifi_ips': [{'interface': iface, 'ip': ip} for iface, ip in all_wifi_ips],
-                        'tethering_enabled': tethering_enabled,
                         'port': int(params.get("BPPortalPort") or "8088")
                     },
                     'clients': {
@@ -1355,21 +1299,6 @@ class WebRoutesHandler(BaseHTTPRequestHandler):
                     })
                 except Exception as e:
                     logger.exception("Error getting params")
-                    self.send_json_response({
-                        'success': False,
-                        'error': str(e)
-                    }, 500)
-
-            elif path == '/api/params/categories':
-                # Get parameters organized by category
-                try:
-                    categorized = get_params_by_category(params)
-                    self.send_json_response({
-                        'success': True,
-                        'categories': categorized
-                    })
-                except Exception as e:
-                    logger.exception("Error getting params by category")
                     self.send_json_response({
                         'success': False,
                         'error': str(e)
@@ -2203,35 +2132,13 @@ class WebRoutesHandler(BaseHTTPRequestHandler):
             elif path == '/api/params/backup':
                 # Get only params with BACKUP flag for backup/restore
                 try:
-                    # Get all params with their metadata (including attributes)
-                    all_params = get_all_params(params)
-
-                    # Filter to only params with BACKUP attribute and extract their values
-                    backup_data = {}
-                    backup_keys = []
-
-                    for key, param_entry in all_params.items():
-                        attributes = param_entry.get('attributes', [])
-                        if 'BACKUP' in attributes:
-                            backup_keys.append(key)
-                            value = param_entry.get('value')
-
-                            # Store value for backup
-                            if value is not None:
-                                # Check if it's already a dict with _binary flag
-                                if isinstance(value, dict) and value.get('_binary'):
-                                    backup_data[key] = value
-                                elif isinstance(value, (str, int, float, bool)):
-                                    backup_data[key] = value
-                                else:
-                                    # For other types, store as JSON string
-                                    backup_data[key] = json.dumps(value)
+                    backup_data = export_backup_params(params)
 
                     self.send_json_response({
                         'success': True,
                         'params': backup_data,
                         'count': len(backup_data),
-                        'backup_params_list': sorted(backup_keys)
+                        'backup_params_list': backup_param_keys()
                     })
 
                 except Exception as e:
@@ -2381,7 +2288,7 @@ class WebRoutesHandler(BaseHTTPRequestHandler):
                                             params.put("ApiCache_DriveStats", json.dumps(api_data))
                                             logger.info(f"Successfully cached drive stats (as JSON string): {api_data.get('all', {}).get('routes', 0)} routes")
                                         except Exception as cache_error2:
-                                            logger.error(f"Failed to cache drive stats: {cache_error2}")
+                                            logger.exception(f"Failed to cache drive stats: {cache_error2}")
                                     logger.info(f"Successfully fetched drive stats from Comma API: {api_data.get('all', {}).get('routes', 0)} routes")
                                     
                                     # Parse and return the data
@@ -2916,7 +2823,7 @@ class WebRoutesHandler(BaseHTTPRequestHandler):
                         os.remove(export_path)
                         logger.info(f"Cleaned up cancelled export: {export_path}")
                     except Exception as e:
-                        logger.error(f"Failed to clean up export file: {e}")
+                        logger.exception(f"Failed to clean up export file: {e}")
 
                 self.send_json_response({'status': 'cancelled', 'message': 'Export cancelled'})
                 return
@@ -3073,52 +2980,14 @@ class WebRoutesHandler(BaseHTTPRequestHandler):
                         }, 400)
                         return
 
-                    # Use centralized attributes cache to get list of valid BACKUP params
-                    from bluepilot.backend.params.params_manager import _load_param_attributes_cache
+                    result = restore_backup_params(params_data, params, onroad=is_onroad())
+                    for param_key in result['restored']:
+                        broadcast_websocket_event(WebSocketEvent.PARAM_UPDATED, {
+                            'key': param_key,
+                            'value': params_data[param_key]
+                        })
 
-                    attributes_cache = _load_param_attributes_cache()
-                    backup_params = {key for key, attrs in attributes_cache.items() if 'BACKUP' in attrs}
-
-                    restored = []
-                    failed = []
-                    skipped = []
-
-                    for param_key, param_value in params_data.items():
-                        # Only restore params that have BACKUP flag
-                        if param_key not in backup_params:
-                            skipped.append(param_key)
-                            logger.warning(f"Skipping {param_key}: not a BACKUP param")
-                            continue
-
-                        try:
-                            # Handle binary data
-                            if isinstance(param_value, dict) and param_value.get('_binary'):
-                                import base64
-                                value = base64.b64decode(param_value['data'])
-                                params.put(param_key, value)
-                            else:
-                                # String value
-                                params.put(param_key, str(param_value))
-
-                            restored.append(param_key)
-
-                            # Broadcast param change
-                            broadcast_websocket_event(WebSocketEvent.PARAM_UPDATED, {
-                                'key': param_key,
-                                'value': param_value
-                            })
-
-                        except Exception as e:
-                            logger.error(f"Failed to restore param {param_key}: {e}")
-                            failed.append({'param': param_key, 'error': str(e)})
-
-                    self.send_json_response({
-                        'success': len(failed) == 0,
-                        'restored': restored,
-                        'failed': failed,
-                        'skipped': skipped,
-                        'count': len(restored)
-                    })
+                    self.send_json_response(result, 503 if 'error' in result else 200)
 
                 except json.JSONDecodeError:
                     self.send_json_response({
@@ -3271,22 +3140,6 @@ class WebRoutesHandler(BaseHTTPRequestHandler):
                             'hint': 'Use the device settings panel for this operation'
                         }, 501)
 
-                    elif action == 'restart_ui':
-                        success, message = restart_ui_process()
-                        if success:
-                            self.send_json_response({
-                                'success': True,
-                                'message': message
-                            })
-                            broadcast_websocket_event(WebSocketEvent.STATUS_CHANGED, {
-                                'status': 'ui_restart_requested'
-                            })
-                        else:
-                            self.send_json_response({
-                                'success': False,
-                                'error': message
-                            }, 500)
-
                     elif action == 'manage_ssh_keys':
                         # Manage SSH keys (add/remove GitHub SSH keys)
                         username = data.get('username')
@@ -3345,29 +3198,6 @@ class WebRoutesHandler(BaseHTTPRequestHandler):
                                 'has_keys': has_keys,
                                 'username': current_username if has_keys else None
                             })
-
-                    elif action == 'set_copyparty_password':
-                        # Set Copyparty password
-                        password = data.get('password', '')
-
-                        if password is None:
-                            self.send_json_response({
-                                'success': False,
-                                'error': 'Missing password field'
-                            }, 400)
-                            return
-
-                        # Empty string means remove password
-                        if password == '':
-                            params.remove('CopypartyPassword')
-                        else:
-                            params.put('CopypartyPassword', password)
-
-                        self.send_json_response({
-                            'success': True,
-                            'message': 'Password saved. Reboot required to apply changes.',
-                            'requires_reboot': True
-                        })
 
                     elif action == 'view_error_log':
                         # View error log
@@ -3435,7 +3265,6 @@ class WebRoutesHandler(BaseHTTPRequestHandler):
 
             elif path == '/api/clear-cache':
                 # Clear all cached data (remuxed videos, thumbnails, GPS metrics, drive stats, fingerprints)
-                import shutil
 
                 cleared = {
                     'remux_cache': 0,
@@ -3717,14 +3546,10 @@ def main():
     # Enable all CPU cores for better FFmpeg performance
     enable_performance_mode()
 
-    # Check if server should be disabled due to crashes
-    # if not lifecycle.check_and_handle_crashes():
-    #     logger.error("Server startup aborted due to excessive crashes")
-    #     return
-
     # Start WebSocket server in separate thread if websockets is available
     try:
-        import websockets
+        if importlib.util.find_spec("websockets") is None:
+            raise ImportError("websockets not available")
         websocket_thread = threading.Thread(
             target=start_websocket_server_thread,
             daemon=True,
@@ -3773,7 +3598,7 @@ def main():
             })
             logger.debug(f"Broadcasted external param change: {key} = {value}")
         except Exception as e:
-            logger.error(f"Error broadcasting param change: {e}")
+            logger.exception(f"Error broadcasting param change: {e}")
 
     params_watcher = ParamsWatcher(params, broadcast_callback=on_param_change)
     params_watcher.start()
@@ -3790,11 +3615,6 @@ def main():
     # Only wlan IPs are advertised to users (cellular IPs are filtered out)
     wifi_ip = get_wifi_ip()
     all_wifi_ips = get_all_wifi_ips()
-    try:
-        tethering_enabled = params.get_bool("EnableTethering")
-    except Exception:
-        # EnableTethering may not be registered in params schema
-        tethering_enabled = False
 
     # Always bind to all interfaces to support both WiFi and hotspot seamlessly
     bind_address = '0.0.0.0'
@@ -3808,11 +3628,6 @@ def main():
         logger.info(f"Primary WiFi IP: {wifi_ip or 'N/A'}")
     else:
         logger.warning("No WiFi interfaces detected!")
-
-    if tethering_enabled:
-        logger.info("Tethering/hotspot: ENABLED")
-    else:
-        logger.info("Tethering/hotspot: Disabled")
 
     logger.info("Note: Only WiFi/hotspot IPs are shown to users (cellular filtered)")
     logger.info("=" * 60)
@@ -3854,7 +3669,7 @@ def main():
                         logger.info(f"Successfully bound to {bind_address}:{port} after force cleanup")
                         break
                     except Exception as final_error:
-                        logger.error(f"Failed to start server even after force cleanup: {final_error}")
+                        logger.exception(f"Failed to start server even after force cleanup: {final_error}")
                         logger.error("Manual intervention required. Try: sudo reboot")
                         return
             else:
@@ -3881,7 +3696,7 @@ def main():
 
             last_onroad_status[0] = current_onroad
         except Exception as e:
-            logger.error(f"Error in status monitor: {e}")
+            logger.exception(f"Error in status monitor: {e}")
 
     # Start background dependency installation if needed (after server is ready to start)
     # This ensures the server is responsive immediately while packages install in background
@@ -3917,7 +3732,7 @@ def main():
                 try:
                     lifecycle.trigger_restart()
                 except Exception as e:
-                    logger.error(f"Failed to trigger restart: {e}")
+                    logger.exception(f"Failed to trigger restart: {e}")
                     # Server will continue running, retry on next timeout
                 return  # Don't call original handler if restarting
 
@@ -3931,9 +3746,7 @@ def main():
         logger.info("Server stopped by user")
         server.shutdown()
     except Exception as e:
-        logger.error(f"Server error: {e}")
-        # Record this error for monitoring but don't stop the server
-        # lifecycle.record_crash()
+        logger.exception(f"Server error: {e}")
         logger.info("Server continuing despite error...")
         # Don't shutdown or re-raise - keep server running
 

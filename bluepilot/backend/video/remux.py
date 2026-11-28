@@ -27,7 +27,7 @@ from bluepilot.backend.config import (
     MAX_CONCURRENT_FFMPEG,
 )
 from bluepilot.backend.video.ffmpeg import FFmpegProcess
-from bluepilot.backend.utils.power import enable_performance_mode
+from bluepilot.backend.routes.parsing import get_segment_number
 
 logger = logging.getLogger(__name__)
 
@@ -71,19 +71,6 @@ def has_sufficient_disk_space(required_bytes, path="/data", min_free_gb=1):
         return False
 
     return True
-
-
-def get_segment_number(route_name):
-    """Extract segment number from route name
-    Example: 2024-09-18--14-30-00--5 -> 5
-    """
-    match = re.search(r'--(\d+)$', route_name)
-    if match:
-        try:
-            return int(match.group(1))
-        except:
-            return 0
-    return 0
 
 
 def get_route_segments(route_base):

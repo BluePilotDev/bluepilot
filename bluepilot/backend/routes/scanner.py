@@ -137,7 +137,7 @@ def scan_routes():
             try:
                 mtime = os.path.getmtime(entry_path)
                 route_dt = datetime.fromtimestamp(mtime)
-            except:
+            except (OSError, ValueError, OverflowError):
                 logger.warning(f"Could not parse datetime from route: {base_name}, skipping")
                 continue
 

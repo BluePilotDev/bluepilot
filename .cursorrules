@@ -1,2 +1,1 @@
-Read AGENTS.md in the repo root for full codebase documentation before making any changes.
-Critical rule: Minimize changes to stock OpenPilot/SunnyPilot files. When changes are needed, wrap them in # BluePilot: <description> / # End BluePilot comments. BluePilot code lives in bluepilot/ and selfdrive/ui/bp/ using inheritance overrides.
+Read AGENTS.md in the repo root before making any change. It says which repo a change belongs in, how to change an upstream file, and what CI requires.

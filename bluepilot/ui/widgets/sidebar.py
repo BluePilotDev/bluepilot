@@ -17,8 +17,7 @@ from openpilot.cereal import log
 from openpilot.common.params import Params
 from openpilot.selfdrive.ui.ui_state import ui_state
 from openpilot.common.hardware import PC
-from openpilot.system.ui.lib.application import gui_app, FontWeight, MousePos
-from openpilot.system.ui.lib.text_measure import measure_text_cached
+from openpilot.system.ui.lib.application import gui_app
 from openpilot.system.ui.widgets import Widget
 from bluepilot.ui.lib.colors import BPColors
 from bluepilot.ui.lib.constants import BPConstants, get_carrier_name

@@ -28,8 +28,6 @@ except ImportError:
 from bluepilot.backend.routes.processing import (
     ROUTES_DIR,
     METRICS_CACHE,
-    THUMBNAIL_CACHE,
-    check_processing_status,
     process_route,
 )
 
@@ -250,7 +248,7 @@ def main():
     # Get web server port from params
     try:
         web_port = int(params.get("BPPortalPort") or "8088")
-    except:
+    except Exception:
         web_port = 8088
 
     broadcaster = WebSocketBroadcaster(http_fallback_port=web_port)
@@ -288,7 +286,7 @@ def main():
             logger.info("Preprocessor stopped by user")
             break
         except Exception as e:
-            logger.error(f"Error in main loop: {e}")
+            logger.exception(f"Error in main loop: {e}")
 
         # Wait before next check
         time.sleep(check_interval)

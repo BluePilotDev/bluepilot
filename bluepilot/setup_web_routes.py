@@ -8,7 +8,6 @@ Requires: websockets (for real-time updates, graceful fallback if not available)
 
 import os
 import sys
-import subprocess
 import importlib.util
 
 def check_file(path, description):
@@ -91,7 +90,7 @@ def main():
                 print(f"✓ BPPortalPort = {port}")
             else:
                 print("  BPPortalPort not set (will default to 8088)")
-        except:
+        except Exception:
             print("  BPPortalPort not set (will default to 8088)")
 
     except ImportError:

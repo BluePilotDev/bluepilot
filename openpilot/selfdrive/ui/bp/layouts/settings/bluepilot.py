@@ -26,6 +26,8 @@ from openpilot.selfdrive.ui.bp.lib.dm_icon_style import (
   get_dm_icon_style,
 )
 from openpilot.selfdrive.ui.bp.lib.custom_sound import get_custom_sound_selection
+from openpilot.selfdrive.ui.bp.lib.model_path_color_bp import PARAM_KEY as MODEL_PATH_COLOR_PARAM, model_path_color_label
+from openpilot.selfdrive.ui.bp.widgets.model_path_color_dialog_bp import ModelPathColorDialogBP
 from opendbc.bluepilot_lateral.core.lateral_curv_ext import PrimaryLateralControl
 from openpilot.selfdrive.ui.bp.onroad.augmented_road_view_bp import GaugeStyle
 
@@ -228,6 +230,19 @@ class BluePilotLayout(Widget):
       callback=lambda state: self._toggle_callback(state, "BPThemeAutoSeasonal"),
       icon="warning.png"
     )
+
+    # BluePilot: Restore BP 6.0 presets and add a custom wheel/HEX picker.
+    self._model_path_color_label = model_path_color_label(
+      self._safe_get(self._params, MODEL_PATH_COLOR_PARAM, "Stock")
+    )
+    self._model_path_color = button_item(
+      lambda: tr("Model Path Color"),
+      lambda: self._model_path_color_label,
+      lambda: tr("Choose a BluePilot 6.0 path color preset or create a custom color. " +
+                 "Tesla Rainbow Mode and active theme packs take priority over custom colors."),
+      callback=self._show_model_path_color_dialog,
+    )
+    # End BluePilot
 
     wheel_style_idx = int(ensure_steering_wheel_icon_style_initialized(self._params, SteeringWheelIconStyle.COMMA_3X))
     self._wheel_icon_style_btn = multiple_button_item(
@@ -741,6 +756,7 @@ class BluePilotLayout(Widget):
         self._hide_camera_view,
         self._theme_pack_btn,
         self._theme_auto_seasonal,
+        self._model_path_color,
         self._rainbow_lane_lines,
         self._show_blindspot,
         self._show_brake_status,
@@ -950,6 +966,9 @@ class BluePilotLayout(Widget):
     super().show_event()
     self._scroller.show_event()
     self._update_toggles()
+    self._model_path_color_label = model_path_color_label(
+      self._safe_get(self._params, MODEL_PATH_COLOR_PARAM, "Stock")
+    )
     # Enable WiFi scanning when BluePilot menu is shown
     self._wifi_manager.set_active(True)
 
@@ -1100,6 +1119,12 @@ class BluePilotLayout(Widget):
       callback=handle_selection,
     )
     gui_app.push_widget(self._theme_dialog)
+
+  def _show_model_path_color_dialog(self):
+    gui_app.push_widget(ModelPathColorDialogBP(on_saved=self._on_model_path_color_saved))
+
+  def _on_model_path_color_saved(self, value: str):
+    self._model_path_color_label = model_path_color_label(value)
 
   def _set_wheel_icon_style(self, button_index: int):
     """Handle wheel icon style: 0 = comma 4, 1 = comma 3X."""

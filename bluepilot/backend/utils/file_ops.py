@@ -55,7 +55,7 @@ def atomic_write(filepath, content, mode='w'):
             raise e
 
     except Exception as e:
-        logger.error(f"Atomic write failed for {filepath}: {e}")
+        logger.exception(f"Atomic write failed for {filepath}: {e}")
         return False
 
 
@@ -65,7 +65,7 @@ def safe_json_write(filepath, data):
         json_str = json.dumps(data, indent=2)
         return atomic_write(filepath, json_str, mode='w')
     except Exception as e:
-        logger.error(f"JSON write failed for {filepath}: {e}")
+        logger.exception(f"JSON write failed for {filepath}: {e}")
         return False
 
 

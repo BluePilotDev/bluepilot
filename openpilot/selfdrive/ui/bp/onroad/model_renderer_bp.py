@@ -12,6 +12,12 @@ from openpilot.bluepilot.ui.lib.bp_shaders import draw_rainbow_polygon
 from openpilot.selfdrive.ui.bp.lib.ui_debug_logger import bp_ui_log
 # BluePilot: seasonal theme packs (colors.json overrides for road colors)
 from openpilot.selfdrive.ui.bp.lib import theme_pack
+from openpilot.selfdrive.ui.bp.lib.model_path_color_bp import (
+  PARAM_KEY as MODEL_PATH_COLOR_PARAM,
+  model_path_color_rgb,
+  model_path_gradient,
+  normalize_model_path_color,
+)
 
 # BluePilot: Lane line colors by status (upstream removed LANE_LINE_COLORS dict)
 LANE_LINE_COLORS_BP = {
@@ -75,6 +81,9 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
     self._transform_dirty = True
     # BluePilot: seasonal theme pack (None when disabled)
     self._theme_pack = theme_pack.get_active_pack(force=True)
+    # BluePilot: BP 6.0 model-path color selector, including literal #RRGGBB values.
+    self._model_path_color = normalize_model_path_color(self._bp_params.get(MODEL_PATH_COLOR_PARAM, return_default=True))
+    self._custom_path_gradient = model_path_gradient(self._model_path_color)
 
     # BluePilot: Lead position smoothing filters to reduce radar jitter
     dt = 1 / gui_app.target_fps
@@ -115,6 +124,10 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
     if (new_pack is None) != (self._theme_pack is None):
       self._transform_dirty = True  # themed lane widths differ; re-project on toggle
     self._theme_pack = new_pack
+    model_path_color = normalize_model_path_color(self._bp_params.get(MODEL_PATH_COLOR_PARAM, return_default=True))
+    if model_path_color != self._model_path_color:
+      self._model_path_color = model_path_color
+      self._custom_path_gradient = model_path_gradient(self._model_path_color)
 
   def _render(self, rect: rl.Rectangle):
     sm = ui_state.sm
@@ -520,6 +533,8 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
     elif (themed_gradient := self._themed_path_gradient()) is not None:
       # BluePilot: theme pack path colors replace the throttle/no-throttle gradient
       draw_polygon(self._rect, self._path.projected_points, gradient=themed_gradient)
+    elif self._custom_path_gradient is not None:
+      draw_polygon(self._rect, self._path.projected_points, gradient=self._custom_path_gradient)
     else:
       super()._draw_path()
 
@@ -563,9 +578,12 @@ class ModelRendererBP(RadRacerRoadMixin, ModelRenderer):
     right_edge = points[mid_point:][::-1]
 
     pack_edge = self._theme_pack.rl_colors().get("PathEdge") if self._theme_pack is not None else None
-    if pack_edge is not None and ui_state.status != UIStatus.DISENGAGED:
-      # BluePilot: theme pack path edge color (disengaged keeps the status blackout)
-      edge_color = pack_edge
+    custom_rgb = None if ui_state.rainbow_path else model_path_color_rgb(self._model_path_color)
+    if pack_edge is not None:
+      # BluePilot: an active theme suppresses custom color; disengaged keeps the theme's status blackout.
+      edge_color = pack_edge if ui_state.status != UIStatus.DISENGAGED else LANE_LINE_COLORS_BP[UIStatus.DISENGAGED]
+    elif custom_rgb is not None:
+      edge_color = rl.Color(*custom_rgb, 255)
     elif self._disable_lane_line_status_color and ui_state.status != UIStatus.DISENGAGED:
       edge_color = rl.Color(255, 255, 255, 255)
     else:
