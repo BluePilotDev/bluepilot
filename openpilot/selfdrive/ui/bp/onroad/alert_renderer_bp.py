@@ -3,7 +3,8 @@ from __future__ import annotations
 import pyray as rl
 from openpilot.cereal import log
 
-from openpilot.selfdrive.ui.onroad.alert_renderer import AlertRenderer, ALERT_PADDING
+from openpilot.selfdrive.ui.onroad.alert_renderer import ALERT_PADDING
+from openpilot.selfdrive.ui.sunnypilot.onroad.alert_renderer import AlertRendererSP
 from openpilot.system.ui.lib.application import gui_app
 from openpilot.system.ui.lib.text_measure import measure_text_cached
 from openpilot.selfdrive.ui.bp.lib.ui_debug_logger import bp_ui_log
@@ -26,7 +27,8 @@ PILL_HEIGHT_DOUBLE = 175
 PILL_BACKGROUND_COLOR = rl.Color(45, 45, 45, 255)
 
 
-class AlertRendererBP(AlertRenderer):
+# BluePilot: built on sunnypilot's class for its text wrapping, dynamic height and developer-UI offsets
+class AlertRendererBP(AlertRendererSP):
   """BluePilot AlertRenderer with pill-shaped notifications below speed display."""
 
   def _render(self, rect: rl.Rectangle):
@@ -58,7 +60,8 @@ class AlertRendererBP(AlertRenderer):
         )
         self._draw_pill_text(text_rect, alert)
     else:
-      # Same drawing as AlertRenderer._render after brightness hook (do not call super()._render)
+      # Same drawing as AlertRenderer._render after brightness hook (do not call super()._render);
+      # AlertRendererSP doesn't override _render, its _get_alert_rect and _draw_text apply here
       alert_rect = self._get_alert_rect(rect, alert.size)
       self._draw_background(alert_rect, alert)
       text_rect = rl.Rectangle(

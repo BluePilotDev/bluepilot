@@ -15,7 +15,8 @@ import pyray as rl
 from collections.abc import Callable
 from openpilot.cereal import log
 from openpilot.common.params import Params
-from openpilot.selfdrive.ui.ui_state import ui_state
+from openpilot.selfdrive.ui.ui_state import ui_state, ChestnutState
+from openpilot.selfdrive.ui.sunnypilot.layouts.sidebar import SidebarSP
 from openpilot.common.hardware import PC
 from openpilot.system.ui.lib.application import gui_app
 from openpilot.system.ui.widgets import Widget
@@ -126,6 +127,10 @@ class SidebarBP(Widget):
 
     # Fan widget - rotates continuously based on fan speed
     self._fan_widget = FanWidget()
+
+    # BluePilot: sunnypilot's chestnut icons and state rules, used rather than inherited
+    # (SidebarSP sets its own _sunnylink_status, which this class keeps as a tuple)
+    self._chestnut = SidebarSP()
 
     # State tracking - frame counters for throttled updates
     self._metrics_counter = 0
@@ -520,6 +525,14 @@ class SidebarBP(Widget):
     # Debug only when onroad
     if ui_state.started and self._debug_btn:
       self._debug_btn.render(rl.Rectangle(self._btn_x, bottom_y, btn_size, btn_size))
+      bottom_y -= btn_size + btn_spacing
+
+    # BluePilot: chestnut status above the buttons while one is connected; display only
+    if ui_state.chestnut_state != ChestnutState.DISCONNECTED:
+      icon, _, opacity = self._chestnut._get_home_icon(self._chestnut._chestnut_default_img)
+      scale = btn_size / icon.width
+      pos = rl.Vector2(self._btn_x, bottom_y + (btn_size - icon.height * scale) / 2)
+      rl.draw_texture_ex(icon, pos, 0.0, scale, rl.Color(255, 255, 255, int(255 * opacity)))
 
   def _draw_background(self, rect: rl.Rectangle):
     """Draw sidebar background with gradient"""

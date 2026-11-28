@@ -143,7 +143,8 @@ class HudRendererBP(HudRendererSP):
     if self._hide_v_ego_ui:
       self.speed_right = 0
       return
-    speed_text = str(round(self.speed))
+    # BluePilot: sunnypilot's speed value, which follows TrueVEgoUI (the stock self.speed is always the cluster speed)
+    speed_text = str(round(self.speed_renderer.speed))
     speed_text_size = measure_text_cached(self._font_bold, speed_text, FONT_SIZES.current_speed)
     speed_pos = rl.Vector2(
       rect.x + rect.width / 2 - speed_text_size.x / 2,
