@@ -66,7 +66,7 @@ openpilot's, where sunnypilot has none). BluePilot's classes end in `BP`, sunnyp
 
 ```
 HudRenderer (openpilot)  →  HudRendererSP (sunnypilot)  →  HudRendererBP (BluePilot)
-AlertRenderer (openpilot)                               →  AlertRendererBP
+AlertRenderer (openpilot)  →  AlertRendererSP (sunnypilot)  →  AlertRendererBP
 AugmentedRoadView (openpilot)                           →  AugmentedRoadViewBP        the driving view
 ModelRenderer (openpilot)                               →  ModelRendererBP            the path and lane lines
 ```
